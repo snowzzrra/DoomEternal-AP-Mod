@@ -10,5 +10,47 @@
   "owner": {
     "resource": "game/dlc/e4m3_mcity/e4m3_mcity_patch2.resources",
     "priority": 56
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "game_interact_automap_e4m3_mcity": {
+        "location_id": 7770509,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 49.8499985,
+          "y": 236.949997,
+          "z": -35.351265
+        },
+        "region": "The Holt - Crimson Forest",
+        "qualification": "End of the horseshoe path after the first Secret Encounter cave and possessed Arachnotron; before Maykr Pillars.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/6",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc/e4m3_mcity/e4m3_mcity.decl",
+          "sha256": "6f0dfc2f4052b84d0b2381b5226e9155f24e60e9836999545bb91b77d1478839",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      },
+      "game_pickup_mega_health_2": {
+        "entity": "game_pickup_mega_health_2",
+        "location_id": 7770515,
+        "inherit": "pickup/mega_health",
+        "class": "idProp2",
+        "position": {
+          "z": -32.4048767,
+          "x": -1.6500001,
+          "y": 226.000015
+        },
+        "region": "The Holt - Crimson Forest",
+        "qualification": "The native secret-wall alcove between the waterfall/first secret cave and the horseshoe path records Secret2_e4m4; the wall and native secret stay intact.",
+        "source_entities": [
+          "game_destructible_e3m1_slayer_secret_stone_wall_1",
+          "game_target_secret_2_e4m4"
+        ],
+        "reference": "vanillamaps/e4m3_mcity.map"
+      }
+    }
   }
 }

@@ -20,7 +20,8 @@
     "AP_CHECK_CODEX_PROGRESS_CODEX_4_E3M3": 7770401,
     "AP_CHECK_CODEX_PROGRESS_CODEX_2_E3M3": 7770402,
     "AP_CHECK_CODEX_PROGRESS_CODEX_5_E3M3": 7770403,
-    "AP_CHECK_CODEX_PROGRESS_CODEX_3_E3M3": 7770404
+    "AP_CHECK_CODEX_PROGRESS_CODEX_3_E3M3": 7770404,
+    "AP_CHECK_TEMPLE_INTERIOR_INTERACT_AUTOMAP_1_E3M3": 7770505
   },
   "names": {
     "7770388": "Urdak - Mastery Token - First Forcefield Room Upper Ledge",
@@ -41,12 +42,31 @@
     "7770403": "Urdak - Icon of Sin Codex",
     "7770404": "Urdak - Maykr Angels Codex",
     "7770405": "Urdak - Secret Encounter - Statue-Puzzle Upper Door",
-    "7770406": "Urdak - Secret Encounter - Eighth-Arena Breakable Wall"
+    "7770406": "Urdak - Secret Encounter - Eighth-Arena Breakable Wall",
+    "7770505": "Urdak - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_TEMPLE_INTERIOR_INTERACT_AUTOMAP_1_E3M3": {
+      "policy": "ap_only"
+    }
   },
-  "target_policies": {},
+  "target_policies": {
+    "temple_interior_interact_automap_1_e3m3": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
+    }
+  },
   "remove_entities": [],
   "secret_encounters": [
     {

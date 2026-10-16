@@ -1,6 +1,8 @@
 from doom_eap.runtime.materialization import authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
 from doom_eap.runtime.receipt_delivery import base_special_receipt_allowed
 from doom_eap.runtime.physical_checks import PhysicalChecks
+from doom_eap.runtime.killsanity import Killsanity
+from doom_eap.content.killsanity_plan import milestone_ids
 from doom_eap.runtime.task_supervision import SessionTasks
 from doom_eap.runtime.level_ready import LevelReady
 from doom_eap.runtime.location_setup import LocationSetup
@@ -47,6 +49,7 @@ from doom_eap.runtime.materialization_coordinator import MaterializationCoordina
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime import save_files
 from doom_eap.runtime.save_records import read_unlockable_record
+from doom_eap.content.mastery_requirements import mastery_entries_for_profile
 from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
 from collections.abc import Mapping
 from pathlib import Path
@@ -2762,6 +2765,8 @@ class DoomEternalContext(CommonContext):
         self.receipt_delivery = ReceiptDelivery(logger)
         self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
         self.death_observer = DeathObservation(logger)
+        self.killsanity = Killsanity(logger)
+        self.killsanity_counter_visible = config.get("killsanity_counter_visible", True) is True
         self.save_observer = SaveObserver()
         self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self)
         self.runtime_observation_lease = RuntimeObservationLease()
@@ -3381,7 +3386,7 @@ class DoomEternalContext(CommonContext):
             )
             self.server_checked_locations_ready = False
             try:
-                active = self.location_setup.begin(args, _doom_location_ids())
+                active = self.location_setup.begin(args, _doom_location_ids(), milestone_ids(slot_data["killsanity"]))
             except ValueError as error:
                 self._fail_placement_scout(str(error))
                 return
@@ -4991,8 +4996,14 @@ class DoomEternalContext(CommonContext):
         if not isinstance(existing_session, dict):
             existing_session = default_session_state()
         self.session_state = normalize_session_state(existing_session)
+        from doom_eap.runtime.weapon_points import namespace_id
+        self.killsanity.bind(
+            self.session_state, namespace_id(effective_seed_name, self.team, self.slot, generation),
+            slot_data.get("killsanity", {}).get("milestones", ()),
+        )
         self.goals.bind(self.state_key, self.session_state)
-        self.save_checks.bind()
+        masteries = mastery_entries_for_profile(WEAPON_MASTERY_ENTRIES, slot_data["mastery_requirements"])
+        self.save_checks.bind({entry["signal"]["unlockable"]: entry for entry in masteries})
         self.receipt_delivery.bind(self.session_state)
         self.publisher_dispatch.bind(self.session_state.setdefault("publisher_acknowledgements", {}))
         self.save_observer.bind_baselines(SaveObserverBaselineStore(self.session_state))
@@ -6240,7 +6251,7 @@ class DoomEternalContext(CommonContext):
             first_sample_locations=frozenset(self.server_locations) - frozenset(self.checked_locations))
 
     def observe_sticky_mastery(self, snapshot, path):
-        """Sticky compatibility wrapper used by the proven 24→25 regression."""
+        """Observe one Sticky Bombs native mastery record."""
         record = {
             "numUnlockableRules": STICKY_MASTERY_ENTRY["signal"]["numUnlockableRules"],
             "rule_0_statDuration": STICKY_MASTERY_ENTRY["signal"]["rule_0_statDuration"],
@@ -6282,7 +6293,6 @@ class DoomEternalContext(CommonContext):
             self.check_observation(), self.check_publication())
 
     async def check_sticky_mastery_location(self):
-        """Sticky compatibility wrapper preserving its exact send contract."""
         await self.check_weapon_mastery_location(STICKY_MASTERY_ENTRY)
 
     async def check_game_details_death(self):
@@ -6549,11 +6559,50 @@ class DoomEternalContext(CommonContext):
         if self.bootstrap.observe_supported_map(map_name):
             self.onboard_bootstrap("on_supported_map_load")
 
+    async def check_killsanity(self, game_running):
+        tracker = self.killsanity
+        if not tracker.enabled or not self.item_state_ready:
+            return
+        identity = (self.state_key, id(self.session_state), tracker.namespace)
+        link = None
+        try:
+            if game_running:
+                link = self.native_game_link()
+                if link.namespace != tracker.namespace:
+                    return
+                snapshot = await asyncio.to_thread(link.observe_combat, set(CONTEXT_BY_MAP))
+                if identity != (self.state_key, id(self.session_state), tracker.namespace):
+                    return
+                tracker.consume(snapshot, self.persist_session_state)
+            self._killsanity_observation_error = None
+        except Exception as error:
+            signature = str(error)
+            if signature != getattr(self, "_killsanity_observation_error", None):
+                logger.warning("[Killsanity] Observation pending: %s", error)
+                self._killsanity_observation_error = signature
+        if identity != (self.state_key, id(self.session_state), tracker.namespace):
+            return
+        if game_running and link is not None:
+            try:
+                await tracker.present(link, getattr(self, "killsanity_counter_visible", True))
+                self._killsanity_presentation_error = None
+            except Exception as error:
+                signature = str(error)
+                if signature != getattr(self, "_killsanity_presentation_error", None):
+                    logger.warning("[Killsanity] Presentation pending: %s", error)
+                    self._killsanity_presentation_error = signature
+        try:
+            await tracker.publish(self.check_observation(), self.check_publication())
+        except Exception as error:
+            logger.warning("[Killsanity] Milestone publication pending: %s", error)
+
     async def death_monitor_loop(self):
         while not self.exit_event.is_set():
             self.check_rpc_autopause()
             self.queue_received_deathlink()
-            if not doom_process_identity():
+            game_running = bool(doom_process_identity())
+            await self.check_killsanity(game_running)
+            if not game_running:
                 await asyncio.sleep(1.0)
                 continue
             work_token = self.runtime_lifecycle.capture_work()
@@ -6864,6 +6913,10 @@ async def launcher_control_loop(ctx):
             emit_launcher_event("chat_send_failed", message="Invalid launcher control message")
             continue
         if not isinstance(control, dict):
+            continue
+        if control.get("type") == "killsanity_counter_visibility":
+            if type(control.get("visible")) is bool:
+                ctx.killsanity_counter_visible = control["visible"]
             continue
         if control.get("type") == "core_runtime_reload":
             updated = load_config()

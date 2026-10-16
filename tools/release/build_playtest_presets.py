@@ -11,6 +11,7 @@ def build(destination: Path) -> None:
     schema = load_options_schema(root / "data/options_schema.json")
     common = {**default_option_values(schema), "use_dlc_content": True,
               "campaign_difficulty": "hurt_me_plenty", "special_weapon": "progressive_special_weapon",
+              "enemy_randomizer": True, "enemy_preset": "slayers_path", "progressive_difficulty": True,
               "randomize_dash": False, "include_weapon_mastery_challenges": True, "mission_count": "all"}
     rmo = {**common, "mission_pool": "custom", "custom_dark_lord": False,
            "custom_missions": ["Hell on Earth", "Doom Hunter Base", "Mars Core", "UAC Atlantica Facility", "The World Spear", "Final Sin"],
@@ -22,9 +23,13 @@ def build(destination: Path) -> None:
               "goal_mission_as_item": False, "additional_victory_requirements": next(
                   [choice["key"] for choice in option["choices"]] for option in schema["options"]
                   if option["key"] == "additional_victory_requirements")}
+    smoke = {**rmo, "custom_missions": ["Exultia", "Doom Hunter Base", "Final Sin"],
+             "easier_secret_encounters": True, "trap_percentage": 0,
+             "additional_victory_requirements": ["Complete All Included Missions"]}
+    save_player_yaml(destination / "Smoke3.yaml", schema, "Slayer", smoke)
     save_player_yaml(destination / "RMO6.yaml", schema, "Marine", rmo)
     save_player_yaml(destination / "Full-MAI.yaml", schema, "DoomSlayer", access)
-    print(json.dumps({"presets": ["RMO6.yaml", "Full-MAI.yaml"], "difficulty": "Hurt Me Plenty"}))
+    print(json.dumps({"presets": ["Smoke3.yaml", "RMO6.yaml", "Full-MAI.yaml"], "difficulty": "Hurt Me Plenty"}))
 
 
 if __name__ == "__main__":

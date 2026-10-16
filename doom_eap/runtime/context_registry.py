@@ -8,6 +8,9 @@ from typing import Any, Iterable, Mapping
 
 from doom_eap.contracts.runtime_context import DlcEvidence, RuntimeContext
 from doom_eap.runtime.lifecycle import RuntimeLifecycle
+from doom_eap.content.enemy_options import normalize_enemy_options
+from doom_eap.content.killsanity_plan import validate_killsanity_plan
+from doom_eap.content.enemy_plan import validate_frozen_enemy_plan
 from doom_eap.contracts.materialization import (
     SUPPORT_RUNE_CAPABILITY, TAG_SPECIAL_CAPABILITY, SUPPORT_RUNE_IDS,
     TAG_SPECIAL_IDS, CRUCIBLE_ID, GATE_KEY_TO_MAP, context_item_ids, support_rune_commands,
@@ -16,9 +19,10 @@ from doom_eap.contracts.materialization import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO_ROOT / "data" / "runtime_contexts.json"
-SLOT_DATA_REVISION = str(json.loads(
+_SLOT_IDENTITY = json.loads(
     (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
-)["slot_data_revision"])
+)
+SLOT_DATA_REVISION = str(_SLOT_IDENTITY["slot_data_revision"])
 CAPABILITY_CROSS_CAMPAIGN = "cross_campaign_materialization_v1"
 TAG_CAPABILITY = "tag_context_v1"
 GOAL_CAPABILITIES = frozenset({"goal_events_v1", "goal_endpoint_events_v1"})
@@ -117,7 +121,16 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the generated room identity and exact option contract."""
     if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
-        raise ValueError(f"slot_data_revision must be {SLOT_DATA_REVISION}")
+        raise ValueError(
+            "DoomEAP 0.7 requires a new 0.7 room and AP save. "
+            "Your existing save has not been changed."
+        )
+    if slot_data.get("slot_data_schema_version") != _SLOT_IDENTITY["slot_data_schema_version"]:
+        raise ValueError("slot_data_schema_version is incompatible")
+    if not isinstance(slot_data.get("enemies"), dict) or json.dumps(slot_data["enemies"], sort_keys=True) != json.dumps(
+        normalize_enemy_options(slot_data), sort_keys=True
+    ):
+        raise ValueError("enemies does not match its generated options")
     required = slot_data.get("required_capabilities")
     if (
         not isinstance(required, list)
@@ -138,10 +151,14 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("use_dlc_content must be boolean")
     if not isinstance(slot_data.get("include_dlc_missions"), bool):
         raise ValueError("include_dlc_missions must be boolean")
-    if slot_data.get("dlc_logic_timing") not in {
-        "late_game", "from_the_beginning", "Late Game", "From the Beginning",
-    }:
-        raise ValueError("dlc_logic_timing is invalid")
+    if slot_data.get("logic_difficulty") not in {"Relaxed", "Standard", "Expert"}:
+        raise ValueError("logic_difficulty is invalid")
+    validate_killsanity_plan(slot_data.get("killsanity_options"), slot_data.get("killsanity"))
+    validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
+    if slot_data.get("mastery_requirements") not in {"Original", "Half", "Quarter"}:
+        raise ValueError("mastery_requirements is invalid")
+    if type(slot_data.get("easier_secret_encounters")) is not bool:
+        raise ValueError("easier_secret_encounters must be boolean")
     if slot_data.get("special_weapon") not in {
         "progressive_special_weapon", "progressive_sentinel_hammer", "the_crucible",
         "Progressive Special Weapon", "Progressive Sentinel Hammer", "The Crucible",

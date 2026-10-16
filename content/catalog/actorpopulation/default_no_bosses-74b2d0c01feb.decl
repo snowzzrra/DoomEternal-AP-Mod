@@ -1,0 +1,238 @@
+{
+	edit = {
+		aiTypeDefAssignments = {
+			num = 29;
+			item[0] = {
+				entityDef = "ai/fodder/zombie_tier_1";
+				pointValue = 1;
+				spawnWeight = 0.899999976;
+				factionName = "zombie_t1";
+				defaultSensorySettings = "ai/zombie_t1";
+			}
+			item[1] = {
+				entityDef = "ai/fodder/zombie_tier_3";
+				aiType = "POPULATION_TYPE_ZOMBIE_TIER_3";
+				pointValue = 2;
+				spawnWeight = 0.800000012;
+				factionName = "zombie_t3";
+				defaultSensorySettings = "ai/zombie_t3";
+			}
+			item[2] = {
+				entityDef = "ai/fodder/zombie_maykr";
+				aiType = "POPULATION_TYPE_ZOMBIE_MAYKR";
+				pointValue = 3;
+				spawnWeight = 0.699999988;
+				factionName = "maykr_minion";
+				defaultSensorySettings = "ai/zombie_t3";
+			}
+			item[3] = {
+				entityDef = "ai/fodder/imp";
+				aiType = "POPULATION_TYPE_IMP";
+				pointValue = 2;
+				spawnWeight = 0.800000012;
+				factionName = "imp";
+				defaultSensorySettings = "ai/imp";
+			}
+			item[4] = {
+				entityDef = "ai/fodder/gargoyle";
+				aiType = "POPULATION_TYPE_GARGOYLE";
+				pointValue = 3;
+				spawnWeight = 0.699999988;
+				factionName = "gargoyle";
+				defaultSensorySettings = "ai/gargoyle";
+			}
+			item[5] = {
+				entityDef = "ai/fodder/prowler";
+				aiType = "POPULATION_TYPE_PROWLER";
+				pointValue = 4;
+				spawnWeight = 0.600000024;
+				factionName = "prowler";
+				defaultSensorySettings = "ai/prowler";
+			}
+			item[6] = {
+				entityDef = "ai/fodder/soldier_blaster";
+				aiType = "POPULATION_TYPE_HELL_SOLDIER";
+				pointValue = 3;
+				spawnWeight = 0.699999988;
+				factionName = "blaster";
+				defaultSensorySettings = "ai/soldier_blaster";
+			}
+			item[7] = {
+				entityDef = "ai/fodder/soldier_shield";
+				aiType = "POPULATION_TYPE_SHOTGUN_SOLDIER";
+				pointValue = 4;
+				spawnWeight = 0.600000024;
+				factionName = "shield";
+				defaultSensorySettings = "ai/soldier_shield";
+			}
+			item[8] = {
+				entityDef = "ai/fodder/carcass";
+				aiType = "POPULATION_TYPE_CARCASS";
+				pointValue = 5;
+				spawnWeight = 0.5;
+				factionName = "carcass";
+				defaultSensorySettings = "ai/carcass";
+			}
+			item[9] = {
+				entityDef = "ai/fodder/lostsoul";
+				aiType = "POPULATION_TYPE_LOST_SOUL";
+				pointValue = 2;
+				spawnWeight = 0.800000012;
+				factionName = "lost_soul";
+				defaultSensorySettings = "ai/lostsoul";
+			}
+			item[10] = {
+				entityDef = "ai/heavy/hellknight";
+				aiType = "POPULATION_TYPE_HELL_KNIGHT";
+				pointValue = 14;
+				spawnWeight = 0.200000003;
+				factionName = "hell_knight";
+				defaultSensorySettings = "ai/hellknight";
+			}
+			item[11] = {
+				entityDef = "ai/heavy/dreadknight";
+				aiType = "POPULATION_TYPE_DREAD_KNIGHT";
+				pointValue = 12;
+				spawnWeight = 0.212500006;
+				factionName = "dread_knight";
+				defaultSensorySettings = "ai/dreadknight";
+			}
+			item[12] = {
+				entityDef = "ai/heavy/pinky";
+				aiType = "POPULATION_TYPE_PINKY";
+				pointValue = 12;
+				spawnWeight = 0.212500006;
+				factionName = "pinky";
+				defaultSensorySettings = "ai/pinky";
+			}
+			item[13] = {
+				entityDef = "ai/heavy/pinky_spectre";
+				aiType = "POPULATION_TYPE_SPECTRE";
+				pointValue = 14;
+				spawnWeight = 0.200000003;
+				factionName = "spectre";
+				defaultSensorySettings = "ai/pinky_spectre";
+			}
+			item[14] = {
+				entityDef = "ai/heavy/cacodemon";
+				aiType = "POPULATION_TYPE_CACODEMON";
+				pointValue = 16;
+				spawnWeight = 0.174999997;
+				factionName = "cacodemon";
+				defaultSensorySettings = "ai/cacodemon";
+			}
+			item[15] = {
+				entityDef = "ai/heavy/painelemental";
+				aiType = "POPULATION_TYPE_PAIN_ELEMENTAL";
+				pointValue = 24;
+				spawnWeight = 0.100000001;
+				factionName = "pain_elemental";
+				defaultSensorySettings = "ai/painelemental";
+			}
+			item[16] = {
+				entityDef = "ai/heavy/mancubus_fire";
+				aiType = "POPULATION_TYPE_MANCUBUS";
+				pointValue = 18;
+				spawnWeight = 0.150000006;
+				factionName = "manc_fire";
+				defaultSensorySettings = "ai/mancubus_fire";
+			}
+			item[17] = {
+				entityDef = "ai/heavy/mancubus_goo";
+				aiType = "POPULATION_TYPE_CYBER_MANCUBUS";
+				pointValue = 24;
+				spawnWeight = 0.100000001;
+				factionName = "manc_goo";
+				defaultSensorySettings = "ai/mancubus_goo";
+			}
+			item[18] = {
+				entityDef = "ai/heavy/arachnotron";
+				aiType = "POPULATION_TYPE_ARACHNOTRON";
+				pointValue = 20;
+				spawnWeight = 0.137500003;
+				factionName = "arachnotron";
+				defaultSensorySettings = "ai/arachnotron";
+			}
+			item[19] = {
+				entityDef = "ai/heavy/revenant";
+				aiType = "POPULATION_TYPE_REVENANT";
+				pointValue = 8;
+				spawnWeight = 0.25;
+				factionName = "revenant";
+				defaultSensorySettings = "ai/revenant";
+			}
+			item[20] = {
+				entityDef = "ai/heavy/whiplash";
+				aiType = "POPULATION_TYPE_WHIPLASH";
+				pointValue = 10;
+				spawnWeight = 0.224999994;
+				factionName = "whiplash";
+				defaultSensorySettings = "ai/whiplash";
+			}
+			item[21] = {
+				entityDef = "ai/superheavy/doom_hunter";
+				aiType = "POPULATION_TYPE_DOOM_HUNTER";
+				pointValue = 82;
+				spawnWeight = 0.0299999993;
+				factionName = "doom_hunter";
+				defaultSensorySettings = "ai/doomhunter";
+			}
+			item[22] = {
+				entityDef = "ai/superheavy/marauder";
+				aiType = "POPULATION_TYPE_MARAUDER";
+				pointValue = 64;
+				spawnWeight = 0.0500000007;
+				factionName = "marauder";
+				defaultSensorySettings = "ai/marauder";
+			}
+			item[23] = {
+				entityDef = "ai/superheavy/baron";
+				aiType = "POPULATION_TYPE_BARON";
+				pointValue = 73;
+				spawnWeight = 0.0399999991;
+				factionName = "baron";
+				defaultSensorySettings = "ai/baron";
+			}
+			item[24] = {
+				entityDef = "ai/superheavy/archvile";
+				aiType = "POPULATION_TYPE_ARCHVILE";
+				pointValue = 91;
+				spawnWeight = 0.0199999996;
+				factionName = "archvile";
+				defaultSensorySettings = "ai/archvile";
+			}
+			item[25] = {
+				entityDef = "ai/superheavy/tyrant";
+				aiType = "POPULATION_TYPE_TYRANT";
+				pointValue = 100;
+				spawnWeight = 0.00999999978;
+				factionName = "tyrant";
+				defaultSensorySettings = "ai/tyrant";
+			}
+			item[26] = {
+				entityDef = "ai/ambient/zombie_cueball";
+				aiType = "POPULATION_TYPE_CUEBALL";
+				pointValue = 1;
+				spawnWeight = 0.899999976;
+				factionName = "cueball";
+				defaultSensorySettings = "ai/cueball";
+			}
+			item[27] = {
+				entityDef = "ai/ambient/buffpod";
+				aiType = "POPULATION_TYPE_BUFF_POD";
+				pointValue = 1;
+				spawnWeight = 0.899999976;
+				factionName = "buff_pod";
+				defaultSensorySettings = "common";
+			}
+			item[28] = {
+				entityDef = "ai/ambient/tentacle";
+				aiType = "POPULATION_TYPE_TENTACLE";
+				pointValue = 1;
+				spawnWeight = 0.899999976;
+				factionName = "tentacle";
+				defaultSensorySettings = "common";
+			}
+		}
+	}
+}

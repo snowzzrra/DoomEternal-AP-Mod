@@ -10,5 +10,31 @@
   "owner": {
     "resource": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
     "priority": 74
+  },
+  "source_evidence": {
+    "physical_pickup_sources": [
+      {
+        "location_id": 7770496,
+        "source_entity": "intro_interact_automap_1_e1m4",
+        "source_inherit": "interact/automap",
+        "source_class": "idInteractable_Automap",
+        "spawn_position": {
+          "x": -13,
+          "y": -139.999985,
+          "z": 32.8487244
+        },
+        "region": "Doom Hunter Base - Station of Redemption",
+        "qualification": "The station follows the first teleporter and Doom Hunter hologram, before the coffin traversal to Lazarus Generators.",
+        "reference": "https://www.neoseeker.com/doom-eternal/walkthrough/Mission_4",
+        "native_interaction_retained": true,
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e1m4_boss/e1m4_boss.decl",
+          "sha256": "3cf61262d7ac279fa73a50a9f1fc0cc72bf83aaa2f0b56b7dcaa0f6128a25deb",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    ]
   }
 }

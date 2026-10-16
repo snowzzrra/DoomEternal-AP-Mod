@@ -8,17 +8,22 @@
     "AP_CHECK_PICKUPS_PROGRESS_CODEX_2_E3M4": 7770413,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M4": 7770415,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M5": 7770416,
-    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M6": 7770417
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M6": 7770417,
+    "AP_CHECK_CHASM_INTERACT_AUTOMAP_1_E3M4": 7770506
   },
   "names": {
     "7770412": "Final Sin - Extra Life - First Building Vent",
     "7770413": "Final Sin - Icon of Sin Codex",
     "7770415": "Final Sin - Extra Life - Second Building Lower Vent",
     "7770416": "Final Sin - Extra Life - Twin-Elevator Vent",
-    "7770417": "Final Sin - Extra Life - Fourth-Arena Gore Room"
+    "7770417": "Final Sin - Extra Life - Fourth-Arena Gore Room",
+    "7770506": "Final Sin - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_CHASM_INTERACT_AUTOMAP_1_E3M4": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
     "pickups_pickup_extra_life_extra_life_1_1_e3m4": {
@@ -48,6 +53,20 @@
     "pickups_progress_codex_2_e3m4": {
       "independent_ap_trigger": true,
       "remove_original": true
+    },
+    "chasm_interact_automap_1_e3m4": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
     }
   },
   "remove_entities": [],

@@ -28,9 +28,10 @@ def fixture(root):
             artifacts.append({"path": name, "role": role, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     data = (root / "sentinel-runtime.zip").read_bytes()
     artifacts.append({"path": "sentinel-runtime.zip", "role": "runtime_zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-    document = {"schema": 1, "product": "sentinel-core", "version": "1.0.2-rc-1", "base_version": "1.0.2",
-                "channel": "rc", "rc_number": 1, "mod_versions": ["0.6.0"], "architecture": "x64", "platform": "windows",
-                "abi": ABI, "required_capabilities": [2097152], "source_commit": "a" * 40,
+    document = {"schema": 1, "product": "sentinel-core", "version": "1.1.0-rc-1", "base_version": "1.1.0",
+                "channel": "rc", "rc_number": 1, "mod_version_range": ">=0.7.0,<0.8.0", "minimum_launcher_version": "0.7.0",
+                "architecture": "x64", "platform": "windows",
+                "abi": dict(ABI), "required_capabilities": [2097152, 4194304, 8388608], "source_commit": "a" * 40,
                 "source_dirty": False, "build_id": "b" * 64, "pair_id": "b" * 64, "artifacts": artifacts}
     (root / "distribution.json").write_text(json.dumps(document), encoding="utf-8")
     return document
@@ -44,7 +45,7 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 4), ("1.0.0", 5), ("1.0.1", 6), ("1.0.2", 6), ("1.0.3", 6), ("1.0.4", 6), ("1.0.5", 7)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 7), ("1.1.1", 7), ("1.1.99", 7)])
 @pytest.mark.parametrize("suffix", ["", "-rc-1"])
 def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_abi, suffix):
     manifest = fixture(tmp_path)
@@ -77,10 +78,54 @@ def test_native_probe_refuses_failed_response(tmp_path, monkeypatch, version, re
         link._run(["--pid", "7", "--native", "--json"])
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.0.0", 3), ("1.0.5", 8), ("1.0.4", 99)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 3), ("1.1.0", 8), ("1.1.1", 99)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest.update(version=base + "-rc-1", base_version=base, abi={**ABI, "inventory": inventory_abi})
     (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="Incompatible"):
         verify_runtime(tmp_path / "distribution.json")
+
+
+@pytest.mark.parametrize("version,mod_range", [("1.0.5", ">=0.7.0,<0.8.0"),
+                                               ("1.1.0", ">=0.6.0,<0.7.0"),
+                                               ("1.2.0", ">=0.7.0,<0.8.0")])
+def test_distribution_requires_current_core_and_mod_lines(tmp_path, version, mod_range):
+    manifest = fixture(tmp_path)
+    manifest.update(version=version, base_version=version, channel="stable", rc_number=0,
+                    mod_version_range=mod_range)
+    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="Incompatible runtime"):
+        verify_runtime(tmp_path / "distribution.json")
+
+
+@pytest.mark.parametrize("name,version", [("combat", None), ("combat", 1), ("combat", 3),
+                                         ("combat_presentation", None), ("combat_presentation", 2)])
+def test_distribution_refuses_incompatible_combat_before_reading_artifacts(tmp_path, name, version):
+    manifest = fixture(tmp_path)
+    if version is None:
+        del manifest["abi"][name]
+    else:
+        manifest["abi"][name] = version
+    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
+    (tmp_path / "sentinel-runtime.zip").unlink()
+    with pytest.raises(ValueError, match="Incompatible ABI or capability"):
+        verify_runtime(tmp_path / "distribution.json")
+
+
+def test_distribution_refuses_unknown_required_capability(tmp_path):
+    manifest = fixture(tmp_path)
+    manifest["required_capabilities"].append(1 << 24)
+    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="Incompatible ABI or capability"):
+        verify_runtime(tmp_path / "distribution.json")
+
+
+def test_core_self_test_reports_compatible_version_range(tmp_path, capsys):
+    from doom_eap.launcher.launcher_app import main
+
+    fixture(tmp_path)
+    assert main(["--self-test", "--core-only", "--core-runtime", str(tmp_path / "distribution.json")]) == 0
+    report = json.loads(capsys.readouterr().out.splitlines()[-1])
+    assert report["mod_version_range"] == ">=0.7.0,<0.8.0"
+    assert report["abi"]["combat"] == 2

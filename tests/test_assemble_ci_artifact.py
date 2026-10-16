@@ -17,6 +17,8 @@ from scripts.release.assemble_ci_artifact import (
     write_deterministic_zip,
 )
 from tools.release.release_manifest import MANIFEST_FILENAME
+from doom_eap.contracts.challenge_registry import load_challenge_registry
+from tools.decls.mastery_decl_builder import _reward_free_override
 from tools.validation.release_layout import ROOM_COMPILER_RESOURCE_FILES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -65,11 +67,16 @@ def create_fake_handoff(
     with zipfile.ZipFile(apworld_path, "w") as zf:
         zf.writestr("doometernal/__init__.py", "# test apworld\n")
 
-    # native ap_client.exe
     if not omit_ap_client:
         client_content = b"MZ" + b"\x00" * 200
         (shared_client_dir / "ap_client.exe").write_bytes(client_content)
         (shared_client_dir / "save_death_probe.exe").write_bytes(client_content)
+        notices = shared_client_dir / "notices"
+        notices.mkdir()
+        (notices / "LICENSE.txt").write_bytes(b"test runtime license\n")
+        cache = shared_client_dir / "__pycache__"
+        cache.mkdir()
+        (cache / "test_helper.cpython-312.pyc").write_bytes(b"test bytecode")
 
     # build-manifest.json
     manifest = {
@@ -129,6 +136,15 @@ def create_synthetic_room_resources(
 
     base_bytes = b"base_entities_content_data"
     rep_bytes = b"replacement_entities_content_data"
+    source_bytes = b"canonical source\r\nentity {\r\n}\r\n"
+    enemy_bytes = b"test enemy resource"
+    enemy_path = "gameresources/ai/fodder/imp_stone"
+    enemy_member = "enemy_resources/stone_imp/" + enemy_path
+    mastery_sources = {
+        "gameresources/generated/decls/" + entry["decls"]["unlockable"]["path"]:
+        _reward_free_override(entry)[0].encode("utf-8")
+        for entry in load_challenge_registry()["weapon_masteries"]
+    }
 
     base_hash = hashlib.sha256(base_bytes).hexdigest()
     rep_hash = hashlib.sha256(rep_bytes).hexdigest()
@@ -137,12 +153,18 @@ def create_synthetic_room_resources(
         rep_hash = "0" * 64
 
     manifest_doc = {
-        "schema_version": 1,
+        "schema_version": 2,
         "model": "dependent_map_payloads",
+        "enemy_resources": {"stone_imp": {"members": {enemy_path: {
+            "member": enemy_member, "sha256": hashlib.sha256(enemy_bytes).hexdigest(),
+            "size": len(enemy_bytes),
+        }}}},
+        "source_snapshots": {"e1m1_intro": {"member": "sources/e1m1_intro.entities",
+            "sha256": hashlib.sha256(source_bytes).hexdigest(), "size": len(source_bytes)}},
         "physical_option_keys": [
             "randomize_chainsaw", "randomize_dash", "randomize_first_battery"
         ],
-        "base_members": [base_file],
+        "base_members": [base_file, *mastery_sources],
         "context_targets": {
             "test_context": base_file,
         },
@@ -181,6 +203,8 @@ def create_synthetic_room_resources(
         base_zip = target_dir / "base_mod.zip"
         with zipfile.ZipFile(base_zip, "w") as zf:
             zf.writestr(base_file, base_bytes)
+            for member, source in mastery_sources.items():
+                zf.writestr(member, source)
             if mismatch_archive_members:
                 zf.writestr("unexpected_extra.file", b"extra")
 
@@ -188,6 +212,8 @@ def create_synthetic_room_resources(
         rep_zip = target_dir / "room_payloads.zip"
         with zipfile.ZipFile(rep_zip, "w") as zf:
             zf.writestr(rep_file, rep_bytes)
+            zf.writestr("sources/e1m1_intro.entities", source_bytes)
+            zf.writestr(enemy_member, enemy_bytes)
 
     return target_dir
 
@@ -207,6 +233,22 @@ class TestAssembleCIArtifact(unittest.TestCase):
             return CANONICAL_LOCAL_RESOURCES
         create_synthetic_room_resources(self.resources_dir)
         return self.resources_dir
+
+    def test_handoff_requires_declared_release_version(self):
+        create_fake_handoff(self.handoff_dir, version="v0.7.0")
+        manifest_path = self.handoff_dir / "BUILD-MANIFEST.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(validate_handoff_structure(self.handoff_dir)["version_label"], "v0.7.0")
+        for value in (None, "", " ", 7):
+            with self.subTest(value=value):
+                manifest["version_label"] = value
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "version_label"):
+                    validate_handoff_structure(self.handoff_dir)
+        manifest.pop("version_label")
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "version_label"):
+            validate_handoff_structure(self.handoff_dir)
 
     def test_successful_assembly_and_audit(self):
         create_fake_handoff(self.handoff_dir)
@@ -243,6 +285,8 @@ class TestAssembleCIArtifact(unittest.TestCase):
             self.assertNotIn("DoomEternalArchipelago/DoomEternalArchipelagoLauncher.exe", names)
             self.assertIn("DoomEternalArchipelago/doometernal.apworld", names)
             self.assertIn("DoomEternalArchipelago/client/ap_client.exe", names)
+            self.assertEqual(zf.read("DoomEternalArchipelago/client/notices/LICENSE.txt"), b"test runtime license\n")
+            self.assertNotIn("DoomEternalArchipelago/client/__pycache__/test_helper.cpython-312.pyc", names)
             self.assertIn(f"DoomEternalArchipelago/{MANIFEST_FILENAME}", names)
             for res in ROOM_COMPILER_RESOURCE_FILES:
                 self.assertIn(f"DoomEternalArchipelago/{res}", names)
@@ -253,6 +297,8 @@ class TestAssembleCIArtifact(unittest.TestCase):
             self.assertNotIn("DoomEternalArchipelago/DoomEternalArchipelagoLauncher", names)
             self.assertIn("DoomEternalArchipelago/doometernal.apworld", names)
             self.assertIn("DoomEternalArchipelago/client/ap_client.exe", names)
+            self.assertEqual(zf.read("DoomEternalArchipelago/client/notices/LICENSE.txt"), b"test runtime license\n")
+            self.assertNotIn("DoomEternalArchipelago/client/__pycache__/test_helper.cpython-312.pyc", names)
             self.assertIn(f"DoomEternalArchipelago/{MANIFEST_FILENAME}", names)
             for res in ROOM_COMPILER_RESOURCE_FILES:
                 self.assertIn(f"DoomEternalArchipelago/{res}", names)
@@ -261,6 +307,17 @@ class TestAssembleCIArtifact(unittest.TestCase):
 
 
 
+
+    def test_enemy_resource_hash_mismatch_rejected(self):
+        resources = create_synthetic_room_resources(Path(self.temp_dir) / "enemy-hash")
+        validate_room_resources(resources)
+        path = resources / "room_payload_manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        snapshot = next(iter(manifest["enemy_resources"]["stone_imp"]["members"].values()))
+        snapshot["sha256"] = "0" * 64
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Enemy resource hash mismatch"):
+            validate_room_resources(resources)
 
     def test_checksum_mismatch_rejected(self):
         create_fake_handoff(self.handoff_dir, corrupt_hash=True)

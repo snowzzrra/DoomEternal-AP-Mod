@@ -564,6 +564,7 @@ def apply_native_entity_contract(block, contract):
 
 
 TARGET_POLICY_CONSUMERS = {
+    "permanent_resource_budget": "authorial resource budget metadata",
     "independent_ap_trigger": "generate_map independent-trigger branch",
     "remove_original": "generate_map original-owner branch",
     "drop_targets": "build_independent_targets",
@@ -571,6 +572,7 @@ TARGET_POLICY_CONSUMERS = {
     "safe_target_graph": "audit_preserved_target_graph",
     "forbidden_target_terms": "audit_preserved_target_graph",
     "gate_relay": "append_target_to_named_entity",
+    "reveal_entity": "replace_pickup_reveal_target",
     "independent_entity_name": "generate_independent_pickup_trigger",
     "independent_position": "generate_independent_pickup_trigger",
     "independent_visual_z_offset": "build_universal_physical_policy",
@@ -733,8 +735,14 @@ def validate_target_policies(config_entities, target_policies, content):
             "remove_original", "independent_entity_name", "independent_position",
             "independent_size", "independent_targets", "independent_visual",
             "completion_targets", "no_auto_visual", "preserve_layers", "bind_parent",
+            "reveal_entity",
         }
-        universal_size_override = set(policy) == {"independent_size"}
+        if "reveal_entity" in policy and not all(
+            isinstance(policy.get(key), str) and policy[key].strip()
+            for key in ("reveal_entity", "gate_relay")
+        ):
+            raise ValueError(f"Pickup reveal requires a show entity and gate relay: {entity_name}")
+        universal_size_override = set(policy) - {"permanent_resource_budget"} == {"independent_size"}
         unused_independent = sorted(
             set(policy) & independent_only
             if not policy.get("independent_ap_trigger") and not universal_size_override
@@ -1211,8 +1219,8 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
             "\t\t\t}"
         )
     else:
-        position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
-        if not position_match:
+        position_match = re.search(r'(spawnPosition\s*=\s*\{[^}]*\})', block)
+        if not position_match or _spawn_position_from_block(block) is None:
             raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
         position = position_match.group(1)
     hitbox_size = policy.get(
@@ -1234,6 +1242,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
     target_lines = "\n".join(
         f'\t\t\t\titem[{index}] = "{target}";' for index, target in enumerate(targets)
     )
+    trigger_first = "\t\t\ttriggerFirst = true;\n" if policy.get("gate_relay") else ""
     return f'''entity {{
 {layers}\tentityDef {independent_name} {{
 \t\tinherit = "trigger/trigger";
@@ -1244,7 +1253,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\ttriggerOnce = true;
+{trigger_first}\t\t\ttriggerOnce = true;
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
 \t\t\t}}
@@ -1317,6 +1326,12 @@ def generate_inert_location_visual(block, policy):
         if bind_parent else ""
     )
     cleanup_name = visual.get("cleanup_entity")
+    reveal_flags = ""
+    if policy.get("reveal_entity"):
+        reveal_flags = "\t\t\tflags = { hide = true; }\n"
+        save_match = re.search(r'\bwhenToSave\s*=\s*"[^"]+";', block)
+        if save_match:
+            reveal_flags += f"\t\t\t{save_match.group(0)}\n"
     reconciliation_name = visual.get("reconciliation_entity")
     if cleanup_name and not reconciliation_name:
         location_match = re.fullmatch(
@@ -1387,7 +1402,7 @@ def generate_inert_location_visual(block, policy):
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-{automap_line}{think_line}\t\t\tisStatic = false;
+{automap_line}{think_line}{reveal_flags}\t\t\tisStatic = false;
 {bind_info_line}\t\t\tspawnPosition = {{
 \t\t\t\tx = {position[0]};
 \t\t\t\ty = {position[1]};
@@ -1602,6 +1617,25 @@ def append_target_to_named_entity(content, entity_name, target_name):
                     entity_block = replace_targets_block(entity_block, [*targets, target_name])
                 return content[:start] + entity_block + content[end + 1:]
     raise ValueError(f"unterminated gated AP target relay: {entity_name}")
+
+
+def replace_pickup_reveal_target(content, entity_name, location_id, policy):
+    source_bounds = find_entity_block_bounds(content, entity_name)
+    source = content[slice(*source_bounds)] if source_bounds else ""
+    if not re.search(r'\bhide\s*=\s*true;', source):
+        raise ValueError(f"Pickup reveal source must start hidden: {entity_name}")
+    reveal_name = policy["reveal_entity"]
+    bounds = find_entity_block_bounds(content, reveal_name)
+    if bounds is None:
+        raise ValueError(f"Pickup reveal entity missing: {reveal_name}")
+    block = content[slice(*bounds)]
+    if not re.search(r'class\s*=\s*"idTarget_Show";', block) or extract_target_names(block) != [entity_name]:
+        raise ValueError(f"Pickup reveal source target drift: {reveal_name}")
+    gate_bounds = find_entity_block_bounds(content, policy["gate_relay"])
+    if gate_bounds is None or reveal_name not in extract_target_names(content[slice(*gate_bounds)]):
+        raise ValueError(f"Pickup reveal gate does not target its show entity: {reveal_name}")
+    block = replace_targets_block(block, [f"ap_location_visual_{location_id}"])
+    return content[:bounds[0]] + block + content[bounds[1]:]
 
 
 def build_universal_physical_policy(
@@ -2752,7 +2786,14 @@ def generate_map(
             )
         )
         if gate_relay and not sentinel_source:
-            content = append_target_to_named_entity(content, gate_relay, entity_name)
+            gate_target = entity_name
+            if policy.get("independent_ap_trigger"):
+                gate_target = policy.get("independent_entity_name", f"ap_independent_{entity_name}")
+                if policy.get("reveal_entity"):
+                    content = replace_pickup_reveal_target(
+                        content, entity_name, config_entities[f"AP_CHECK_{entity_name.upper()}"], policy
+                    )
+            content = append_target_to_named_entity(content, gate_relay, gate_target)
     assert_no_weapon_mastery_token_currency(content, f"Registered vanilla map {map_key}")
 
     for entity_name in neutralize_pickups:
@@ -2858,6 +2899,7 @@ def generate_map(
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
+                target_policy.pop("permanent_resource_budget", None)
                 feedback_policy = resolve_location_feedback_policy(
                     location_feedback, ap_check_id, target_policy
                 )
@@ -2873,8 +2915,8 @@ def generate_map(
                             "preserve_visual_layers": preserve_visual_layers,
                         },
                     )
-                elif set(target_policy) == {"independent_size"}:
-                    size_override = target_policy["independent_size"]
+                elif set(target_policy) == {"independent_size"} or target_policy.get("reveal_entity"):
+                    overrides = target_policy
                     target_policy = build_universal_physical_policy(
                         ap_check_id,
                         location_id,
@@ -2885,7 +2927,7 @@ def generate_map(
                             "preserve_visual_layers": preserve_visual_layers,
                         },
                     )
-                    target_policy["independent_size"] = size_override
+                    target_policy.update(overrides)
                 elif is_sentinel_crystal_source(block) and not target_policy.get(
                     "independent_ap_trigger"
                 ):

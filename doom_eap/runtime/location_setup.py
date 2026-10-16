@@ -47,18 +47,18 @@ class LocationSetup:
             raise ValueError(f"Connected.{field} contains invalid location ID")
         return set(values)
 
-    def begin(self, args, supported_ids):
+    def begin(self, args, supported_ids, unscouted_ids=frozenset()):
         self.invalidate()
         missing = self._connected_ids(args, "missing_locations")
         checked = self._connected_ids(args, "checked_locations")
         if missing & checked:
             raise ValueError("Connected location sets overlap")
         active = missing | checked
-        unknown = sorted(active - supported_ids)
+        unknown = sorted(active - supported_ids - unscouted_ids)
         if unknown:
             raise ValueError(f"Connected contains unknown DOOM location IDs: {unknown}")
-        self._expected = active
-        return frozenset(active)
+        self._expected = active - unscouted_ids
+        return frozenset(self._expected)
 
     def fail(self, message):
         if self._failed:

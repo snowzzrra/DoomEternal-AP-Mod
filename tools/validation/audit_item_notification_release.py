@@ -29,6 +29,7 @@ from tools.validation.validate_item_notification_package import (
 from tools.validation.release_layout import expected_release_roots
 from tools.release.release_manifest import load_release_manifest
 from tools.release.room_payloads import (
+    _decode_source_snapshot,
     BASE_RESOURCE_NAME,
     ROOM_PAYLOAD_MANIFEST_NAME,
     ROOM_PAYLOAD_RESOURCE_NAME,
@@ -243,9 +244,11 @@ def _audit_room_selection(
         for record in manifest_maps.values()
         for state in record["states"]
         if state["source"] == "replacement"
-    }
+    } | {snapshot["member"] for snapshot in payload_manifest["source_snapshots"].values()}
     if set(payload_members) != expected_payload_members:
         raise AssertionError("room payload archive member set drifted")
+    for map_key, snapshot in payload_manifest["source_snapshots"].items():
+        _decode_source_snapshot(payload_members[snapshot["member"]], snapshot, map_key)
 
     selections = []
     for state_index, options in enumerate(_global_option_states()):
@@ -699,6 +702,7 @@ def _extract_playable_zip(
             "randomize_chainsaw": True,
             "randomize_dash": True,
             "randomize_first_battery": True,
+            "mastery_requirements": "Half",
         },
     )
     for member, content in assembled.items():

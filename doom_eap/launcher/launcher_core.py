@@ -30,6 +30,9 @@ from tools.decls.devinv_builder import (
 )
 from .launcher_platform import IDFILE_DECOMPRESSOR, publish_file
 from doom_eap.content.compiler_identity import load_compiler_source_identity
+from doom_eap.content.enemy_options import normalize_enemy_options
+from doom_eap.content.killsanity_plan import milestone_ids, validate_killsanity_plan
+from doom_eap.content.enemy_plan import validate_frozen_enemy_plan
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -44,7 +47,7 @@ SLOT_DATA_REVISION = str(_CONTRACT_IDENTITY["slot_data_revision"])
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
 SUPPORTED_CAPABILITIES = frozenset({
     "room_mod_v2",
-    "slot_data_v5",
+    "slot_data_v6",
     "unified_campaign_v1",
     "fortress_economy_v1",
     "progressive_blood_punch_v1",
@@ -65,7 +68,12 @@ SUPPORTED_CAPABILITIES = frozenset({
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
     "include_dlc_missions": True,
-    "dlc_logic_timing": "Late Game",
+    "logic_difficulty": "Standard",
+    "mastery_requirements": "Half",
+    "resource_profile": "Balanced",
+    "item_pool_counts": {},
+    "filler_weights": {},
+    "trap_weights": {},
     "goal": "Acquire the Unmaykr",
     "goal_endpoint_event": "Internal Goal Endpoint: Acquire the Unmaykr",
     "additional_victory_requirements": [],
@@ -77,6 +85,7 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "include_weapon_mastery_challenges": True,
     "include_slayer_gates": True,
     "include_secret_encounters": True,
+    "easier_secret_encounters": False,
     REVEAL_AP_LOCATIONS_OPTION_KEY: False,
     "starting_weapon": "Combat Shotgun",
     "praetor_suit_upgrades_in_pool": 6,
@@ -128,6 +137,7 @@ CLIENT_CONFIG_FIELDS = frozenset({
     "save_games_dir",
     "server_address",
     "seed_manifest_hash",
+    "killsanity_counter_visible",
     "core_runtime_manifest",
     "selected_core_runtime_manifest",
     "proton_executable",
@@ -148,7 +158,14 @@ def release_identity() -> dict[str, Any]:
 
 
 def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Normalize current APWorld slot fields while retaining legacy defaults."""
+    """Validate the room line before preparing its content or local state."""
+    if raw.get("slot_data_revision") != SLOT_DATA_REVISION:
+        raise ValueError(
+            "DoomEAP 0.7 requires a new 0.7 room and AP save. "
+            "Your existing save has not been changed."
+        )
+    if raw.get("slot_data_schema_version") != SLOT_DATA_SCHEMA_VERSION:
+        raise ValueError("Connected.slot_data.slot_data_schema_version is unsupported")
     slot_data = {
         key: list(value) if isinstance(value, list) else dict(value) if isinstance(value, dict) else value
         for key, value in ROOM_SLOT_DEFAULTS.items()
@@ -164,6 +181,7 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
         "include_weapon_mastery_challenges",
         "include_slayer_gates",
         "include_secret_encounters",
+        "easier_secret_encounters",
         REVEAL_AP_LOCATIONS_OPTION_KEY,
     )
     for key in boolean_keys:
@@ -171,10 +189,22 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"Connected.slot_data.{key} is required")
         if not isinstance(slot_data[key], bool):
             raise ValueError(f"Connected.slot_data.{key} must be boolean")
-    if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
-        raise ValueError("Connected.slot_data.include_dlc_missions requires use_dlc_content")
-    if slot_data["dlc_logic_timing"] not in {"Late Game", "From the Beginning"}:
-        raise ValueError("Connected.slot_data.dlc_logic_timing is invalid")
+    if not isinstance(slot_data.get("enemies"), dict) or json.dumps(slot_data["enemies"], sort_keys=True) != json.dumps(
+        normalize_enemy_options(slot_data), sort_keys=True
+    ):
+        raise ValueError("Connected.slot_data.enemies does not match its generated options")
+    if slot_data.get("logic_difficulty") not in {"Relaxed", "Standard", "Expert"}:
+        raise ValueError("Connected.slot_data.logic_difficulty is invalid")
+    slot_data["killsanity"] = validate_killsanity_plan(slot_data.get("killsanity_options"), slot_data.get("killsanity"))
+    validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
+    if slot_data.get("mastery_requirements") not in {"Original", "Half", "Quarter"}:
+        raise ValueError("Connected.slot_data.mastery_requirements is invalid")
+    if slot_data.get("resource_profile") not in {"Balanced", "Generous", "Lean"}:
+        raise ValueError("Connected.slot_data.resource_profile is invalid")
+    from doom_eap.content.options_foundation import _validate_option_dict, load_options_schema
+    schema = {option["key"]: option for option in load_options_schema(ROOT / "data" / "options_schema.json")["options"]}
+    for key in ("item_pool_counts", "filler_weights", "trap_weights"):
+        slot_data[key] = _validate_option_dict(schema[key], slot_data[key])
     if slot_data["goal"] not in GOAL_VALUES:
         raise ValueError("Connected.slot_data.goal is invalid")
     requirements = slot_data["additional_victory_requirements"]
@@ -186,7 +216,7 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
     if slot_data["special_weapon"] not in SPECIAL_WEAPON_VALUES:
         raise ValueError("Connected.slot_data.special_weapon is invalid")
     for key, minimum, maximum in (
-        ("praetor_suit_upgrades_in_pool", 0, 21),
+        ("praetor_suit_upgrades_in_pool", 0, schema["praetor_suit_upgrades_in_pool"]["maximum"]),
         ("trap_percentage", 0, 100),
     ):
         value = slot_data[key]
@@ -336,7 +366,7 @@ class RoomSnapshot:
             raise ValueError("Connected missing_locations and checked_locations overlap")
         raw_placements = connected.get("placements")
         active = tuple(sorted(set(missing) | set(checked)))
-        placements = _normalize_placements(raw_placements, active, slot)
+        placements = _normalize_placements(raw_placements, tuple(set(active) - milestone_ids(slot_data["killsanity"])), slot)
 
         return cls(
             seed_name=seed_name,
@@ -421,8 +451,6 @@ class SeedManifest:
         for key in ("use_dlc_content", "include_dlc_missions"):
             if not isinstance(normalized_options[key], bool):
                 raise ValueError(f"manifest option {key} must be boolean")
-        if normalized_options["include_dlc_missions"] and not normalized_options["use_dlc_content"]:
-            raise ValueError("manifest option include_dlc_missions requires use_dlc_content")
         project_room_config(normalized_options)
         if "starting_inventory" in normalized_options:
             inventory = normalized_options["starting_inventory"]
@@ -441,11 +469,13 @@ class SeedManifest:
         normalized_placements = (
             ()
             if static_precompile
-            else _normalize_placements(placements, active_ids, int(slot))
+            else _normalize_placements(placements, tuple(set(active_ids) - (
+                milestone_ids(normalized_options["killsanity"]) if "killsanity" in normalized_options else set()
+            )), int(slot))
         )
         required_capabilities = {
             "room_mod_v2",
-            "slot_data_v5",
+            "slot_data_v6",
             "unified_campaign_v1",
             "dlc_missions_v1",
             "goal_events_v1",
@@ -501,7 +531,9 @@ class SeedManifest:
                 "real-room compilation requires complete placement mapping"
             )
         return _normalize_placements(
-            self.placements, self.active_location_ids, self.slot
+            self.placements, tuple(set(self.active_location_ids) - (
+                milestone_ids(self.options["killsanity"]) if "killsanity" in self.options else set()
+            )), self.slot
         )
 
     @classmethod
@@ -513,28 +545,18 @@ class SeedManifest:
         static_content_digest: str = "",
     ) -> SeedManifest:
         identity = release_identity()
-        slot_data = snapshot.slot_data
+        slot_data = _normalize_slot_data(snapshot.slot_data)
         if "bridge_protocol" in slot_data and slot_data["bridge_protocol"] != identity["bridge_protocol_version"]:
             raise ValueError(f"session bridge_protocol is incompatible: {slot_data['bridge_protocol']!r} != {identity['bridge_protocol_version']!r}")
-        schema = slot_data.get("manifest_schema_version", 1)
+        schema = slot_data.get("manifest_schema_version")
         supported_contract = identity["session_mod_contract_revision"]
-        contract = slot_data.get("mod_contract_revision", supported_contract)
-        if not isinstance(schema, int) or schema < 1 or schema > MANIFEST_SCHEMA_VERSION:
+        contract = slot_data.get("mod_contract_revision")
+        if schema != MANIFEST_SCHEMA_VERSION:
             raise ValueError(f"session manifest schema is unsupported: {schema!r}")
         if contract != supported_contract:
             raise ValueError(f"session mod contract is unsupported: {contract!r}")
-        slot_data_revision = slot_data.get("slot_data_revision")
-        if slot_data_revision is not None and slot_data_revision != SLOT_DATA_REVISION:
-            raise ValueError(f"session slot data revision is unsupported: {slot_data_revision!r}")
         required = slot_data.get("required_capabilities")
-        if required is None:
-            required_capabilities = {
-                "room_mod_v2",
-                "placement_scouts_v1",
-                "physical_options_v1",
-                "room_options_v1",
-            }
-        elif isinstance(required, list) and all(isinstance(value, str) for value in required):
+        if isinstance(required, list) and all(isinstance(value, str) for value in required):
             required_capabilities = set(required)
         else:
             raise ValueError("session required_capabilities must be a list of strings")
@@ -542,10 +564,9 @@ class SeedManifest:
         if unsupported:
             raise ValueError(f"session requires unsupported capabilities: {unsupported}")
         if "compiler_revision" in slot_data and slot_data["compiler_revision"] != identity["compiler_revision"]:
-            # Implementation metadata only. Compatibility is decided above.
             import logging
             logging.getLogger(__name__).info("session compiler_revision differs: room=%r local=%r", slot_data["compiler_revision"], identity["compiler_revision"])
-        unknown = sorted(set(snapshot.active_location_ids) - known_location_ids)
+        unknown = sorted(set(snapshot.active_location_ids) - known_location_ids - milestone_ids(slot_data["killsanity"]))
         if unknown:
             raise ValueError(f"session contains unknown DOOM Eternal location IDs: {unknown}")
         starting_inventory = dict(slot_data.get("starting_inventory", {}))
@@ -560,7 +581,15 @@ class SeedManifest:
                 "native_generation_fingerprint": slot_data["native_generation_fingerprint"],
                 "use_dlc_content": slot_data["use_dlc_content"],
                 "include_dlc_missions": slot_data["include_dlc_missions"],
-                "dlc_logic_timing": slot_data["dlc_logic_timing"],
+                "enemies": slot_data["enemies"],
+                "enemy_plan": slot_data.get("enemy_plan"),
+                "killsanity": slot_data["killsanity"],
+                "logic_difficulty": slot_data["logic_difficulty"],
+                "mastery_requirements": slot_data["mastery_requirements"],
+                "resource_profile": slot_data["resource_profile"],
+                "item_pool_counts": slot_data["item_pool_counts"],
+                "filler_weights": slot_data["filler_weights"],
+                "trap_weights": slot_data["trap_weights"],
                 "goal": slot_data["goal"],
                 "goal_endpoint_event": slot_data["goal_endpoint_event"],
                 "additional_victory_requirements": list(
@@ -573,6 +602,7 @@ class SeedManifest:
                 ],
                 "include_slayer_gates": slot_data["include_slayer_gates"],
                 "include_secret_encounters": slot_data["include_secret_encounters"],
+                "easier_secret_encounters": slot_data["easier_secret_encounters"],
                 "praetor_suit_upgrades_in_pool": slot_data[
                     "praetor_suit_upgrades_in_pool"
                 ],
@@ -857,6 +887,10 @@ class RoomCompiler:
         decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
+        secret_timers = None
+        if (options or {}).get("easier_secret_encounters", False):
+            from doom_eap.content.secret_encounter_timers import load_secret_encounter_timers
+            secret_timers = load_secret_encounter_timers()
         selected_groups = (options or {}).get("active_fortress_spend_group_ids")
         economy_enabled = "fortress_economy_v1" in (options or {}).get("required_capabilities", ())
         fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
@@ -917,6 +951,9 @@ class RoomCompiler:
                 if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
                     from tools.maps.ap_map_generator import remove_blood_punch_grants
                     text = remove_blood_punch_grants(text)
+                if secret_timers is not None:
+                    from doom_eap.content.secret_encounter_timers import apply_secret_encounter_timers
+                    text = apply_secret_encounter_timers(text, member, secret_timers)
                 if economy_enabled and member.endswith(fortress_member_suffix):
                     from tools.maps.fortress_campaign import project_spend_groups
                     text = text.rstrip() + "\n" + fortress_labels
@@ -1211,8 +1248,80 @@ class RoomCompiler:
                 raise ValueError("idFileDeCompressor produced no encoded overlay")
             return compressed.read_bytes()
 
+    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> None:
+        from dataclasses import replace
+
+        from doom_eap.content.enemy_resources import read_enemy_resource_payloads, required_enemy_resource_species
+        from doom_eap.content.enemy_species import load_species_registry, project_species_profiles
+        from tools.maps.encounter_materializer import materialize_frozen_encounters
+        from tools.maps.encounter_populations import materialize_frozen_populations
+        from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+        from tools.release.room_payloads import read_source_snapshots
+
+        plan = manifest.options.get("enemy_plan")
+        validate_frozen_enemy_plan(plan, manifest.options["enemies"])
+        if plan is None:
+            return
+        changed_maps = {key: row for key, row in plan["maps"].items() if row["operations"]}
+        if not changed_maps:
+            return
+        required_sources = set(changed_maps)
+        species = set()
+        try:
+            for row in changed_maps.values():
+                for operation in row["operations"]:
+                    required_sources.add(operation["from"]["spawner"]["map_key"])
+                    if operation.get("reserve") is not None:
+                        for template in ("commit_template", "finish_template"):
+                            required_sources.add(operation["reserve"][template]["map_key"])
+                    for wave in operation["waves"]:
+                        for instance in wave["instances"]:
+                            species.add(instance["species"])
+                            required_sources.add(instance["ai"]["map_key"])
+                            if operation["event_def"] == "spawnAI":
+                                required_sources.add(instance["origin_spawner"]["map_key"])
+        except (KeyError, TypeError) as error:
+            raise ValueError("Enemy generation source references are malformed") from error
+        resources = read_enemy_resource_payloads(self.payload_resource, self.payload_manifest, required_enemy_resource_species(species))
+        for member, payload in resources.items():
+            if member in assembled and assembled[member] != payload:
+                raise ValueError(f"Enemy resources conflict with the room payload: {member}")
+        sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
+        registry = load_species_registry(ROOT / "content/catalog/enemy_species.json")
+        profiles = project_species_profiles(registry)
+        compiler = ModCompiler(ROOT)
+        neutral_manifest = replace(manifest, static_precompile=True)
+        with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
+            staged = Path(temporary)
+            for map_key, row in sorted(changed_maps.items()):
+                if map_key not in self.payload_manifest["maps"]:
+                    raise ValueError(f"Enemy generation map is not packaged: {map_key}")
+                member = self.payload_manifest["maps"][map_key]["target_member"]
+                if member not in assembled:
+                    raise ValueError(f"Enemy generation map is not active: {map_key}")
+                materialized = materialize_frozen_encounters(sources[map_key], row, sources,
+                                                             species_profiles=profiles, source_registry=registry, source_root=ROOT)
+                materialized, populations = materialize_frozen_populations(materialized, row, registry, ROOT)
+                for population_member, payload in populations.items():
+                    if population_member in resources and resources[population_member] != payload:
+                        raise ValueError(f"Enemy population resources conflict: {population_member}")
+                    if population_member in assembled and assembled[population_member] != payload:
+                        raise ValueError(f"Enemy population conflicts with the room payload: {population_member}")
+                    resources[population_member] = payload
+                source_path = staged / f"{map_key}.source"
+                output_path = staged / f"{map_key}.entities"
+                source_path.write_bytes(materialized.encode("utf-8"))
+                compiler.compile_map(neutral_manifest, source_path, output_path, map_key)
+                audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
+                                                     {map_key: output_path}, staged / "publishers",
+                                                     source_maps=sources, retained_overrides=assembled)
+                if audit["unrelated_generated_entity_diff_count"]:
+                    raise ValueError(f"Enemy map publisher patch changed unrelated entities: {map_key}")
+                assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
+        assembled.update(resources)
+
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
-        from tools.release.room_payloads import assemble_room_files, canonical_json, dlc_mission_map_keys, write_deterministic_zip
+        from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
         placements = manifest.require_complete_placements()
         if manifest.static_content_digest != self.static_content_digest:
             raise ValueError("room static content identity drifted")
@@ -1223,7 +1332,7 @@ class RoomCompiler:
         assembled, selected = assemble_room_files(
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
-        # JSON round-trip so tuple fields match what the archive stores.
+        self._apply_enemy_plan(assembled, manifest)
         seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(manifest.options)
         receipt = {
@@ -1243,8 +1352,7 @@ class RoomCompiler:
             manifest.options.get("starting_weapon"),
         )
         assembled[devinv_path] = devinv_source.encode("utf-8")
-        # Native NewGame selects sp/e1m1 DevInv; Core redirects its first
-        # map to Fortress. The destination archive must own that room override.
+        # Core redirects NewGame from sp/e1m1 to Fortress, which needs the same room loadout.
         hub_devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", "hub"
         ).as_posix()
@@ -1265,7 +1373,7 @@ class RoomCompiler:
             skip_dlc1_credits=True,
             skip_dlc2_credits=True,
         ))
-        if manifest.options.get("use_dlc_content", True):
+        if manifest.options.get("include_dlc_missions", True):
             assembled.update({
                 path: source.encode("utf-8")
                 for path, source in build_tag_devinv_overrides(
@@ -1279,10 +1387,6 @@ class RoomCompiler:
             from tools.maps.mission_complete_map_patcher import patch_generated_map_text
 
             catalog = load_content_catalog()
-            # DLC mission AP content is scoped by include_dlc_missions; DLC
-            # gameplay/context support stays scoped by use_dlc_content.
-            include_dlc_missions = manifest.options.get("include_dlc_missions", True)
-            excluded_mission_maps = set() if include_dlc_missions else dlc_mission_map_keys()
             for context in dlc_contexts():
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
                     raise ValueError(f"DLC context overlay requires one exact map: {context.identity}")
@@ -1290,8 +1394,6 @@ class RoomCompiler:
                 if not isinstance(overlay_member, str):
                     raise ValueError(f"DLC context lacks room payload target: {context.identity}")
                 map_key = context.map_keys[0]
-                if map_key in excluded_mission_maps:
-                    continue
                 spec = catalog.maps.get(map_key)
                 if spec is None:
                     raise ValueError(f"DLC context map spec missing: {map_key}")
@@ -1484,13 +1586,16 @@ class ModCompiler:
             int(spec["location_id"])
             for spec in PHYSICAL_OPTIONS.values()
         }
-        return [
+        active = [
             location_id for location_id in ids
             if location_id not in (physical_ids - physical_location_ids(options))
             and (options.get("include_slayer_gates", True) or not names[str(location_id)].endswith(" - Slayer Gate Complete"))
             and (options.get("include_secret_encounters", True) or " - Secret Encounter - " not in names[str(location_id)])
             and (options.get("include_slayer_gates", True) or names[str(location_id)] != "Fortress of Doom - Unmaykr Acquired")
         ]
+        if "killsanity" in options:
+            active.extend(milestone_ids(options["killsanity"]))
+        return sorted(active)
 
     def known_location_ids(self) -> set[int]:
         return set(self.active_location_ids({key: True for key in PHYSICAL_OPTION_KEYS}))
@@ -1526,7 +1631,6 @@ class ModCompiler:
         campaign_maps = tuple(
             spec for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
-            and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
             and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
         )
         for map_spec in campaign_maps:
@@ -1544,7 +1648,6 @@ class ModCompiler:
         campaign_keys = {
             spec.key for spec in load_content_catalog(self.root).enabled_maps()
             if spec.key != "hub"
-            and (manifest.options.get("use_dlc_content", True) or not spec.requires_dlc_content)
             and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
         }
         if map_key not in campaign_keys:

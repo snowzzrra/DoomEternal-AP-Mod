@@ -1666,6 +1666,23 @@ class LauncherController:
             raise
         self.emit("ammo_refill_keybind_status", state="configured", keybind=refill)
 
+    def set_killsanity_counter_visible(self, visible: bool) -> None:
+        if type(visible) is not bool:
+            raise ValueError("Killsanity counter visibility must be a boolean")
+        previous = self.config.get("killsanity_counter_visible", True)
+        try:
+            self.save_config({"killsanity_counter_visible": visible})
+        except OSError:
+            self.config["killsanity_counter_visible"] = previous
+            raise
+        supervisor = self.supervisor
+        if supervisor is not None and supervisor.running:
+            control = json.dumps({"type": "killsanity_counter_visibility", "visible": visible})
+            try:
+                supervisor.send_command(f"AP_CONTROL {control}")
+            except (OSError, RuntimeError) as error:
+                self.emit("killsanity_counter_status", state="pending", message=str(error))
+
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:
             connected = self.connected_room

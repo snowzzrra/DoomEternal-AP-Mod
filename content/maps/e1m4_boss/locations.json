@@ -21,7 +21,8 @@
     "AP_CHECK_WING_B_PROGRESS_PRAETOR_TOKEN_1_E1M4": 7770158,
     "AP_CHECK_WING_B_PROGRESS_CHEATS_ONE_SHOT_KILL_ON_STAGGER_1": 7770159,
     "AP_CHECK_WING_A_PICKUP_COLLECTIBLE_TOYS_LOST_SOUL_1": 7770160,
-    "AP_CHECK_WING_A_PROGRESS_RUNE_1_E1M4": 7770161
+    "AP_CHECK_WING_A_PROGRESS_RUNE_1_E1M4": 7770161,
+    "AP_CHECK_INTRO_INTERACT_AUTOMAP_1_E1M4": 7770496
   },
   "location_feedback": {
     "AP_CHECK_CATWALK_PLATFORM_PROGRESS_ARGENT_CELL_1_1530710120": {
@@ -55,6 +56,9 @@
     },
     "AP_CHECK_WING_A_PICKUP_COLLECTIBLE_TOYS_LOST_SOUL_1": {
       "policy": "vanilla_only"
+    },
+    "AP_CHECK_INTRO_INTERACT_AUTOMAP_1_E1M4": {
+      "policy": "ap_only"
     }
   },
   "neutralize_pickups": [
@@ -117,6 +121,20 @@
         ]
       },
       "duplicate_policy": "native_only"
+    },
+    "intro_interact_automap_1_e1m4": {
+      "native_entity_contract": {
+        "original_targets": [],
+        "required_snippets": [
+          "inherit = \"interact/automap\";",
+          "class = \"idInteractable_Automap\";",
+          "activateTargetsOnEndInteraction = true;",
+          "useStat = \"STAT_AUTOMAP\";",
+          "saveType = \"SGS_GAME_DATA\";",
+          "triggerDef = \"trigger/interact/use_panel\";"
+        ]
+      },
+      "permanent_resource_budget": false
     }
   },
   "schema_version": 1,
@@ -139,6 +157,7 @@
     "7770158": "Doom Hunter Base - Praetor Suit Token - Coffin Cylinder Interior",
     "7770159": "Doom Hunter Base - Silver Bullet Mode Cheat Code",
     "7770160": "Doom Hunter Base - Lost Soul Toy",
-    "7770161": "Doom Hunter Base - Rune - Deag Ranak Hall"
+    "7770161": "Doom Hunter Base - Rune - Deag Ranak Hall",
+    "7770496": "Doom Hunter Base - Automap Station"
   }
 }

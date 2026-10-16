@@ -1,0 +1,2573 @@
+{
+  "schema_version": 1,
+  "map_key": "e1m3_cult",
+  "source": {
+    "path": "vanillamaps/e1m3_cult.map",
+    "sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866"
+  },
+  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "logic_sources": {},
+  "counting": {
+    "unit": "finite_authored_combat_opportunity",
+    "scope": "one_initial_pass_of_each_selected_segment",
+    "identity_fields": [
+      "map_key",
+      "manager",
+      "script_index",
+      "event_index",
+      "ordinal"
+    ],
+    "replays_add_to_N": false,
+    "requires_forced_deaths": false,
+    "map_N": null,
+    "campaign_N": null
+  },
+  "qualification": {
+    "source": "reviewed_finite_scripts_and_concrete_source_templates",
+    "runtime": false,
+    "replacement_feasibility": "qualified_separately_from_original_opportunity_count"
+  },
+  "segments": [
+    {
+      "id": "game_encounter_manager_crusher_12",
+      "manager": "game_encounter_manager_crusher_12",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "game_encounter_trigger_commit_21"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "game_encounter_trigger_exit_20",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "558189df4995b8888d4d680f58086e0fc0cd8dad33956e7ec6195e67951620da"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "27320f879b1a9ad4888e654d35ac7a12b35f67e52a4fd567da7e5323e53fe48b",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 2,
+          "label": "meathook",
+          "spawner": "game_encounter_spawn_group_cylinder_crusher_horde13",
+          "members": [
+            {
+              "spawner": "game_target_spawn_621",
+              "ai": "game_ai_fodder_zombie_t1_scientist_1",
+              "definition_sources": [
+                "game_encounter_spawn_group_parent_shared1"
+              ]
+            },
+            {
+              "spawner": "game_target_spawn_623",
+              "ai": "game_ai_fodder_zombie_t1_scientist_1",
+              "definition_sources": [
+                "game_encounter_spawn_group_parent_shared1"
+              ]
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "encounter_spawn_group_zone_ds_zombies": {
+      "sha256": "8455a434dcc607cc0c5cebed59b2b2169d9a51382378052dcfeceb3ee92a8c51",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "game_ai_ambient_tentacle_1": {
+      "sha256": "63bef1f936ccc0ff99785577b3944eb6dc87a2eceaeb3226290f054e2c8deb25",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/tentacle"
+    },
+    "game_ai_ambient_zombie_cueball_1": {
+      "sha256": "950f5345e79f2e5dd5c6bf40238e0e7f66b1084c45e2f404892e1dfa5d05d768",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/zombie_cueball"
+    },
+    "game_ai_fodder_gargoyle_1": {
+      "sha256": "182d6cafed66949db20c9dba97d877b5df871d5ddafed749ed35dfd83fcff133",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/gargoyle"
+    },
+    "game_ai_fodder_imp_1": {
+      "sha256": "7a128eb210185781fc022ea9ef1042d26d95bd9c66f1e4cdac3051b3c5edcbed",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp"
+    },
+    "game_ai_fodder_lostsoul_1": {
+      "sha256": "ffb2db0c09ba02a96f3d16db1384ff9e254a21cec3bc7b3012d28484b67ef6f1",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/lostsoul"
+    },
+    "game_ai_fodder_soldier_blaster_1": {
+      "sha256": "8ac19bed1884436a61b9362ea40ab04ecd6d51ddf85b114202bff0b04813c4fe",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster"
+    },
+    "game_ai_fodder_soldier_shield_4": {
+      "sha256": "c304a7048c8ceb170634c33f364fa3754618d1c27e224b4297021c8f2c083e9c",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_shield"
+    },
+    "game_ai_fodder_zombie_t1_scientist_1": {
+      "sha256": "47009f0e44a132656bbec5271bdbed271bcd66f77f90ffed13922f4264451d1c",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_t1_scientist",
+      "starting_health": 200
+    },
+    "game_ai_fodder_zombie_tier_3_1": {
+      "sha256": "cc974fad30ed5b2f3e28665c0f47cf1360be7686f1fa97ed2d33610ef3764284",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_3"
+    },
+    "game_ai_heavy_arachnotron_1": {
+      "sha256": "c8fb45e75641056c4091bdd6a19d33ddc1c039cb61d84044b6876975e9321953",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/arachnotron"
+    },
+    "game_ai_heavy_cacodemon_1": {
+      "sha256": "34092bd3a89699184e4443a3d1f7940f4776dfcd2bb18a78e6a9dc363ca4b97d",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/cacodemon"
+    },
+    "game_ai_heavy_hellknight_1": {
+      "sha256": "0c8386060360916c56e395320ca8a15375d8298912f33b4e14b940271c250a17",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/hellknight"
+    },
+    "game_ai_heavy_mancubus_fire_1": {
+      "sha256": "be21fcf4d0ab0ec182217acb702a2cbef87d9ffcfb910a9b3c7f98d20a162d21",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/mancubus_fire"
+    },
+    "game_ai_heavy_revenant_1": {
+      "sha256": "e4fa6694c64d0ad84e89cc1b6aac1ce0784818c654355651c03916a7ed8cb353",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/revenant"
+    },
+    "game_ai_heavy_whiplash_1": {
+      "sha256": "a95b8f450d30e60986b7a67cf1e014f97d318c64a980f946230feed28d471e74",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/whiplash"
+    },
+    "game_encounter_manager_crusher_12": {
+      "sha256": "699dcbcbaf073fca96fa1b8b3a9c8ea1b94e4ba283d83bd2111db991baf00086",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_cacodemon2": {
+      "sha256": "374f57bf9e3c5f1a14edc7316c002078c3a09778a885fe0060e64a48fead2f28",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_cacodemon6": {
+      "sha256": "a1143a012b5e211ed27f5e4358af7d4cfbb030f3d96e2b5445d49882e7d074ba",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_cacodemon7": {
+      "sha256": "18f2278125215c177cc5be0ebbc1c258280b027bef3f4a29b8d69da57661814d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_cacodemon8": {
+      "sha256": "b391660a4ade88e4e38994fcca42bf823de0f937bf7fc1da942f9a9a1c119084",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_cacodemon9": {
+      "sha256": "769e5f9c763364604e6ea9e302d64369bc6ad7ef58e6dce5fd6c498e95fa1753",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde10": {
+      "sha256": "469949ad0729a5c5b4cc571abec9239fcd25ef10c6d47addaa8f59719db63ddb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde11": {
+      "sha256": "d628a22c0dbdd91994f810095a752d8818b77b01c723969c596bda02acefae0a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde13": {
+      "sha256": "b7c54719b41a217356201a40e542207f46061f4ce433ef011cdcbf886d17a8f8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde16": {
+      "sha256": "721117f6e8c43d771f48739e46c807bfe1b81df730928227414096a82fc231ba",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde17": {
+      "sha256": "2ac000e3ca5e6226942d449e57bac4c863d84836a8bd2d84f8f9f6127724059a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde18": {
+      "sha256": "dfed5a40f16aefdba7ae7d5046f0db8e151af87f397897fe50e99c0529cf9108",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde19": {
+      "sha256": "9c703777d60f41917e783db942567987ce9f27d1111564b886a021a8c8717eed",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde20": {
+      "sha256": "a920997f3e6ad1a532730eb85ce7787fccc55729d12d05ea73df398c261d1b52",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde23": {
+      "sha256": "4dc1a7a04c2dcfb9b1a1b97a5732ff804d3ac17ee8a6d71e42f6b909b069a755",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde24": {
+      "sha256": "fb8ee99b6caf0d1096c484720ba53b5ac7cc443b4d534d70d4687455f140609b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde25": {
+      "sha256": "c16151f68bbda128e25cbaf32151d8404685f49ab69b3cd92f352c5ffcedd810",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde26": {
+      "sha256": "d76076211b22f33fd3dd6c5a2f62fd0a5abee218c896686df7f2b78a32878bd0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde28": {
+      "sha256": "cc5d0d96c61793ec86adec2eb716b2bf6a02f524a7985d3e5a4b1e3340612b37",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde29": {
+      "sha256": "392a33e2e89c6e66a752d5188737a6f2dd166c87db9520c57d35289056c959b7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde3": {
+      "sha256": "c269a9649fc4e1c2523c59773fedcda49b31a09610b157bfa58b6627952bbecd",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde30": {
+      "sha256": "966418eb7a7b14e80ed0cd0e925b20bf3e1360bf6660e78304239ad4b54826cf",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde31": {
+      "sha256": "c13f0bbcda73c20a88da759cf024eb9b9f9de8d1d82297ada4a2f5eeb754ed6b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde34": {
+      "sha256": "af64ee423d3efa99bd0629e0e356ad1a0f2bbc5bf189cf862189fe4a7373fcfd",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde35": {
+      "sha256": "cbfc48537bf2718ee83ccfa31934bff1b6901057a09780bb701746369892f544",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde36": {
+      "sha256": "3072e96df37fddc2b6e998fe6ab0ef68db21e4cb886ef0bf991b6885e9d3b707",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde39": {
+      "sha256": "3fcf4cb2dd921b905d7445e3d637fe8ebf0bdcacc5ce0eba51f856cfaa01e94c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde41": {
+      "sha256": "c4f3da2eb6feebc4f6906b7acc7f7ce7a7343ec7880ff394082fe3e7ad8e9632",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde42": {
+      "sha256": "f7f52c444ad542ebfb95e94df6e38bea0134a5a959c170b625133f471c1ae1d4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde44": {
+      "sha256": "07c7f11968e7869c8627c2136304323e9393d32082d970a137cb5bcd57193a86",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde47": {
+      "sha256": "be75c5e4eff87a86f75951cdfed5d2d91a4aeab63fd77fa684bd6612d4283431",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde48": {
+      "sha256": "beb9a2e577b5ae00009af715b226a893351fd79e3727f6ae580ed8e05d420073",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde49": {
+      "sha256": "deb6a0a1a91017eb81e53cfbd7b2d4f2717718279060f910bf39c318545e434f",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde5": {
+      "sha256": "d1db36a54dc34e106b5d9304e248217ae7ea35ddbeb660daade2f9da406fdc41",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde51": {
+      "sha256": "f1e538551c42c06a089b7b729a2435387286bb3d79fe12aba48658aa0338d220",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde52": {
+      "sha256": "6bec7de991ee8548d58ee432de5d0852a9f08aa92832cd0e91de1cc6f6b7af27",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde54": {
+      "sha256": "6b04a7dc2c6b18e9807510db8505692a5e6287aada1b739f6e5d98ef541b19e4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde6": {
+      "sha256": "5bb261984a07135a6a5b9048be088b6cec768629116e2fffe3f30caabf80bdba",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_crusher_horde7": {
+      "sha256": "461d53ece95210cbb163b2dad5c483e0ab399ecc3ed94d3819ec7fea8173e4e9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_gargoyle1": {
+      "sha256": "038b036d58cdce35adca5e92ae4d9abfc9a9dee076a64b34a7b60ebf413708ff",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_gargoyle3": {
+      "sha256": "8110e18e4554d6e5098e2b4aa0e9bbe9dc89f4c575852fe5634464dc1d2997cc",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_gargoyle7": {
+      "sha256": "aa59eef7f33edbd6f0ab0eff672179ffcac6a5c3e23bf6f5cd68f0b492194b03",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_gargoyle9": {
+      "sha256": "1ac25e38b5299922222f4ea26092ed2895632c6721002e1fbd370b6c2d706be4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_hub_zombies": {
+      "sha256": "14797196a08f8d5aa128c047e6e84a2ac2d7caf57d491fd92bc853a3fa588f1a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_imp5": {
+      "sha256": "b6e7517ad43c4c91246ade4ae3fb54d503144a048950c692ae90004d9c2fde71",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde1": {
+      "sha256": "b39e8a84e3be346c8b4c6de5899e8a35945fa264273c3dc98e48deab4e15dbce",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde2": {
+      "sha256": "14d60c9b19a07ef10e7b8ffab7d2afba14105db93b9c8a3cfb52fb4acbd563bb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde3": {
+      "sha256": "0d4b61f08e0e27a59357a2872a6d8943a76c1541ce97469de2927070e81f1519",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde4": {
+      "sha256": "4c6dd8e604922826cae01775dd9568febf8e44656e6869d478b27040eced5e75",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde5": {
+      "sha256": "f33eb8eefa375bb7a05c3e714566622ab8cf5c72e254cffe6528f2e4e03cb2a6",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde6": {
+      "sha256": "4b08e6f25fbdfa989dc7ae0991f64a3fc74ddfb1a2180601fc6b5d814ea242d0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde7": {
+      "sha256": "c0731b6376a14f57fa269118f96d1fb04c9c59acf1fe570c0edddcf525c90d55",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde8": {
+      "sha256": "bf9351de9a9054667c87e334fd37ce565d3d98fdd5848baa0e58738eab1333b1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_manc_horde9": {
+      "sha256": "cbfb159c01280e7cdc8f8a222743cc0e2d6396d10f871fc2217624690604addd",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_pinky10": {
+      "sha256": "5f39127567cd966ac7afcf3ff055faa268c3d46895130d943a4723cff98cc977",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_pinky11": {
+      "sha256": "36a51ce4e18d98623a5993f5c0876b1b4f1aacbb32a4bb1da2b92c19468cc3d2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_pinky3": {
+      "sha256": "1cbe8940fd36da5db1051ea97f0ff6c339841205e35dc7979ff2938632af9eff",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky4": {
+      "sha256": "6c774328d52f19640e2c8e7a1adab026f420c268e5a86c07d91c5d064a887e39",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky5": {
+      "sha256": "8d0558f2e0c4637f37f8b13dc75244586df63e0c32913d4ba599e18be9fb0569",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky6": {
+      "sha256": "4f415a795c1052c068a74752f5dfb2e368203c4a5335c1a0d5ad32f3f147ed38",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky7": {
+      "sha256": "95ac13dfccd0657fd2635f6d2d9ea8298d43971b2f53c335f8b9613dc56034dd",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky8": {
+      "sha256": "ea3f5155abec60484500102ada7a72ea5ea9455d39b1a5c9b401bdbabb93e334",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_pinky9": {
+      "sha256": "aafb70ebff0c7202bd9c35e3ae83ef81acbcf8f535adb7518ab88cdb1eb16501",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_soldier1": {
+      "sha256": "aa278e04a269ca79aeed09f17c7aca6f3cc2054d2a06c004dc083cfff711264f",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier11": {
+      "sha256": "71a5e7a4359d5324f7844627064035c703f8e6909e5008c7c05373c43072e217",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier12": {
+      "sha256": "8d83ab99d4002e1fbd6afa6d9daa6487f045d9f6e224001da2f37a19cb0de325",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier13": {
+      "sha256": "3320ec37b996236049d0586995ad8996dcd53095760f452266221d55e8827415",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_soldier2": {
+      "sha256": "7021b749b8262cd248d9da0807f3b3ed6027aa9f1c926dd2f66bc12fea0d0feb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier5": {
+      "sha256": "c9ff0a95716774b9e42db153d88bc705d0a72aa6f1257bb5b4504b99f2ba3278",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier8": {
+      "sha256": "4de9b145c2604d819016d187c0d71bb5d8697f42b6ff55930eae0cf32d3cb5d7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_soldier9": {
+      "sha256": "fba251241fa5752c75c8b2676354e9db1cc273a06d631113d6bc9f25099032a4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie1": {
+      "sha256": "6d44e9dfc59fa8cf984145d0ca9dd32e67189813979ea7ca18bbd5f8c3f444b0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie10": {
+      "sha256": "2d18a725035ef850434a53a32cddc8ccf7f5b5ee3ddcef78af3628b8b4ccadc0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie13": {
+      "sha256": "1561e4d55d7e5a2874cd993c8c4367a2752c292896f25f169ef26d34e3b5a651",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie16": {
+      "sha256": "4abb3d57b2765fdfb4b4c7e80ca4e0a2075572e300bf4701705a1ec59516897d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie18": {
+      "sha256": "21e915ea36c94d957d966341c4e8dec75ff80369a07c3674bd27e0e12fe45567",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie19": {
+      "sha256": "f4554627a04dc842869e916894df056dc3bef876f7e0dc0a330e5d31e55a277b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie2": {
+      "sha256": "28115f6d5beb24daadcad048bc6086e5b17ef2eca1277e39513c6e75a6ea885d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie21": {
+      "sha256": "ce26400d44a7f6d84328c983bafbf6ea12998d622a96a552ef5470f99f532247",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie22": {
+      "sha256": "b1031ae385aab331ef29a46e116bd6ecbda6c97333f7af072c3828ca35bdb19d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie23": {
+      "sha256": "7dfb47150ba700f2b9d08ead2acc6dc02172facbdc2928c59c4ca2595c0f72cf",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie24": {
+      "sha256": "5ec01d538fe1aded84c738cee0566d8623d8a63cc84613b8ccd301756a6b43b3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie25": {
+      "sha256": "42d4babf023128f0d3776f0ea269370d7e95d710ca81fc5c7c4dc8d468010440",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie26": {
+      "sha256": "4b482bcbad3d2da6c8f6553e33768b81a3b236a13a765fcd557fbf829ede4d0a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie28": {
+      "sha256": "b90e67e4b43e0446c7b95ca84616f2320ab73a2413ef0c11d1f8e292ce9995d4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie29": {
+      "sha256": "6b00e34de9f472b24c01b56294a5aa64475670679b18fb899986547cf6428919",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie3": {
+      "sha256": "c82115556fd1604fe5519877cc2762945afde07be08e746f2f2e089de82aa2cf",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie30": {
+      "sha256": "f50048da7255b9be81a880703db80af45c37270f4299a0dd9d125bc653ac2801",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie31": {
+      "sha256": "af694554a4c826c074afb193b0aaaea5f5b9c1f98692c4e5ad3d22db8a9c86dc",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombie4": {
+      "sha256": "7eaf2b4dd30c875725c68e0f15626581558962e292d827dbb0fb82a9c57d3bd2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie6": {
+      "sha256": "37543e3af5fd60e8c30cd0241c2051161507a3bf5cdf87d788a8f47681444d07",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie7": {
+      "sha256": "d146d95f6089e890e946f7f436588e8c1680ba4d750b69dbc7c845f69e2cfa2d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie8": {
+      "sha256": "0b10960ffc67f5682d4c3c3537af70bff33703c2581c597dc3734a169a47559a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombie9": {
+      "sha256": "287155f0bde1d3acc5d39e6124b17e98beb04a0c5db4012070e27748aad6c0e1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_1": {
+      "sha256": "c1264098135e97095f6c1b90edc91d2e017f06aae4c7efc3c096ec0d041f9d10",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_12": {
+      "sha256": "353a14b4c2612afd55673285ac0168311e60a5200df7b3905286548e01745c4d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_15": {
+      "sha256": "d19b2228dc61a3c5026bbd83a31472378157b2f3760d5952a83307ede8dedc1c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_25": {
+      "sha256": "6246177bd782c5e3675468f12e1e8ff11c6d70a055c6a50209773861d84535cb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_27": {
+      "sha256": "e33bac42660e74276a1967cae395648fd24ff59b1e7cf9c6f46b36a885cae08c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_28": {
+      "sha256": "4717d26c2dc09f68efd8a01f58c8544e456671388fba7684348dc69629f7cbd4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_33": {
+      "sha256": "15294481d58a0c301a1a4319ea4174d720f26f04c0f7f63bcd24c8887a281b75",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_35": {
+      "sha256": "d6cd27c042c66728bfb6c90a445b64e03bbea579cdb4339b1f40d871ac20ea67",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_37": {
+      "sha256": "427b2567ed6d3f6049725355d9fa5e1aaff18deedefe45057f201f47fab563eb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_39": {
+      "sha256": "c9792d4edf46a9e856cb6593b15209514f3b0ff4436e7147745fba05f031d738",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_40": {
+      "sha256": "52c06cd578a2de9b64b434e21704f71197851a83f59b4827320954a03d370f50",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_41": {
+      "sha256": "e112764d7ca3d3a2f163fdb84dd207c1034e2f93db2e02c25f3cba1430254b13",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_43": {
+      "sha256": "11f45fff38050095f2accdfd67bb7c1813be35d279288e92f285831df54d3074",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_45": {
+      "sha256": "8f16a7e7bd548873f5b021a76ce2bf22976e48ea234092f230acf633239303a2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_46": {
+      "sha256": "f5c2621ec5925bf41dc39e6ee4f1c0ffb47acfb73e604f44f25a126cacb46cce",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_48": {
+      "sha256": "59edab54251e79b3264fc1ccba0ac56122499a7f26b7684ec785f4fe94c7ce55",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_49": {
+      "sha256": "8e21bfe6f5ab96b50994b87b67c3b27dc55044f5da20a3a3eb399b29b1073a45",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_50": {
+      "sha256": "b80633a9b7eb53efb5facd75f45270c5bf476823fea26ee236db4f3200ba1afe",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_53": {
+      "sha256": "7d20cda4b072ade4fea06da5f5fe629a94638a48445db7980b1c388ae0e92999",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_54": {
+      "sha256": "8f5d811f22f1562f7238082b6e7d87ab99e0d3fdbd82ef495f2f2e2bc4a61cac",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_6": {
+      "sha256": "82fee41b869bdd4a6e4a70d521542bc6d4019f4f1c0d519c7bc6d5f25d08d707",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_7": {
+      "sha256": "f2838b1b9ff0f5a74296b81938994247884edabd3042331b9f918d02cd14c88c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_cylinder_zombiesuicide_9": {
+      "sha256": "4342c8c314c81ebd1ed4270dcb138ad11714a067da655c2032919c25cb7aa585",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final1": {
+      "sha256": "5e9f39ec581801b8760c35e2e19569010a3667d3715b066c90cefe3cdfd8b5ec",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final10": {
+      "sha256": "32d631fcadf146badd5604a794fb544e1158c59cdab38fe92ac06e4c0b44deca",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_final11": {
+      "sha256": "19206c02d502c2eb44e1f80cb6f07b9d8dba47ce270fc70ab74a1a0f13b5b909",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_final2": {
+      "sha256": "a6dd01f56732b373bc15af74272ff051d3049bba0b519ba8728fcf3dda5e6198",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final3": {
+      "sha256": "e4795f65d3f25556ddebfbe36c4086b0a3a0e1fb5e796dd8d38ad87b6876c1e9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final4": {
+      "sha256": "d89025abda1a7f87e4849fda82f61ecd823c16fd6bf6b5a1a7ac57021bf03ea0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final5": {
+      "sha256": "945fc9e3ac080d6512603c10c59956ed4f7e5920f201fbcdf27e6a8a3cebfdc9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final6": {
+      "sha256": "14d727456f5dd6750672e6d03c42ce0feadfbe5fc7789175b6a863e0f5c8f0c6",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final8": {
+      "sha256": "120f4126f7a0e21dac62adad8b5f4d3a3ba79e3c6dd357bc9a944b87369f2a8b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_final9": {
+      "sha256": "47cd812c5e08864fe85851d8d11534b920ebb917c6db733543bbd476d16f66b9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_spawn_group_parent_shared1": {
+      "sha256": "a31b0181d0f129085e8cfef74a62ac2ac780fa9c532425924e030a3bf5925e1b",
+      "class_name": "idTarget_Spawn_Parent",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_1": {
+      "sha256": "84bf30838cd2a97f477fc398b729163a56fa0c321ec6e5ef9b9f8c02e1ad7337",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_10": {
+      "sha256": "86be400a1be5e0a986ad228dd911a5df1259b5b07c8c71c0fea21a68cd7f3860",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_11": {
+      "sha256": "55a0570fabf963cb8b540250e16476926c36548e9806075deaf9367a89533ba1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_2": {
+      "sha256": "3062dfa69c598ad58d295749d1524cdf6045ae28a00adf3fea03d7ba462cc5f8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_4": {
+      "sha256": "8b1369359a92f43f69b4f4cc798af6f4206ca878cf3d15eee627d48196192e3e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_5": {
+      "sha256": "b9880d5a555c0935767e46e8ad5ee35d25fc9493fc3ffbdb29b21105fa28440b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_6": {
+      "sha256": "1cc258d0bce316ac4d63c6ad8ea1a820dc552a77e5d7b5ffe8eafb42be7aa9db",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_7": {
+      "sha256": "48f7f0c9077c9c7513916feae0336098babb7797d62ac454298d6d1f26d37847",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_spawn_group_revenant_8": {
+      "sha256": "640adf1fac285828f29a275797ca1b4df2f25632969a2d5bfd2b66ab07d522ad",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "game_encounter_trigger_commit_21": {
+      "sha256": "6791247158bde6b30c095870d2900206102d5e49d7a85083cf94af1fbee21d02",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_encounter_trigger_exit_20": {
+      "sha256": "a4dbaf835f4778fc9fa418abc7e01a6ecec2850692007ff141cb03872cf24229",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+      ]
+    },
+    "game_target_spawn_621": {
+      "sha256": "2bfc57f03863fc3147fdc5121f0ecfd21df9ad4b53b31eaf090583aaa9995688",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 116.855736,
+        "y": 16.5230465,
+        "z": -57.5000038
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "game_target_spawn_623": {
+      "sha256": "984199bc8c6d7bb8d289c8079c9ecac9fe2f1838976f7333ef50699cf35c1c8d",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 130.100021,
+        "y": 14.7499714,
+        "z": -57.1003151
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "gameplay_encounter_spawn_group_e1m3_zombies": {
+      "sha256": "4c58f7a448ef06a4361a38beb838240ff704999b79d1ef5d43abe53db8954082",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_arachnotron1": {
+      "sha256": "58307c314dc36cda05901200ceefe31cf23db65e8c8b62dfcfe7b8ed39117a16",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_archvile1": {
+      "sha256": "7f8e8034f38b6bb32ccc42938e9bca3f313956497b1a9b016c8ac46a288d14f4",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_baron1": {
+      "sha256": "1fa44bf5b3508eef18307680c9c184c1ba0fd15ed860d1ed93e631d1d7b3e9c2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_buffpod1": {
+      "sha256": "3cc1503cec3caedb9efd2ae1ebfdec63fb54da35407b768137cfb8fac8e2f40c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_cacodemon1": {
+      "sha256": "c927744c28ce7584b635f8ae8a3058b71da8ef96f2726f7f3986d22b9996fcec",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_carcass1": {
+      "sha256": "29e098096d22fc2a6fb19bd09fc7cf146b8bc473bdf5d01e8c7abff7a7134c0c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_doom_hunter1": {
+      "sha256": "e3bde96e4736d66b3694b0c50dc29ada6ae2a53fe81cf0b2e408291fa59c489d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_dreadknight1": {
+      "sha256": "254a01c5dc0544cf32f1b88fac37b2925675c37f6e314a4d47cd0521dba6abd2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_gargoyle1": {
+      "sha256": "02cbae86bbe4e537e67cc6c1cc54d45624b509c28412ebd42e50ae7d38470491",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_hellknight1": {
+      "sha256": "b739a1a6c7526f173fcfb7f522b16353acd16ce64317dc76b38591cc3efaed6c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_imp1": {
+      "sha256": "a4b8e2b11a5dad6e384191250655e3813cf57ba390ae4e79e0dbe94f2e408bbb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_lostsoul1": {
+      "sha256": "afa81e4fcdd9cb612b7cb785d62c3fda077598a991bdabc15320be21069d6041",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_manc_fire1": {
+      "sha256": "36aba72acf619c0b5181f40755fa733d4e52c9bbcdf40266950590ae3ebf87e8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_manc_goo1": {
+      "sha256": "4165877cf93fbb08a2ec25f064f9cb19ac8c36b4bfd1fec945a205d8dc754f8e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_marauder1": {
+      "sha256": "b4d871a1a93ef0f8bb064feb179124052b94e74087717a4dd1d6dad27fda3591",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_painelemental1": {
+      "sha256": "e71dde1e5184cf71780ca1075137adf64245cad40ffc940e3e6fc6540d82b4e2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_pinky1": {
+      "sha256": "cea9eaac123f37e07517990abd4c50f48cfb7fe0afbdda29ca3a752709cbb21d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_pinky_spectre1": {
+      "sha256": "b2b94af31691f6766a27a56b1e7c2e5d354c42bf687c4a73b922b1772388bd81",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_prowler1": {
+      "sha256": "bdc8f0b57c981a5ab0a22f676d1d05ebb77ed7675f79ac19e81ab9b35187d902",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_revenant1": {
+      "sha256": "28733d4d0b6213db04d0577acc935cfec085ae2b2a46cd2d93b29f949759aae1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_soldier_blaster1": {
+      "sha256": "f155b427e193f9533414a58174e47aaa06f514c279d871d400eace968768170a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_soldier_shield1": {
+      "sha256": "aa6d823e0aa8b86c1b4a9858e1d8403a56e6e76a0ab090870ec9b88235230a70",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_tentacle1": {
+      "sha256": "b855d93ee020c11c6d62da0e4913fd4d675ca0472af844bd85294a80e0f5896c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_tyrant1": {
+      "sha256": "b28cd62d2e9ca3ad7215a5a7e615b7d54e0e942bffac4185dd20cb932f6a2398",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_whiplash1": {
+      "sha256": "ea3a03652f97167dc51aed07b5957cb1c46137827f7308902844a67ca0c6ee59",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_zombie_t1": {
+      "sha256": "629b23815277062f0d2d9ac9322b8d0cc6945e91113df7887e5f408811478876",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_encounter_spawn_group_master_zombie_t2": {
+      "sha256": "28e1235c5805d3faf2f0ce4b82de7a4da634220e67f67d4953e820d965121d06",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_slayergate_e1m3_encounter_spawn_group_master_prowler": {
+      "sha256": "308a82c3f3d8d5de84b5882369c7d2a743a81260054ab755e233dcd506753bc7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "gameplay_slayergate_e1m3_encounter_spawn_group_soldier_blaster": {
+      "sha256": "14dfa8377c1733715d3c60ed48b65efec6560152429e9900d1c03d1b5d49cd67",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde10": {
+      "sha256": "884089d7d035f81eb4f490a101a59399b54a9f2054c3c9363fcc49d4b3c67afc",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde11": {
+      "sha256": "83c9e82d7b14bd61374c3503915b351ad514d31496fa6659e1175ebc56257a23",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde13": {
+      "sha256": "b3a62dbdeb658b604f04917939809b51f72f2808e485ad6b8f6ce939422350b3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde16": {
+      "sha256": "3c93b3b622283a7849a2130516ffe30d59438e14eab2f904aee89af784363a01",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde17": {
+      "sha256": "c1f712e32d80bcf44a872c85b1b5bd63084aec3ef8bf8836f903a0e0cfaf387a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde18": {
+      "sha256": "4f70305b24357462e16e6d860aa868f88258855d66d13f993e21d6e15b1b4cb8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde19": {
+      "sha256": "b826a889825e7c081d4b10a27fecf5ce07bd008d8ab3eae10a86602f0d359602",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde20": {
+      "sha256": "4824b799e1c94c7a22bb2017b991d665f298d1a65090ef71d3ec1f74214b857b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde23": {
+      "sha256": "c447d5d6e0896e9e8a00c5eaa80c75126b033a01fd3a923b8fad42894afc8bfa",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde24": {
+      "sha256": "13a9508caba4a117cbe0984d9c5b2d7588a623d1ce01123930e3d46f0d02d922",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde25": {
+      "sha256": "788f0405c5d616fd288e547edebe02e7ca79ab8c6b56eacb6530d9c19f868dd0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde26": {
+      "sha256": "0c16a26699bfefff0dd9695177e97b916020790107d479b0385a67cc7d775e6a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde28": {
+      "sha256": "0526eac04ab7d96d5c245105155fbb3ca5daa89f3f7dc8e353a51e6979595a3c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde29": {
+      "sha256": "0232856b251842291271279a2073eebefe416db7855f082ad19db3032f5ff81d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde30": {
+      "sha256": "e7c347e0d8b389913f88835dc21fa98591eb59d0b1947f06b8d40f986c428cf0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde31": {
+      "sha256": "b07a4e912bbada6a2aea925cf48d68452c342c9fdd3d54ce006ad0d770a67251",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde32": {
+      "sha256": "ff93cc4b5be2ed7f7f1c5e2557ab7db5cbe6379d7458003c65a576d5bbef0351",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde33": {
+      "sha256": "6dccc35ce7eb94659f38c6dab433b2d02fc1ea408fde5bbda31f1607070964ae",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde34": {
+      "sha256": "a766e651a1fe08be0b611206d0751ee4ac0eb6f0334fe2fa4e5eba81732bde5a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde35": {
+      "sha256": "130b8c708685c1eca8278818d1fee93a311fe20a2abb1b28ce166468e4da2157",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde36": {
+      "sha256": "f100af62e692744c58c9464a7aa42f23a0e99b24da088a428e35852915c1a58a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde5": {
+      "sha256": "b781198a553f69b03d465e47e79504d8b89093d6b381f70dd882ade4b3345a56",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde6": {
+      "sha256": "8bd259e73dd8fd08275121f20ed6cbe5f9a1943c0516fbc40d7a2d2daa268fb7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_crusher_horde7": {
+      "sha256": "0e1c4d6a093f16f00c1655e0bdb2ce57c9cf3f0d6d134e1e070d4be54a4f62c5",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_gargoyle3": {
+      "sha256": "bec8289af54b0d4c6ec5f4d88f0607e4e311ab0d15332620f8ed45589ac54e72",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_gargoyle4": {
+      "sha256": "f26d901a8b7b3f9b85e2247959a3c0d616a01f7f9eda49ee5d8c4bb30d8ac56d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_hub_zombies": {
+      "sha256": "d06679087ef838d483dd5401b58bc60abbb392e29cd632d4bcf5f2e0123b5f2c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_imp5": {
+      "sha256": "2c386e9b6ca0e6203788508cd6ff2e678c5dac90c071cb8ddb25cdb2400f7516",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_manc_horde1": {
+      "sha256": "7aaa19478ffe2859cb5c40d33339924a3f7b0fcb8df0225c7b0673c6dd562832",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_manc_horde2": {
+      "sha256": "e6ae5c09970955f3d04d899c8ef3c4e4238cfe71228bc3e2ff3c0be5c37ce9f1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_manc_horde3": {
+      "sha256": "1521522eab81e7d36ac27d967fba20cd78396d83d8166ff1c25f983e0bcf5144",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_manc_horde4": {
+      "sha256": "ea2136d2ba5e988afa17a3e555a123ae118a70b9b87aa1d60e062149b91ab391",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_pinky3": {
+      "sha256": "09730da6ba9c25e05bb6f4ddd7c936b9a9ebdca513d8a21fe426ddc104382652",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_pinky4": {
+      "sha256": "f8518dd428449636d94dafe7a609432eae454fce3e78d60e1a45451d86bf88f8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_pinky5": {
+      "sha256": "1329d2a750291abead821c42236ce57cf0f1c51f76467d8a8fc2eb31edf3140f",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_pinky6": {
+      "sha256": "d4b3a1d9de86f8c79580264980a8879b69c4fc3b3acc515e890588f7e8cac92a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_ssg1_zombie5": {
+      "sha256": "bc53e8edcd94ea901ec72102aab62a5120b83b0ae09e4246c23bcf8494a15dd6",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie1": {
+      "sha256": "788014654d4350795f78b71d5e03d9da246ce63ab26fce5533754697a62c3b1a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie10": {
+      "sha256": "3792e47838d41588e3f92c365eb4800bc796456f53f80279af3ea21262ce2b0f",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie13": {
+      "sha256": "9cddeb0f96e62b9d40d434bfe2fd9be2dc62ffcf8df44a54c094286fa332ae1e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie18": {
+      "sha256": "df0970b4642d44042cdd9f3c3c9629855206e0ffe92456e79b6764e9a3fd30cf",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie19": {
+      "sha256": "e15245b767a59abacaaab6e97b900a95c13ac4d99b30ce9e159982733d6cbe13",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie2": {
+      "sha256": "a53e99e4a571b71edc47b8684986f941931bb201d8d464201fe5ba8ea5d34d4a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie20": {
+      "sha256": "5df96c2c7143e811e60b620bc0afec2edefa5709ed5b0ebaffaa268137ee87ba",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie6": {
+      "sha256": "0b125ada9b07faedb6e2072ead1f69e94125e4670ba2ae397f38366abdeb411c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie8": {
+      "sha256": "22fa56612d398fc621b4397538c433d26995120352e1bd6334292c6b61e79dae",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombie9": {
+      "sha256": "0237889dfa9e11a28236bd06e68857139b1f3b86777e4aad3c24f3a5bdf26694",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_12": {
+      "sha256": "978ccfe8ad852e019be002c4ede4eece48e0be352a33a9bacf5210fac6466234",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_15": {
+      "sha256": "4df92c4418ec89fbdc1a009eb30746ecc98f5e0a6e2d1961dacc0ea30c60b2a1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_22": {
+      "sha256": "166014d54a6b1a8a766b5b50a202d2cabd806ab2421c674eb230ed32c0eb92e2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_24": {
+      "sha256": "9a1335f700e4c4af0dd9c356b53a6614734015ff0781647d09df7b95007afd62",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_25": {
+      "sha256": "4916860d970b851f2bf76e329790dead5757c154b4af42ebc17590f4e858fb67",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_28": {
+      "sha256": "063f40651eb89f57e6498be0cec8ba8d8f3c74e15c52d882da34be00f3aa2fc3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_30": {
+      "sha256": "3ec319bfc5f23af9481bac7c47495ddcd07ff0889bef62726c914e7f6c03f43d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_31": {
+      "sha256": "6bb27602ae6db735c6a90a7260279ff2b2f875e318190176930e0294d4b6d16e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_33": {
+      "sha256": "0f6475c8fc7374cdc47d01e47dc5064eaae09792060eb0359582d817ae39981c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_35": {
+      "sha256": "782e55242544e13b656e96a5a9af1c15f1a9ad89517cfd271d2f116d02af624d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_36": {
+      "sha256": "210d8ce3055346ed239d0fbb8a353e4aba9ccd0da460ef5bb34bf310853d0060",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_7": {
+      "sha256": "72e52d99f6f12c30b9fddde06a4259cb46090961c2d3a22a99bf57ebb0d74d93",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_cylinder_zombiesuicide_9": {
+      "sha256": "0b8ee1c1fbfef06b7fdc03d824786b1df11364c26b1402bfddc2357f6d858c66",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_arachnotron": {
+      "sha256": "8d5bbeaca4f5278245600ea35ed187ac30fffd075d5e21ae71b20f44623e497e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_archvile": {
+      "sha256": "40273b5024fbdf7541c0083a35d1d8b5249e4b6aa82e3bbccda08d05f53d0461",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_baron": {
+      "sha256": "54c7cb5d35fbb7ef533e9e2ed065c99eb803aa890edae1bb20e23624f9eb8d08",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_buffpod": {
+      "sha256": "d4a87d00686519df0a64366654c48839530ef0b690f05bc13ddb2eb1f12ff550",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_cacodemon": {
+      "sha256": "2da3a2113a14c93f153dfcd406c7ec9739507ef8efaa9687532569c1a147b8c6",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_carcass": {
+      "sha256": "a05fd90c1f30fc4af35e521be810289330a5044de2f67f83c658a509eef725f3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_cueball": {
+      "sha256": "e6e43e1fabe802165440a07d679d8f5de6bf99a8c62b5fd85224c28e2189fc3f",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_doom_hunter": {
+      "sha256": "3ed6dc261729781fe757e7ae81af844ab51f70318d83bd9170e93c3881ee9064",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_dreadknight": {
+      "sha256": "4620df150f74b37144cb0f577a603326773a559d9330a95835a7b78d5ced1797",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_everyone": {
+      "sha256": "a5999953c016399ccd99ccfe92895a40f83c2dabfa1a97ff953638ce3a0dc890",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_gargoyle": {
+      "sha256": "87af1887fb91aaf6484502414867fabfd1ac8f51f02c3724f6adc905e1cfc2f8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_hellknight": {
+      "sha256": "bfbca4bc52fac0d5a41563dfaf59209796b8eb15e340f25c9ed7a9b37ec1ccca",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_imp": {
+      "sha256": "4b0b4d3dc31b20909a746dbe8de574e8f8211a4be1084b5c20fbeeadcf2eddd7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_lostsoul": {
+      "sha256": "239c40e27af7cec57936c153a74537f1360e693b944a0ec435d36e44d4618037",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_manc_fire": {
+      "sha256": "4be3c6c96d2d4f7145a3fd6e386a4a5d9f4e87ee103f1a2e56b3d6a5d59f5461",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_manc_goo": {
+      "sha256": "d589fb0ee166078b0c713bef3bf9e0a146badab33272f256a24b4c7d9c60b1ec",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_marauder": {
+      "sha256": "6a3157a5033571d6624988db33cd629cb0d08a76ab0e399746cadda9f8f8596c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_painelemental": {
+      "sha256": "496a0395deaf18ca25d331752d876222bc98ed4924612fc5906f4b2f52216471",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_pinky": {
+      "sha256": "93269fcbac9e9470e6173cb494346422c3fef435677bbd0442cfba0f85da4848",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_pinky_spectre": {
+      "sha256": "867137e82ebc507f858734aac4eb77490352c8f06193b64b9f7e61f4ec192d1a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_prowler": {
+      "sha256": "e866bb3ac70625b8dbf44ecf9f838d697fda291b41152d5a49ea75214fbd6d53",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_revenant": {
+      "sha256": "5eb99e39e3557257c460a4a62b208f594bf82d613e9dca4b8345cd01b8d887cf",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_soldier_blaster": {
+      "sha256": "4c4247b049d25508d353fab281cd0b1943e6a40d72b4b1e8232a0e9ffed8c2f9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_soldier_shield": {
+      "sha256": "749bcf1ccb7a7d247acd82f078521bdeba6dfae4cef08339f2233bcd03c24bec",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_tentacle": {
+      "sha256": "47660f8d23307b2a0893a896e97a4971f1e2f08900640e9231c8fc903d062f20",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_tyrant": {
+      "sha256": "a5a34b7ef6e2e84d6a716a41b5799ad59b8e573d739d3b673530078dbcd6ec9b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_whiplash": {
+      "sha256": "70d5a8dfdc223e47d218ef9df58cd6f38a7845c1a2816a80c452afebff0615b7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_zombie_t1": {
+      "sha256": "cb94a1bbf2e301bda00f93a7eb3147a385170ab048c9bed3636e6942682bfd03",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_master_zombie_t3": {
+      "sha256": "0d3a2b789385aa4772fc70561fcd57eda146b7ccbd4401e4932eb7a051e88fbc",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_ds_zombies1": {
+      "sha256": "b640c8fc9f4a7f7abffdb51de3a77660eff3720d2447d0fb5253985b966a6217",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_trickle_zombies_1": {
+      "sha256": "d9caf14018fd06be2647f551240c69b764d8053f7275193ca482632134eb8968",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_trickle_zombies_prefab": {
+      "sha256": "5726981880d17dec22889a932c86df82b48a2de63e9194ff1cecac5785e37e23",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_trickle_zombies_prefab2": {
+      "sha256": "a164428e2bbd328dfd289f041b040d85aa56933212088907757bd515cd2e30ce",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_trickle_zombies_prefab3": {
+      "sha256": "e8cd431c7969f9d7e2b20098321f4e7d538f3961c03d23095e88363963099cfb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_encounter_spawn_group_zone_trickle_zombies_prefab4": {
+      "sha256": "77f1a5ec5aac40b6a32d49d54ee74149b9988e848712668908753c0dd132a86b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_manc_fire1": {
+      "sha256": "4620f8b0a4c92949a46f24ead9c0bd74a098b22564c62232c438ae184f5c89ee",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_master_arachnotron1": {
+      "sha256": "0a56017fc098a5ab953ebf0604a7d053646bab46608cc7a503ccffebe81d5b31",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_master_imp1": {
+      "sha256": "c981a768c7a1c3f5810c6fb4dce45f113fb57e1dac7a29e0fc66effc477e0d07",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_master_revenant1": {
+      "sha256": "21507ae6ad88abd753fe4ad61f3e5ce310211be5bf2fc8ad2d3a2cf6a113df77",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_painelemental1": {
+      "sha256": "1f1436fb909fca652402f7c290c1d4cfb6627d4310036ea1da5bf50bbb551395",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_slayergate_mc_encounter_spawn_group_soldier_blaster1": {
+      "sha256": "540e6d88a73073e7b8749bbf76fb86a3c9d424639859b9224e6ee7c85be63d90",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_spawn_group_final_fodder": {
+      "sha256": "d4d24a752d9d64d83bb0d8a6a4e23e0e06f7a21d53c36fa639b7ac2669beb342",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_spawn_group_final_heavy": {
+      "sha256": "523a02d125d3be739b796d746b5a0a797a7f17fa0536d427f7c5fc50221e63fb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "masterlevel_spawn_group_final_zombies": {
+      "sha256": "fd61fe626662cd39ab9bd497fbc8239bcb0759dadd74a4656866978f7134664c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_manc_fire": {
+      "sha256": "5b6bf052da78541dd3a06f32729dcd1e57a54a6fe8b6fce12717aacc13181e66",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_master_arachnotron": {
+      "sha256": "5e0af6595fe96cf0df41b4c3c5920b7ddebba201fbc9152d9184cc8ca4feacc3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_master_gargoyle": {
+      "sha256": "1351f7b3fda797ad348789233ab334960b2488446dcce46db9cd0ff3e38c1387",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_master_imp": {
+      "sha256": "e0c041327a5fcddedafe12541fc1a5aa03c278ca1d2194e2ab339029baef5b51",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_master_prowler": {
+      "sha256": "5e9deda0a11ec14757fcc6b1f2dd08bc1cd982b534ed3f4380798aa881844a74",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_master_revenant": {
+      "sha256": "e429fd4e63cec8fbe6a5533308f51794bd0f210fb6dd3b0ce8e107737a66941d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_painelemental": {
+      "sha256": "5be8905c0c67caccd6bff457a40f13f05f3d563c925155e0cebd4fe8cbb3464e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_ds_encounter_spawn_group_soldier_blaster": {
+      "sha256": "d2c63cd3d92d4f74c547d16a3e24e9aaa311ebc9a8dffb5e8758c2f080aff6b7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_manc_fire": {
+      "sha256": "475cc2b006353d288809d718dcb1d60641bfe2be43aa5fd5e077203d060dd912",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_master_arachnotron": {
+      "sha256": "6e1c5a5db392283bb7931017d5634aad0cec1b408798fd4836812224e0a31b4a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_master_fodder": {
+      "sha256": "c06a2c955fbae683b160223c8fa73bfb73a476816b6d7d361e468bb1839a3e3b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_master_imp": {
+      "sha256": "f334923831121179f7e90b9acefabb88d60eb8837c8470b468b44082d076a443",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_master_prowler": {
+      "sha256": "ed75d75e599cce24ca3adb4f2501395997c905d98b8950da8c4eb6cd4d0e25d1",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_master_revenant": {
+      "sha256": "d158eea535b474a185dc34c5eb04c0afc277cd1a67a702c0c4fe970b8835ee62",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_painelemental": {
+      "sha256": "e226795d83b5d47047dd6a0d0acf8e3d6a9e45e8e641772467907680a253bb3c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    },
+    "slayergate_sb_encounter_spawn_group_soldier_blaster": {
+      "sha256": "c8270e33c02f4d47f0dca6f831bb3de7db701f201a01f06b44b447e2f33d59af",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e1m3_cult/e1m3_masterlevel"
+      ]
+    }
+  },
+  "gaps": [
+    {
+      "manager": "game_encounter_manager_centralhub_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_10",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_13",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_15",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_16",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_17",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_18",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_19",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_21",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_22",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_24",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_26",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_27",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_28",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_9",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusher_dummy",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_crusherhallway_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_drawbridge_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_dummy_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_feedinggrounds_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_fleshblender_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_fleshblender_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_guillotinehallway_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_guillotinehallway_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_guillotinehallway_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_guillotinehallway_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_guillotinehallway_5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_longhallway_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_manc_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_revenant",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_skullexcavation_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_traindepot_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_walktheplank_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_walktheplank_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie14",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie17",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie18",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie21",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie23",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie24",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "game_encounter_manager_zombie6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "gameplay_slayergate_e1m3_encounter_manager",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_b1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_cageroom_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_10",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_12",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_13",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_15",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_16",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_17",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_18",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_19",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_9",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_dummy1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_crusher_dummy_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_final",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_hub_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_hub_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_manc_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_return_hallway",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_revenant",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_revenant2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_sacrifice1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_sacrifice4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_ssg3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x5",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_x6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie11",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie14",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie16",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie18",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie20",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie21",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie6",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_encounter_manager_zombie9",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "masterlevel_slayergate_mc_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "slayergate_ds_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "slayergate_sb_encounter_manager_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    }
+  ],
+  "definition_ancestry_sha256": "9c01e82f0abfd48ff9d236adb3e51a24de95a5e29298dab7632bc4a5decca081",
+  "source_snapshot": {
+    "member": "sources/e1m3_cult.entities",
+    "sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+    "size": 18900226
+  },
+  "review_source": {
+    "path": "content/catalog/encounter_opportunity_segments.json",
+    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+  }
+}

@@ -1,0 +1,100 @@
+"""Add pinned population assignments required by already materialized encounters."""
+
+import hashlib
+import json
+
+from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace
+from tools.maps.encounter_catalog import entity_records
+from tools.maps.encounter_materializer import _edit
+from tools.maps.encounter_population_sources import PopulationSources
+from tools.maps.enemy_attributes import _member
+
+
+PRIVATE_POPULATION_PREFIX = "gameresources_patch2/generated/decls/actorpopulation/actorpopulation/ap_v070/"
+PRIVATE_POPULATION_ASSETSINFO_PREFIX = "gameresources_patch2/EternalMod/assetsinfo/ap_v070_population_"
+
+
+def _object_body(text, path):
+    body = text.strip()[1:-1]
+    for name in path:
+        member = _member(body, name)
+        if member is None or not member[2]:
+            raise ValueError(f"Population source has no object: {name}")
+        start, _, _ = member
+        end = find_matching_brace(body, start)
+        body = body[start + 1:end - 1]
+    return body
+
+
+def materialize_frozen_populations(materialized_map_text, map_plan, registry, root):
+    """Return map text and private DECL bytes without changing original populations."""
+    operations = map_plan["operations"]
+    if not operations:
+        return materialized_map_text, {}
+    sources = registry["actorpopulation_sources"]
+    populations = PopulationSources(registry, root)
+    load, variants = populations.load, populations.variants
+    resolved, matches = populations.resolved, populations.matches
+
+    def additional_assignment(inherit, spawn_type):
+        candidates = []
+        for name in sorted(sources):
+            values = variants(name)
+            for variant in values:
+                document, rows, _, text = load(name, variant)
+                for index, row in sorted(rows.items()):
+                    if not matches(row, inherit, spawn_type):
+                        continue
+                    if len(values) != 1:
+                        raise ValueError(f"Ambiguous actor population variant: {name}")
+                    parent = document.get("inherit")
+                    if parent and any(index < load(parent, value)[2] for value in variants(parent)):
+                        raise ValueError(f"Population assignment has unresolved inherited fields: {name}/{index}")
+                    candidates.append(_object_body(text, ("edit", "aiTypeDefAssignments", f"item[{index}]")))
+        if len(candidates) != 1:
+            raise ValueError(f"Missing or ambiguous population assignment: {inherit}/{spawn_type}")
+        return candidates[0]
+
+    selected = {operation["manager"]["entity"] for operation in operations}
+    selected.update(instance["ai_name"] for operation in operations for wave in operation["waves"]
+                    for instance in wave["instances"])
+    records = {record["name"]: record for record in entity_records(materialized_map_text, include_names=selected)}
+    if selected - records.keys():
+        raise ValueError("Materialized population manager or AI is absent")
+    needed = {}
+    for operation in operations:
+        manager = operation["manager"]["entity"]
+        for wave in operation["waves"]:
+            for instance in wave["instances"]:
+                needed.setdefault(manager, set()).add((records[instance["ai_name"]]["inherit"], instance["spawn_type"]))
+    result, declarations, replacements = materialized_map_text, {}, []
+    for manager, requests in sorted(needed.items()):
+        population = records[manager]["edit"].get("aiTypeDefAssignments")
+        existing_variants = populations.resolved_variants(population)
+        if all(any(matches(row, inherit, mask) for row in rows.values())
+               for rows in existing_variants for inherit, mask in requests):
+            continue
+        existing = resolved(population)
+        missing = sorted((inherit, mask) for inherit, mask in requests
+                         if not any(matches(row, inherit, mask) for row in existing.values()))
+        additions = [additional_assignment(inherit, mask) for inherit, mask in missing]
+        identity = json.dumps([map_plan["map_key"], manager, population,
+                               variants(population)[0]["sha256"], additions], separators=(",", ":"))
+        name = "p_" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        fields = "\n".join(f"\t\t\titem[{len(existing) + index}] = {{{body}}}"
+                           for index, body in enumerate(additions))
+        declaration = ("{\n\tinherit = " + json.dumps(population) + ";\n\tedit = {\n"
+                       "\t\taiTypeDefAssignments = {\n\t\t\tnum = " + str(len(existing) + len(additions))
+                       + ";\n" + fields + "\n\t\t}\n\t}\n}\n")
+        declarations[PRIVATE_POPULATION_PREFIX + name + ".decl"] = declaration.encode("utf-8")
+        reference = "actorpopulation/ap_v070/" + name
+        assetsinfo = {"assets": [{"name": reference, "resourceType": "rs_streamfile",
+                                  "mapResourceType": "actorPopulation", "version": 0,
+                                  "specialByte1": 0, "specialByte2": 0, "specialByte3": 0}]}
+        declarations[PRIVATE_POPULATION_ASSETSINFO_PREFIX + name + ".json"] = (
+            json.dumps(assetsinfo, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        start, end = find_entity_block_bounds(result, manager)
+        replacements.append((start, end, _edit(result[start:end], ("aiTypeDefAssignments",), reference)))
+    for start, end, block in sorted(replacements, reverse=True):
+        result = result[:start] + block + result[end:]
+    return result, declarations

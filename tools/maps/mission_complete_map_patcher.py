@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
@@ -89,22 +90,40 @@ def _render_hell_target_list(original: str, targets: list[str]) -> str:
     )
 
 
-def _patch_hell(contract: dict, root: Path, mod_root: Path) -> dict:
-    source = root / contract["source_path"]
-    raw = source.read_bytes()
-    source_sha = _sha256(raw)
-    if source_sha != contract["source_sha256"]:
-        raise ValueError(f"Hell source hash mismatch: {source}")
-    text = raw.decode("utf-8")
-    start, end = _hell_node_value_bounds(text, contract["node_id"])
-    before = _target_list(text[start:end], "Hell native owner")
-    if before != contract["original_targets"]:
-        raise ValueError(f"Hell native owner target drift: {before}")
-    after = [contract["ap_check"], *before]
-    result = text[:start] + _render_hell_target_list(text[start:end], after) + text[end:]
+def _patch_hell(
+    contract: dict, root: Path, mod_root: Path,
+    *, retained_overrides: Mapping[str, bytes] | None = None,
+) -> dict:
+    if retained_overrides is None:
+        source = root / contract["source_path"]
+        raw = source.read_bytes()
+        source_sha = _sha256(raw)
+        if source_sha != contract["source_sha256"]:
+            raise ValueError(f"Hell source hash mismatch: {source}")
+        text = raw.decode("utf-8")
+        start, end = _hell_node_value_bounds(text, contract["node_id"])
+        before = _target_list(text[start:end], "Hell native owner")
+        if before != contract["original_targets"]:
+            raise ValueError(f"Hell native owner target drift: {before}")
+        after = [contract["ap_check"], *before]
+        result = text[:start] + _render_hell_target_list(text[start:end], after) + text[end:]
+        override_raw = result.encode("utf-8")
+    else:
+        try:
+            override_raw = retained_overrides[contract["override_path"]]
+        except KeyError as exc:
+            raise ValueError(f"missing retained Hell override: {contract['override_path']}") from exc
+        if not contract["override_sha256"]:
+            raise ValueError("Hell retained override has no pinned hash")
+        result = override_raw.decode("utf-8")
+        start, end = _hell_node_value_bounds(result, contract["node_id"])
+        before = contract["original_targets"]
+        after = _target_list(result[start:end], "Hell retained override")
+        if after != [contract["ap_check"], *before]:
+            raise ValueError(f"Hell retained override target drift: {after}")
+        source_sha = None
     if result.count(contract["ap_check"]) != 1:
         raise ValueError("Hell AP target was not inserted exactly once")
-    override_raw = result.encode("utf-8")
     override_sha = _sha256(override_raw)
     expected_override = contract["override_sha256"]
     if expected_override and override_sha != expected_override:
@@ -121,13 +140,24 @@ def _patch_hell(contract: dict, root: Path, mod_root: Path) -> dict:
         "expected_override_sha256": expected_override or override_sha,
         "before_targets": before,
         "after_targets": after,
-        "changed_lists": 1,
+        "changed_lists": 1 if retained_overrides is None else 0,
     }
 
 
+def _source_map_text(contract: dict, root: Path, source_maps: Mapping[str, str] | None) -> str:
+    if source_maps is None:
+        return (root / contract["source_path"]).read_text(encoding="utf-8")
+    try:
+        source = source_maps[contract["map_key"]]
+    except KeyError as exc:
+        raise ValueError(f"missing Mission Complete source map: {contract['map_key']}") from exc
+    return source.replace("\r\n", "\n").replace("\r", "\n")
+
+
 def _patch_exultia(contract: dict, root: Path, generated_map: Path,
-                   publishers: tuple[PublisherContract, ...] = ()) -> dict:
-    source = (root / contract["source_path"]).read_text(encoding="utf-8")
+                    publishers: tuple[PublisherContract, ...] = (),
+                    *, source_maps: Mapping[str, str] | None = None) -> dict:
+    source = _source_map_text(contract, root, source_maps)
     source_bounds = find_entity_block_bounds(source, contract["owner"])
     if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
         raise ValueError("Exultia native owner is missing or duplicated in source")
@@ -294,8 +324,9 @@ def _patch_sentinel_prime_end(
     publishers: tuple[PublisherContract, ...],
     root: Path,
     generated_map: Path,
+    *, source_maps: Mapping[str, str] | None = None,
 ) -> dict:
-    source = (root / mission["source_path"]).read_text(encoding="utf-8")
+    source = _source_map_text(mission, root, source_maps)
     source_bounds = find_entity_block_bounds(source, mission["owner"])
     if source_bounds is None or source.count(f"entityDef {mission['owner']}") != 1:
         raise ValueError("Sentinel Prime terminal owner is missing or duplicated")
@@ -491,7 +522,11 @@ def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> i
     )
 
 
-def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, Path], mod_root: Path) -> dict:
+def patch_mission_complete_maps(
+    contract_path: Path, generated_maps: dict[str, Path], mod_root: Path,
+    *, source_maps: Mapping[str, str] | None = None,
+    retained_overrides: Mapping[str, bytes] | None = None,
+) -> dict:
     contracts = json.loads(contract_path.read_text(encoding="utf-8"))
     if contracts.get("schema_version") != 1:
         raise ValueError("unsupported Mission Complete map contract schema")
@@ -516,10 +551,11 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
     for name, contract in contract_items.items():
         strategy = contract.get("patch_strategy")
         if strategy == "logic_node_targets":
-            audit = _patch_hell(contract, root, mod_root)
+            audit = _patch_hell(contract, root, mod_root, retained_overrides=retained_overrides)
         elif strategy in {"entity_targets", "deferred_publishers"}:
             audit = _patch_exultia(
-                contract, root, generated_maps[contract["map_key"]], publisher_contracts
+                contract, root, generated_maps[contract["map_key"]], publisher_contracts,
+                source_maps=source_maps,
             )
         elif strategy == "terminal_publishers":
             audit = _patch_sentinel_prime_end(
@@ -527,6 +563,7 @@ def patch_mission_complete_maps(contract_path: Path, generated_maps: dict[str, P
                 publisher_contracts,
                 root,
                 generated_maps[contract["map_key"]],
+                source_maps=source_maps,
             )
             terminal_audit = audit
         else:

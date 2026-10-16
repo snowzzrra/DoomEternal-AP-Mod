@@ -10,5 +10,31 @@
   "owner": {
     "resource": "game/sp/e1m1_intro/e1m1_intro_patch3.resources",
     "priority": 62
+  },
+  "source_evidence": {
+    "physical_pickup_sources": [
+      {
+        "location_id": 7770492,
+        "source_entity": "cathedral_interact_automap_1_e1m1",
+        "source_inherit": "interact/automap",
+        "source_class": "idInteractable_Automap",
+        "spawn_position": {
+          "x": 237.000183,
+          "y": -700.999573,
+          "z": -185.350082
+        },
+        "region": "Hell on Earth - City - Ravaged Cathedral",
+        "qualification": "The native station is in the Heavy Cannon room in the cathedral route.",
+        "reference": "https://www.gamespot.com/articles/doom-eternal-mission-1-walkthrough-hell-on-earth/1100-6474897/",
+        "native_interaction_retained": true,
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e1m1_intro/e1m1_intro.decl",
+          "sha256": "5917bb9278e4901a5b6c1e81f2bc6533d0a3ca5bde72af94bc9fdc207f8a016f",
+          "station_groups": [
+            "AUTOMAP_GROUP_B"
+          ]
+        }
+      }
+    ]
   }
 }

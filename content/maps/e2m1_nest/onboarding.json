@@ -10,5 +10,50 @@
   "owner": {
     "resource": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
     "priority": 30
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "pickups_interact_automap_1_e2m1": {
+        "location_id": 7770498,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 86,
+          "y": -21.3000011,
+          "z": -94.5999908
+        },
+        "region": "Super Gore Nest - Lower Area - Argent Energy Station",
+        "qualification": "After the heart power console; mouth door opens into the automap room before the electric-floor route.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e2m1_nest/e2m1_nest.decl",
+          "sha256": "b88080cdfa1adbbb694dbad7fe5a366772d38e94a085c116f58352ea973be118",
+          "station_groups": [
+            "AUTOMAP_GROUP_B"
+          ]
+        }
+      },
+      "game_pickup_mega_health_1": {
+        "entity": "game_pickup_mega_health_1",
+        "location_id": 7770513,
+        "inherit": "pickup/mega_health",
+        "class": "idProp2",
+        "position": {
+          "z": -31.9870358,
+          "x": 25.2000027,
+          "y": -47.0999985
+        },
+        "region": "Super Gore Nest - Upper Area - Vermilion Canal",
+        "qualification": "Relay249 counts three cake targets, records native Secret2 and activates bday_secret_mega. The physical reward retains its encounter commit and environment cleanup targets.",
+        "source_entities": [
+          "game_target_relay_249",
+          "game_target_change_layer_1",
+          "game_target_secret_2",
+          "game_encounter_trigger_commit_77",
+          "game_target_remove_39"
+        ],
+        "reference": "vanillamaps/e2m1_nest.map"
+      }
+    }
   }
 }

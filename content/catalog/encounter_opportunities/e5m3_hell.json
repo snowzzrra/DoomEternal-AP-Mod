@@ -1,0 +1,1129 @@
+{
+  "schema_version": 1,
+  "map_key": "e5m3_hell",
+  "source": {
+    "path": "id Software",
+    "sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44"
+  },
+  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "logic_sources": {},
+  "counting": {
+    "unit": "finite_authored_combat_opportunity",
+    "scope": "one_initial_pass_of_each_selected_segment",
+    "identity_fields": [
+      "map_key",
+      "manager",
+      "script_index",
+      "event_index",
+      "ordinal"
+    ],
+    "replays_add_to_N": false,
+    "requires_forced_deaths": false,
+    "map_N": null,
+    "campaign_N": null
+  },
+  "qualification": {
+    "source": "reviewed_finite_scripts_and_concrete_source_templates",
+    "runtime": false,
+    "replacement_feasibility": "qualified_separately_from_original_opportunity_count"
+  },
+  "segments": [
+    {
+      "id": "city_lower_encounter_manager_dlc2_4",
+      "manager": "city_lower_encounter_manager_dlc2_4",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_commit_11"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_exit_7",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 3,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "76494fffefd535ec47f724fa305cf6d76ac166b837ef06b4115d46f498dafc3c",
+          "species": "revenant",
+          "spawn_type": "ENCOUNTER_SPAWN_REVENANT",
+          "count": 1,
+          "label": "city_porch_rev",
+          "spawner": "city_lower_target_spawn_77",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_77",
+              "ai": "city_lower_ai_heavy_revenant_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnAI",
+          "event_sha256": "e8aa4a11ea802597e8c395e3074457573b40745b2a0ab4fd62223673bdd61829",
+          "species": "chaingun_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_CHAINGUN_SOLDIER",
+          "count": 2,
+          "label": "city_porch_soldiers",
+          "spawner": "city_lower_encounter_spawn_group_zone_5",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_79",
+              "ai": "city_lower_ai_fodder_soldier_chaingun_1"
+            },
+            {
+              "spawner": "city_lower_target_spawn_78",
+              "ai": "city_lower_ai_fodder_soldier_chaingun_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "breach_wasteland_war_ambient_ledge_group_02",
+      "manager": "breach_wasteland_war_ambient_ledge_group_02",
+      "script_index": 0,
+      "segment_N": 4,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "breach_wasteland_war_encounter_trigger_commit_6"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "breach_wasteland_war_encounter_trigger_exit_1",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 7,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "0a4d8b18cda269a8de4c2ed6ff841f407d3366491f2cb5c2a82e944f43bb4d23",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "amb_imp_01",
+          "spawner": "breach_wasteland_war_target_spawn_6",
+          "members": [
+            {
+              "spawner": "breach_wasteland_war_target_spawn_6",
+              "ai": "breach_wasteland_war_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "bcd1cd697480d614b4a7f6546357e3d2892f0636d67fe4def031944540dd4258",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "amb_imp_02",
+          "spawner": "breach_wasteland_war_target_spawn_7",
+          "members": [
+            {
+              "spawner": "breach_wasteland_war_target_spawn_7",
+              "ai": "breach_wasteland_war_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "51d575de733cf8e940d0d8757627884c952d7535316fd82b27c2ea4fe6128b22",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "amb_imp_03",
+          "spawner": "breach_wasteland_war_target_spawn_25",
+          "members": [
+            {
+              "spawner": "breach_wasteland_war_target_spawn_25",
+              "ai": "breach_wasteland_war_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 6,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "fc2192de17366c3fe560858e75485595ad951b5cbbee0515301a83d26cdf272a",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "amb_imp_04",
+          "spawner": "breach_wasteland_war_target_spawn_26",
+          "members": [
+            {
+              "spawner": "breach_wasteland_war_target_spawn_26",
+              "ai": "breach_wasteland_war_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "city_lower_encounter_manager_dlc2_deck_landing",
+      "manager": "city_lower_encounter_manager_dlc2_deck_landing",
+      "script_index": 0,
+      "segment_N": 3,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_commit_10"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_exit_6",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 6,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "efdabda8d90a6422e9c307670446f300505d4f4789da03f3d96d155a7c80b144",
+          "species": "demonic_trooper",
+          "spawn_type": "ENCOUNTER_SPAWN_GENERIC",
+          "count": 1,
+          "label": "city_deck_landing",
+          "spawner": "city_lower_target_spawn_45",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_45",
+              "ai": "city_lower_ai_ambient_demonic_trooper_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "8ba3c55073b4ad688aa42577a08ae273d0c28c9157731bf08c30d36ba14c482d",
+          "species": "demonic_trooper",
+          "spawn_type": "ENCOUNTER_SPAWN_GENERIC",
+          "count": 1,
+          "label": "city_deck_landing",
+          "spawner": "city_lower_target_spawn_47",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_47",
+              "ai": "city_lower_ai_ambient_demonic_trooper_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "8cb65f0f8ec89773215c93771fa1e25cbc1b0a844b9678727dfb370401ef372c",
+          "species": "demonic_trooper",
+          "spawn_type": "ENCOUNTER_SPAWN_GENERIC",
+          "count": 1,
+          "label": "city_deck_landing",
+          "spawner": "city_lower_target_spawn_46",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_46",
+              "ai": "city_lower_ai_ambient_demonic_trooper_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "city_lower_encounter_manager_2",
+      "manager": "city_lower_encounter_manager_2",
+      "script_index": 0,
+      "segment_N": 1,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_commit_2"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "city_lower_encounter_trigger_exit_1",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 2,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "4133c952dd9a11d29444612572db65a18f48087275955b31d7ec7878750c14f2",
+          "species": "dread_knight",
+          "spawn_type": "ENCOUNTER_SPAWN_DREAD_KNIGHT",
+          "count": 1,
+          "label": "",
+          "spawner": "city_lower_target_spawn_9",
+          "members": [
+            {
+              "spawner": "city_lower_target_spawn_9",
+              "ai": "city_lower_ai_heavy_dreadknight_1",
+              "definition_sources": [
+                "city_lower_encounter_spawn_group_parent_1"
+              ]
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "oscar_encounter_manager_dragon_runners",
+      "manager": "oscar_encounter_manager_dragon_runners",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "oscar_encounter_trigger_commit_dragon_runners"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "oscar_encounter_trigger_exit_1",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 4,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "195a6b6a5a7d163e1bdd717dcf419e73f453e89014fda14ec5bef35000adf66a",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "dragon_runners",
+          "spawner": "oscar_target_spawn_1",
+          "members": [
+            {
+              "spawner": "oscar_target_spawn_1",
+              "ai": "oscar_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "d6be3ee1b2d98ccc1a30e27a58a18d549c08324268dbae3dfebd47dcf047fe4a",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_IMP",
+          "count": 1,
+          "label": "dragon_runners",
+          "spawner": "oscar_target_spawn_2",
+          "members": [
+            {
+              "spawner": "oscar_target_spawn_2",
+              "ai": "oscar_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    }
+  ],
+  "entities": {
+    "breach_wall_base_encounter_spawn_group_zone_1": {
+      "sha256": "a596d111bc11afb9663cf59424b43bcabab3fff9dffda2e533bd1a983b40b9cb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_base_encounter_spawn_group_zone_garg1": {
+      "sha256": "b8c8d3dff4281b2ce09d2c5e0c75ac961bbb4f9fdc61f79e8b3c5f873ebcb41b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_base_encounter_spawn_group_zone_garg2": {
+      "sha256": "cece3a67d7e239170661f316db6a629f2961cec13c82d307c0629d3c46e12a29",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_base_spawn_group_wall_base_arachnatron": {
+      "sha256": "4671dee9d0a93c6bd0811a6088ba76d4da2b6d7291ef0389435dadb7b0092071",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_base_spawn_group_wallbase_ruuners_02_soldiers": {
+      "sha256": "fcec7dbcb4e1b70d7057bb8a104ba486411d79f126e02590dcf4f913f1e9b345",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_base_spawn_group_wallbase_ruuners_02_t3s": {
+      "sha256": "b2d27586f1f9e9724a3a3be23e3186b2b84038d79ac1ebbf761e3227ec9484da",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_deck_spawn_group_zone_wall_deck_gargs": {
+      "sha256": "65b2784a11696c6b63f56ca6a4a761a7f3079d68925f583c9e9c1341c7901c33",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wall_deck_spawn_group_zone_wall_deck_gargs1": {
+      "sha256": "fd92b5b7b87ce63ab0461445afdabe6a82e7c6bb3ba110f94e26e3874b0c1b96",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_arena_encounter_spawn_group_zone_1": {
+      "sha256": "a90d0a220a94e754fd048ac2eeb6baa669f64bdd7353e069466cc307274cdcea",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_arena_encounter_spawn_group_zone_2": {
+      "sha256": "6d29ad993dde06c9bc41d365f207841adc7b755260db370a30c66bb0bb0848cb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_encounter_spawn_group_zone_2": {
+      "sha256": "6b909adfcd897bf5ee93c3c3139e0221d61108f8d52aa83f8c91f88cedc6bf27",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_spawn_group_opening_ledge_gargoyles": {
+      "sha256": "2bdb4703d65753eaaefaeb2a0982bc90668faa9b079c5aa21466f4dfabf04c4c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_spawn_group_opening_ledge_imps": {
+      "sha256": "5f7bbd1769f1f5d3d12367d7594571c9725af64b86efd5604965337ca6854ff8",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_spawn_group_opening_mancubus_group01": {
+      "sha256": "928113693dfee509225612a0c28ea7a4f1ef350c044a62254014e06902df04fe",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_war_ai_fodder_imp_1": {
+      "sha256": "8b1596eaad4ed6da17a75b0e41195af0f6add8d0e17ed5500763f09c51da3da4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "breach_wasteland_war_ambient_ledge_group_01_hk": {
+      "sha256": "3ad684ce222adf047f94a27db3d26bf8af1d333a9d68dd2f6d3cb4f5600fd7c7",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_war_ambient_ledge_group_01_imps": {
+      "sha256": "a6eab5d8d9ad91d8a32906c9e5c3f34b4105bbcd4e1e7d5149a2350cbcd01ae2",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_war_ambient_ledge_group_01_soldiers": {
+      "sha256": "714a8abe3d769db54d79068984d940c0f7f38471eb1d7f6c968b8215bb9181d0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_war_ambient_ledge_group_02": {
+      "sha256": "670dce2e107bb5d07a253d2968fa9cec7776a3115179e3fd6e1e644682bd1d4c",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "breach_wasteland_war_encounter_trigger_commit_6": {
+      "sha256": "bad89c361222e4277ea783ad77f9eca4a73cb0b0cb606bfa04895abc0cbe17f5",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "breach_wasteland_war_encounter_trigger_exit_1": {
+      "sha256": "6afe8a930b42f9103edb8146f9eab9f46c54b261ce42ab27a1bbf2c62d4fa2a8",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "breach_wasteland_war_spawn_group_amb_imps01": {
+      "sha256": "3b3b61f7996d234a810483550542d3b2b9ed6b29d7f094ea37aa59fc06ffaacc",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "breach_wasteland_war_target_spawn_25": {
+      "sha256": "c317004618a5fb010a9636e8d779cb9bb445d7c5a9299b491fe8d6c158f58b1d",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1760,
+        "y": -198,
+        "z": -142.568161
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "breach_wasteland_war_target_spawn_26": {
+      "sha256": "63ba7d23453f0b26aef9c2acd83d120299e2ba6a8b23dd5594bac5ce09d56f80",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1756.5,
+        "y": -199,
+        "z": -142.318176
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "breach_wasteland_war_target_spawn_6": {
+      "sha256": "aabd9606e9de64839be5a6dad4bfe384daee24592b411c5b25a356c5d35de50f",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1772,
+        "y": -199,
+        "z": -144
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "breach_wasteland_war_target_spawn_7": {
+      "sha256": "40f09e7b07afecf8d4dc2da08ee7c62d6757705bded3efa1d64e87ece4e1b514",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1766,
+        "y": -198.5,
+        "z": -143.386353
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "city_lower_ai_ambient_demonic_trooper_1": {
+      "sha256": "3508abc9d603f273f8dc55ab3f16cf371002dc128c08dae71de8c1a339b72aeb",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/ambient/demonic_trooper"
+    },
+    "city_lower_ai_fodder_imp_1": {
+      "sha256": "f167288be26f1dd7df377dc2c9aeddb752d6c8c9168f0ab093f74b5d20af4ba4",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp"
+    },
+    "city_lower_ai_fodder_soldier_blaster_1": {
+      "sha256": "b43659d361ab6e304ab5eb887a956abc05cbb63dff8c2cef75670a7d0d27120f",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster"
+    },
+    "city_lower_ai_fodder_soldier_chaingun_1": {
+      "sha256": "9dab8f378d229e6671e853869d3b2d09ef0052cb574e49edcca6cb21fd7aa2cc",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_chaingun",
+      "starting_health": 500
+    },
+    "city_lower_ai_fodder_zombie_tier_3_1": {
+      "sha256": "d6d24208eea6fbbbac8ac1dce6fe6256fd4cb35b6fb363958f6f8365e25ed1eb",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_tier_3"
+    },
+    "city_lower_ai_heavy_dreadknight_1": {
+      "sha256": "66bddc3b12d887a569cc370b4c62ea422b13f5f790df9910ad13c5d0a8c76671",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/dreadknight",
+      "starting_health": 3000
+    },
+    "city_lower_ai_heavy_revenant_1": {
+      "sha256": "eec989e0dcdcbd0b253b8e264987ce9e2609be9ef4732637d2d8931021fd3603",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/revenant"
+    },
+    "city_lower_encounter_manager_2": {
+      "sha256": "9fdf2e44aa856f3d1da1b1e6687cfba2b13b4eb0c002a94aca402eb0aa7586a7",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "city_lower_encounter_manager_dlc2_4": {
+      "sha256": "de9ce418a61f8d6f7de0a48f33120e596cebacd9da64dba9cf7110495ea93cbb",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "city_lower_encounter_manager_dlc2_deck_landing": {
+      "sha256": "aa68e8dad646b966366a9d8b710c3c90a804f590c52e57e92b1f41cf7505c9e3",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_b_deck_unlock_demon_troops": {
+      "sha256": "733d6734ae697739a78dbd2cd0ae561735809f2ee7554ddbf519884c128d5aba",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_b_deck_unlock_dhunter": {
+      "sha256": "f3706654cfed9bbb5bb6677853480630b9bb5e83356a3b57a1c9a50ac01bc024",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_b_deck_unlock_fodder": {
+      "sha256": "c54e099be90da34d28ac3fe6828e9d481858defda04b3fd9bd5cb4e66389e6d0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_a_deck_imps": {
+      "sha256": "1a621da8c43380736bdb23e8d8fe2207f52dbb4cb9ab3dfdc457f879009b930c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_a_deck_landing_soldiers": {
+      "sha256": "043a6ad6f146a7cbcd59bd503bcd58cd1096a87cd0e077a80744ae031dcc0921",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_a_deck_soldiers_lower": {
+      "sha256": "dcb8d82231c5933fd328cd2661ede0031650752ac699e49dc4a47734c5155448",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_front_runners": {
+      "sha256": "df55f6214d8fe02ad2d8efc36ee22b6ef71100814d1fe5246b5ea637f80fb0e6",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_lower_int_soldiers": {
+      "sha256": "bbefa6fe02c1438a477a8f73a4b70d3bbd2ad36f4f436faa87bd344e9e7756f0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_lower_int_upper_fodder": {
+      "sha256": "e6add2e9407b8f9cedf0e5f91899a15204ca912294fc516be3ce3e86766b1130",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_lower_int_whiplash": {
+      "sha256": "1a7cead5820c91020dec6b5fcce82a98105dbb27341160de5ca6c09dff6b1454",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_arachnatron": {
+      "sha256": "fec3bff180e79dbd8a205effab961a26b8a623f08c3014cd2fb526d9d800a2ca",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_armd_baron": {
+      "sha256": "da325de8ffe9932a5176be3f16890359c6fcf1438accc2b17580273ee09f1676",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_back_fodder_a": {
+      "sha256": "78d76a9cf644320416b1698eaf5f87b0204c5791c275aa03f3274ea4298f002d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_back_fodder_b": {
+      "sha256": "88c7ce490ac8f95d098f5353dd0726dae08740cd17dfba7ad486598a09cae363",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_imp_fodder": {
+      "sha256": "d35cf052bf73da3b2815f520e1a5f556d36b3bd8a1c750aa9a3ef59fac388489",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_main_soldier_fodder": {
+      "sha256": "83c73efc409752a97304dd08d652f05c44a922d988a07dd70d2be1e149f19f1d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_parent_1": {
+      "sha256": "762c3ae001ed50b515c2d48797909460bd8bb8ef249b3c8697ce4905e78024bb",
+      "class_name": "idTarget_Spawn_Parent",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_zone_2": {
+      "sha256": "e9397574df5a3dd0b42e866a16f22d7e54fdd137d3d43a8cad1b5b6b540346d3",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_zone_3": {
+      "sha256": "4377054165b4c2c90d257108a8c686a8a0ec587093cdfaa5a54721ed0ba988f0",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_zone_4": {
+      "sha256": "106c0200dd2f842df271610635abe640295177998049533741a4bda30bdb910a",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_spawn_group_zone_5": {
+      "sha256": "775046a5454a5974ea79b22329c68f2ebd5cec579fc769eeec91c4c9f24df821",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_commit_10": {
+      "sha256": "2c11d7cda5e1d43736ddbbe296c506dd6445f4050dc4c8ad1c6085a23f924ae6",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_commit_11": {
+      "sha256": "009f133ee9874df4980957be1fce41316d7ea8388a329162b2b0cd9e33bf9ae5",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_commit_2": {
+      "sha256": "400557d916bb4915c62900c38e6cd0a365545643d05b4524f3529cbf4902c709",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_exit_1": {
+      "sha256": "8bb35715b4fab6f7554424a0af249a956445913e5a4f613caf18bafdbd2b6cc8",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_exit_6": {
+      "sha256": "892ec652c9546c9d6fc296c9acf7c65d95fff25e9d9834164f4eda66e0659a43",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "city_lower_encounter_trigger_exit_7": {
+      "sha256": "41f744bb96382435220658081ec9aa19c8e5f7951a206d2699fa1eec94465e68",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "city_lower_target_spawn_45": {
+      "sha256": "3fcec90cd56c618318283954c67bb66aa668609cdbb4dc7e1d43765134da2aba",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -649.300476,
+        "y": -621.950989,
+        "z": -164.600021
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "city_lower_target_spawn_46": {
+      "sha256": "d4432eb6d6387f817ea168330d52da5a990855e7ec2cb3a26a7e58383176a9e0",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -633.550659,
+        "y": -611.150513,
+        "z": -164.59993
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "city_lower_target_spawn_47": {
+      "sha256": "a7a1a1ce5467db79dbd9f8481c507e5e6166592e5ab8ec6d79bacaa856f4a7c0",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -646.000366,
+        "y": -613.60083,
+        "z": -164.59993
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "city_lower_target_spawn_77": {
+      "sha256": "78b9fce5f649d32d7aa899ff46a16bbce7985fa93f2441ee390abdce236edce8",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -450.762115,
+        "y": -672.850769,
+        "z": -183.15802
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "city_lower_target_spawn_78": {
+      "sha256": "6156b5415a65d4641fc88c1a3537385fa0bd75cb80c49d4ffabc46a318d09a4d",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -464.762299,
+        "y": -661.351379,
+        "z": -173.212708
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "city_lower_target_spawn_79": {
+      "sha256": "cb3bae7fb540f4cffff92155dab3ffbfcd8df318d3758a23dccbfecf71668a28",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -464.662384,
+        "y": -686.750732,
+        "z": -173.212708
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "city_lower_target_spawn_9": {
+      "sha256": "3bac29eb49fb0d924121f58070bc2f400f335e48a7b266b4d1f7e25b7968ef2e",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -623,
+        "y": -548.099976,
+        "z": -168.200012
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "city_reveal_encounter_spawn_group_post_cam_reveal_pe": {
+      "sha256": "7347739164e236741ae7ada3c65e7295f035240f199b106e7d373c440faba498",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_reveal_encounter_spawn_group_post_cam_troops": {
+      "sha256": "94b583b78097e619e8b6d0e51b0dc53d5b2c4c83038cce56ae055a1359607e2c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_reveal_encounter_spawn_group_zone_1": {
+      "sha256": "4108656b31699729793c22705c73646eff76225af8b5022506d4166abf8ff40c",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_reveal_encounter_spawn_group_zone_2": {
+      "sha256": "64abd3813eef6838d4d79c1e2c39977b483335e3b1e4558ea221e7254ff6fe34",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_rooftop_encounter_spawn_group_zone_1": {
+      "sha256": "20d0eb16dd409313447ad4553993df2a68ae4a09e1c870e47d82a3d651f34d12",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_rooftop_encounter_spawn_group_zone_2": {
+      "sha256": "fa234ab0a1edc6595be27b5e5bec1c091f75d68bddd53668d17f6449278a8d75",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_rooftop_encounter_spawn_group_zone_3": {
+      "sha256": "17db4f88052e3cd8e0ece16011879b1ed969c88f099b73a76ad555a91a2b7847",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "city_rooftop_encounter_spawn_group_zone_4": {
+      "sha256": "04d885a2303a0d8969c8121b97c8547689aa643bd0827e3d3d1a3754570000aa",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "encounter_spawn_group_zone_1": {
+      "sha256": "20dfcc297a0b637e61f50b512fd27fa7a4faef2e3f9906c0f96d0617bf57cd27",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "encounter_spawn_group_zone_2": {
+      "sha256": "1de2577ea0631eadfabb076c56fec9cb2fc46779d7c662d75c530cb0d97ef3e9",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "hangar_encounter_spawn_group_zone_1": {
+      "sha256": "59f523362b05b82bf54780cae9cd54899e823c2a0fe52a2725018458afc16849",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "hangar_encounter_spawn_group_zone_2": {
+      "sha256": "0a20f8c32f7325a5889d39a7c43879679f5278f70bcef7a5c195697082a75504",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "hangar_encounter_spawn_group_zone_3": {
+      "sha256": "9fb9a79869142e797e0dc754a5aa83709a768bd633491da1f55f02fa9247e35d",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "hangar_encounter_spawn_group_zone_4": {
+      "sha256": "d9c67c085e950b3d69c348af467a5b10b236d65398969147f144e5c6c7c5e5fb",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "oscar_ai_fodder_imp_1": {
+      "sha256": "cb56135b26939eed19ec4f26cc8e4d7f700c4490ce8566cdc134bfba41245a05",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "oscar_encounter_manager_dragon_runners": {
+      "sha256": "d7775822225a9965a0751d0bffc0f5dad4ef9491a6bcc5f6be45e7c966686488",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "oscar_encounter_spawn_group_zone_1": {
+      "sha256": "e95402f1cd932662fec74deebcb0c418ed3592250b3a0424d52f418c7196bd4b",
+      "class_name": "idTargetSpawnGroup",
+      "layers": []
+    },
+    "oscar_encounter_trigger_commit_dragon_runners": {
+      "sha256": "c693172a094ae05b8692fadc9de4908bdeb9ba8acbbbeb9acd58b579e90bb315",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "oscar_encounter_trigger_exit_1": {
+      "sha256": "45c2c307f9a148746ec44ad6ffa8ba8385201715c57ad50cd0be272cf25c3812",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "oscar_target_spawn_1": {
+      "sha256": "5f41f3d14a607fefc75a6ee47709b9ec7146417e146355b511e9424758056c49",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1533.39954,
+        "y": -286.351532,
+        "z": -94.8999405
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "oscar_target_spawn_2": {
+      "sha256": "8c4407a4b47081b79ef75dbad6eb686aca2fdfe7914e0f3f66ecf12ab305977a",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": -1532.94922,
+        "y": -282.60144,
+        "z": -99.7999649
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    }
+  },
+  "gaps": [
+    {
+      "manager": "_example_encounter_manager_0",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_base_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_base_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_base_encounter_manager_dlc2_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_base_encounter_manager_dlc2_4",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_base_encounter_manager_wallbase_runners_02",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_deck_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wall_deck_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wasteland_arena_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wasteland_arena_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wasteland_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wasteland_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "breach_wasteland_war_ambient_ledge_group_01",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_lower_encounter_manager_b_deck_unlock",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_lower_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_lower_encounter_manager_dlc2_3",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_lower_encounter_manager_lower_city_entrance",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_lower_encounter_manager_lower_city_main",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_reveal_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "city_rooftop_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "hangar_encounter_manager_dlc2_1",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    },
+    {
+      "manager": "hangar_encounter_manager_dlc2_2",
+      "reason": "finite_initial_pass_not_reviewed",
+      "map_N": null
+    }
+  ],
+  "definition_ancestry_sha256": "9c01e82f0abfd48ff9d236adb3e51a24de95a5e29298dab7632bc4a5decca081",
+  "source_snapshot": {
+    "member": "sources/e5m3_hell.entities",
+    "sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+    "size": 6722570
+  },
+  "review_source": {
+    "path": "content/catalog/encounter_opportunity_segments.json",
+    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+  }
+}

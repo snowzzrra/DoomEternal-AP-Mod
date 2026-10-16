@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "qualification_gaps": {
+    "campaign_execution": "Layer selection, concurrent scripts, alternative paths and scripted external AI require review before summing finite kill budgets.",
+    "completion": "Waits and stopMaintainingAICount calls are extracted; termination and renewable initial cohorts require graph qualification.",
+    "geometry": "Spawn conditions, positions and traversal flags are source evidence; compatible replacement families require spatial review.",
+    "simultaneous_ai_limit": "Engine cap and headroom for natural summons and protected actors are unqualified.",
+    "individual_attributes": "Per-actor HP, outgoing damage, speed and scale operations require engine qualification; template references do not prove isolation.",
+    "resources": "AI reference candidates are extracted; minimal transitive resources/streamdb dependencies and DLC-in-Base precedence require qualification.",
+    "kill_observation": "Player attribution, duplicate death delivery, respawn, pooling and despawn discrimination require a qualified enemy-death source."
+  },
+  "maps": {
+    "e1m4_boss": {
+      "stage1_encounter_manager": {
+        "category": "boss",
+        "protection": {
+          "entities": ["stage1_doom_hunter", "stage1_boss_pos"],
+          "spawn_events": [{"script": 1, "event": 1}],
+          "reason": "Doom Hunter boss participates in the dh_01_detach/DOOM_HUNTER waits and stage1_complete sequence; checkpoint script restores the same boss.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e1m4_boss.map:417121 stage1_encounter_manager scripts; stage1_boss_pos entityDefs references stage1_doom_hunter."
+      },
+      "stage2_encounter_manager": {
+        "category": "boss",
+        "protection": {
+          "entities": ["stage2_spawn_group_boss", "stage2_spawn_parent_boss", "stage2_boss_pos_01", "stage2_boss_pos_02", "stage2_doom_hunter_01", "stage2_doom_hunter_02"],
+          "spawn_events": [{"script": 0, "event": 2}],
+          "reason": "Two Doom Hunters occupy the boss group consumed by stage-2 boss waits and completion events.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e1m4_boss.map:449546 stage2_encounter_manager; stage2_spawn_group_boss targetSpawnParent references stage2_spawn_parent_boss; authored boss points reference both Doom Hunters."
+      }
+    },
+    "e2m2_base": {
+      "fort_encounter_manager_tower": {
+        "category": "boss_sequence",
+        "protection": {
+          "entities": ["fort_target_spawn_marauder_1", "fort_ai_superheavy_marauder_1"],
+          "spawn_events": [{"script": 1, "event": 1}],
+          "reason": "The ARC Complex exit waits for this Marauder before fodder cleanup and level-end activation; checkpoint script restores the same occurrence.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e2m2_base.map:618106 fort_encounter_manager_tower; script0 event4 waits for MARAUDER=0; events5/6/8 stop and kill marauder_fodder; script1 event1 uses fort_target_spawn_marauder_1."
+      }
+    }
+  }
+}

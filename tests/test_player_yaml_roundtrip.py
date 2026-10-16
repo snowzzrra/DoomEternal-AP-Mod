@@ -21,7 +21,11 @@ def test_import_edit_export_preserves_common_settings(tmp_path):
     name, imported, original = load_player_yaml(source, schema)
     assert imported["campaign_difficulty"] == "hurt_me_plenty"
     imported["campaign_difficulty"] = "nightmare"
-    exported = yaml.safe_load(dump_player_yaml(schema, name, imported, imported=original))
+    imported["enemy_speed"] = {"minimum": 150, "maximum": 150}
+    exported_yaml = dump_player_yaml(schema, name, imported, imported=original)
+    assert "# Speed is fixed at 100%" in exported_yaml
+    exported = yaml.safe_load(exported_yaml)
+    assert exported["DOOM Eternal"]["enemy_speed"] == imported["enemy_speed"]
     assert exported["description"] == "Personal settings"
     assert exported["DOOM Eternal"]["accessibility"] == "minimal"
     assert exported["DOOM Eternal"]["start_hints"] == ["Ballista"]
@@ -29,6 +33,10 @@ def test_import_edit_export_preserves_common_settings(tmp_path):
     assert exported["DOOM Eternal"]["campaign_difficulty"] == "nightmare"
     source.write_text(yaml.safe_dump(exported), encoding="utf-8")
     assert load_player_yaml(source, schema)[1] == imported
+    obsolete = {**document, "DOOM Eternal": {**document["DOOM Eternal"], "dlc_logic_timing": "late_game"}}
+    source.write_text(yaml.safe_dump(obsolete), encoding="utf-8")
+    with pytest.raises(ValueError, match="0.7 template"):
+        load_player_yaml(source, schema)
     for invalid in ("name: Marine\nname: Slayer\n", yaml.safe_dump({
         **document, "DOOM Eternal": {**document["DOOM Eternal"], "campaign_difficulty": {"nightmare": 50}}
     }), yaml.safe_dump({**document, "DOOM Eternal": {**document["DOOM Eternal"], "custom_missions": [{}]}})):

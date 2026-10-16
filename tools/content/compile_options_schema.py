@@ -18,17 +18,6 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = ROOT.parent / "Archipelago"
 DEFAULT_OUTPUT = ROOT / "data" / "options_schema.json"
-LAUNCHER_DESCRIPTIONS = {
-    "goal_mission_as_item": (
-        "Choose if you can or cannot get your Goal Mission as an Item.\n"
-        "If false, the mission is unlocked when you finish all other missions.\n"
-        "Has no effect for Acquire the Unmaykr, which ends in the Fortress."
-    ),
-    "death_link_mode": (
-        "Choose how a received DeathLink is fulfilled. Soft applies one death to you, "
-        "but can be mitigated by Extra Lives or Saving Throw. Hardcore ignores mitigation."
-    ),
-}
 
 
 def _load_apworld(ap_root: Path):
@@ -37,7 +26,7 @@ def _load_apworld(ap_root: Path):
     os.environ.setdefault("SKIP_REQUIREMENTS_UPDATE", "1")
     sys.path.insert(0, str(ap_root))
     try:
-        from Options import Choice, NamedRange, OptionSet, Range, Toggle  # type: ignore[import-not-found]
+        from Options import Choice, NamedRange, OptionDict, OptionSet, Range, Toggle  # type: ignore[import-not-found]
         # Load only APWorld option sources. Importing ``worlds.doometernal`` through
         # Archipelago's package initializer loads every installed world, which makes
         # this projection depend on unrelated optional worlds and AP core versions.
@@ -76,11 +65,11 @@ def _load_apworld(ap_root: Path):
             sys.path.remove(str(ap_root))
         except ValueError:
             pass
-    return world, Toggle, Choice, OptionSet, Range, NamedRange
+    return world, Toggle, Choice, OptionSet, Range, NamedRange, OptionDict
 
 
 def compile_schema(ap_root: Path) -> dict[str, Any]:
-    world, toggle_type, choice_type, option_set_type, range_type, named_range_type = _load_apworld(ap_root)
+    world, toggle_type, choice_type, option_set_type, range_type, named_range_type, option_dict_type = _load_apworld(ap_root)
     options = []
     excluded = []
     for key, option_type in world.options_dataclass.type_hints.items():
@@ -96,7 +85,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
         base = {
             "key": key,
             "display_name": getattr(option_type, "display_name", key),
-            "description": LAUNCHER_DESCRIPTIONS.get(key, inspect.cleandoc(option_type.__doc__ or "")),
+            "description": inspect.cleandoc(option_type.__doc__ or ""),
             "group": "Game Options",
             "source_class": option_type.__name__,
         }
@@ -188,6 +177,13 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                 named_range["maximum_label"] = "All"
             options.append(named_range)
             continue
+        if issubclass(option_type, option_dict_type) and option_type.__module__ != "Options":
+            options.append({**base, "ui_type": "option_dict", "default": dict(option_type.default),
+                            "entries": [{"key": name,
+                                         "label": getattr(option_type, "entry_labels", {}).get(name, name),
+                                         "minimum": getattr(option_type, "entry_minimum", 0), "maximum": maximum}
+                                        for name, maximum in sorted(option_type.entry_limits.items())]})
+            continue
         if issubclass(option_type, range_type):
             options.append(
                 {
@@ -213,7 +209,6 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
 
     source = ap_root / "worlds/doometernal/options.py"
     document = {
-        "schema_version": 2,
         "game": world.game,
         "source": "Archipelago/worlds/doometernal/options.py",
         "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
@@ -222,8 +217,9 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
     }
     sys.path.insert(0, str(ROOT))
     try:
-        from doom_eap.content.options_foundation import validate_options_schema
+        from doom_eap.content.options_foundation import OPTIONS_SCHEMA_VERSION, validate_options_schema
 
+        document["schema_version"] = OPTIONS_SCHEMA_VERSION
         return validate_options_schema(document)
     finally:
         sys.path.remove(str(ROOT))

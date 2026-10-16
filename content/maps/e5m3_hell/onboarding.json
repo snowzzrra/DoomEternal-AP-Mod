@@ -140,7 +140,29 @@
       ],
       "unlock_target": "fast_travel_target_fast_travel_unlock_1"
     },
-    "terminal": "hangar_target_level_transition_1"
+    "terminal": "hangar_target_level_transition_1",
+    "physical_pickup_sources": {
+      "pickups_interact_automap_1": {
+        "location_id": 7770512,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -1680.40002,
+          "y": -297.600006,
+          "z": -162.160049
+        },
+        "region": "Immora - Immora Assault - Plateau Battle",
+        "qualification": "Cave following the first Escalation arena; before the ramp and cannons leading to Walls of Immora.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/7",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc2/e5m3_hell/e5m3_hell.decl",
+          "sha256": "531ea49c86252d80058f0794e398f5e85bab99307469d175efe9b7a281c09a2b",
+          "station_groups": [
+            "AUTOMAP_GROUP_A"
+          ]
+        }
+      }
+    }
   },
   "locations": [
     {

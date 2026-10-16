@@ -1,0 +1,558 @@
+{
+  "schema_version": 1,
+  "qualification": "explicitly_reviewed_single_script_original_opportunity_segments",
+  "map_and_campaign_totals_qualified": false,
+  "maps": {
+    "e1m2_war": {
+      "map_key": "e1m2_war",
+      "source": {
+        "path": "vanillamaps/e1m2_war.map",
+        "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65"
+      },
+      "segments": [
+        {
+          "id": "capitol_encounter_manager_5",
+          "manager": "capitol_encounter_manager_5",
+          "manager_sha256": "c0dd1cfc0a0b861b127c5b167abf7980124fa63a4da61ea98bf9a235174f7a20",
+          "layers": [
+            "game/sp/e1m2_battle/e1m2_main_level"
+          ],
+          "segment_N": 3,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "survivor_encounter_manager_2",
+          "manager": "survivor_encounter_manager_2",
+          "manager_sha256": "e8b64f74277837bbde1daa483ff43fdb7b25771948575fa91c393967dcc540db",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "slaughterpit_encounter_manager_1",
+          "manager": "slaughterpit_encounter_manager_1",
+          "manager_sha256": "e3393a0ea2e80362ba4929e3a4ea76d84d3c1ab2a1993792443eb434047bb8d3",
+          "layers": [
+            "game/sp/e1m2_battle/e1m2_main_level"
+          ],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        }
+      ]
+    },
+    "e2m1_nest": {
+      "map_key": "e2m1_nest",
+      "source": {
+        "path": "vanillamaps/e2m1_nest.map",
+        "sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7"
+      },
+      "segments": [
+        {
+          "id": "game_encounter_manager_77_e2m1",
+          "manager": "game_encounter_manager_77_e2m1",
+          "manager_sha256": "d48b3981512eb9fd7050ff03f779bb5ad7e095a0936b1e355d221330c2f7ad58",
+          "layers": [],
+          "segment_N": 4,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "game_encounter_manager_74",
+          "manager": "game_encounter_manager_74",
+          "manager_sha256": "01cb5f6e480c527cd801e5d1e1bc2e18754475a188ffb9af9901466e9a7ea525",
+          "layers": [
+            "game/sp/e2m1_nest/main_level"
+          ],
+          "segment_N": 6,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "game_encounter_manager_72",
+          "manager": "game_encounter_manager_72",
+          "manager_sha256": "512405d65ba3d0154f7a15e038e8b937563677f322f4bb2c87a8c5f9cc26e3c0",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "game_encounter_manager_54",
+          "manager": "game_encounter_manager_54",
+          "manager_sha256": "94684f4b0f9fa2fe0b3e4870cf9d60d33d7edc5ab008eedb141b15d98b3d5f06",
+          "layers": [
+            "game/sp/e2m1_nest/main_level"
+          ],
+          "segment_N": 4,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "game_encounter_manager_46",
+          "manager": "game_encounter_manager_46",
+          "manager_sha256": "06e77c3b789ef6706c8199ddb1cbc3e1b2042c768dc221388c8e50cd7af1724a",
+          "layers": [
+            "game/sp/e2m1_nest/main_level"
+          ],
+          "segment_N": 2,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "game_encounter_manager_70_e2m1",
+          "manager": "game_encounter_manager_70_e2m1",
+          "manager_sha256": "4882787538f346a64baa145e971cfd6bd11643d3df0dc36696ec7bc391aa76c0",
+          "layers": [
+            "game/sp/e2m1_nest/main_level"
+          ],
+          "segment_N": 12,
+          "evidence": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved"
+        }
+      ]
+    },
+    "e2m3_core": {
+      "map_key": "e2m3_core",
+      "source": {
+        "path": "vanillamaps/e2m3_core.map",
+        "sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff"
+      },
+      "segments": [
+        {
+          "id": "slayer_gate_encounter_manager_slayer_tentacles",
+          "manager": "slayer_gate_encounter_manager_slayer_tentacles",
+          "manager_sha256": "b2d55deeafd34cf563b30b16ef255abc2e7da9885af0f88bccaef4e5c1c3e2a5",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 11,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "meteors_encounter_manager_24",
+          "manager": "meteors_encounter_manager_24",
+          "manager_sha256": "7585f2a7d8facc4d9900ae600aa9ddd8a885141a190bbd87d007909a86eae4ce",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 2,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "meteors_encounter_manager_26",
+          "manager": "meteors_encounter_manager_26",
+          "manager_sha256": "dcb50c3dbf2e927109ae518213a9fec46beb5eeabd17bb88cfd122aa8424237b",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        }
+      ]
+    },
+    "e4m1_rig": {
+      "map_key": "e4m1_rig",
+      "source": {
+        "path": "id Software",
+        "sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62"
+      },
+      "segments": [
+        {
+          "id": "destroyed_rig_encounter_manager_dlc1_1",
+          "manager": "destroyed_rig_encounter_manager_dlc1_1",
+          "manager_sha256": "50f587e1d2c55ba99bbbe1bf406ec4f8ab979c6c525a8c3a9b76f90b2051942b",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "destroyed_rig_encounter_manager_dlc1_5",
+          "manager": "destroyed_rig_encounter_manager_dlc1_5",
+          "manager_sha256": "28e7bd031999c14289abd233b40f2f63f412e6b782a9798c599c757737772017",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "starting_platform_encounter_manager_dlc1_1",
+          "manager": "starting_platform_encounter_manager_dlc1_1",
+          "manager_sha256": "654e9e184bffbfa07a07fa2e91ac2fe00f92d1d5d00ff086a33072ead245b5c8",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "starting_platform_encounter_manager_dlc1_5",
+          "manager": "starting_platform_encounter_manager_dlc1_5",
+          "manager_sha256": "8614ae0fc8e1a984c37415544f9d1db8a2f83c13332961b8a975c0bb546f489d",
+          "layers": [],
+          "segment_N": 5,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        }
+      ]
+    },
+    "e5m1_spear": {
+      "map_key": "e5m1_spear",
+      "source": {
+        "path": "id Software",
+        "sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6"
+      },
+      "segments": [
+        {
+          "id": "ai_combat_encounter_manager_dlc2_10",
+          "manager": "ai_combat_encounter_manager_dlc2_10",
+          "manager_sha256": "5fb768d0dd78ff9149c35701ab86abb157f7a2d0b918cbb28cca8603067135c2",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "ai_combat_encounter_manager_dlc2_9",
+          "manager": "ai_combat_encounter_manager_dlc2_9",
+          "manager_sha256": "472c95d43d16974aca45fec5a235f7148039965e4650b0a076bf6af0b825120e",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "ai_combat_encounter_manager_dlc2_17",
+          "manager": "ai_combat_encounter_manager_dlc2_17",
+          "manager_sha256": "6b0365f06720062f1f4184639e846fa0677f577ba55adfc904c60e2c76f2f31f",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "two finite HellSoldier requests select the same concrete actor across native DLC1 count33/count34 inheritance; omitted fresh managed members add no concrete palette contributor; the complete map-group upper bound agrees with an active contributor"
+        },
+        {
+          "id": "ai_combat_encounter_manager_dlc1_8",
+          "manager": "ai_combat_encounter_manager_dlc1_8",
+          "manager_sha256": "2752c1e3d177da9ccf3a88cd5b8984b25ab790c4f1bfd86e12917d22d6780476",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "two finite Mancubus requests at source events 2 and 4 precede ANY-zero event 5; reviewed relay, barrier, nav-obstacle and emitter controls retain their exact source graph; native Exit defaults do not reset the completed script; physical activation and completion remain conditional",
+          "control_events": [
+            {
+              "event_index": 0,
+              "event_def": "activateTarget",
+              "target": "village_upper_surprise_blocker_control"
+            },
+            {
+              "event_index": 1,
+              "event_def": "activateTarget",
+              "target": "ai_combat_target_relay_3"
+            },
+            {
+              "event_index": 6,
+              "event_def": "activateTarget",
+              "target": "village_upper_surprise_blocker_control"
+            },
+            {
+              "event_index": 7,
+              "event_def": "activateTarget",
+              "target": "ai_combat_target_relay_3"
+            },
+            {
+              "event_index": 8,
+              "event_def": "activateTarget",
+              "target": "ai_combat_target_relay_27"
+            }
+          ],
+          "control_entities": {
+            "ai_combat_target_relay_27": "c3bf69ecd39bacb22212ba6107146a7307d0a8063d9ab4b7f1e2e4d5510afb2a",
+            "ai_combat_target_relay_3": "56d43bbd9fe0fda56f2cad321d8b695caabec639683fcc39470cdc97692ff661",
+            "village_upper_surprise_blocker_control": "0a3ae7f063f76b383726c32baf1cdb7a1b96feff44c9447b2801faf8ee5d03c5",
+            "ai_combat_energy_wall_shutdown_vertical_5": "33cec26e1b26b767424809f93d5971384684cf7abe36ee10a2ebba9ad2fa781f",
+            "ai_combat_energy_wall_shutdown_vertical_6": "c3d23085c012a974b7b8c9627fb602b1d35a2b418f9a1736815ae2264806d82b",
+            "ai_combat_energy_wall_shutdown_vertical_9": "58569f6f67ad263d06d57d532eca8a91f33f4d1b7efc06d20054fee9f9a1e979",
+            "ai_combat_func_dynamic_4": "058443b8af04806fcddf51affbaf0014e0a4101469613aef3570c18b27a07413",
+            "ai_combat_volume_nav_obstacle_3": "86b5fdd383666f1c5c36e9696201680ca0f2234c616ac1e813b16af315ff4732",
+            "village_func_dynamic_38": "916bf485f3a14febd2abe4109bc3a51b047fa629314c1e3b1452e33e9ac599a0"
+          }
+        }
+      ]
+    },
+    "e5m3_hell": {
+      "map_key": "e5m3_hell",
+      "source": {
+        "path": "id Software",
+        "sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44"
+      },
+      "segments": [
+        {
+          "id": "city_lower_encounter_manager_dlc2_4",
+          "manager": "city_lower_encounter_manager_dlc2_4",
+          "manager_sha256": "de9ce418a61f8d6f7de0a48f33120e596cebacd9da64dba9cf7110495ea93cbb",
+          "layers": [],
+          "segment_N": 3,
+          "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "breach_wasteland_war_ambient_ledge_group_02",
+          "manager": "breach_wasteland_war_ambient_ledge_group_02",
+          "manager_sha256": "670dce2e107bb5d07a253d2968fa9cec7776a3115179e3fd6e1e644682bd1d4c",
+          "layers": [],
+          "segment_N": 4,
+          "evidence": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved"
+        },
+        {
+          "id": "city_lower_encounter_manager_dlc2_deck_landing",
+          "manager": "city_lower_encounter_manager_dlc2_deck_landing",
+          "manager_sha256": "aa68e8dad646b966366a9d8b710c3c90a804f590c52e57e92b1f41cf7505c9e3",
+          "layers": [],
+          "segment_N": 3,
+          "evidence": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved"
+        },
+        {
+          "id": "city_lower_encounter_manager_2",
+          "manager": "city_lower_encounter_manager_2",
+          "manager_sha256": "9fdf2e44aa856f3d1da1b1e6687cfba2b13b4eb0c002a94aca402eb0aa7586a7",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "oscar_encounter_manager_dragon_runners",
+          "manager": "oscar_encounter_manager_dragon_runners",
+          "manager_sha256": "d7775822225a9965a0751d0bffc0f5dad4ef9491a6bcc5f6be45e7c966686488",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    },
+    "e4m3_mcity": {
+      "map_key": "e4m3_mcity",
+      "source": {
+        "path": "id Software",
+        "sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904"
+      },
+      "segments": [
+        {
+          "id": "forest_canyon_secret_tentacles",
+          "manager": "forest_canyon_encounter_manager_dlc1_forestcanyonsecret_1",
+          "manager_sha256": "297a8045bc885f7db040d92a9e402d0cc970aea6892aee39335202184165e0ba",
+          "layers": [],
+          "segment_N": 3,
+          "evidence": "source spawnAI requests three Tentacles in one finite script before ANY-zero; the group Parent supplies one pinned actor definition to empty concrete points and is not a position; physical admission and player-kill attribution require separate qualification"
+        }
+      ]
+    },
+    "e2m2_base": {
+      "map_key": "e2m2_base",
+      "source": {
+        "path": "vanillamaps/e2m2_base.map",
+        "sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f"
+      },
+      "segments": [
+        {
+          "id": "precombat_encounter_manager_atrium_3",
+          "manager": "precombat_encounter_manager_atrium_3",
+          "manager_sha256": "93132fca2d28fa68b88ecdb3a0f5de6ffd55df4631b5b1c556432aeedbe22c70",
+          "layers": [
+            "game/sp/e2m2_base/main_level"
+          ],
+          "segment_N": 6,
+          "evidence": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification"
+        },
+        {
+          "id": "fract_encounter_manager_secret_1",
+          "manager": "fract_encounter_manager_secret_1",
+          "manager_sha256": "a8c8d9b0eee1db599e8631721ef68da64fddcc7c34bf45343c4dab738717af6f",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    },
+    "e4m2_swamp": {
+      "map_key": "e4m2_swamp",
+      "source": {
+        "path": "id Software",
+        "sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690"
+      },
+      "segments": [
+        {
+          "id": "ai_encounter_manager_dlc1_5",
+          "manager": "ai_encounter_manager_dlc1_5",
+          "manager_sha256": "409b31dedf3a349c9a9be6572644c2f5d46626d68d89bd32339714541ff3895f",
+          "layers": [],
+          "segment_N": 6,
+          "evidence": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification"
+        },
+        {
+          "id": "ai_encounter_manager_dlc1_6",
+          "manager": "ai_encounter_manager_dlc1_6",
+          "manager_sha256": "71e86ae969195408f938937941c0567c393c40ddb33e460a58c317d108761111",
+          "layers": [],
+          "segment_N": 5,
+          "evidence": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification"
+        },
+        {
+          "id": "ai_encounter_manager_sunken_ruins_10",
+          "manager": "ai_encounter_manager_sunken_ruins_10",
+          "manager_sha256": "7ef1fdd2fe4f3a3900b9471f7cdd5979d3d1ccc11805578f2c91a6b56b70eeaf",
+          "layers": [],
+          "segment_N": 3,
+          "evidence": "native actorpopulation mask and complete definition ancestry select one source actor in every population variant; one finite initial script ends at an ANY-zero barrier; physical admission and player-kill attribution require separate qualification"
+        },
+        {
+          "id": "ai_encounter_manager_1_2015883833",
+          "manager": "ai_encounter_manager_1_2015883833",
+          "manager_sha256": "c83682cb791ab2caf6620dd1f70c5900aa95fc068d77595b2ecc79153745f2be",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "ai_encounter_manager_1_2015883832",
+          "manager": "ai_encounter_manager_1_2015883832",
+          "manager_sha256": "5d245cb18b4bb6d896f6465112669c41800893ee2eec54e0f2b923129bd4d3d7",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "ai_encounter_manager_1_2015883831",
+          "manager": "ai_encounter_manager_1_2015883831",
+          "manager_sha256": "3e14b27a061770a123af148b955932348efca34cb18b8794bc350810954097a2",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "ai_encounter_manager_1_2015883830",
+          "manager": "ai_encounter_manager_1_2015883830",
+          "manager_sha256": "4d2c88ea2897ed29ddbb1a7eb414ff59f469ab4f8588ee619bf0bcbb979e3574",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "ai_encounter_manager_1_2015883829",
+          "manager": "ai_encounter_manager_1_2015883829",
+          "manager_sha256": "ca2b7aef5da99ffa6fd70702c194f266f26ab8f1d455d04a2de6e352aecc34f0",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "ai_encounter_manager_1_1995188878",
+          "manager": "ai_encounter_manager_1_1995188878",
+          "manager_sha256": "b83a893da8b8f148d95cf27803b4489740f35e7935e3f8fbe0f4b7e34711fb4c",
+          "layers": [],
+          "segment_N": 1,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    },
+    "e1m3_cult": {
+      "map_key": "e1m3_cult",
+      "source": {
+        "path": "vanillamaps/e1m3_cult.map",
+        "sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866"
+      },
+      "segments": [
+        {
+          "id": "game_encounter_manager_crusher_12",
+          "manager": "game_encounter_manager_crusher_12",
+          "manager_sha256": "699dcbcbaf073fca96fa1b8b3a9c8ea1b94e4ba283d83bd2111db991baf00086",
+          "layers": [
+            "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel"
+          ],
+          "segment_N": 2,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        }
+      ]
+    },
+    "e3m3_maykr": {
+      "map_key": "e3m3_maykr",
+      "source": {
+        "path": "e3m3_maykr.map",
+        "sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb"
+      },
+      "segments": [
+        {
+          "id": "green_control_tower_cacos1",
+          "manager": "green_control_tower_cacos1",
+          "manager_sha256": "7ed101f2f35eb879608c372a95737e5aaca9d8c3457e2a4aa93b8bae07d6329a",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 3,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "temp_all_scripting_encounter_manager_13",
+          "manager": "temp_all_scripting_encounter_manager_13",
+          "manager_sha256": "02447356659fdbfc5573747bea97ba2809b7a31913bfcc9c8bfbc493f9c62793",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 3,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "temp_all_scripting_encounter_manager_14",
+          "manager": "temp_all_scripting_encounter_manager_14",
+          "manager_sha256": "5630f4702430a5081d5a928ea16c78cb7a70c943643d29abbeea4b9a8d1c8bdb",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 5,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "temp_all_scripting_encounter_manager_18",
+          "manager": "temp_all_scripting_encounter_manager_18",
+          "manager_sha256": "89caf4dddaa65b4738a7b7d867ce4751f412689f21b6f0a4796c800288587ad6",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 3,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "temp_all_scripting_precombat",
+          "manager": "temp_all_scripting_precombat",
+          "manager_sha256": "23d1e7e892c876c847d3c5a360e2942d2a918fd8988ed59d641f71767ae7324c",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 6,
+          "evidence": "finite initial requests select one concrete actor across every admitted startup palette; complete map-group upper bound and same-layer active contributor agree under native population masks and definition ancestry"
+        },
+        {
+          "id": "temp_all_scripting_encounter_manager_17",
+          "manager": "temp_all_scripting_encounter_manager_17",
+          "manager_sha256": "b458a3641005296887a195d00e681bf65abceb46e48c8bc4052c8d063639c40d",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 5,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    },
+    "e3m1_slayer": {
+      "map_key": "e3m1_slayer",
+      "source": {
+        "path": "e3m1_slayer.map",
+        "sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705"
+      },
+      "segments": [
+        {
+          "id": "ai_encounter_manager_throne_secret_e3m1",
+          "manager": "ai_encounter_manager_throne_secret_e3m1",
+          "manager_sha256": "dce81411febe4dba2c0416d681ed4f5121f8d318ee9611f90f4ee827eeafd070",
+          "layers": [
+            "game/sp/e3m1_slayer/main_level"
+          ],
+          "segment_N": 3,
+          "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    }
+  },
+  "withheld_segments": [
+    {
+      "map_key": "e4m2_swamp",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "manager": "ai_encounter_manager_dlc1_7",
+      "manager_sha256": "ead30a004588489d3b1299d2c43649e1ff6b863792e448301e7d1d260838c13e",
+      "reason": "Unresolved source entity: ai_target_spawn_supertent"
+    }
+  ]
+}

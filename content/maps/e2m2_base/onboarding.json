@@ -30,5 +30,29 @@
       "relative_entities_path": "game/sp/e2m2_base/e2m2_base.entities",
       "supported_game_revision": "Steam 6.66 Rev 3.1"
     }
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "automap_interact_automap_1_e2m2": {
+        "location_id": 7770499,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 87.8000031,
+          "y": -20.3999977,
+          "z": 42.3999939
+        },
+        "region": "ARC Complex - Vargo Convention Center",
+        "qualification": "Upstairs from the Modbot, beside the Slayer Gate and broken bridge with Cueball Toy.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e2m2_base/e2m2_base.decl",
+          "sha256": "84cd5be7c6d43727f519c13635795072ed1f4762a7a24aed5209d7018c0a2e42",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }
