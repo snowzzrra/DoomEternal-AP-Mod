@@ -256,7 +256,7 @@ def _render_command(name: str, command: str) -> str:
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\tcommandText = "{command}";
+\t\t\tcommandText = "{command};";
 \t\t}}
 \t}}
 }}

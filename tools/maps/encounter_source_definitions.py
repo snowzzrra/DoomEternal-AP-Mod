@@ -3,7 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
-import re
+from doom_eap.content.enemy_species import enemy_spawn_mask
 
 from tools.maps.encounter_population_sources import PopulationSources
 from tools.maps.encounter_spawn_admission import admitted_parent_definitions
@@ -59,7 +59,8 @@ class SourceDefinitions:
         if initial_definitions:
             raise ValueError("Multiple source definition resets need review")
         self._load()
-        if spawn_type == "ENCOUNTER_SPAWN_ANY" or re.fullmatch(r"ENCOUNTER_SPAWN_[A-Z0-9_]+", spawn_type) is None:
+        source_mask = enemy_spawn_mask(spawn_type)
+        if source_mask & (source_mask - 1):
             raise ValueError("Multiple source definitions need one qualified native spawn type")
         candidates = []
         for definition in definitions:
@@ -70,7 +71,8 @@ class SourceDefinitions:
         selected = []
         for rows in self._populations.resolved_variants(population):
             bases = {row["entityDef"] for row in rows.values()
-                     if row.get("entityDef") and self._populations.encounter_type(row) == spawn_type}
+                     if row.get("entityDef") and (native_type := self._populations.encounter_type(row))
+                     and enemy_spawn_mask(native_type) == source_mask}
             choices = [name for name, chain in candidates if any(base in chain for base in bases)]
             if len(choices) != 1:
                 raise ValueError("Source definitions have no unique native selection")

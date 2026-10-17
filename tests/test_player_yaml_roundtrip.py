@@ -23,7 +23,6 @@ def test_import_edit_export_preserves_common_settings(tmp_path):
     imported["campaign_difficulty"] = "nightmare"
     imported["enemy_speed"] = {"minimum": 150, "maximum": 150}
     exported_yaml = dump_player_yaml(schema, name, imported, imported=original)
-    assert "# Speed is fixed at 100%" in exported_yaml
     exported = yaml.safe_load(exported_yaml)
     assert exported["DOOM Eternal"]["enemy_speed"] == imported["enemy_speed"]
     assert exported["description"] == "Personal settings"

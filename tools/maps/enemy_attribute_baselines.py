@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import json
+import math
 from pathlib import Path
 
 from tools.maps.encounter_catalog import entity_records
@@ -39,3 +40,15 @@ def resolve_enemy_attribute_baselines(source_block, *, catalog=None):
     if health is not None:
         bases["aiHealth"] = health
     return copy.deepcopy(bases)
+
+
+def positive_enemy_hitpoints(health):
+    if not isinstance(health, dict):
+        return False
+    for key in ("max", "starting"):
+        value = health.get(key)
+        if isinstance(value, dict) and set(value) == {"defaultValue"}:
+            value = value["defaultValue"]
+        if type(value) not in (int, float) or value <= 0 or (type(value) is float and not math.isfinite(value)):
+            return False
+    return True

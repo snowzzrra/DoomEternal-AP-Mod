@@ -1213,10 +1213,12 @@
   "progressive_difficulty": true,
   "native_generation_fingerprint": "a8fe3c82ee8407ae6364013a1950243972f6a9c798fdfdd955b924af435fed17",
   "killsanity": {
-    "revision": 2,
+    "revision": 3,
     "enabled": false,
     "interval": 100,
     "maximum_milestones": 0,
+    "finite_kills": 0,
+    "finite_sources": [],
     "milestones": []
   }
 }

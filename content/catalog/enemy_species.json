@@ -723,14 +723,23 @@
     },
     "hell_soldier": {
       "speed": {
-        "status": "unsupported",
+        "status": "qualified",
         "evidence": {
-          "kind": "selected_source_consumers_inactive",
+          "kind": "native_displacement_and_limit_consumers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
-          "source_counterevidence_sha256": "189e1e61aefbdfdbadf75117923df85e28ee13b4edfa1cc3f6c9d1ca61c0cdeb",
-          "velocity_consumer": "0x1408c5cb0",
-          "animation_consumer": "0x140891d70",
-          "behavior": "behaviors/soldier_blaster/soldier_blaster"
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "displacement_consumer": "0x1408be280",
+          "controller_mode": 1,
+          "behavior": "behaviors/soldier_blaster/soldier_blaster",
+          "source_template": {
+            "map_key": "e1m1_intro",
+            "entity": "uac_hq_ai_fodder_soldier_blaster_1",
+            "sha256": "853a94bd793bfc7c3aa98619284119ec6d675ee67798710ff05eaafccf0689ca"
+          },
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "scope": "normal locomotion; native animation timing",
+          "gameplay_verified": false
         }
       },
       "status": "qualified",
@@ -811,7 +820,27 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_displacement_and_limit_consumers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "displacement_consumer": "0x1408be280",
+          "controller_mode": 1,
+          "behavior": "behaviors/imp/demon_imp",
+          "source_template": {
+            "map_key": "e1m1_intro",
+            "entity": "ai_fodder_imp_9_charge",
+            "sha256": "13eb81d80a4c2f7ee8fb4eb596105644c15e25dbe4e7d3d718558bcd5d8924bf"
+          },
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "scope": "normal locomotion; native animation timing",
+          "gameplay_verified": false
+        }
+      }
     },
     "lost_soul": {
       "status": "qualified",
@@ -1194,7 +1223,27 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_displacement_and_limit_consumers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "displacement_consumer": "0x1408be280",
+          "controller_mode": 1,
+          "behavior": "behaviors/imp_stone/default",
+          "source_template": {
+            "map_key": "e5m1_spear",
+            "entity": "ai_combat_ai_fodder_imp_stone_2",
+            "sha256": "29bfe0aee160c9023158469f3feea966c751c0f9474d59a759683b0d461d56d4"
+          },
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "scope": "normal locomotion; native animation timing",
+          "gameplay_verified": false
+        }
+      }
     },
     "super_tentacle": {
       "status": "qualified",
@@ -1699,6 +1748,94 @@
           "stored_size": 359,
           "decoded_size": 359,
           "stored_sha256": "4e2bb9c5bb22f668203c17c7db940329ef1c047f076dbc4c546fb22515764802"
+        }
+      ]
+    },
+    "actorpopulation/default/default_iconofsin": {
+      "source_installation_pristine": false,
+      "variants": [
+        {
+          "path": "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl",
+          "sha256": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
+          "bank": "game/sp/e3m4_boss/e3m4_boss_patch1.resources",
+          "resource_name": "generated/decls/actorpopulation/actorpopulation/default/default_iconofsin.decl",
+          "index": 5611,
+          "offset": 123040256,
+          "stored_size": 358,
+          "decoded_size": 358,
+          "stored_sha256": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a"
+        }
+      ]
+    },
+    "actorpopulation/default/e3m4": {
+      "variants": [
+        {
+          "path": "content/catalog/actorpopulation/e3m4-a96ac2ca8c2d.decl",
+          "sha256": "a96ac2ca8c2d2ec5a033d350580234a98ee2a33604d5dee3eb3b169e962ac8f4",
+          "source_installation_pristine": false,
+          "source": {
+            "bank": "game/sp/e3m4_boss/e3m4_boss_patch2.resources",
+            "index": 1303,
+            "name": "generated/decls/actorpopulation/actorpopulation/default/e3m4.decl",
+            "offset": 77280512,
+            "stored_size": 349,
+            "size": 349,
+            "compression_raw": 0
+          },
+          "resource_name": "generated/decls/actorpopulation/actorpopulation/default/e3m4.decl"
+        }
+      ]
+    },
+    "actorpopulation/default/dlc2_demonic_soldier": {
+      "variants": [
+        {
+          "path": "content/catalog/actorpopulation/dlc2_demonic_soldier-86c6c104fd56.decl",
+          "sha256": "86c6c104fd562fbd0438a463fc1c4376c610f9975954a7f8b670eb940fb75dcb",
+          "source_installation_pristine": false,
+          "source": {
+            "bank": "game/dlc2/e5m1_spear/e5m1_spear_patch2.resources",
+            "index": 461,
+            "name": "generated/decls/actorpopulation/actorpopulation/default/dlc2_demonic_soldier.decl",
+            "offset": 10247936,
+            "stored_size": 221,
+            "size": 221,
+            "compression_raw": 0
+          },
+          "resource_name": "generated/decls/actorpopulation/actorpopulation/default/dlc2_demonic_soldier.decl"
+        }
+      ]
+    },
+    "actorpopulation/default/dlc1_e4m3": {
+      "variants": [
+        {
+          "path": "content/catalog/actorpopulation/dlc1_e4m3-7faca2724aa2.decl",
+          "sha256": "7faca2724aa2547aae723fee8ee3d5f500a0582fe217ff2ac92a5309a7d6399e",
+          "source_installation_pristine": false,
+          "source": {
+            "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+            "index": 14370,
+            "name": "generated/decls/actorpopulation/actorpopulation/default/dlc1_e4m3.decl",
+            "offset": 248688640,
+            "stored_size": 1451,
+            "size": 1451,
+            "compression_raw": 0
+          },
+          "resource_name": "generated/decls/actorpopulation/actorpopulation/default/dlc1_e4m3.decl"
+        },
+        {
+          "path": "content/catalog/actorpopulation/dlc1_e4m3-5a915939c870.decl",
+          "sha256": "5a915939c870a37b55262054d444a127881841c4cff8fbc89e767afe50ee8225",
+          "source_installation_pristine": false,
+          "source": {
+            "bank": "game/dlc/e4m3_mcity/e4m3_mcity_patch1.resources",
+            "index": 2383,
+            "name": "generated/decls/actorpopulation/actorpopulation/default/dlc1_e4m3.decl",
+            "offset": 108004224,
+            "stored_size": 1609,
+            "size": 1609,
+            "compression_raw": 0
+          },
+          "resource_name": "generated/decls/actorpopulation/actorpopulation/default/dlc1_e4m3.decl"
         }
       ]
     }

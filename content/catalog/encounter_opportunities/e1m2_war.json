@@ -5,7 +5,7 @@
     "path": "vanillamaps/e1m2_war.map",
     "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65"
   },
-  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "species_registry_sha256": "6eeb6a99dbe98526e2539e2f7fc012d4ee0ab6e9092fb222caa228080378b73a",
   "logic_sources": {},
   "counting": {
     "unit": "finite_authored_combat_opportunity",
@@ -641,6 +641,6 @@
   },
   "review_source": {
     "path": "content/catalog/encounter_opportunity_segments.json",
-    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+    "sha256": "54e1d7b4b5266def024a19fbf2c5826f568b6d28ab73440adaf59bb10974a54e"
   }
 }

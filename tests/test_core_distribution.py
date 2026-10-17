@@ -100,7 +100,11 @@ def test_distribution_requires_current_core_and_mod_lines(tmp_path, version, mod
 
 
 @pytest.mark.parametrize("name,version", [("combat", None), ("combat", 1), ("combat", 3),
-                                         ("combat_presentation", None), ("combat_presentation", 2)])
+                                          ("combat_presentation", None), ("combat_presentation", 2),
+                                          ("enemy_movement", None), ("enemy_movement", 0), ("enemy_movement", 2),
+                                          ("enemy_supply", None), ("enemy_supply", 0), ("enemy_supply", 2),
+                                          ("enemy_limits", None), ("enemy_limits", 0), ("enemy_limits", 2),
+                                          ("enemy_tracking", None), ("enemy_tracking", 0), ("enemy_tracking", 2)])
 def test_distribution_refuses_incompatible_combat_before_reading_artifacts(tmp_path, name, version):
     manifest = fixture(tmp_path)
     if version is None:

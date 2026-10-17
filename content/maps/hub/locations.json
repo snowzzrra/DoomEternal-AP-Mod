@@ -352,6 +352,10 @@
       "ap_touch_only": true,
       "no_auto_visual": true,
       "native_entity_contract": {
+        "add_properties": {
+          "activateTargetsOnUse": false,
+          "activateTargetsOnEndInteraction": true
+        },
         "original_targets": [
           "sentinel_battery_room_interact_hub_unmaykr_fx_1_1829410956",
           "sentinel_battery_room_interact_hub_unmaykr_fx_2_1829410956",

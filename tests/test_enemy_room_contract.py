@@ -6,6 +6,7 @@ import pytest
 
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.enemy_options import normalize_enemy_options
+from doom_eap.content.enemy_plan import enemy_combat_cost
 from doom_eap.content.killsanity_plan import build_killsanity_plan, milestone_ids
 from doom_eap.launcher.launcher_core import ModCompiler, RoomCompiler, RoomSnapshot, SeedManifest, _normalize_slot_data
 from doom_eap.runtime.context_registry import validate_slot_contract
@@ -17,11 +18,13 @@ def slot_data():
 
 
 def frozen_plan():
-    return {"revision": 1, "seed": "room", "finite_kills": 1000,
+    return {"revision": 3, "seed": "room", "finite_kills": 1000,
             "maps": {"e1m1_intro": {"schema": 2, "map_key": "e1m1_intro", "source_sha256": "a" * 64,
                                     "operations": []}},
             "finite_sources": [{"map_key": "e1m1_intro", "location": "Hell on Earth - Mission Complete",
-                                "count": 1000, "repeatable": True}]}
+                                "count": 1000, "repeatable": True}],
+            "combat_costs": {"e1m1_intro": {"original": 0, "target": None, "actual": 0}},
+            "secret_timers": {}}
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
@@ -57,7 +60,8 @@ def test_room_requires_frozen_plan_for_requested_enemy_semantics(validate, enabl
     slot["enemies"] = normalize_enemy_options(slot)
     slot["killsanity_options"]["enabled"] = enabled == "killsanity"
     slot["killsanity_options"]["maximum_milestones"] = 13
-    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"])
+    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
+        "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     slot.pop("enemy_plan", None)
     if plan_state == "null":
         slot["enemy_plan"] = None
@@ -90,10 +94,12 @@ def test_kill_rewards_are_independent_of_enemy_totals_but_validate_enemy_sources
     slot["enemy_plan"] = frozen_plan()
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
-    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"])
+    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
+        "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     validate(slot)
     slot["killsanity_options"]["maximum_milestones"] = 14
-    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"])
+    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
+        "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     validate(slot)
     slot["enemy_plan"]["maps"]["e1m1_intro"]["source_sha256"] = "drift"
     with pytest.raises(ValueError, match="source hash"):
@@ -101,17 +107,24 @@ def test_kill_rewards_are_independent_of_enemy_totals_but_validate_enemy_sources
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
-@pytest.mark.parametrize("species", ["arachnotron", "imp"])
-def test_room_rejects_speed_without_positive_species_qualification(validate, species):
+@pytest.mark.parametrize("species, qualified", [("arachnotron", False), ("gargoyle", False),
+    ("imp", True), ("hell_soldier", True), ("stone_imp", True)])
+def test_room_accepts_speed_only_for_qualified_species(validate, species, qualified):
     slot = slot_data()
     slot["enemy_randomizer"] = True
     slot["enemies"] = normalize_enemy_options(slot)
     slot["enemy_plan"] = frozen_plan()
     slot["enemy_plan"]["maps"]["e1m1_intro"]["operations"] = [{"waves": [{"instances": [{
-        "species": species, "attributes": {"speed_percent": 150},
+        "species": species, "attributes": {"health_percent": 100, "damage_percent": 100,
+                                             "speed_percent": 150, "size_percent": 100},
     }]}]}]
-    with pytest.raises(ValueError, match="Speed changes are not qualified"):
+    if qualified:
+        slot["enemy_plan"]["combat_costs"]["e1m1_intro"]["actual"] = float(enemy_combat_cost(
+            species, slot["enemy_plan"]["maps"]["e1m1_intro"]["operations"][0]["waves"][0]["instances"][0]["attributes"]))
         validate(slot)
+    else:
+        with pytest.raises(ValueError, match="Speed changes are not qualified"):
+            validate(slot)
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
@@ -120,7 +133,8 @@ def test_room_rejects_changed_kill_reward_addresses(validate):
     slot["enemy_plan"] = frozen_plan()
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
-    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"])
+    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
+        "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     validate(slot)
     slot["killsanity"]["milestones"][0]["threshold"] = 101
     with pytest.raises(ValueError, match="Killsanity"):
@@ -135,7 +149,8 @@ def test_milestones_are_active_checks_without_placement_scouting():
     slot["enemy_plan"] = frozen_plan()
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
-    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"])
+    slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
+        "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     milestones = milestone_ids(slot["killsanity"])
     ordinary = 7770001
     connected = {"slot": 1, "team": 0, "slot_data": slot,

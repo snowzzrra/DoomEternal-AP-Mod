@@ -5,7 +5,7 @@
     "path": "vanillamaps/e2m1_nest.map",
     "sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7"
   },
-  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "species_registry_sha256": "6eeb6a99dbe98526e2539e2f7fc012d4ee0ab6e9092fb222caa228080378b73a",
   "logic_sources": {},
   "counting": {
     "unit": "finite_authored_combat_opportunity",
@@ -765,6 +765,201 @@
           "replacement_constraints": []
         }
       ]
+    },
+    {
+      "id": "game_encounter_manager_71_initial",
+      "manager": "game_encounter_manager_71",
+      "script_index": 0,
+      "segment_N": 5,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor.",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "game_encounter_trigger_commit_70"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "game_encounter_trigger_exit_69",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 5,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "25e7a0220b8ac30df5dad9363944a8af995205489342936a2e98645c761b77d0",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_282",
+          "members": [
+            {
+              "spawner": "game_target_spawn_282",
+              "ai": "game_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "835f80f517a1abce2fc847aa7514ad616dbbd10d920974e72338e73d844aa0ae",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_283",
+          "members": [
+            {
+              "spawner": "game_target_spawn_283",
+              "ai": "game_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "c8641a3a5f214e795ae1128f96c18c9de921d7f98d7234bef15e30b19c63e8ee",
+          "species": "whiplash",
+          "spawn_type": "ENCOUNTER_SPAWN_WHIPLASH ENCOUNTER_DO_NOT_USE_MAX_HEAVY",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_583",
+          "members": [
+            {
+              "spawner": "game_target_spawn_583",
+              "ai": "game_ai_heavy_whiplash_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 3,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "078e31a6abb0dd0ed4434b7d879acf8ac26ab62b19d1638750a6489f965a77f2",
+          "species": "shotgun_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_SHOTGUN_SOLDIER",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_612",
+          "members": [
+            {
+              "spawner": "game_target_spawn_612",
+              "ai": "game_ai_fodder_soldier_shield_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "09fafcb83fc9461e8e685da5623a298b24c7410be083c3472e621a99e172873c",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_590",
+          "members": [
+            {
+              "spawner": "game_target_spawn_590",
+              "ai": "game_ai_fodder_zombie_tier_1_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "game_encounter_manager_65_initial",
+      "manager": "game_encounter_manager_65",
+      "script_index": 0,
+      "segment_N": 2,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor.",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "game_encounter_trigger_commit_64"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "game_encounter_trigger_exit_63",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 3,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "489216b325ec336fe459bee4f12d04c62b777cd6264c1cfeab4b1a4eae83ce4c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "7d905557904f98944ce7a3f2fa3fd4e7aab6413332020a425547446308592f81",
+          "species": "lost_soul",
+          "spawn_type": "ENCOUNTER_SPAWN_LOST_SOUL ENCOUNTER_DO_NOT_USE_MAX_COMMON",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_568",
+          "members": [
+            {
+              "spawner": "game_target_spawn_568",
+              "ai": "game_ai_fodder_lostsoul_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "bb84cf72c2d4cb00ee688a08063def8e0cd7b95dc0985500e4393493718b7d3c",
+          "species": "lost_soul",
+          "spawn_type": "ENCOUNTER_SPAWN_LOST_SOUL ENCOUNTER_DO_NOT_USE_MAX_COMMON",
+          "count": 1,
+          "label": "",
+          "spawner": "game_target_spawn_569",
+          "members": [
+            {
+              "spawner": "game_target_spawn_569",
+              "ai": "game_ai_fodder_lostsoul_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
     }
   ],
   "entities": {
@@ -1269,6 +1464,149 @@
         "z": -15
       },
       "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "game_ai_fodder_soldier_shield_1": {
+      "sha256": "f9a21d6bfadbf139e946878a61c422fe3e6fab90c14bcb6552f0426326bd3103",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_shield",
+      "starting_health": 500
+    },
+    "game_ai_heavy_whiplash_1": {
+      "sha256": "35da49134c21eef53eb5e5bfa5a514011f7622c9d76a77323b7479dbb228834d",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/whiplash",
+      "starting_health": 2000
+    },
+    "game_encounter_manager_71": {
+      "sha256": "a0957d1385a58728b8dba1896c7cd2c771fd5bb3d90a32679e410ca9d493b557",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e2m1_nest/main_level"
+      ]
+    },
+    "game_encounter_trigger_commit_70": {
+      "sha256": "67668adcf8c7e480dedfbe3cf7fac009772a0f82d60be143104abeba69784f0c",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e2m1_nest/main_level"
+      ]
+    },
+    "game_encounter_trigger_exit_69": {
+      "sha256": "4a45b091e2ae292e89a1440709091603ad712c23c3134af32865687d2950bfbd",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e2m1_nest/main_level"
+      ]
+    },
+    "game_target_spawn_282": {
+      "sha256": "527c3b9dac3aeb8683eda55c3f2251a8c44216c14b6cef4d83880f3f188af7be",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 112.200218,
+        "y": 41.2000809,
+        "z": -11.9999962
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "game_target_spawn_283": {
+      "sha256": "25f7f497df47bbc4b99c8bae2fcb50055e28ecbf677e4a1fbc1005b2c5fce244",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 109.800201,
+        "y": 44.3000336,
+        "z": -11.9999962
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "game_target_spawn_583": {
+      "sha256": "423c7c411708ba6ac9decfb42d1016e2e65ed08beea23c651998119e5bcc6de2",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 141.049835,
+        "y": 51.6999512,
+        "z": -11.899992
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "game_target_spawn_590": {
+      "sha256": "755fa31ad4ae958a3672c2f208f193fcdc677d53f587f09baa864521786d639f",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 127.04995,
+        "y": 49.9999733,
+        "z": -1.84999311
+      },
+      "spawn_override": "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION",
+      "protected_reason": "authored_entrance_animation",
+      "replacement_qualification": "preserve_source_species_until_entrance_animation_is_qualified"
+    },
+    "game_target_spawn_612": {
+      "sha256": "6ab94bbaf57d1eba19bb4ee07c034b4da0adac7a04c8bf44496d74e817478bf5",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 108.850174,
+        "y": 41.9000397,
+        "z": -11.899992
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "game_ai_fodder_lostsoul_1": {
+      "sha256": "68ff55b8f98ebef20d6e4a26aeb27506c8ba2c35d87a149d4ee5fc0995f9d23f",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/lostsoul",
+      "health_source": "qualified_attribute_baseline",
+      "starting_health": 100
+    },
+    "game_encounter_manager_65": {
+      "sha256": "735c5190cf5b29f8c1507bbfa762d6b0249d8acfe75610a45dd7560c7f0c299e",
+      "class_name": "idEncounterManager",
+      "layers": []
+    },
+    "game_encounter_trigger_commit_64": {
+      "sha256": "ced528676209de9840aa92d44f03f4a188a0ff0018942e6a3a1fe957af0d5739",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "game_encounter_trigger_exit_63": {
+      "sha256": "9869b06673fd41a0084ebafe7437f2ca9c348867967956edcce1e11014165946",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "game_target_spawn_568": {
+      "sha256": "e48d9464e6925d2105e85a9cb29a9cb19410c77e014de7074057fa6e8a6d00fc",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 50.3999901,
+        "y": -62.0000076,
+        "z": -104.999992
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "game_target_spawn_569": {
+      "sha256": "a604265732c637e3f28acb9e84f925c99e0d69dcef2cb97bb061f9161fa9506c",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 47.2999878,
+        "y": -61.6999969,
+        "z": -102.099983
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
     }
   },
   "gaps": [
@@ -1383,11 +1721,6 @@
       "map_N": null
     },
     {
-      "manager": "game_encounter_manager_65",
-      "reason": "finite_initial_pass_not_reviewed",
-      "map_N": null
-    },
-    {
       "manager": "game_encounter_manager_66",
       "reason": "finite_initial_pass_not_reviewed",
       "map_N": null
@@ -1404,11 +1737,6 @@
     },
     {
       "manager": "game_encounter_manager_69",
-      "reason": "finite_initial_pass_not_reviewed",
-      "map_N": null
-    },
-    {
-      "manager": "game_encounter_manager_71",
       "reason": "finite_initial_pass_not_reviewed",
       "map_N": null
     },
@@ -1575,6 +1903,7 @@
   },
   "review_source": {
     "path": "content/catalog/encounter_opportunity_segments.json",
-    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
-  }
+    "sha256": "54e1d7b4b5266def024a19fbf2c5826f568b6d28ab73440adaf59bb10974a54e"
+  },
+  "attribute_baselines_sha256": "d179a44d71faec36d646082763f24d3c62892aed6cbe36821aa527fe595c5741"
 }

@@ -888,7 +888,9 @@ class RoomCompiler:
 
         placement_by_id = {record.location_id: record for record in placements}
         secret_timers = None
-        if (options or {}).get("easier_secret_encounters", False):
+        easier_secrets = (options or {}).get("easier_secret_encounters", False)
+        frozen_timers = ((options or {}).get("enemy_plan") or {}).get("secret_timers", {})
+        if easier_secrets or frozen_timers:
             from doom_eap.content.secret_encounter_timers import load_secret_encounter_timers
             secret_timers = load_secret_encounter_timers()
         selected_groups = (options or {}).get("active_fortress_spend_group_ids")
@@ -953,7 +955,8 @@ class RoomCompiler:
                     text = remove_blood_punch_grants(text)
                 if secret_timers is not None:
                     from doom_eap.content.secret_encounter_timers import apply_secret_encounter_timers
-                    text = apply_secret_encounter_timers(text, member, secret_timers)
+                    text = apply_secret_encounter_timers(text, member, secret_timers,
+                                                         frozen_timers, easier=easier_secrets)
                 if economy_enabled and member.endswith(fortress_member_suffix):
                     from tools.maps.fortress_campaign import project_spend_groups
                     text = text.rstrip() + "\n" + fortress_labels
@@ -1266,7 +1269,6 @@ class RoomCompiler:
         if not changed_maps:
             return
         required_sources = set(changed_maps)
-        species = set()
         try:
             for row in changed_maps.values():
                 for operation in row["operations"]:
@@ -1276,13 +1278,12 @@ class RoomCompiler:
                             required_sources.add(operation["reserve"][template]["map_key"])
                     for wave in operation["waves"]:
                         for instance in wave["instances"]:
-                            species.add(instance["species"])
                             required_sources.add(instance["ai"]["map_key"])
                             if operation["event_def"] == "spawnAI":
                                 required_sources.add(instance["origin_spawner"]["map_key"])
         except (KeyError, TypeError) as error:
             raise ValueError("Enemy generation source references are malformed") from error
-        resources = read_enemy_resource_payloads(self.payload_resource, self.payload_manifest, required_enemy_resource_species(species))
+        resources = read_enemy_resource_payloads(self.payload_resource, self.payload_manifest, required_enemy_resource_species(plan))
         for member, payload in resources.items():
             if member in assembled and assembled[member] != payload:
                 raise ValueError(f"Enemy resources conflict with the room payload: {member}")
@@ -1311,7 +1312,8 @@ class RoomCompiler:
                 source_path = staged / f"{map_key}.source"
                 output_path = staged / f"{map_key}.entities"
                 source_path.write_bytes(materialized.encode("utf-8"))
-                compiler.compile_map(neutral_manifest, source_path, output_path, map_key)
+                compiler.compile_map(neutral_manifest, source_path, output_path, map_key,
+                                     encounter_source=sources[map_key])
                 audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
                                                      {map_key: output_path}, staged / "publishers",
                                                      source_maps=sources, retained_overrides=assembled)
@@ -1670,7 +1672,7 @@ class ModCompiler:
         return project_map_config(config, manifest.options)
 
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,
-                    map_key: str = "e1m2_war") -> Path:
+                    map_key: str = "e1m2_war", *, encounter_source: str | None = None) -> Path:
         """Compile one supported campaign map with map-local room transforms."""
         from doom_eap.content.item_classification import load_item_classifications
         from doom_eap.runtime.item_reconciliation import load_policy_registry
@@ -1697,6 +1699,7 @@ class ModCompiler:
                 config_path,
                 output_entities.with_suffix(".manifest.json"),
                 item_definitions,
+                encounter_source=encounter_source,
                 item_names={item_id: policy.name for item_id, policy in policies.items()},
                 item_classifications=load_item_classifications(
                     self.root / "data/item_classifications.json"

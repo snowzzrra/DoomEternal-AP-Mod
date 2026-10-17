@@ -102,6 +102,24 @@
           ],
           "segment_N": 12,
           "evidence": "single initial script contains only finite source spawns and delays before an ANY-zero barrier; each point selects one positive-health source actor; source labels, path targets and activation bindings are preserved"
+        },
+        {
+          "id": "game_encounter_manager_71_initial",
+          "manager": "game_encounter_manager_71",
+          "manager_sha256": "a0957d1385a58728b8dba1896c7cd2c771fd5bb3d90a32679e410ca9d493b557",
+          "layers": [
+            "game/sp/e2m1_nest/main_level"
+          ],
+          "segment_N": 5,
+          "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
+        },
+        {
+          "id": "game_encounter_manager_65_initial",
+          "manager": "game_encounter_manager_65",
+          "manager_sha256": "735c5190cf5b29f8c1507bbfa762d6b0249d8acfe75610a45dd7560c7f0c299e",
+          "layers": [],
+          "segment_N": 2,
+          "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
         }
       ]
     },
@@ -141,6 +159,26 @@
           ],
           "segment_N": 1,
           "evidence": "single initial script contains only finite source spawns and delays, ending at a population-zero barrier; each source point resolves to one positive-health template"
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_4_initial",
+          "manager": "uac_chunk_1_encounter_manager_4",
+          "manager_sha256": "3294f24b26234a25b5ae9264142bad3e28cd5591e4fdf5fa2362f51d3ffe75c6",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 6,
+          "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
+        },
+        {
+          "id": "phobos_encounter_manager_7_initial",
+          "manager": "phobos_encounter_manager_7",
+          "manager_sha256": "b84b601b87e548149a91a7aca173c93ab6f06542b8ff3a6c2ad02e77d24d653c",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 5,
+          "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
         }
       ]
     },
@@ -523,6 +561,16 @@
           ],
           "segment_N": 5,
           "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        },
+        {
+          "id": "temp_all_scripting_encounter_manager_15_initial",
+          "manager": "temp_all_scripting_encounter_manager_15",
+          "manager_sha256": "41b602b15e8e2dc5e0358cd6e2004466e109e1bcfeb3d935dda45b00f88c22be",
+          "layers": [
+            "game/sp/e3m3_maykr/main_level"
+          ],
+          "segment_N": 4,
+          "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
         }
       ]
     },

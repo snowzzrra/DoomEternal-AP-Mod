@@ -186,6 +186,12 @@ def _compile_catalog(
                          (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_species.json"),
                          (catalog.root / "content/catalog/enemy_species.json").read_bytes())
+    write_bytes_artifact(output.with_name("encounter_composition.json"),
+                         (catalog.root / "content/catalog/encounter_composition.json").read_bytes())
+    write_bytes_artifact(output.with_name("secret_encounter_timers.py"),
+                         (catalog.root / "doom_eap/content/secret_encounter_timers.py").read_bytes())
+    write_bytes_artifact(output.with_name("secret_encounter_timers.json"),
+                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
     write_bytes_artifact(output.with_name("killsanity_plan.py"),
                          (catalog.root / "doom_eap/content/killsanity_plan.py").read_bytes())
     write_artifact(catalog.root / "data" / "campaign_stages.json",

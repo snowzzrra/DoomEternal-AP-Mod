@@ -19,7 +19,7 @@ def _call(name, args):
     return dict(eventCall=dict(eventDef=name, args=_items(args)))
 
 
-def _fixture(*, count=2, barrier='ENCOUNTER_SPAWN_ANY', duplicate=False, operation='spawnAI', definitions=None, health=100, parent_definition=None, group_parent=False, controls=False):
+def _fixture(*, count=2, barrier='ENCOUNTER_SPAWN_ANY', duplicate=False, operation='spawnAI', definitions=None, health=100, parent_definition=None, group_parent=False, controls=False, completion=None, spawn_type="ENCOUNTER_SPAWN_IMP", initial_definition=None, inherited_health=False, partial_gate=None):
     def properties(values):
         return '\n'.join(f'{key} = {{ {properties(value)} }}' if isinstance(value, dict)
             else f'{key} = {json.dumps(value)};' for key, value in values.items())
@@ -27,8 +27,16 @@ def _fixture(*, count=2, barrier='ENCOUNTER_SPAWN_ANY', duplicate=False, operati
     def entity(name, kind, inherit, edit):
         return f'entity {{\nentityDef {name} {{\ninherit = "{inherit}";\nclass = "{kind}";\nedit = {{ {properties(edit)} }}\n}}\n}}\n'
 
-    spawn = _call(operation, [dict(eEncounterSpawnType_t='ENCOUNTER_SPAWN_IMP'),dict(int=count),dict(entity='group'),dict(string='cohort')])
-    calls = [spawn] * (2 if duplicate else 1) + [_call('waitAIRemaining', [dict(eEncounterSpawnType_t=barrier),dict(int=0),dict(string=''),dict(bool=False)])]
+    spawn = _call(operation, [dict(eEncounterSpawnType_t=spawn_type),dict(int=count),dict(entity='group'),dict(string='cohort')])
+    calls = [spawn] * (2 if duplicate else 1)
+    if operation == 'staggeredAISpawn':
+        spawn['eventCall']['args'] = _items(list(spawn['eventCall']['args'][f'item[{i}]'] for i in range(4)) + [dict(float=0.25), dict(float=1)])
+        if completion is not False:
+            calls.append(_call('waitStaggeredSpawnComplete', completion if completion is not None else
+                [dict(eEncounterSpawnType_t='ENCOUNTER_SPAWN_ANY'),dict(int=0),dict(string='cohort'),dict(bool=False)]))
+    if partial_gate is not None:
+        calls.append(_call('waitAIRemaining', [dict(eEncounterSpawnType_t=spawn_type),dict(int=partial_gate),dict(string='cohort'),dict(bool=False)]))
+    calls.append(_call('waitAIRemaining', [dict(eEncounterSpawnType_t=barrier),dict(int=0),dict(string=''),dict(bool=False)]))
     if controls:
         calls.insert(0, _call('activateTarget', [dict(entity='relay'),dict(string='blocker on')]))
         calls.append(_call('activateTarget', [dict(entity='relay'),dict(string='blocker off')]))
@@ -42,10 +50,12 @@ def _fixture(*, count=2, barrier='ENCOUNTER_SPAWN_ANY', duplicate=False, operati
     for name in ('point_a','point_b'):
         edit = dict(entityDefs=_items([dict(name=value) for value in (definitions if definitions is not None else ['actor'])]),
             spawnPosition=dict(x=0,y=0,z=0),spawnEditable=dict(aiStateOverride='AIOVERRIDE_TELEPORT'))
+        if initial_definition is not None:
+            edit['initialEntityDefs'] = _items([dict(name=initial_definition)])
         if parent_definition is not None and not group_parent:
             edit['targetSpawnParent'] = 'parent'
         text += entity(name,'idTarget_Spawn','target/spawn',edit)
-    text += entity('actor','idAI2','ai/fodder/imp',dict(aiHealth=dict(components={'components[0]':dict(max=health,starting=health)})))
+    text += entity('actor','idAI2','ai/fodder/imp',dict(aiHealth=dict(components={} if inherited_health else {'components[0]':dict(max=health,starting=health)})))
     if parent_definition is not None:
         parent_definitions = parent_definition if isinstance(parent_definition,list) else [parent_definition]
         text += entity('parent','idTarget_Spawn_Parent','encounter/spawn_group/parent',dict(entityDefs=_items([dict(name=value) for value in parent_definitions])))
@@ -102,8 +112,8 @@ def test_unreviewed_cleanup_graph_does_not_become_finite_opportunities(defect):
 
 
 @pytest.mark.parametrize('options,message', [
-    (dict(count=3),'exceeds distinct source points'),
-    (dict(duplicate=True),'reuse without an empty-population barrier'),
+    (dict(count=0),'Unqualified finite request'),
+    (dict(count=1,duplicate=True),'reuse without an empty-population barrier'),
     (dict(operation='maintainAICount'),'Unsupported cohort'),
     (dict(barrier='ENCOUNTER_SPAWN_ARACHNOTRON'),'barrier omits source species'),
     (dict(definitions=[]),'needs one definition|Unqualified source spawn group defaults'),
@@ -138,10 +148,12 @@ def test_group_parent_definitions_preserve_count_from_event_not_positions():
     assert catalog['counting']['map_N'] is None and catalog['counting']['campaign_N'] is None
 
 
-def test_parent_control_cannot_supply_an_extra_physical_position():
+def test_native_queued_count_reuses_points_without_counting_parent_as_a_position():
     data, registry, profile = _fixture(count=3,definitions=[],parent_definition='actor',group_parent=True)
-    with pytest.raises(ValueError,match='exceeds distinct source points'):
-        extract_reviewed_catalog(data,registry,profile)
+    catalog = extract_reviewed_catalog(data,registry,profile)
+    creation, = catalog['segments'][0]['creations']
+    assert creation['count'] == 3
+    assert [member['spawner'] for member in creation['members']] == ['point_a','point_b']
 
 
 @pytest.mark.parametrize('definition_source',[None,'point_a'])
@@ -251,3 +263,133 @@ def test_snapshot_source_must_match_the_canonical_descriptor(tmp_path):
     descriptor_path.write_text(json.dumps(descriptor))
     with pytest.raises(ValueError,match='Canonical source descriptor differs'):
         extract_snapshot_catalogs(root,payload,review)
+
+
+@pytest.mark.parametrize('duplicate', [False, True])
+@pytest.mark.parametrize('queue_mask', ['ENCOUNTER_SPAWN_ANY', 'ENCOUNTER_SPAWN_IMP'])
+def test_staggered_sources_count_successful_emissions_and_pin_queue_completion(duplicate, queue_mask):
+    completion = [dict(eEncounterSpawnType_t=queue_mask),dict(int=0),dict(string='cohort'),dict(bool=False)]
+    data, registry, profile = _fixture(count=3, operation='staggeredAISpawn', duplicate=duplicate, completion=completion)
+    catalog = extract_reviewed_catalog(data, registry, profile)
+    segment, = catalog['segments']
+    assert segment['segment_N'] == 3 * (2 if duplicate else 1)
+    assert all(c['label'] == 'cohort' and c['count'] == 3 for c in segment['creations'])
+    for creation in segment['creations']:
+        if queue_mask == 'ENCOUNTER_SPAWN_ANY':
+            assert creation['replacement_constraints'] == []
+        else:
+            assert [rule['event_def'] for rule in creation['replacement_constraints']] == ['waitStaggeredSpawnComplete']
+    verify_catalog(catalog, data, registry)
+
+
+@pytest.mark.parametrize('defect', ['missing', 'mask', 'label', 'remaining'])
+def test_pending_staggered_sources_cannot_become_completed_finite_budget(defect):
+    completion = [dict(eEncounterSpawnType_t='ENCOUNTER_SPAWN_ANY'),dict(int=0),dict(string='cohort'),dict(bool=False)]
+    if defect == 'missing':
+        completion = False
+    elif defect == 'mask':
+        completion[0] = dict(eEncounterSpawnType_t='ENCOUNTER_SPAWN_ARACHNOTRON')
+    elif defect == 'label':
+        completion[2] = dict(string='other')
+    else:
+        completion[1] = dict(int=1)
+    data, registry, profile = _fixture(operation='staggeredAISpawn', completion=completion)
+    with pytest.raises(ValueError, match='queue completion before'):
+        extract_reviewed_catalog(data, registry, profile)
+
+
+@pytest.mark.parametrize("spawn_type", ["ENCOUNTER_SPAWN_IMP | ENCOUNTER_SPAWN_STONE_IMP",
+                                      "ENCOUNTER_SPAWN_IMP ENCOUNTER_DO_NOT_USE_MAX_COMMON"])
+def test_concrete_source_keeps_the_full_native_mask_and_physical_identity(spawn_type):
+    data, registry, profile = _fixture(spawn_type=spawn_type)
+    catalog = extract_reviewed_catalog(data, registry, profile)
+    creation, = catalog["segments"][0]["creations"]
+    assert creation["spawn_type"] == spawn_type and creation["species"] == "imp"
+    assert creation["count"] == 2
+    verify_catalog(catalog, data, registry)
+
+
+def test_unrelated_native_alias_cannot_claim_the_concrete_actor():
+    data, registry, profile = _fixture(spawn_type="ENCOUNTER_DO_NOT_USE_MAX_COMMON")
+    with pytest.raises(ValueError, match="Unqualified actor identity"):
+        extract_reviewed_catalog(data, registry, profile)
+
+
+@pytest.mark.parametrize("initial_definition", [None, "actor"])
+def test_any_requests_are_counted_only_from_stable_concrete_definitions(initial_definition):
+    data, registry, profile = _fixture(spawn_type="ENCOUNTER_SPAWN_ANY", initial_definition=initial_definition)
+    catalog = extract_reviewed_catalog(data, registry, profile)
+    creation, = catalog["segments"][0]["creations"]
+    assert creation["species"] == "imp" and creation["count"] == 2
+    assert creation["source_identity"] == "concrete_spawner_definitions"
+    assert creation["replacement_qualification"] == "preserve_source_event_until_any_materialization_is_qualified"
+    verify_catalog(catalog, data, registry)
+
+
+def test_any_definition_reset_cannot_change_the_qualified_actor():
+    data, registry, profile = _fixture(spawn_type="ENCOUNTER_SPAWN_ANY", initial_definition="different")
+    with pytest.raises(ValueError, match="ANY source needs one stable definition"):
+        extract_reviewed_catalog(data, registry, profile)
+
+
+def test_any_group_uses_the_pinned_parent_palette_when_points_have_no_definitions():
+    data, registry, profile = _fixture(spawn_type="ENCOUNTER_SPAWN_ANY", definitions=[],
+                                      group_parent=True, parent_definition="actor")
+    catalog = extract_reviewed_catalog(data, registry, profile)
+    creation, = catalog["segments"][0]["creations"]
+    assert all(member["definition_source"] == "parent" for member in creation["members"])
+    assert "parent" in catalog["entities"]
+    verify_catalog(catalog, data, registry)
+
+
+@pytest.mark.parametrize("health", [{"defaultValue": 100}, {"defaultValue": 0}, {"defaultValue": True}, {"minimum": 1, "maximum": 100}])
+def test_default_health_requires_one_positive_native_value(health):
+    data, registry, profile = _fixture(health=health)
+    if health == {"defaultValue": 100}:
+        catalog = extract_reviewed_catalog(data, registry, profile)
+        verify_catalog(catalog, data, registry)
+    else:
+        with pytest.raises(ValueError, match="Nonpositive source health"):
+            extract_reviewed_catalog(data, registry, profile)
+
+
+def test_inherited_health_uses_a_pinned_source_baseline(tmp_path):
+    data, registry, profile = _fixture(inherited_health=True)
+    actor = next(row for row in entity_records(data.decode()) if row["name"] == "actor")
+    baseline = {"schema_version": 1, "qualification": "offline_native_defaults",
+        "native": {"damage_out_modifiers": {"value": {"num": 0}}},
+        "templates": {actor["sha256"]: {"entity": "actor", "inherit": "ai/fodder/imp",
+            "scale": {"x": 1, "y": 1, "z": 1}, "hitpoint_input": {"max": 100, "starting": 100}}}}
+    path = tmp_path / "content/catalog/enemy_attribute_baselines.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(baseline))
+    catalog = extract_reviewed_catalog(data, registry, profile, root=tmp_path)
+    assert catalog["entities"]["actor"]["starting_health"] == 100
+    assert catalog["entities"]["actor"]["health_source"] == "qualified_attribute_baseline"
+    verify_catalog(catalog, data, registry, root=tmp_path)
+    path.write_text(json.dumps({**baseline, "templates": {}}))
+    with pytest.raises(ValueError, match="Attribute baseline pin differs"):
+        verify_catalog(catalog, data, registry, root=tmp_path)
+    with pytest.raises(ValueError, match="Unqualified enemy attribute source SHA-256"):
+        extract_reviewed_catalog(data, registry, profile, root=tmp_path)
+
+
+@pytest.mark.parametrize("remaining", [1, 2])
+def test_partial_population_gate_preserves_overlap_and_is_pinned(remaining):
+    data, registry, profile = _fixture(partial_gate=remaining)
+    catalog = extract_reviewed_catalog(data, registry, profile)
+    segment, = catalog["segments"]
+    assert segment["segment_N"] == 2
+    gate, = segment["activation"]["event_gates"]
+    assert gate["event_def"] == "waitAIRemaining" and gate["args"][1]["int"] == remaining
+    verify_catalog(catalog, data, registry)
+    gate["args"][1]["int"] = 0
+    with pytest.raises(ValueError, match="Event gate"):
+        verify_catalog(catalog, data, registry)
+
+
+@pytest.mark.parametrize("remaining", [True, -1, 1.5])
+def test_partial_population_gate_rejects_invalid_native_counts(remaining):
+    data, registry, profile = _fixture(partial_gate=remaining)
+    with pytest.raises(ValueError, match="Invalid population gate"):
+        extract_reviewed_catalog(data, registry, profile)

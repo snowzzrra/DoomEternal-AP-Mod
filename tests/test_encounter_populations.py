@@ -115,16 +115,35 @@ def test_population_present_in_only_some_variants_still_requires_unique_writer(s
     values.append(dict(path=path.relative_to(root).as_posix(), sha256=hashlib.sha256(payload).hexdigest()))
     text, plan = fixture_plan(species="imp")
     text = text.replace(BASE, DLC2)
-    with pytest.raises(ValueError, match="Ambiguous actor population variant"):
+    with pytest.raises(ValueError, match="ambiguous population assignment"):
         materialize_frozen_populations(text, plan, registry, root)
 
 
-def test_writer_rejects_native_dlc1_variants_with_different_assignment_indices(sources):
+def test_private_addition_preserves_every_native_dlc1_variant(sources):
+    from tools.maps.encounter_population_sources import PopulationSources
+
     registry, root = sources
     text, plan = fixture_plan()
-    text = text.replace(BASE, "actorpopulation/default/dlc1")
-    with pytest.raises(ValueError, match="Ambiguous actor population variant"):
-        materialize_frozen_populations(text, plan, registry, root)
+    population = "actorpopulation/default/dlc1"
+    text = text.replace(BASE, population)
+    original = PopulationSources(registry, root).resolved_variants(population)
+    output, declarations = materialize_frozen_populations(text, plan, registry, root)
+    member, payload = next((name, data) for name, data in declarations.items() if name.startswith(PRIVATE_POPULATION_PREFIX))
+    target = root / member
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    selected, = entity_records(output, include_names={"arena"})
+    reference = selected["edit"]["aiTypeDefAssignments"]
+    registry["actorpopulation_sources"][reference] = {"variants": [
+        {"path": member, "sha256": hashlib.sha256(payload).hexdigest()}]}
+    extended = PopulationSources(registry, root).resolved_variants(reference)
+    assert len(original) == len(extended)
+    append_index = max(map(len, original))
+    for before, after in zip(original, extended):
+        assert {index: after[index] for index in before} == before
+        assert after[append_index]["entityDef"] == "ai/fodder/imp_stone"
+        assert all(not after[index].get("entityDef") for index in range(len(before), append_index))
+    assert block(output, "unselected") == block(text, "unselected")
 
 
 @pytest.mark.parametrize("include_stone", [False, True])
@@ -157,7 +176,7 @@ def test_native_default_zombie_assignment_is_retained_without_duplicate(sources,
         assert output == text and declarations == {}
 
 
-@pytest.mark.parametrize("defect", ["hash", "base_variant", "candidate_variant", "missing_assignment"])
+@pytest.mark.parametrize("defect", ["hash", "candidate_variant", "missing_assignment"])
 def test_population_rejects_unqualified_sources_instead_of_changing_spawn_semantics(sources, defect):
     original, root = sources
     registry = copy.deepcopy(original)

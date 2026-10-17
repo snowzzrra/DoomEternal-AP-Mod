@@ -22,8 +22,12 @@ def _load_enemy_resource_catalog(catalog_path: Path) -> dict:
     return catalog
 
 
-def required_enemy_resource_species(species_ids, *, catalog_path: Path = CATALOG) -> set[str]:
+def required_enemy_resource_species(plan, *, catalog_path: Path = CATALOG) -> set[str]:
     profiles = _load_enemy_resource_catalog(catalog_path)["species"]
+    species_ids = {instance["species"]
+                   for map_key, row in (plan or {}).get("maps", {}).items()
+                   for operation in row["operations"] for wave in operation["waves"] for instance in wave["instances"]
+                   if instance["ai"]["map_key"] != map_key}
     return {species_id for species_id in species_ids if species_id in DLC_SPECIES or species_id in profiles}
 
 

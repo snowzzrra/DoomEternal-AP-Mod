@@ -5,10 +5,13 @@ import hashlib
 import json
 from pathlib import Path
 
+from doom_eap.content.enemy_species import enemy_spawn_mask
+
 from .ap_map_generator import find_entity_block_bounds
 from .encounter_catalog import ENTITY_HEADER, entity_records, list_items
 from .encounter_materializer import _value_span, text_sha256
 from .encounter_source_definitions import SourceDefinitions
+from .enemy_attribute_baselines import resolve_enemy_attribute_baselines, positive_enemy_hitpoints
 
 
 def _require(condition, message):
@@ -23,19 +26,40 @@ def _get(value, path):
 
 
 def typed_consumers(calls, spawn_type, label):
-    if spawn_type == "ENCOUNTER_SPAWN_ANY":
+    source_mask = enemy_spawn_mask(spawn_type)
+    if source_mask == (1 << 44) - 1:
         return []
     result = []
     for index, call in enumerate(calls):
-        if call["eventDef"] in {"spawnSingleAI", "spawnAI", "maintainAICount"}:
+        if call["eventDef"] in {"spawnSingleAI", "spawnAI", "staggeredAISpawn", "maintainAICount"}:
             continue
         args = list_items(call["args"])
-        masks = {token for arg in args if "eEncounterSpawnType_t" in arg for token in arg["eEncounterSpawnType_t"].split()}
+        masks = [enemy_spawn_mask(arg["eEncounterSpawnType_t"]) for arg in args if "eEncounterSpawnType_t" in arg]
         labels = [arg["string"] for arg in args if "string" in arg]
-        if spawn_type in masks and (not labels or label in labels or "" in labels):
+        if any(mask != (1 << 44) - 1 and mask & source_mask for mask in masks) and (not labels or label in labels or "" in labels):
             result.append(dict(event_index=index, event_def=call["eventDef"], spawn_type=spawn_type,
                 replacement_qualification="preserve_source_spawn_type"))
     return result
+
+
+def _verify_staggered_completion(calls, first, last, spawn_type, label):
+    source_mask = enemy_spawn_mask(spawn_type)
+    for call in calls[first + 1:last + 1]:
+        kind = call["eventDef"]
+        if kind not in {"waitStaggeredSpawnComplete", "waitAIRemaining"}:
+            continue
+        args = list_items(call["args"])
+        if len(args) != 4:
+            continue
+        mask = enemy_spawn_mask(args[0].get("eEncounterSpawnType_t"))
+        if mask & source_mask != source_mask:
+            continue
+        if args[2].get("string") not in {"", label} or type(args[1].get("int")) is not int or args[1]["int"] != 0:
+            continue
+        if kind == "waitStaggeredSpawnComplete":
+            return
+        break
+    raise ValueError("Staggered source needs queue completion before its population-zero gate")
 
 
 def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None, root=None):
@@ -52,6 +76,12 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
     for path, pin in catalog.get("logic_sources", {}).items():
         _require(logic_sources is not None and path in logic_sources, f"Missing pinned logic declaration: {path}")
         _require(hashlib.sha256(logic_sources[path]).hexdigest() == pin["sha256"], f"Logic declaration pin differs: {path}")
+    attribute_baselines = None
+    if 'attribute_baselines_sha256' in catalog:
+        path = Path(root or Path(__file__).resolve().parents[2]) / 'content/catalog/enemy_attribute_baselines.json'
+        raw = path.read_bytes()
+        _require(hashlib.sha256(raw).hexdigest() == catalog['attribute_baselines_sha256'], 'Attribute baseline pin differs')
+        attribute_baselines = json.loads(raw)
     pins = catalog["entities"]
     records = {row["name"]: row for row in entity_records(source, include_names=set(pins))}
     _require(records.keys() == pins.keys(), "A pinned entity is absent from the canonical map")
@@ -74,8 +104,13 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
                 _require(pin.get("replacement_qualification") == "preserve_source_species_until_entrance_animation_is_qualified"
                     and pin.get("protected_reason") == "authored_entrance_animation", f"Entrance animation protection differs: {name}")
         if "starting_health" in pin:
-            health = row["edit"]["aiHealth"]["components"]["components[0]"]
-            _require(health["starting"] == pin["starting_health"] and health["starting"] > 0 and health["max"] > 0,
+            health = row["edit"].get("aiHealth", {}).get("components", {}).get("components[0]", {})
+            if 'health_source' in pin:
+                _require(pin['health_source'] == 'qualified_attribute_baseline' and attribute_baselines is not None,
+                    f'Missing qualified health baseline: {name}')
+                start, end = find_entity_block_bounds(source, name)
+                health = resolve_enemy_attribute_baselines(source[start:end], catalog=attribute_baselines).get('aiHealth', {}).get('components', {}).get('components[0]', {})
+            _require(health.get("starting") == pin["starting_health"] and positive_enemy_hitpoints(health),
                 f"AI health differs: {name}")
 
     identities = set()
@@ -95,7 +130,7 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
         scope = segment.get("source_slice", dict(first_event_index=0, last_event_index=len(calls) - 1))
         first, last = scope["first_event_index"], scope["last_event_index"]
         _require(type(first) is int and type(last) is int and 0 <= first <= last < len(calls), "Invalid source slice")
-        _require(not any(call["eventDef"] in {"migrateAIFromExternalScript", "removeAI", "spawnArchvile", "staggeredAISpawn"}
+        _require(not any(call["eventDef"] in {"migrateAIFromExternalScript", "removeAI", "spawnArchvile", "spawnSpirit", "spawnBuffPod", "spawnPossessedAI"}
             for call in calls[first:last + 1]), f"Manager requires another cohort qualification: {manager_name}")
         _require(not list_items(edit.get("preCombatTriggers")), f"PreCombat selection requires review: {manager_name}")
         activation = segment["activation"]
@@ -127,7 +162,7 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
             if call["eventDef"] in {"waitForEventFlag", "waitMulitpleConditions", "waitAIHealthLevel"} or (call["eventDef"] == "waitAIRemaining" and args[1]["int"] > 0):
                 gates.append(dict(event_index=index, event_def=call["eventDef"], args=args))
         _require(activation["event_gates"] == gates, f"Event gates differ: {manager_name}")
-        source_creations = {index for index, call in enumerate(calls) if first <= index <= last and call["eventDef"] in {"spawnSingleAI", "spawnAI", "maintainAICount"}}
+        source_creations = {index for index, call in enumerate(calls) if first <= index <= last and call["eventDef"] in {"spawnSingleAI", "spawnAI", "staggeredAISpawn", "maintainAICount"}}
         _require({row["event_index"] for row in segment["creations"]} == source_creations, f"Creation coverage differs: {manager_name}")
         start, end = find_entity_block_bounds(source, manager_name)
         block = source[start:end]
@@ -178,7 +213,9 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
             _require(type(count) is int and count > 0 and type(creation["count"]) is int and creation["count"] == count,
                 f"Finite count differs: {key}")
             total += count
-            label = args[6]["string"] if maintenance else args[-1]["string"]
+            label = args[6 if maintenance else 3 if grouped else 2]["string"]
+            if call["eventDef"] == "staggeredAISpawn":
+                _verify_staggered_completion(calls, event_index, last, creation["spawn_type"], label)
             _require(args[0]["eEncounterSpawnType_t"] == creation["spawn_type"] and label == creation["label"], f"Spawn cohort differs: {key}")
             _require(args[5 if maintenance else 2 if grouped else 1]["entity"] == creation["spawner"], f"Origin spawner differs: {key}")
             if maintenance:
@@ -196,7 +233,10 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
             _require([row["spawner"] for row in creation["members"]] == members, f"Group member coverage differs: {key}")
             profile = profiles[creation["species"]]
             concrete_any = creation["spawn_type"] == "ENCOUNTER_SPAWN_ANY" and creation.get("source_identity") == "concrete_spawner_definitions"
-            _require(profile["status"] == "qualified" and (creation["spawn_type"] in profile["source_spawn_types"] or concrete_any), f"Unqualified species mask: {key}")
+            _require(profile["status"] == "qualified" and (creation["spawn_type"] in profile["source_spawn_types"] or concrete_any
+                or (creation["spawn_type"] != "ENCOUNTER_SPAWN_ANY" and any(enemy_spawn_mask(creation["spawn_type"]) & enemy_spawn_mask(mask)
+                    for mask in profile["source_spawn_types"] if mask != "ENCOUNTER_SPAWN_ANY"))),
+                f"Unqualified species mask: {key}")
             if concrete_any:
                 _require(creation.get("replacement_qualification") == "preserve_source_event_until_any_materialization_is_qualified",
                     f"ANY origin replacement is unqualified: {key}")
@@ -226,6 +266,10 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
                     selected_ai = source_definitions.select(definitions, creation["spawn_type"], edit.get("aiTypeDefAssignments"), record,
                         initial_definitions=list_items(records[definition_source]["edit"].get("initialEntityDefs")))
                 _require(selected_ai == member["ai"], f"Authored AI differs: {key}")
+                if concrete_any:
+                    related = [point, records[definition_source]]
+                    _require(definitions == [dict(name=selected_ai)] and all(list_items(value["edit"].get("initialEntityDefs"))
+                        in ([], [dict(name=selected_ai)]) for value in related), f"ANY source definition reset differs: {key}")
                 parents = [origin["edit"].get("targetSpawnParent")] if grouped else []
                 parents.append(point["edit"].get("targetSpawnParent"))
                 for parent_name in filter(None, parents if native_selection and admission_parents is None else []):

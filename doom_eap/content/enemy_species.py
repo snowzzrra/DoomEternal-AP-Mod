@@ -59,13 +59,49 @@ def project_speed_capabilities(registry):
 
 
 @cache
-def enemy_speed_capabilities():
+def _registry():
     path = files(__package__).joinpath("enemy_species.json")
     if not path.is_file():
         path = Path(__file__).resolve().parents[2] / "content/catalog/enemy_species.json"
     registry = json.loads(path.read_bytes().decode("utf-8"))
     project_species_profiles(registry)
-    return project_speed_capabilities(registry)
+    return registry
+
+
+@cache
+def enemy_speed_capabilities():
+    return project_speed_capabilities(_registry())
+
+
+def enemy_spawn_mask(spawn_type):
+    """Resolve native actor names and their boundary aliases without dropping bits."""
+    if not isinstance(spawn_type, str):
+        raise ValueError("Unqualified native actor mask")
+    masks = {row["encounter_spawn_type"]: row["encounter_value"]
+             for row in _registry()["population_encounter_conversion"]["values"].values()}
+    masks["ENCOUNTER_SPAWN_ANY"] = (1 << 44) - 1
+    # Native boundary aliases share actor bits; they are not ignorable control flags.
+    masks.update({"ENCOUNTER_DO_NOT_USE_MAX_COMMON": 1 << 13,
+                  "ENCOUNTER_DO_NOT_USE_MAX_HEAVY": 1 << 25,
+                  "ENCOUNTER_DO_NOT_USE_MAX_SUPER": 1 << 31,
+                  "ENCOUNTER_DO_NOT_USE_AMBIENT": 1 << 35})
+    value = 0
+    for token in spawn_type.replace("|", " ").split():
+        if token not in masks:
+            raise ValueError(f"Unqualified native actor type: {token}")
+        value |= masks[token]
+    if not 0 < value < 1 << 44:
+        raise ValueError("Unqualified native actor mask")
+    return value
+
+
+def enemy_tracking_suffix(source_type, physical_type):
+    """Bind a physical body to one qualified native tracking slot."""
+    source, physical = enemy_spawn_mask(source_type), enemy_spawn_mask(physical_type)
+    # Native registration stores the selected type, not the request's candidate mask.
+    if source & (source - 1) or physical & (physical - 1):
+        raise ValueError("Tracking needs one native source slot and one physical actor type")
+    return f"_t{source:016x}{physical:016x}"
 
 
 def validate_enemy_speed_percent(species, speed):

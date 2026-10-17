@@ -7,10 +7,13 @@ from pathlib import Path
 import re
 from zipfile import ZipFile
 
+from doom_eap.content.enemy_species import enemy_spawn_mask
+
 from .ap_map_generator import find_entity_block_bounds
 from .encounter_catalog import ENTITY_HEADER, entity_records, list_items, walk_values
 from .encounter_materializer import _value_span, text_sha256
 from .encounter_source_definitions import SourceDefinitions
+from .enemy_attribute_baselines import resolve_enemy_attribute_baselines, positive_enemy_hitpoints
 from .verify_encounter_opportunities import verify_catalog, typed_consumers
 
 
@@ -33,6 +36,8 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
     cached = {}
     blocks = {}
     pins = {}
+    attribute_baselines = None
+    attribute_baselines_sha256 = None
 
     def record(name):
         if name not in cached:
@@ -65,7 +70,7 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
         scripts = list_items(edit['encounterComponent']['entityEvents'])
         _require(len(scripts) == 1 and not list_items(edit.get('preCombatTriggers')), f'Alternative activation needs review: {name}')
         calls = [event['eventCall'] for event in list_items(scripts[0]['events'])]
-        _require(calls and all(call['eventDef'] in {'spawnSingleAI', 'spawnAI', 'wait', 'waitAIRemaining', 'activateTarget'} for call in calls),
+        _require(calls and all(call['eventDef'] in {'spawnSingleAI', 'spawnAI', 'staggeredAISpawn', 'waitStaggeredSpawnComplete', 'wait', 'waitAIRemaining', 'activateTarget'} for call in calls),
             f'Unsupported cohort or control operation: {name}')
         controls = []
         for index, call in enumerate(calls):
@@ -103,6 +108,7 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 bindings[field].append(binding)
         _require(bindings['commitTriggers'], f'No reviewed Commit binding: {name}')
         creations = []
+        event_gates = []
         used_points = set()
         for index, call in enumerate(calls):
             args = list_items(call['args'])
@@ -112,17 +118,22 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 _require(type(args[0]['float']) in {int, float} and args[0]['float'] >= 0, f'Invalid source delay: {name}/{index}')
                 continue
             if call['eventDef'] == 'waitAIRemaining':
-                _require(args[1]['int'] == 0, f'Positive population gate needs review: {name}/{index}')
-                if args[0]['eEncounterSpawnType_t'] == 'ENCOUNTER_SPAWN_ANY' and args[2]['string'] == '':
+                remaining = args[1]['int']
+                _require(type(remaining) is int and remaining >= 0, f'Invalid population gate: {name}/{index}')
+                if remaining > 0:
+                    event_gates.append(dict(event_index=index, event_def=call['eventDef'], args=args))
+                elif enemy_spawn_mask(args[0]['eEncounterSpawnType_t']) == (1 << 44) - 1 and args[2]['string'] == '':
                     used_points.clear()
                 continue
-            grouped = call['eventDef'] == 'spawnAI'
+            if call['eventDef'] == 'waitStaggeredSpawnComplete':
+                continue
+            grouped = call['eventDef'] in {'spawnAI', 'staggeredAISpawn'}
             count = args[1]['int'] if grouped else 1
             spawn_type = args[0]['eEncounterSpawnType_t']
             origin_name = args[2 if grouped else 1]['entity']
             origin = record(origin_name)
-            _require(type(count) is int and count > 0 and len(spawn_type.split()) == 1,
-                f'Unqualified finite request: {name}/{index}')
+            _require(type(count) is int and count > 0, f'Unqualified finite request: {name}/{index}')
+            source_mask = enemy_spawn_mask(spawn_type)
             parent_names = []
             if grouped:
                 _require(origin['class'] == 'idTargetSpawnGroup', f'Unsupported group: {origin_name}')
@@ -131,10 +142,11 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 if parent:
                     _require(record(parent)['class'] == 'idTarget_Spawn_Parent', f'Invalid spawn parent: {parent}')
                     parent_names.append(parent)
-                _require(count <= len(point_names), f'Request exceeds distinct source points: {name}/{index}')
             else:
                 point_names = [origin_name]
-            _require(len(point_names) == len(set(point_names)) and not used_points.intersection(point_names),
+            queued = call['eventDef'] == 'staggeredAISpawn' or (grouped and count > 1)
+            _require(point_names and len(point_names) == len(set(point_names))
+                and (queued or not used_points.intersection(point_names)),
                 f'Source point reuse without an empty-population barrier: {name}/{index}')
             used_points.update(point_names)
             members = []
@@ -167,12 +179,27 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                         initial_definitions=list_items(parent_row['edit'].get('initialEntityDefs'))) if native_selection else None
                     _require(selected_parent == ai_name if native_selection else parent_definitions == [dict(name=ai_name)],
                         f'Source parent override needs review: {point_name}/{parent_name}')
+                if spawn_type == 'ENCOUNTER_SPAWN_ANY':
+                    related = [point, record(definition_source)]
+                    _require(definitions == [dict(name=ai_name)] and all(list_items(value['edit'].get('initialEntityDefs'))
+                        in ([], [dict(name=ai_name)]) for value in related), f'ANY source needs one stable definition: {point_name}')
                 ai = record(ai_name)
                 matched = [key for key, value in species.items() if value['status'] == 'qualified'
-                    and spawn_type in value['source_spawn_types'] and ai['inherit'] in value['inherits']]
+                    and ai['inherit'] in value['inherits']
+                    and (spawn_type == 'ENCOUNTER_SPAWN_ANY' or spawn_type in value['source_spawn_types']
+                        or any(source_mask & enemy_spawn_mask(mask)
+                        for mask in value['source_spawn_types'] if mask != 'ENCOUNTER_SPAWN_ANY'))]
                 _require(ai['class'] == 'idAI2' and len(matched) == 1, f'Unqualified actor identity: {ai_name}')
                 health = ai['edit'].get('aiHealth', {}).get('components', {}).get('components[0]', {})
-                _require(health.get('max', 0) > 0 and health.get('starting', 0) > 0, f'Nonpositive source health: {ai_name}')
+                if 'max' not in health or 'starting' not in health:
+                    if attribute_baselines is None:
+                        path = Path(root or Path(__file__).resolve().parents[2]) / 'content/catalog/enemy_attribute_baselines.json'
+                        raw = path.read_bytes()
+                        attribute_baselines = json.loads(raw)
+                        attribute_baselines_sha256 = hashlib.sha256(raw).hexdigest()
+                    health = resolve_enemy_attribute_baselines(blocks[ai_name], catalog=attribute_baselines).get('aiHealth', {}).get('components', {}).get('components[0]', {})
+                    pins[ai_name]['health_source'] = 'qualified_attribute_baseline'
+                _require(positive_enemy_hitpoints(health), f'Nonpositive source health: {ai_name}')
                 _require(not any(re.search(r'invul|immortal|invinc|undamag', path, re.I) and value
                     for path, value in walk_values(ai['edit'])), f'Protected damage state needs review: {ai_name}')
                 pins[ai_name]['starting_health'] = health['starting']
@@ -186,21 +213,25 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
             _require(len(identities) == 1, f'Mixed source group needs review: {origin_name}')
             event_path = ('encounterComponent', 'entityEvents', 'item[0]', 'events', f'item[{index}]', 'eventCall')
             left, right = _value_span(blocks[name], event_path)
-            label = args[-1]['string']
+            label = args[3 if grouped else 2]['string']
             creations.append(dict(event_index=index, event_def=call['eventDef'], event_sha256=text_sha256(blocks[name][left:right].strip()),
                 species=identities.pop(), spawn_type=spawn_type, count=count, label=label, spawner=origin_name,
                 members=members, replacement_constraints=typed_consumers(calls, spawn_type, label)))
+            if spawn_type == 'ENCOUNTER_SPAWN_ANY':
+                creations[-1].update(source_identity='concrete_spawner_definitions',
+                    replacement_qualification='preserve_source_event_until_any_materialization_is_qualified')
         total = sum(creation['count'] for creation in creations)
         _require(total == selection['segment_N'] and total > 0, f'Reviewed segment N differs: {name}')
         barrier = list_items(calls[phase_index]['args'])
         for creation in creations:
-            _require(barrier[0]['eEncounterSpawnType_t'] == 'ENCOUNTER_SPAWN_ANY'
-                or creation['spawn_type'] in barrier[0]['eEncounterSpawnType_t'].split(), f'Final barrier omits source species: {name}')
+            source_mask = enemy_spawn_mask(creation['spawn_type'])
+            _require(enemy_spawn_mask(barrier[0]['eEncounterSpawnType_t']) & source_mask == source_mask,
+                f'Final barrier omits source species: {name}')
             _require(barrier[2]['string'] in {'', creation['label']}, f'Final barrier omits source cohort: {name}')
         left, right = _value_span(blocks[name], ('encounterComponent', 'entityEvents', 'item[0]', 'events', f'item[{phase_index}]', 'eventCall'))
         segments.append(dict(id=selection['id'], manager=name, script_index=0, segment_N=total,
             qualification='finite_authored_opportunities_if_activated', review=selection['evidence'],
-            activation=dict(kind='reviewed_single_script_initial_pass', bindings=bindings, incoming_targets=[], event_gates=[],
+            activation=dict(kind='reviewed_single_script_initial_pass', bindings=bindings, incoming_targets=[], event_gates=event_gates,
                 required_phase='selected_source_population_zero',
                 phase_anchor=dict(event_index=phase_index, event_def='waitAIRemaining', event_sha256=text_sha256(blocks[name][left:right].strip())),
                 gaps=['physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero']), creations=creations))
@@ -215,6 +246,8 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
         gaps=[dict(manager=name, reason='finite_initial_pass_not_reviewed', map_N=None) for name in sorted(managers-selected)])
     if source_definitions.ancestry_sha256 is not None:
         catalog['definition_ancestry_sha256'] = source_definitions.ancestry_sha256
+    if attribute_baselines_sha256 is not None:
+        catalog['attribute_baselines_sha256'] = attribute_baselines_sha256
     verify_catalog(catalog, source_bytes, registry_bytes, root=root)
     return catalog
 

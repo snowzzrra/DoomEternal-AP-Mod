@@ -91,7 +91,9 @@ def apply(frozen):
     return materialize_frozen_encounters(source, plan, maps, species_profiles=profiles)
 
 
-def test_direct_materializer_rejects_speed_without_positive_species_qualification(frozen):
+def test_direct_materializer_rejects_speed_without_positive_species_qualification(frozen, monkeypatch):
+    from doom_eap.content import enemy_species
+    monkeypatch.setattr(enemy_species, "enemy_speed_capabilities", lambda: {"stone_imp": "unqualified"})
     instance = frozen[1]["operations"][0]["waves"][0]["instances"][0]
     instance["attributes"]["speed_percent"] = 135
     instance["ai_name"] = "ap_v070_ai_stone__ap_v070_s00135"
@@ -726,3 +728,201 @@ item[1] = { string = "after"; } } } }''', 1)
     with pytest.raises(ValueError):
         destination.write_text(apply(reserved))
     assert destination.read_text() == "existing output"
+
+
+def test_phase_first_wave_retries_admission_before_its_native_completion_gate(reserved):
+    source, plan, _, _ = reserved
+    plan["schema"] = 5
+    operation = plan["operations"][0]
+    operation.pop("reserve")
+    operation["waves"][0] = {"instances": operation["waves"][0]["instances"]}
+    result = apply(reserved)
+    events = calls(result)
+    spawns = [event for event in events if event["eventDef"] in ("spawnSingleAI", "staggeredAISpawn")]
+    assert len(spawns) == sum(len(wave["instances"]) for wave in operation["waves"])
+    assert all(event["eventDef"] == "staggeredAISpawn" and list_items(event["args"])[1] == {"int": 1} for event in spawns)
+    first_clear = next(index for index, event in enumerate(events) if event["eventDef"] == "waitAIRemaining")
+    assert events[first_clear - 1]["eventDef"] == "waitStaggeredSpawnComplete"
+    assert list_items(events[first_clear - 1]["args"])[2] == {"string": "cohort_keep"}
+    assert events[-1]["eventDef"] == "activateTarget" and list_items(events[-1]["args"])[0] == {"entity": "final_relay"}
+    for name in ("point", "point2", "group", "old_ai", "final_relay"):
+        assert block(result, name) == block(source, name)
+
+
+def test_initial_private_imp_is_ready_before_combat_and_stays_in_the_maintained_cohort(reserved):
+    source, plan, maps, profiles = reserved
+    plan["schema"] = 5
+    operation = plan["operations"][0]
+    operation["waves"][0] = {"instances": operation["waves"][0]["instances"]}
+    maps["dlc"] += entity("supplier", "idAI2", "ai/fodder/imp", "")
+    reserve = operation["reserve"]
+    reserve["supply_source"] = {"species": "imp", "spawn_type": "ENCOUNTER_SPAWN_IMP",
+        "ai": ref(maps["dlc"], "dlc", "supplier"), "spawners": [ref(source, "map", "point")]}
+    result = apply(reserved)
+    main = calls(result)
+    assert [call["eventDef"] for call in main[:2]] == ["activateTarget", "waitForEventFlag"]
+    ready_flag = list_items(main[1]["args"])[1]["string"]
+    ready_name = reserve["manager_name"] + "_ready"
+    assert record(result, ready_name)["edit"]["userFlag"] == ready_flag
+    assert ready_name in list_items(record(result, "arena")["edit"]["userFlagTriggers"])
+    private = record(result, reserve["manager_name"])["edit"]["encounterComponent"]["entityEvents"]["item[0]"]
+    events = [item["eventCall"] for item in list_items(private["events"])]
+    assert [event["eventDef"] for event in events] == ["staggeredAISpawn", "waitStaggeredSpawnComplete",
+        "activateTarget", "maintainAICount", "waitForEventFlag", "stopMaintainingAICount", "removeAI"]
+    initial, maintain = list_items(events[0]["args"]), list_items(events[3]["args"])
+    assert initial[3] == maintain[6] == {"string": reserve["label"]}
+    assert initial[2] == maintain[5]
+    assert list_items(events[2]["args"])[0] == {"entity": ready_name}
+    assert events[-1]["eventDef"] == "removeAI"
+
+
+@pytest.fixture
+def tracked(reserved):
+    from doom_eap.content.enemy_species import enemy_tracking_suffix
+    _, plan, _, _ = reserved
+    plan["schema"] = 7
+    operation = plan["operations"][0]
+    operation.pop("reserve")
+    operation["waves"][0] = {"instances": operation["waves"][0]["instances"]}
+    for index, actor in enumerate(actor for wave in operation["waves"] for actor in wave["instances"]):
+        marker = enemy_tracking_suffix(operation["from"]["spawn_type"], actor["spawn_type"])
+        suffix = f"{index:020x}{marker}_l00000001000000010000000100000002_kn__ap_v070_s{actor['attributes']['speed_percent']:05d}"
+        for field, prefix in (("ai_name", "ai"), ("spawner_name", "spawn"), ("group_name", "group")):
+            actor[field] = f"ap_v070_{prefix}_{suffix}"
+    return reserved
+
+
+def test_tracking_preserves_native_control_types_and_actual_frozen_ai(tracked):
+    source, plan, _, _ = tracked
+    result = apply(tracked)
+    operation = plan["operations"][0]
+    actors = [actor for wave in operation["waves"] for actor in wave["instances"]]
+    requests = [event for event in calls(result) if event["eventDef"] == "staggeredAISpawn"]
+    assert len(requests) == len(actors)
+    assert all(list_items(event["args"])[0] == {"eEncounterSpawnType_t": operation["from"]["spawn_type"]}
+               for event in requests)
+    assert {list_items(event["args"])[2]["entity"] for event in requests} == {actor["group_name"] for actor in actors}
+    for actor in actors:
+        point = record(result, actor["spawner_name"])["edit"]
+        assert list_items(point["entityDefs"]) == [{"name": actor["ai_name"]}]
+        assert list_items(record(result, actor["group_name"])["edit"]["spawners"]) == [actor["spawner_name"]]
+    assert block(result, "final_relay") == block(source, "final_relay")
+
+
+@pytest.mark.parametrize("field", ["ai_name", "spawner_name", "group_name"])
+def test_tracking_drift_is_rejected_before_materializing(tracked, field):
+    actor = tracked[1]["operations"][0]["waves"][0]["instances"][0]
+    actor[field] = actor[field].replace("_t", "_t0", 1)
+    with pytest.raises(ValueError, match="tracking"):
+        apply(tracked)
+
+
+@pytest.mark.parametrize("point_axis", [None, {"mat": {"x": 0, "y": 1, "z": 0}}])
+def test_native_point_keeps_its_axis_when_the_donor_has_an_authored_orientation(frozen, point_axis):
+    source, plan, maps, profiles = frozen
+    donor_axis = {"mat": {"x": 1, "y": 0, "z": 0}}
+    donor = maps["dlc"].replace('selfReference = "stone";',
+        'selfReference = "stone"; spawnOrientation = { mat = { x = 1; y = 0; z = 0; } }')
+    if point_axis is not None:
+        original = block(source, "point")
+        source = source.replace(original, original.replace('edit = {',
+            'edit = { spawnOrientation = { mat = { x = 0; y = 1; z = 0; } }', 1))
+    plan["source_sha256"] = text_sha256(source)
+    operation = plan["operations"][0]
+    operation["from"]["spawner"] = ref(source, "map", "point")
+    actor = operation["waves"][0]["instances"][0]
+    actor["ai"] = ref(donor, "dlc", "stone")
+    result = materialize_frozen_encounters(source, plan, {"map": source, "dlc": donor}, species_profiles=profiles)
+    assert record(result, actor["spawner_name"])["edit"].get("spawnOrientation") == point_axis
+    assert record(result, actor["ai_name"])["edit"]["spawnOrientation"] == (point_axis or donor_axis)
+    assert block(result, "point") == block(source, "point")
+
+
+def test_private_point_detaches_its_original_definition_parent(frozen):
+    source, plan, maps, profiles = frozen
+    original = block(source, "point")
+    source = source.replace(original, original.replace('edit = {', 'edit = { targetSpawnParent = "parent";', 1))
+    source += entity("parent", "idTarget_Spawn_Parent", "encounter/spawn_group/parent",
+        'entityDefs = { num = 1; item[0] = { name = "old_ai"; } }')
+    plan["source_sha256"] = text_sha256(source)
+    operation = plan["operations"][0]
+    operation["from"]["spawner"] = ref(source, "map", "point")
+    result = materialize_frozen_encounters(source, plan, {**maps, "map": source}, species_profiles=profiles)
+    actor = operation["waves"][0]["instances"][0]
+    point = record(result, actor["spawner_name"])["edit"]
+    assert point["targetSpawnParent"] == ""
+    assert point["entityDefs"] == point["initialEntityDefs"] == {"num": 1, "item[0]": {"name": actor["ai_name"]}}
+    assert block(result, "parent") == block(source, "parent")
+    assert block(result, "point") == block(source, "point")
+
+
+@pytest.fixture
+def typed_phase(tracked):
+    source, plan, maps, profiles = tracked
+    operation = plan["operations"][0]
+    gate = BARRIER.replace("ENCOUNTER_SPAWN_ANY", operation["from"]["spawn_type"]).replace("bool = false", "bool = true")
+    source = source.replace(BARRIER, gate)
+    operation["barrier"]["event_sha256"] = text_sha256(gate)
+    operation["manager"]["sha256"] = ref(source, "map", "arena")["sha256"]
+    plan["source_sha256"] = text_sha256(source)
+    return source, plan, {**maps, "map": source}, profiles
+
+
+def test_tracked_typed_gate_preserves_control_and_waits_for_source_requests(typed_phase):
+    source, plan, _, _ = typed_phase
+    result = apply(typed_phase)
+    source_type = plan["operations"][0]["from"]["spawn_type"]
+    events = calls(result)
+    gate_index = next(i for i, event in enumerate(events) if event["eventDef"] == "waitAIRemaining")
+    assert list_items(events[gate_index]["args"]) == list_items(calls(source)[1]["args"])
+    assert any(event["eventDef"] == "waitStaggeredSpawnComplete" and
+        list_items(event["args"])[0] == {"eEncounterSpawnType_t": source_type} for event in events[:gate_index])
+    assert block(result, "final_relay") == block(source, "final_relay")
+
+
+@pytest.mark.parametrize("context", ["adoptedStandAloneAI", "preCombatTriggers"])
+def test_typed_gate_refuses_external_population_context(typed_phase, context):
+    source, plan, maps, profiles = typed_phase
+    original = block(source, "arena")
+    source = source.replace(original, original.replace("edit = {", f'edit = {{ {context} = {{ num = 1; item[0] = "old_ai"; }}', 1))
+    plan["operations"][0]["manager"]["sha256"] = ref(source, "map", "arena")["sha256"]
+    plan["source_sha256"] = text_sha256(source)
+    with pytest.raises(ValueError, match="remaining zero"):
+        apply((source, plan, {**maps, "map": source}, profiles))
+
+
+def test_typed_gate_cannot_wait_on_the_replacement_species(typed_phase):
+    source, plan, maps, profiles = typed_phase
+    operation = plan["operations"][0]
+    gate = BARRIER.replace("ENCOUNTER_SPAWN_ANY", "ENCOUNTER_SPAWN_STONE_IMP").replace("bool = false", "bool = true")
+    source = source.replace(BARRIER.replace("ENCOUNTER_SPAWN_ANY", operation["from"]["spawn_type"]).replace("bool = false", "bool = true"), gate)
+    operation["barrier"]["event_sha256"] = text_sha256(gate)
+    operation["manager"]["sha256"] = ref(source, "map", "arena")["sha256"]
+    plan["source_sha256"] = text_sha256(source)
+    with pytest.raises(ValueError, match="remaining zero"):
+        apply((source, plan, {**maps, "map": source}, profiles))
+
+
+def test_typed_clear_tracks_previous_gates_and_refuses_live_other_cohorts():
+    from tools.maps.encounter_materializer import finite_population_cleared
+    from tools.maps.encounter_catalog import parse_object
+    soldier = EVENT.replace("ENCOUNTER_SPAWN_IMP", "ENCOUNTER_SPAWN_HELL_SOLDIER")
+    imp_gate = BARRIER.replace("ENCOUNTER_SPAWN_ANY", "ENCOUNTER_SPAWN_IMP")
+    soldier_gate = BARRIER.replace("ENCOUNTER_SPAWN_ANY", "ENCOUNTER_SPAWN_HELL_SOLDIER")
+    def events(*native_calls):
+        return [{"eventCall": parse_object(call.strip()[1:-1])} for call in native_calls]
+    assert not finite_population_cleared(events(soldier, EVENT, imp_gate), 2)
+    assert finite_population_cleared(events(soldier, soldier_gate, EVENT, imp_gate), 3)
+    assert not finite_population_cleared(events(soldier, soldier_gate.replace("int = 0", "int = 1"), EVENT, imp_gate), 3)
+
+
+def test_typed_clear_requires_emission_completion_before_population_zero():
+    from tools.maps.encounter_materializer import finite_population_cleared
+    from tools.maps.encounter_catalog import parse_object
+    staggered = '{ eventDef = "staggeredAISpawn"; args = { num = 6; item[0] = { eEncounterSpawnType_t = "ENCOUNTER_SPAWN_IMP"; } item[1] = { int = 3; } item[2] = { entity = "native_group"; } item[3] = { string = "cohort_keep"; } item[4] = { float = 1; } item[5] = { float = 2; } } }'
+    gate = BARRIER.replace("ENCOUNTER_SPAWN_ANY", "ENCOUNTER_SPAWN_IMP")
+    queue = gate.replace("waitAIRemaining", "waitStaggeredSpawnComplete")
+    def events(*native_calls):
+        return [{"eventCall": parse_object(call.strip()[1:-1])} for call in native_calls]
+    assert finite_population_cleared(events(staggered, queue, gate), 2)
+    assert not finite_population_cleared(events(staggered, gate, queue, gate), 3)
