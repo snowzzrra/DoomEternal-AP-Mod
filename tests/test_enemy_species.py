@@ -144,19 +144,22 @@ def test_apworld_speed_projection_matches_sampling_and_rejects_unqualified_plans
             kwargs = dict(seed=42, instance_key="actor", stage_index=0, stage_count=1)
             assert modules["enemy_plan"].sample_instance_attributes(enemies, species, **kwargs) == (
                 sample_instance_attributes(enemies, species, **kwargs))
-            with pytest.raises(ValueError, match="Speed changes are not qualified"):
+            if enemy_speed_capabilities()[species] == "qualified":
                 modules["enemy_species"].validate_enemy_speed_percent(species, 150)
+            else:
+                with pytest.raises(ValueError, match="Speed changes are not qualified"):
+                    modules["enemy_species"].validate_enemy_speed_percent(species, 150)
 
 
 def test_speed_qualification_needs_separate_evidence_from_identity(registry):
     modified = copy.deepcopy(registry)
-    entry = modified["species"]["imp"]
-    assert project_speed_capabilities(modified)["imp"] == "unqualified"
+    entry = modified["species"]["mancubus"]
+    assert project_speed_capabilities(modified)["mancubus"] == "unqualified"
     entry["speed"] = {"status": "qualified"}
     with pytest.raises(ValueError, match="needs evidence"):
         project_speed_capabilities(modified)
     entry["speed"]["evidence"] = {"fixture": "synthetic qualified Speed consumer"}
-    assert project_speed_capabilities(modified)["imp"] == "qualified"
+    assert project_speed_capabilities(modified)["mancubus"] == "qualified"
     assert project_species_profiles(modified) == project_species_profiles(registry)
 
 
@@ -174,3 +177,24 @@ def test_unproved_identity_expansion_is_refused(registry, fault):
         entry["templates"][0]["role"] = "alias"
     with pytest.raises(ValueError):
         project_species_profiles(modified)
+
+
+def test_native_masks_preserve_aliases_and_tracking_requires_selected_slots():
+    from doom_eap.content.enemy_species import enemy_spawn_mask, enemy_tracking_suffix
+    assert enemy_tracking_suffix("ENCOUNTER_SPAWN_IMP", "ENCOUNTER_SPAWN_STONE_IMP") == "_t00000000000000100000000000000020"
+    assert enemy_spawn_mask("ENCOUNTER_SPAWN_IMP | ENCOUNTER_SPAWN_STONE_IMP") == 48
+    with pytest.raises(ValueError):
+        enemy_tracking_suffix("ENCOUNTER_SPAWN_IMP | ENCOUNTER_SPAWN_STONE_IMP", "ENCOUNTER_SPAWN_STONE_IMP")
+    aliases = {"ENCOUNTER_DO_NOT_USE_MAX_COMMON": 1 << 13,
+               "ENCOUNTER_DO_NOT_USE_MAX_HEAVY": 1 << 25,
+               "ENCOUNTER_DO_NOT_USE_MAX_SUPER": 1 << 31,
+               "ENCOUNTER_DO_NOT_USE_AMBIENT": 1 << 35}
+    for alias, value in aliases.items():
+        assert enemy_spawn_mask("ENCOUNTER_SPAWN_IMP " + alias) == 16 | value
+        assert enemy_tracking_suffix(alias, "ENCOUNTER_SPAWN_STONE_IMP") == f"_t{value:016x}{32:016x}"
+    assert enemy_tracking_suffix("ENCOUNTER_SPAWN_WHIPLASH ENCOUNTER_DO_NOT_USE_MAX_HEAVY", "ENCOUNTER_SPAWN_IMP") == "_t00000000020000000000000000000010"
+    for invalid in (None, "", "ENCOUNTER_SPAWN_ANY", "unknown"):
+        with pytest.raises(ValueError):
+            enemy_tracking_suffix(invalid, "ENCOUNTER_SPAWN_IMP")
+    with pytest.raises(ValueError):
+        enemy_tracking_suffix("ENCOUNTER_SPAWN_IMP", "ENCOUNTER_SPAWN_IMP | ENCOUNTER_SPAWN_STONE_IMP")

@@ -5,7 +5,7 @@
     "path": "vanillamaps/e2m3_core.map",
     "sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff"
   },
-  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "species_registry_sha256": "6eeb6a99dbe98526e2539e2f7fc012d4ee0ab6e9092fb222caa228080378b73a",
   "logic_sources": {},
   "counting": {
     "unit": "finite_authored_combat_opportunity",
@@ -251,6 +251,246 @@
             }
           ],
           "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "uac_chunk_1_encounter_manager_4_initial",
+      "manager": "uac_chunk_1_encounter_manager_4",
+      "script_index": 0,
+      "segment_N": 6,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor.",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "uac_chunk_1_encounter_trigger_commit_1"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "uac_chunk_1_encounter_trigger_exit_4",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [
+          {
+            "event_index": 9,
+            "event_def": "waitAIRemaining",
+            "args": [
+              {
+                "eEncounterSpawnType_t": "ENCOUNTER_SPAWN_IMP"
+              },
+              {
+                "int": 2
+              },
+              {
+                "string": ""
+              },
+              {
+                "bool": false
+              }
+            ]
+          }
+        ],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 11,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "afd57b796a6972443a46d6c14470b68792fd1a7012c22703e5bdd46583a157e4",
+          "species": "revenant",
+          "spawn_type": "ENCOUNTER_SPAWN_REVENANT",
+          "count": 1,
+          "label": "uac_secret_revenant",
+          "spawner": "uac_chunk_1_target_spawn_72",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_72",
+              "ai": "uac_chunk_1_ai_heavy_revenant_1"
+            }
+          ],
+          "replacement_constraints": []
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "e4679c10b2fc1d078eaee86be60bd00c1ab2b604ee243e499593efd298d03cbe",
+          "species": "gargoyle",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 1,
+          "label": "",
+          "spawner": "uac_chunk_1_target_spawn_68",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_68",
+              "ai": "uac_chunk_1_ai_fodder_gargoyle_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified"
+        },
+        {
+          "event_index": 4,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "90f0e851466836bfaa820944d70c2808a210314245262f8a7c5d3f87abbe7313",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 1,
+          "label": "",
+          "spawner": "uac_chunk_1_target_spawn_69",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_69",
+              "ai": "uac_chunk_1_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified"
+        },
+        {
+          "event_index": 6,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "c89db95e4ec93810b906f5cf9ace7d6e295c4857ec73b7876cea7928dd42b84d",
+          "species": "imp",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 1,
+          "label": "",
+          "spawner": "uac_chunk_1_target_spawn_70",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_70",
+              "ai": "uac_chunk_1_ai_fodder_imp_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified"
+        },
+        {
+          "event_index": 8,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "b457cb07a1e7da60980b0f9bafe2800e2fb05af23aaade672fc02d4ac7fa7993",
+          "species": "gargoyle",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 1,
+          "label": "",
+          "spawner": "uac_chunk_1_target_spawn_71",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_71",
+              "ai": "uac_chunk_1_ai_fodder_gargoyle_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified"
+        },
+        {
+          "event_index": 10,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "aa3546fe32c39f9b794a94261db88a18ac6910cf14e0bf4baa76479a332bdbfc",
+          "species": "spectre",
+          "spawn_type": "ENCOUNTER_SPAWN_SPECTRE",
+          "count": 1,
+          "label": "uac_secret_specter",
+          "spawner": "uac_chunk_1_target_spawn_73",
+          "members": [
+            {
+              "spawner": "uac_chunk_1_target_spawn_73",
+              "ai": "uac_chunk_1_ai_heavy_pinky_spectre_1"
+            }
+          ],
+          "replacement_constraints": []
+        }
+      ]
+    },
+    {
+      "id": "phobos_encounter_manager_7_initial",
+      "manager": "phobos_encounter_manager_7",
+      "script_index": 0,
+      "segment_N": 5,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor.",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "phobos_encounter_trigger_commit_6"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "phobos_encounter_trigger_exit_remove_bridge_ai",
+              "force_ai_to_flee": true
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 1,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "100a601278bb34b665e02517e0777ae319cb86f777f329d4ffc446812f78be9c"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnAI",
+          "event_sha256": "421c6fabcf75cb828bf4c52ad4fe2619e34bd98939714fe7b1cd3687b7f96eed",
+          "species": "hell_soldier",
+          "spawn_type": "ENCOUNTER_SPAWN_ANY",
+          "count": 5,
+          "label": "",
+          "spawner": "phobos_encounter_spawn_group_gate_soldiers",
+          "members": [
+            {
+              "spawner": "phobos_target_spawn_46",
+              "ai": "phobos_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "phobos_target_spawn_47",
+              "ai": "phobos_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "phobos_target_spawn_48",
+              "ai": "phobos_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "phobos_target_spawn_51",
+              "ai": "phobos_ai_fodder_soldier_blaster_1"
+            },
+            {
+              "spawner": "phobos_target_spawn_49",
+              "ai": "phobos_ai_fodder_soldier_blaster_1"
+            }
+          ],
+          "replacement_constraints": [],
+          "source_identity": "concrete_spawner_definitions",
+          "replacement_qualification": "preserve_source_event_until_any_materialization_is_qualified"
         }
       ]
     }
@@ -537,6 +777,239 @@
         "x": -2121.16382,
         "y": -852.153198,
         "z": -36.970005
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "uac_chunk_1_ai_fodder_gargoyle_1": {
+      "sha256": "e8bbbf7126aae6b2b608223560b184b3329efa49ed806fcc96d1c9f8140e4eaa",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/gargoyle",
+      "starting_health": 300
+    },
+    "uac_chunk_1_ai_fodder_imp_1": {
+      "sha256": "101b009a25ce2a6df705530df772192966b361c6a1cbf2a93b4a67e8d0d9b339",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/imp",
+      "starting_health": 200
+    },
+    "uac_chunk_1_ai_heavy_pinky_spectre_1": {
+      "sha256": "8622064a965084084614161e8d417117ae1a7d348397ee04846ed78e33664512",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky_spectre",
+      "starting_health": 2000
+    },
+    "uac_chunk_1_ai_heavy_revenant_1": {
+      "sha256": "d026ee507c9e8cf8648e684b95283f26e59239c28da7ff7176dd77777c56cc70",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/revenant",
+      "starting_health": 2000
+    },
+    "uac_chunk_1_encounter_manager_4": {
+      "sha256": "3294f24b26234a25b5ae9264142bad3e28cd5591e4fdf5fa2362f51d3ffe75c6",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ]
+    },
+    "uac_chunk_1_encounter_trigger_commit_1": {
+      "sha256": "f14bedcf6d9d5f9471bc6de5ad6703b1e85d33e6eabd6834a8c0fc04cf64a9c6",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "uac_chunk_1_encounter_trigger_exit_4": {
+      "sha256": "1148239af61f796dabbf4125dcf1e06bc4c88344219fc31fe2deb877ce9fbff8",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "uac_chunk_1_target_spawn_68": {
+      "sha256": "e762ecc28446cf8865b33b13e120c24052a1f44b18c86a32b01d6b6aade3bdd9",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1797.18018,
+        "y": -1747.05994,
+        "z": 57.3195686
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "uac_chunk_1_target_spawn_69": {
+      "sha256": "189bfcc3dc36b83c6d73c135b44aeb65fafa758378c536b081056c36082b2dba",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1806.92114,
+        "y": -1761.61914,
+        "z": 57.2999992
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "uac_chunk_1_target_spawn_70": {
+      "sha256": "91222b2d7b88fb836c1abcf74c17a7489e03d57f21158679cc8beb63c31a65a9",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1823.85669,
+        "y": -1744.15991,
+        "z": 57.2999992
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "uac_chunk_1_target_spawn_71": {
+      "sha256": "036b07192c0e591876d9b1d53b56d155dc1adad552295b70becee6e5ef31844f",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1820.19995,
+        "y": -1725.77014,
+        "z": 55.7999992
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "uac_chunk_1_target_spawn_72": {
+      "sha256": "c50820ea08616753ae02726c55d8e84184cc2965bf3b8db73f71fa225414408f",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1806.31982,
+        "y": -1747.79651,
+        "z": 57.2999992
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "uac_chunk_1_target_spawn_73": {
+      "sha256": "e7687db541c31eeec5b7ee00afcda39d6013435db3cb6f284275a06f294bbbc5",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 1837.87756,
+        "y": -1744.16992,
+        "z": 57.2999992
+      },
+      "spawn_override": "AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER"
+    },
+    "phobos_ai_fodder_soldier_blaster_1": {
+      "sha256": "8fab22d2d80ca0eb5ff81a27bca88fc76f81009765b4b6b6a16ee4d95a4a9528",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/soldier_blaster",
+      "starting_health": 400
+    },
+    "phobos_encounter_manager_7": {
+      "sha256": "b84b601b87e548149a91a7aca173c93ab6f06542b8ff3a6c2ad02e77d24d653c",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ]
+    },
+    "phobos_encounter_spawn_group_gate_soldiers": {
+      "sha256": "31d1a3307d5cfe2d9b9c1e05c096e67ed759afb90c4ead2a983381068601c69e",
+      "class_name": "idTargetSpawnGroup",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ]
+    },
+    "phobos_encounter_trigger_commit_6": {
+      "sha256": "d3069b27cdda7e7a4d52fcbe5b33bde2f8e36e5fd591ffa3121dac5a647c5837",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ]
+    },
+    "phobos_encounter_trigger_exit_remove_bridge_ai": {
+      "sha256": "c11cdf2715d6987c31e9463d7db275dc2db69bc5b9921aacbfa620ff35febd20",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ]
+    },
+    "phobos_target_spawn_46": {
+      "sha256": "e10ec0308f1c70987fd25139f809979ae783046811dc08bc14b1bc093d4e9a68",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 2303.29639,
+        "y": 1058.39966,
+        "z": -47.3999901
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "phobos_target_spawn_47": {
+      "sha256": "3c18ffdfdc0e23ec413662d33ea8f4bea816714b3505bcd900a7e58fa68ec557",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 2305.20117,
+        "y": 1056.40015,
+        "z": -47.3999901
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "phobos_target_spawn_48": {
+      "sha256": "bbd8594a0a20e805e48ecd974f2abe1031e3539a95be27488749315674540024",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 2300.79785,
+        "y": 1064.19568,
+        "z": -47.2999878
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "phobos_target_spawn_49": {
+      "sha256": "4ea95a53f2c44471153dbaf7905b49af62f3971bae691801090fa06d53013d72",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 2312.19946,
+        "y": 1057.39197,
+        "z": -47.2999878
+      },
+      "spawn_override": "AIOVERRIDE_DEFAULT"
+    },
+    "phobos_target_spawn_51": {
+      "sha256": "dbbd04fdfb9b2651d05f71ef2b92b9a0b8ddb51f94fbaa89b7c67043adfc0d27",
+      "class_name": "idTarget_Spawn",
+      "layers": [
+        "game/sp/e2m3_core/main_level"
+      ],
+      "spawn_position": {
+        "x": 2316.51538,
+        "y": 1062.02563,
+        "z": -47.2999878
       },
       "spawn_override": "AIOVERRIDE_DEFAULT"
     }
@@ -963,11 +1436,6 @@
       "map_N": null
     },
     {
-      "manager": "phobos_encounter_manager_7",
-      "reason": "finite_initial_pass_not_reviewed",
-      "map_N": null
-    },
-    {
       "manager": "phobos_encounter_manager_bridge_platform",
       "reason": "finite_initial_pass_not_reviewed",
       "map_N": null
@@ -1073,11 +1541,6 @@
       "map_N": null
     },
     {
-      "manager": "uac_chunk_1_encounter_manager_4",
-      "reason": "finite_initial_pass_not_reviewed",
-      "map_N": null
-    },
-    {
       "manager": "uac_chunk_1_encounter_manager_complete_arena_combat",
       "reason": "finite_initial_pass_not_reviewed",
       "map_N": null
@@ -1125,6 +1588,6 @@
   },
   "review_source": {
     "path": "content/catalog/encounter_opportunity_segments.json",
-    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+    "sha256": "54e1d7b4b5266def024a19fbf2c5826f568b6d28ab73440adaf59bb10974a54e"
   }
 }

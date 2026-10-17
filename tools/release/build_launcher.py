@@ -155,7 +155,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
             "PySide6 is missing; install requirements-launcher.txt in launcher build Python"
         )
 
-    build_root = RELEASE_ROOT / "build/launcher"
+    build_root = RELEASE_ROOT / "build/launcher" / sys.platform / output_dir.relative_to(RELEASE_ROOT)
     build_root.mkdir(parents=True, exist_ok=True)
     from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
     import json

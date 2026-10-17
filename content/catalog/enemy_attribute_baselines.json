@@ -107,7 +107,8 @@
   },
   "source_surveys": {
     "templates_sha256": "1ec6937cfecff3617ecc89b3c6a6f313de82ede3439638aded5d75c37957ec87",
-    "declarations_sha256": "5fd86b09706f98c14022b017f25ed363dd9e786a1e2d15501bc44ce78e3b9e8a"
+    "declarations_sha256": "5fd86b09706f98c14022b017f25ed363dd9e786a1e2d15501bc44ce78e3b9e8a",
+    "definition_ancestry_sha256": "9c01e82f0abfd48ff9d236adb3e51a24de95a5e29298dab7632bc4a5decca081"
   },
   "decompressor_sha256": "11ba96139174b206c38c36f177ed88991cef4f68aee3e81cda106210bcfbe18d",
   "declarations": {
@@ -2276,6 +2277,2488 @@
         "decoded_sha256": "2c439ccb1f6034c276e8b8e1af61cb32e86f5ee7c408c33385f317c351c1867e",
         "inherit": "ai/default_superheavy"
       }
+    ],
+    "ai/ambient/tentacle_liquid": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 14626,
+        "offset": 95808512,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 11461,
+        "offset": 86615808,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 12548,
+        "offset": 101735488,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 12097,
+        "offset": 94389952,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 3637,
+        "offset": 34608320,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/sp/e1m2_battle/e1m2_battle_patch1.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 6202,
+        "offset": 143329728,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest_patch1.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 500,
+        "offset": 86940608,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base_patch1.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 1125,
+        "offset": 18012544,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch3.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 27,
+        "offset": 11207872,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 1307,
+        "offset": 23183360,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      },
+      {
+        "bank": "gameresources.resources",
+        "member": "generated/decls/entitydef/ai/ambient/tentacle_liquid.decl",
+        "index": 37152,
+        "offset": 302156032,
+        "stored_size": 190,
+        "decoded_size": 190,
+        "stored_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "decoded_sha256": "f28d9af7036c65530dae922a5f9eba855a6512b9406497db2ff7a38880e1e88f",
+        "inherit": "ai/ambient/tentacle"
+      }
+    ],
+    "ai/fodder/zombie_t1_hell": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 6575,
+        "offset": 26200896,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 3454,
+        "offset": 17166720,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 4472,
+        "offset": 31824704,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 3794,
+        "offset": 16413248,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 5886,
+        "offset": 18055744,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 3027,
+        "offset": 16019456,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 1247,
+        "offset": 6612480,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 4617,
+        "offset": 24845248,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 5858,
+        "offset": 20777664,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 3632,
+        "offset": 34594816,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 24,
+        "offset": 3008640,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 227,
+        "offset": 7454720,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_darkmetal/pvp_darkmetal.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 2358,
+        "offset": 14520320,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 33,
+        "offset": 3192192,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 232,
+        "offset": 7032832,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 18,
+        "offset": 2811264,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 213,
+        "offset": 6676480,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 14,
+        "offset": 3667328,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 244,
+        "offset": 8097792,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 1633,
+        "offset": 6948864,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 280,
+        "offset": 7589888,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_sideswipe/pvp_sideswipe.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 1561,
+        "offset": 6873088,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 61,
+        "offset": 3935104,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 263,
+        "offset": 7667712,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 37,
+        "offset": 3298688,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 227,
+        "offset": 7135232,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m1_intro/e1m1_intro_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 897,
+        "offset": 105712320,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m2_battle/e1m2_battle_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 563,
+        "offset": 81134336,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 59,
+        "offset": 6667648,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 770,
+        "offset": 69147200,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 68,
+        "offset": 4710400,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 297,
+        "offset": 11053824,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 134,
+        "offset": 12040512,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 1011,
+        "offset": 114400320,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 62,
+        "offset": 8452096,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 247,
+        "offset": 13953792,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 2387,
+        "offset": 41354176,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 45,
+        "offset": 7804160,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 384,
+        "offset": 14256896,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 65,
+        "offset": 5556992,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 277,
+        "offset": 12675840,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 55,
+        "offset": 4835648,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 295,
+        "offset": 11569920,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m3_maykr/e3m3_maykr_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 719,
+        "offset": 68019776,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 92,
+        "offset": 6152192,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss_patch2.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 612,
+        "offset": 15495168,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 27,
+        "offset": 3380608,
+        "stored_size": 571,
+        "decoded_size": 571,
+        "stored_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "decoded_sha256": "19d96265445479623e6740a7c9095b536c4939f2bfa4a3b731b6cd0b10f774ed",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 298,
+        "offset": 9117696,
+        "stored_size": 598,
+        "decoded_size": 598,
+        "stored_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "decoded_sha256": "f18d71b9d8c4b31e3a3edf279a094011682c623c35afa3696982633b4b4746cc",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "gameresources.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_hell.decl",
+        "index": 17694,
+        "offset": 145733056,
+        "stored_size": 482,
+        "decoded_size": 482,
+        "stored_sha256": "68f4f5eb5767b6cbba024b2703b3b8f5ae51e8c369a35c2cac92ae2a4c6abc97",
+        "decoded_sha256": "68f4f5eb5767b6cbba024b2703b3b8f5ae51e8c369a35c2cac92ae2a4c6abc97",
+        "inherit": "ai/fodder/zombie_tier_1"
+      }
+    ],
+    "ai/ambient/spirit_samuel": [
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/ai/ambient/spirit_samuel.decl",
+        "index": 11465,
+        "offset": 86618112,
+        "stored_size": 1195,
+        "decoded_size": 1195,
+        "stored_sha256": "8069c83c629a579336851b99da9ee64f93a55ef224e2b8bc083196a96cb62e93",
+        "decoded_sha256": "8069c83c629a579336851b99da9ee64f93a55ef224e2b8bc083196a96cb62e93",
+        "inherit": "ai/ambient/spirit"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+        "member": "generated/decls/entitydef/ai/ambient/spirit_samuel.decl",
+        "index": 1437,
+        "offset": 24737920,
+        "stored_size": 1251,
+        "decoded_size": 1251,
+        "stored_sha256": "f19b31c093972871b127c427d1802c92100194ed39144ba49109fed4005e0332",
+        "decoded_sha256": "f19b31c093972871b127c427d1802c92100194ed39144ba49109fed4005e0332",
+        "inherit": "ai/ambient/spirit"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/ai/ambient/spirit_samuel.decl",
+        "index": 12551,
+        "offset": 101736448,
+        "stored_size": 1195,
+        "decoded_size": 1195,
+        "stored_sha256": "8069c83c629a579336851b99da9ee64f93a55ef224e2b8bc083196a96cb62e93",
+        "decoded_sha256": "8069c83c629a579336851b99da9ee64f93a55ef224e2b8bc083196a96cb62e93",
+        "inherit": "ai/ambient/spirit"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity_patch1.resources",
+        "member": "generated/decls/entitydef/ai/ambient/spirit_samuel.decl",
+        "index": 2384,
+        "offset": 108005888,
+        "stored_size": 1251,
+        "decoded_size": 1251,
+        "stored_sha256": "f19b31c093972871b127c427d1802c92100194ed39144ba49109fed4005e0332",
+        "decoded_sha256": "f19b31c093972871b127c427d1802c92100194ed39144ba49109fed4005e0332",
+        "inherit": "ai/ambient/spirit"
+      }
+    ],
+    "ai/heavy/whiplash_spectre": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 6577,
+        "offset": 26202112,
+        "stored_size": 634,
+        "decoded_size": 634,
+        "stored_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "decoded_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig_patch2.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 1511,
+        "offset": 26644480,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 3456,
+        "offset": 17167872,
+        "stored_size": 634,
+        "decoded_size": 634,
+        "stored_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "decoded_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 1192,
+        "offset": 22225472,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 4474,
+        "offset": 31825920,
+        "stored_size": 634,
+        "decoded_size": 634,
+        "stored_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "decoded_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity_patch1.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 1026,
+        "offset": 94122432,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 10930,
+        "offset": 87989376,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 12985,
+        "offset": 89520704,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 10152,
+        "offset": 88730176,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 8022,
+        "offset": 78843904,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 4676,
+        "offset": 24911168,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 5913,
+        "offset": 20840448,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 3692,
+        "offset": 34657280,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 5768,
+        "offset": 67627840,
+        "stored_size": 634,
+        "decoded_size": 634,
+        "stored_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "decoded_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch2.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 1219,
+        "offset": 20840448,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest_patch1.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 608,
+        "offset": 90151296,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch3.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 31,
+        "offset": 11211520,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch1.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 5562,
+        "offset": 70012928,
+        "stored_size": 634,
+        "decoded_size": 634,
+        "stored_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "decoded_sha256": "ffa45bc327f4bf388839475525d861334e5119d9eccbebb782a3faa664c26c93",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch2.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 1306,
+        "offset": 23182656,
+        "stored_size": 633,
+        "decoded_size": 633,
+        "stored_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "decoded_sha256": "7d46f9932476903a31f6f82cbe5d5751daae294f321f4be784f3bc6ae38861ca",
+        "inherit": "ai/heavy/whiplash"
+      },
+      {
+        "bank": "gameresources.resources",
+        "member": "generated/decls/entitydef/ai/heavy/whiplash_spectre.decl",
+        "index": 37155,
+        "offset": 302159168,
+        "stored_size": 547,
+        "decoded_size": 547,
+        "stored_sha256": "76706a104f7b4f5d16ab69afcb45fa3202839b3b1cfd4e3d2f3ad2b47b28ea04",
+        "decoded_sha256": "76706a104f7b4f5d16ab69afcb45fa3202839b3b1cfd4e3d2f3ad2b47b28ea04",
+        "inherit": "ai/heavy/whiplash"
+      }
+    ],
+    "encounter/spawn_group/zone": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6571,
+        "offset": 26195904,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3450,
+        "offset": 17163264,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 4468,
+        "offset": 31819712,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3793,
+        "offset": 16412672,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 5885,
+        "offset": 18055168,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3026,
+        "offset": 16018560,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 1246,
+        "offset": 6611904,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 4620,
+        "offset": 24847488,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 5861,
+        "offset": 20779584,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3635,
+        "offset": 34596608,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/hub/hub.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3110,
+        "offset": 15840614,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6333,
+        "offset": 77429952,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_darkmetal/pvp_darkmetal.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 2112,
+        "offset": 8138752,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6717,
+        "offset": 81668352,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6258,
+        "offset": 72259008,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6668,
+        "offset": 79502656,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 1632,
+        "offset": 6948288,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_sideswipe/pvp_sideswipe.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 1562,
+        "offset": 6873728,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 7614,
+        "offset": 82459520,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 7027,
+        "offset": 90548992,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m1_intro/e1m1_intro.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 7411,
+        "offset": 22619904,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m2_battle/e1m2_battle.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 5984,
+        "offset": 20698368,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 4622,
+        "offset": 18793728,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 3198,
+        "offset": 14382336,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6803,
+        "offset": 21731072,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 8462,
+        "offset": 29038336,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 7195,
+        "offset": 22087424,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 2385,
+        "offset": 41353216,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 4738,
+        "offset": 18449664,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 2428,
+        "offset": 13641472,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 2388,
+        "offset": 10495232,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 4929,
+        "offset": 14161664,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 6792,
+        "offset": 78376256,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      },
+      {
+        "bank": "game/tutorials/tutorial_sp.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/zone.decl",
+        "index": 152,
+        "offset": 2438912,
+        "stored_size": 558,
+        "decoded_size": 558,
+        "stored_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "decoded_sha256": "a941ca14e57394861dc59d4835464d641fef9dea37c030cdfdadc3ac62dec8bb",
+        "inherit": null
+      }
+    ],
+    "encounter/spawn_group/cylinder": [
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear_patch2.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 278,
+        "offset": 9507648,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth_patch2.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 201,
+        "offset": 9892416,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/hub/hub.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 5927,
+        "offset": 33054950,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 6334,
+        "offset": 77430784,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_darkmetal/pvp_darkmetal.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 9224,
+        "offset": 79695872,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 6718,
+        "offset": 81668928,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 6259,
+        "offset": 72259584,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 6669,
+        "offset": 79503360,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 1635,
+        "offset": 6950080,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_sideswipe/pvp_sideswipe.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 8636,
+        "offset": 79369216,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 7615,
+        "offset": 82460672,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 7028,
+        "offset": 90549568,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 8176,
+        "offset": 36751936,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 6216,
+        "offset": 30224384,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 12370,
+        "offset": 52950784,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch3.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 177,
+        "offset": 13301888,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 4429,
+        "offset": 48398592,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m3_maykr/e3m3_maykr.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 5817,
+        "offset": 28474752,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss.resources",
+        "member": "generated/decls/entitydef/encounter/spawn_group/cylinder.decl",
+        "index": 7743,
+        "offset": 33265984,
+        "stored_size": 632,
+        "decoded_size": 632,
+        "stored_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "decoded_sha256": "946a3b18fb2ca81c5916372cf37deefda08e7cde1309e89574b587e5222e0b59",
+        "inherit": null
+      }
+    ],
+    "target/spawn": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6511,
+        "offset": 26131200,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3391,
+        "offset": 17094464,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 4407,
+        "offset": 31754112,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3785,
+        "offset": 16406656,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 5877,
+        "offset": 18049216,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3018,
+        "offset": 16013120,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 1240,
+        "offset": 6606848,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 4616,
+        "offset": 24843968,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 5857,
+        "offset": 20776384,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3631,
+        "offset": 34593344,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/hub/hub.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3106,
+        "offset": 15836966,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6316,
+        "offset": 77420800,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_darkmetal/pvp_darkmetal.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 2110,
+        "offset": 8136256,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6702,
+        "offset": 81659840,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6244,
+        "offset": 72251200,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6652,
+        "offset": 79493632,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 1615,
+        "offset": 6930432,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_sideswipe/pvp_sideswipe.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 1560,
+        "offset": 6871296,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 7596,
+        "offset": 82450112,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 7011,
+        "offset": 90540096,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e1m1_intro/e1m1_intro.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 7410,
+        "offset": 22618624,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e1m2_battle/e1m2_battle.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 5983,
+        "offset": 20697088,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 4621,
+        "offset": 18792448,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 3197,
+        "offset": 14381056,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6802,
+        "offset": 21729792,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 8461,
+        "offset": 29037056,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 7194,
+        "offset": 22086144,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 2344,
+        "offset": 41298560,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 4737,
+        "offset": 18448384,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 2427,
+        "offset": 13640192,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 2387,
+        "offset": 10493952,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e3m3_maykr/e3m3_maykr.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 2612,
+        "offset": 13860864,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 4928,
+        "offset": 14160384,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/tutorials/tutorial_demons.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 121,
+        "offset": 864256,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 6780,
+        "offset": 78369728,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      },
+      {
+        "bank": "game/tutorials/tutorial_sp.resources",
+        "member": "generated/decls/entitydef/target/spawn.decl",
+        "index": 148,
+        "offset": 2427136,
+        "stored_size": 1257,
+        "decoded_size": 1257,
+        "stored_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "decoded_sha256": "d249aa00acad69e837fd032bffc5ddd8bec9cd2322c07ee4c17ade200898ceb9",
+        "inherit": "target/default"
+      }
+    ],
+    "target/default": [
+      {
+        "bank": "game/hub/hub_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 79,
+        "offset": 3431422,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 20,
+        "offset": 2997312,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 30,
+        "offset": 3178496,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 15,
+        "offset": 2798784,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 11,
+        "offset": 3656000,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 1614,
+        "offset": 6929984,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 56,
+        "offset": 3922048,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 34,
+        "offset": 3288256,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 56,
+        "offset": 6665600,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 65,
+        "offset": 4707904,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 59,
+        "offset": 8450048,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 43,
+        "offset": 7802880,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 61,
+        "offset": 5554176,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 52,
+        "offset": 4833600,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 89,
+        "offset": 6150144,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 24,
+        "offset": 3369664,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      },
+      {
+        "bank": "gameresources.resources",
+        "member": "generated/decls/entitydef/target/default.decl",
+        "index": 17670,
+        "offset": 145718400,
+        "stored_size": 432,
+        "decoded_size": 432,
+        "stored_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "decoded_sha256": "049aa0aef82cfb99e2af8505bd83d55ce240e3e1a807ee5ab1acaf2d68cd363b",
+        "inherit": null
+      }
+    ],
+    "ai/fodder/zombie_t1_scientist": [
+      {
+        "bank": "game/dlc/e4m1_rig/e4m1_rig.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 6872,
+        "offset": 31515456,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc/e4m2_swamp/e4m2_swamp.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 3710,
+        "offset": 22069568,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc/e4m3_mcity/e4m3_mcity.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 4770,
+        "offset": 37118784,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 3795,
+        "offset": 16413888,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 5887,
+        "offset": 18056384,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 3028,
+        "offset": 16020096,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1248,
+        "offset": 6613120,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 4956,
+        "offset": 31349952,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 6179,
+        "offset": 27246592,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 3963,
+        "offset": 41069824,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_bronco/pvp_bronco.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 25,
+        "offset": 3009216,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_darkmetal/pvp_darkmetal.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 2108,
+        "offset": 8134656,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_deathvalley/pvp_deathvalley.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 34,
+        "offset": 3192768,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_inferno/pvp_inferno.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 19,
+        "offset": 2811840,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_laser/pvp_laser.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 15,
+        "offset": 3667904,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_shrapnel/pvp_shrapnel.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1634,
+        "offset": 6949440,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_sideswipe/pvp_sideswipe.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1814,
+        "offset": 13283328,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_thunder/pvp_thunder.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 62,
+        "offset": 3936256,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/pvp/pvp_zap/pvp_zap.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 38,
+        "offset": 3299264,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m1_intro/e1m1_intro_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 669,
+        "offset": 29310976,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m2_battle/e1m2_battle_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1299,
+        "offset": 92368960,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 60,
+        "offset": 6668288,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 69,
+        "offset": 4710976,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 501,
+        "offset": 86940800,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1126,
+        "offset": 18012736,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 63,
+        "offset": 8452672,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 1159,
+        "offset": 20238336,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 46,
+        "offset": 7804736,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 66,
+        "offset": 5557568,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 56,
+        "offset": 4836224,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m3_maykr/e3m3_maykr_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 389,
+        "offset": 13281664,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss_patch1.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 93,
+        "offset": 6152768,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "game/tutorials/tutorial_pvp_laser/tutorial_pvp_laser.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 28,
+        "offset": 3381184,
+        "stored_size": 626,
+        "decoded_size": 626,
+        "stored_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "decoded_sha256": "5fcff00b252887ca2ed11b0a6bc0cf4227f6bcbc72f25b8b4596a20ee28a7ee1",
+        "inherit": "ai/fodder/zombie_tier_1"
+      },
+      {
+        "bank": "gameresources.resources",
+        "member": "generated/decls/entitydef/ai/fodder/zombie_t1_scientist.decl",
+        "index": 18893,
+        "offset": 149406720,
+        "stored_size": 537,
+        "decoded_size": 537,
+        "stored_sha256": "bc3c5655a703c7cd3d9e48d8c5854020c955a785213d006318d28ea5c2790f67",
+        "decoded_sha256": "bc3c5655a703c7cd3d9e48d8c5854020c955a785213d006318d28ea5c2790f67",
+        "inherit": "ai/fodder/zombie_tier_1"
+      }
     ]
   },
   "templates": {
@@ -2963,6 +5446,1175 @@
         "ai/default",
         "ai/default_superheavy",
         "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "98f82a9645fefb4b1198a1700d9fec6e0dbacf12f923e04c0ea14ae77429cbdb": {
+      "species": "zombie_tier_1",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_zombie_tier_1_2",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0fa5cb20031e11625803f61004c5ff188c942ccfd88049a88ead21fb318f7a28": {
+      "species": "zombie_tier_3",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1fdb2e8dfcacc3d1f374639bf4965d97f05ee3da87e0e9d445b2afd5095a67f3": {
+      "species": "archvile",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "36ced442aa2ed0602a62fe74c49cf3167232cc33772edcc1bc1beb3a9c3b2106": {
+      "species": "carcass",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "20eda6c0fb2e55e533930921db110e391196a35cdd54595cb1f7719656e74cd7": {
+      "species": "cyber_mancubus",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0164e3b665058b3b951524608beb5731d7b0508fc3bc8590593250696b25d712": {
+      "species": "dread_knight",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "894b5f5c9db3183f53b32a2c8dc7af92175e2103de9b08b62b39af3f3afe2aae": {
+      "species": "hell_knight",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_hellknight_2",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "85d5c0730fe65f7a8adb2b033bb2e3dd68d108328ad23db7ec5ebdae0a4c2416": {
+      "species": "mancubus",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_mancubus_fire_2",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f50fb3a0fcd77465626e16be935d045a79823f2fbdb723022d94dad8c164b8d0": {
+      "species": "marauder",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "5590b2110f215af619cdd6f7acc3526a1697e07ea0783ac92491370728cc51c0": {
+      "species": "pinky",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_pinky_2",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "90b0b24b9ab249aa995e587fa6c7d7b4c82f88ca00302b259d0a02a42747e9d3": {
+      "species": "prowler",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_prowler_2",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2813111e31aa3bd0936ede2e4225411516813be99a77013ae35a02f9e7188983": {
+      "species": "shotgun_soldier",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "13d536753e6231f556aeea0979f24a48a9d9ffdace173e75e53d2f5d856c3546": {
+      "species": "spectre",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "98c303961f12388a7876ece1c7d573239de2f14f9c4187876ae5ad4d67539705": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "124a80ea50c3a6c21e8dfddbaa675fb95d1e637d7eed1c0e9b341e362081d7d3": {
+      "species": "archvile",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fe904f8a7b0cf622268c785d5645179ee347de8f34f95f32ee10aeff5119e5d6": {
+      "species": "carcass",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "61fa07d303bd35b44fe9bfc3beed975a2c33d96cdea7de1e9b0a7d8995c71ba3": {
+      "species": "marauder",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "30aad64c17ba1ebf44b2ddc5d3bfeb27207b5008184c36fa5e4ca46963cf5b44": {
+      "species": "prowler",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0da0c5c32dcb671a3a8ed0b0dd1552580d7d067e7cab2e77687912c694859fc6": {
+      "species": "shotgun_soldier",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e88104a42e6cbf25ddcc6ad6891e65f4fbec83432bbdb587cfdfcf8af2aa7101": {
+      "species": "cyber_mancubus",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3b57e37ff807c7c27e1bfbdff9d21e3b5b8f079392d78d6c08f2e2dccbae7ce9": {
+      "species": "dread_knight",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "91a6c2c3c6c6273b8833c25dbd8be87070e219c7c78638791de37924ed5babeb": {
+      "species": "hell_knight",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "21d17f1cac2e760f877b766970394ee69b554c5e2bf2fc8768fcee1114093167": {
+      "species": "mancubus",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e2d825638924df1a4292bd14cb18205daf50ab5783b42131091e65395f4988c1": {
+      "species": "pinky",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "861456d1d2fdfef445ecaefeba9e9bdb6f3eaf83f7d10f496d2cdf0795dbe013": {
+      "species": "spectre",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b64c7c35f7b1a2dbf6a289c32e7c2437e4f7672facebcde0b59a5e46b60d8e3f": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8a29821282e09f5a12a08212d11cd46e4350d66c0fc128d2cf9dec7f9b12a82b": {
+      "species": "cueball",
+      "map_key": "e2m2_base",
+      "entity": "gameplay_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "83a191f50d8080f78467537035dd5f5c945de99b6d9aa6f01d811ab35967ef95": {
+      "species": "zombie_tier_1",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "70bf8eab5f963892302a86271410ea2bdb0ae869c8f63d666b476c188a84677e": {
+      "species": "archvile",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "926dc123ecb15c45aff3e5cd98fe955b199bfe964483f61c73bb2a769f612e55": {
+      "species": "carcass",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "055302442dfd60bd6050dff7bec9320eb83786066082298c5ab09acebb5c6204": {
+      "species": "marauder",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0344fb380dbefa7870bcffd7ac7e5859277e522e9c0fb7c764e26e2ca9b41b0a": {
+      "species": "prowler",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "acbca725a425f590083c9ad78ed60f2b936c7868cac7359e2216facef0765d7a": {
+      "species": "shotgun_soldier",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a356a03ca799f52ae7978319007d226a4c77c9267a9dc16790f47d7dd3936696": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1dd158091469ac39cb6390fa9f5d190a1b15c22a74a9fed931d5e882221be898": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "378f9e35d92c52d813b766607ec226148eae8d1e4470c70f9c336718f4e754e9": {
+      "species": "zombie_tier_1",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_fodder_zombie_tier_1_2",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "087e31e73b53181f8135c281c5c04de7bc5c60a3464e193156e538ee678d3e1f": {
+      "species": "zombie_tier_3",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7fa8f43afb185c6971fd5d69840dabfc142384f786bbe79c6ddcbd6035fb3d3b": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "39efe28dcbf750215d4740fe2387a4c22dd94a6734fbbfdfa2ba51a77d15a7a3": {
+      "species": "carcass",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c934c38c6e4543a0f6d149cb4e356cf806654e8d75c5f56bc78581926cb5f421": {
+      "species": "marauder",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0ae2376e3f289db4eb34b5d846619215b429535981b0093b50b8590e1f87ccdb": {
+      "species": "prowler",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c2b1c7b385559889c2728a32c3b16146367c9a93d9f5a07e8219e88170302d4f": {
+      "species": "shotgun_soldier",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "983384450ec264a888d713667941b86d022cb15ab3cfa2e76c2a0b119c5b32ff": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e9557f07d9435eecc727913aebe9378c791297bc8013c4bab99e767ad8f3130b": {
+      "species": "zombie_tier_1",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "16018205e9a5e8d0d3905489f547bc911a07f2286864f813cd57b26f28ed3624": {
+      "species": "zombie_tier_3",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "426975dfc5175e8d62c1c3be17f7cd40f3298fb6ca307522b1d7ecebf08e6fb3": {
+      "species": "zombie_tier_1",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2aef0af7129903448c25505d08b0c1c901d252a6affb235cfaf4b202bf271d4c": {
+      "species": "carcass",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d0aa3498f52978d2492383fe15977692772380f5d88bc4f8d1bd81496e016cba": {
+      "species": "pinky",
+      "map_key": "e1m4_boss",
+      "entity": "catwalk_platform_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cf6b26e21d53aa2f4389ce875068fb28ac26c9a16f070227de10ecf8f96a4e57": {
+      "species": "shotgun_soldier",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d270eea628d7bc693572c00bea20179a44ab5913a2cf6ab2908711e2229cb7a5": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m4_boss",
+      "entity": "catwalk_platform_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "118c85a24456c4bff372a863fcc189e3292ccd50cab325617088d07b01e277cd": {
+      "species": "archvile",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_superheavy_archvile_2",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1b4fe10b067ac3102312773ee85437e25a782c1d63ec868b90101976dcd63ea3": {
+      "species": "carcass",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_fodder_carcass_2",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "737a210c0ffd5b4f59806b7f0c5dada20f19cb4cbee68490e4e1f40bd8f6101f": {
+      "species": "marauder",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_superheavy_marauder_2",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "60e1e2a38f7e7dcf815cc27d6bc4165c83d8453509dead1ba4acec12635f56b9": {
+      "species": "prowler",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_fodder_prowler_2",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bc51eac98e4837385c34e157974388ca4f8413fcd2e565f0d11651932faadcbd": {
+      "species": "shotgun_soldier",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_fodder_soldier_shield_2",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "000c94184ae52bc67ffe1eb09ed38fa741035d75a43d63d547c320ae0771fac0": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_fodder_zombie_tier_1_2",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0411b832e29085ac95c3658f2f9a960ad118e02b7ffd51cecf6a30e6938927da": {
+      "species": "dread_knight",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_heavy_dreadknight_2",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f3c55ab7098f2f45daa24f61e8676bfd120168ea1623f0334c4cb297f553f32b": {
+      "species": "hell_knight",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_heavy_hellknight_2",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0079d613dace4dc6bcdee7caec42ed499309fad1c23c8957887442dc83d5a164": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_fodder_zombie_tier_3_2",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "68ff55b8f98ebef20d6e4a26aeb27506c8ba2c35d87a149d4ee5fc0995f9d23f": {
+      "species": "lost_soul",
+      "map_key": "e2m1_nest",
+      "entity": "game_ai_fodder_lostsoul_1",
+      "inherit": "ai/fodder/lostsoul",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/lostsoul"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "hitpoint_input": {
+        "max": 100,
+        "starting": 100
+      },
+      "hitpoint_input_proof": {
+        "sha256": "c9ffed558e077ea2019082e5863950ee21d2859202727e1c7a13298293668114",
+        "checks_passed": 83
+      }
+    },
+    "02c3593c9dc5fbb8c2e0cc72f76d782ee4327a006a9413588cb22c0f2586305c": {
+      "species": "whiplash",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6d8d7a63d0a6c0ea4aa4747f42d89a9def3780426910611fefd353b801526cee": {
+      "species": "whiplash",
+      "map_key": "e4m1_rig",
+      "entity": "game__ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "87d6e993005008855b5dc1ae986da2c7ed0d6c87192ad24a48956a9334abe7bc": {
+      "species": "whiplash",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b074a3d269acac16a0b26814f721da8449acc1e6b2be8027fb30109aab4d4226": {
+      "species": "whiplash",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "56e586b9281dc83bf7254fc89d56e8a995e94ac678a13f1424709fd694954d7f": {
+      "species": "whiplash",
+      "map_key": "e1m4_boss",
+      "entity": "wing_c_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "22b895e6763063de3dba49e99fc08152ef793ec39eea9b49cde1276cb6ea29fe": {
+      "species": "whiplash",
+      "map_key": "e4m3_mcity",
+      "entity": "game__ai_heavy_whiplash_2",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
       ],
       "scale": {
         "x": 1,

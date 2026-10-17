@@ -186,15 +186,13 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
             required.add(EXCLUDED_LAYER)
         expected = {name: package.read("gameresources_patch2/" + name)
                     for name in required if "gameresources_patch2/" + name in names}
-        species = {instance["species"]
-                   for row in (manifest.get("options", {}).get("enemy_plan") or {}).get("maps", {}).values()
-                   for operation in row["operations"] for wave in operation["waves"] for instance in wave["instances"]}
+        plan = manifest.get("options", {}).get("enemy_plan")
         enemies = {}
         for member in sorted(names):
             if member.startswith(PRIVATE_POPULATION_PREFIX) and member.endswith(".decl"):
                 container, resource_name = member.split("/", 1)
                 enemies.setdefault(container + ".resources", {})[resource_name] = ("rs_streamfile", package.read(member))
-        for species_id in sorted(required_enemy_resource_species(species)):
+        for species_id in sorted(required_enemy_resource_species(plan)):
             profile = load_enemy_resource_profile(species_id)
             container = profile["resource_container"] + ".resources"
             assets = enemies.setdefault(container, {})

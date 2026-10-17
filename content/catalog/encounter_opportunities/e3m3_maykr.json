@@ -5,7 +5,7 @@
     "path": "e3m3_maykr.map",
     "sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb"
   },
-  "species_registry_sha256": "49893ad8bf66aec04a2a07e5b111be97092809aca234dff9f8dd73eefaa4c5d0",
+  "species_registry_sha256": "6eeb6a99dbe98526e2539e2f7fc012d4ee0ab6e9092fb222caa228080378b73a",
   "logic_sources": {},
   "counting": {
     "unit": "finite_authored_combat_opportunity",
@@ -799,6 +799,152 @@
               "event_index": 5,
               "event_def": "waitAIRemaining",
               "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_MAYKR",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "temp_all_scripting_encounter_manager_15_initial",
+      "manager": "temp_all_scripting_encounter_manager_15",
+      "script_index": 0,
+      "segment_N": 4,
+      "qualification": "finite_authored_opportunities_if_activated",
+      "review": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor.",
+      "activation": {
+        "kind": "reviewed_single_script_initial_pass",
+        "bindings": {
+          "commitTriggers": [
+            {
+              "entity": "temp_all_scripting_encounter_trigger_commit_21"
+            }
+          ],
+          "exitTriggers": [
+            {
+              "entity": "temp_all_scripting_encounter_trigger_exit_16",
+              "force_ai_to_flee": false
+            }
+          ],
+          "userFlagTriggers": []
+        },
+        "incoming_targets": [],
+        "event_gates": [],
+        "required_phase": "selected_source_population_zero",
+        "phase_anchor": {
+          "event_index": 4,
+          "event_def": "waitAIRemaining",
+          "event_sha256": "9511f47d6c1dad7017902548311d2446554cf2534857da3291e9d78e05c35df0"
+        },
+        "gaps": [
+          "physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero"
+        ]
+      },
+      "creations": [
+        {
+          "event_index": 0,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "33a01cb73b96f8f9064b3eab0ee25238e1cdbeecad821bfb46a6fb0f13d69bfe",
+          "species": "spectre",
+          "spawn_type": "ENCOUNTER_SPAWN_SPECTRE",
+          "count": 1,
+          "label": "",
+          "spawner": "temp_all_scripting_spawn_109",
+          "members": [
+            {
+              "spawner": "temp_all_scripting_spawn_109",
+              "ai": "temp_all_scripting_ai_heavy_pinky_spectre_1",
+              "definition_sources": [
+                "temp_all_scripting_encounter_spawn_group_parent14"
+              ]
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 4,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_SPECTRE",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 1,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "b016b43e08d4ee9bf4f802a89ecf3fad34a64b4158da9933000d2d5ae884c761",
+          "species": "whiplash",
+          "spawn_type": "ENCOUNTER_SPAWN_WHIPLASH ENCOUNTER_DO_NOT_USE_MAX_HEAVY",
+          "count": 1,
+          "label": "",
+          "spawner": "temp_all_scripting_spawn_92",
+          "members": [
+            {
+              "spawner": "temp_all_scripting_spawn_92",
+              "ai": "temp_all_scripting_ai_heavy_whiplash_1",
+              "definition_sources": [
+                "temp_all_scripting_encounter_spawn_group_parent14"
+              ]
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 4,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_WHIPLASH ENCOUNTER_DO_NOT_USE_MAX_HEAVY",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 2,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "39513d3f0e53b110265bc0f136f801090598030a1d6dee14deeedef758454713",
+          "species": "doom_hunter",
+          "spawn_type": "ENCOUNTER_SPAWN_DOOM_HUNTER",
+          "count": 1,
+          "label": "",
+          "spawner": "temp_all_scripting_spawn_108",
+          "members": [
+            {
+              "spawner": "temp_all_scripting_spawn_108",
+              "ai": "temp_all_scripting_ai_superheavy_doom_hunter_1",
+              "definition_sources": [
+                "temp_all_scripting_encounter_spawn_group_parent14"
+              ]
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 4,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_DOOM_HUNTER",
+              "replacement_qualification": "preserve_source_spawn_type"
+            }
+          ]
+        },
+        {
+          "event_index": 3,
+          "event_def": "spawnSingleAI",
+          "event_sha256": "eefc4656f7ef6733a4e7e3cde47bf1a943fb5367aa88390a4b2c944b59146531",
+          "species": "zombie_tier_1",
+          "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+          "count": 1,
+          "label": "",
+          "spawner": "temp_all_scripting_spawn_88",
+          "members": [
+            {
+              "spawner": "temp_all_scripting_spawn_88",
+              "ai": "temp_all_scripting_ai_fodder_zombie_t1_hell_6",
+              "definition_sources": [
+                "temp_all_scripting_encounter_spawn_group_parent14"
+              ]
+            }
+          ],
+          "replacement_constraints": [
+            {
+              "event_index": 4,
+              "event_def": "waitAIRemaining",
+              "spawn_type": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
               "replacement_qualification": "preserve_source_spawn_type"
             }
           ]
@@ -1644,6 +1790,105 @@
       "layers": [
         "game/sp/e3m3_maykr/main_level"
       ]
+    },
+    "temp_all_scripting_ai_fodder_zombie_t1_hell_6": {
+      "sha256": "5a98f7afae9f0aeea4652bd74a07891a0eca88645544fcea01b736e2fda2881e",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "starting_health": 200
+    },
+    "temp_all_scripting_ai_heavy_pinky_spectre_1": {
+      "sha256": "fa743445748fa78e1e16387e75642e2b378f25a0c0f314a42bc893377a50694f",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/pinky_spectre"
+    },
+    "temp_all_scripting_ai_heavy_whiplash_1": {
+      "sha256": "f0af4b48b5d3ede5e613294fad0a57bc128cab2d320662e8f73d2010c4565dc2",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/heavy/whiplash"
+    },
+    "temp_all_scripting_ai_superheavy_doom_hunter_1": {
+      "sha256": "40855d922f0c6fdab9ec0022d9b2c15c902896004dbabe4246738cc16f78a169",
+      "class_name": "idAI2",
+      "layers": [
+        "spawn_target_layer"
+      ],
+      "inherit": "ai/superheavy/doom_hunter"
+    },
+    "temp_all_scripting_encounter_manager_15": {
+      "sha256": "41b602b15e8e2dc5e0358cd6e2004466e109e1bcfeb3d935dda45b00f88c22be",
+      "class_name": "idEncounterManager",
+      "layers": [
+        "game/sp/e3m3_maykr/main_level"
+      ]
+    },
+    "temp_all_scripting_encounter_spawn_group_parent14": {
+      "sha256": "d350be6311cba2bbeffbbc79027efa831616a73142d934aaf516c05e923d9449",
+      "class_name": "idTarget_Spawn_Parent",
+      "layers": []
+    },
+    "temp_all_scripting_encounter_trigger_commit_21": {
+      "sha256": "4328650eaef37e6ca1f7df71562db2a266b6e592728e9f7bedc408f533abcb34",
+      "class_name": "idEncounterTrigger_Commit",
+      "layers": []
+    },
+    "temp_all_scripting_encounter_trigger_exit_16": {
+      "sha256": "b7a3a97939a5a1c7f72ae24d3f5dbe3e1897862d5bf503d21379b82feb6b2cd1",
+      "class_name": "idEncounterTrigger_Exit",
+      "layers": []
+    },
+    "temp_all_scripting_spawn_108": {
+      "sha256": "fc1f2c3e81e390c0c8ca116ebf7bd0941cd0f3d142255b6ad51f0d4703da27a0",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 499.030365,
+        "y": 678.579224,
+        "z": -112
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "temp_all_scripting_spawn_109": {
+      "sha256": "5a48691b58e26c7818050151f249dfb24116b9f09bae72ffee0fae5ac161c336",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 502.85025,
+        "y": 672.520447,
+        "z": -112
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "temp_all_scripting_spawn_88": {
+      "sha256": "9befe9c6c961a9f7853a8dca4f7fb718e807cfeffd1c9485f4d6d8b021770124",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 513.579407,
+        "y": 664.998962,
+        "z": -112.650024
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
+    },
+    "temp_all_scripting_spawn_92": {
+      "sha256": "c8027b180176523d7ae8dc520acf663f8f3471343dd40f235e8c35bdaa1a008f",
+      "class_name": "idTarget_Spawn",
+      "layers": [],
+      "spawn_position": {
+        "x": 492.369781,
+        "y": 686.420715,
+        "z": -112
+      },
+      "spawn_override": "AIOVERRIDE_TELEPORT"
     }
   },
   "gaps": [
@@ -1738,11 +1983,6 @@
       "map_N": null
     },
     {
-      "manager": "temp_all_scripting_encounter_manager_15",
-      "reason": "finite_initial_pass_not_reviewed",
-      "map_N": null
-    },
-    {
       "manager": "temp_all_scripting_encounter_manager_16",
       "reason": "finite_initial_pass_not_reviewed",
       "map_N": null
@@ -1801,6 +2041,6 @@
   },
   "review_source": {
     "path": "content/catalog/encounter_opportunity_segments.json",
-    "sha256": "832c1517a6dff931789f3af05f792eac6f883ea43ef01dd35b24a70d147b36af"
+    "sha256": "54e1d7b4b5266def024a19fbf2c5826f568b6d28ab73440adaf59bb10974a54e"
   }
 }

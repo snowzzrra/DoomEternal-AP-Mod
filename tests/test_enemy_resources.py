@@ -18,17 +18,20 @@ def _hash(payload):
     ({"imp"}, set()),
     ({"blood_angel"}, {"blood_angel"}),
 ])
-def test_required_resources_include_base_supplements_and_missing_dlc(tmp_path, requested, expected):
+@pytest.mark.parametrize("source_map", ["destination", "donor"])
+def test_required_resources_include_external_supplements_and_dlc(tmp_path, requested, expected, source_map):
     catalog = tmp_path / "catalog.json"
     catalog.write_text(json.dumps({"revision": 1, "species": {"zombie_maykr": {}}}), encoding="utf-8")
-    assert enemy_resources.required_enemy_resource_species(requested, catalog_path=catalog) == expected
+    plan = {"maps": {"destination": {"operations": [{"waves": [{"instances": [
+        {"species": species, "ai": {"map_key": source_map}} for species in requested]}]}]}}}
+    assert enemy_resources.required_enemy_resource_species(plan, catalog_path=catalog) == (expected if source_map == "donor" else set())
 
 
 def test_resource_selection_rejects_unsupported_catalog_revision(tmp_path):
     catalog = tmp_path / "catalog.json"
     catalog.write_text(json.dumps({"revision": 2, "species": {"zombie_maykr": {}}}), encoding="utf-8")
     with pytest.raises(ValueError, match="catalog revision"):
-        enemy_resources.required_enemy_resource_species({"zombie_maykr"}, catalog_path=catalog)
+        enemy_resources.required_enemy_resource_species(None, catalog_path=catalog)
 
 
 @pytest.fixture
@@ -320,7 +323,7 @@ def test_room_finalizer_verifies_packaged_enemies_and_enables_both_containers(
         catalog.write_text(json.dumps(catalog_document))
     required_species = enemy_resources.required_enemy_resource_species
     monkeypatch.setattr(enemy_resources, "required_enemy_resource_species",
-                        lambda species: required_species(species, catalog_path=catalog))
+                        lambda plan: required_species(plan, catalog_path=catalog))
 
     def load_profile(species):
         assert species == species_id
@@ -343,7 +346,7 @@ def test_room_finalizer_verifies_packaged_enemies_and_enables_both_containers(
     monkeypatch.setattr(launcher_platform, "publish_file", lambda source, destination, **_: source.replace(destination))
     package = base / "room.zip"
     manifest = {"required_capabilities": ["unified_campaign_v1"], "options": {"enemy_plan": {
-        "maps": {"e1m1_intro": {"operations": [{"waves": [{"instances": [{"species": species_id}]}]}]}}}}}
+        "maps": {"e1m1_intro": {"operations": [{"waves": [{"instances": [{"species": species_id, "ai": {"map_key": "donor"}}]}]}]}}}}}
     with zipfile.ZipFile(package, "w") as archive:
         archive.writestr("seed_manifest.json", json.dumps(manifest))
         archive.writestr(population_member, population_payload)

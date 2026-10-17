@@ -2043,6 +2043,7 @@ def inject_secret_encounter_completion(
     manager_name,
     ap_check_id,
     expected_last_event_index,
+    original_content=None,
 ):
     bounds = find_entity_block_bounds(content, manager_name)
     if bounds is None:
@@ -2068,11 +2069,22 @@ def inject_secret_encounter_completion(
         raise ValueError(f"Events block not found for manager {manager_name}")
 
     events_num = int(events_match.group(1))
-    if events_num == expected_last_event_index + 1:
+    source_events_num = events_num
+    if original_content is not None:
+        original_bounds = find_entity_block_bounds(original_content, manager_name)
+        if original_bounds is None:
+            raise ValueError(f"Secret encounter source manager not found: {manager_name}")
+        original_block = original_content[original_bounds[0]:original_bounds[1]]
+        original_marker = original_block.find(manager_marker)
+        original_events = re.search(r"events\s*=\s*\{\s*num\s*=\s*(\d+);", original_block[original_marker:]) if original_marker >= 0 else None
+        if original_events is None:
+            raise ValueError(f"Secret encounter source events not found: {manager_name}")
+        source_events_num = int(original_events.group(1))
+    if source_events_num == expected_last_event_index + 1:
         pass
     else:
         raise ValueError(
-            f"Manager {manager_name} has {events_num} events, expected "
+            f"Manager {manager_name} has {source_events_num} source events, expected "
             f"{expected_last_event_index + 1} before AP hook insertion"
         )
 
@@ -2711,6 +2723,7 @@ def generate_map(
     receipt_feedback=None,
     enable_notifications=True,
     placement_metadata=None,
+    encounter_source=None,
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
@@ -3258,6 +3271,7 @@ def generate_map(
             manager_name,
             ap_check_id,
             expected_last_event_index,
+            original_content=encounter_source,
         )
         manifest_data[ap_check_id] = location_id
         feedback_policy = location_feedback_policy(

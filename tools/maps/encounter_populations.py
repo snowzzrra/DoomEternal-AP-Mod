@@ -34,7 +34,7 @@ def materialize_frozen_populations(materialized_map_text, map_plan, registry, ro
     sources = registry["actorpopulation_sources"]
     populations = PopulationSources(registry, root)
     load, variants = populations.load, populations.variants
-    resolved, matches = populations.resolved, populations.matches
+    matches = populations.matches
 
     def additional_assignment(inherit, spawn_type):
         candidates = []
@@ -74,17 +74,19 @@ def materialize_frozen_populations(materialized_map_text, map_plan, registry, ro
         if all(any(matches(row, inherit, mask) for row in rows.values())
                for rows in existing_variants for inherit, mask in requests):
             continue
-        existing = resolved(population)
+        # leave every native index intact; list growth gives unused slots a null entityDef.
+        append_index = max(map(len, existing_variants))
         missing = sorted((inherit, mask) for inherit, mask in requests
-                         if not any(matches(row, inherit, mask) for row in existing.values()))
+                         if not all(any(matches(row, inherit, mask) for row in rows.values())
+                                    for rows in existing_variants))
         additions = [additional_assignment(inherit, mask) for inherit, mask in missing]
         identity = json.dumps([map_plan["map_key"], manager, population,
-                               variants(population)[0]["sha256"], additions], separators=(",", ":"))
+                               existing_variants, additions], separators=(",", ":"), sort_keys=True)
         name = "p_" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
-        fields = "\n".join(f"\t\t\titem[{len(existing) + index}] = {{{body}}}"
+        fields = "\n".join(f"\t\t\titem[{append_index + index}] = {{{body}}}"
                            for index, body in enumerate(additions))
         declaration = ("{\n\tinherit = " + json.dumps(population) + ";\n\tedit = {\n"
-                       "\t\taiTypeDefAssignments = {\n\t\t\tnum = " + str(len(existing) + len(additions))
+                       "\t\taiTypeDefAssignments = {\n\t\t\tnum = " + str(append_index + len(additions))
                        + ";\n" + fields + "\n\t\t}\n\t}\n}\n")
         declarations[PRIVATE_POPULATION_PREFIX + name + ".decl"] = declaration.encode("utf-8")
         reference = "actorpopulation/ap_v070/" + name

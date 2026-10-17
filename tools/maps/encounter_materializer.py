@@ -11,6 +11,8 @@ Schema 2 also accepts finite spawnAI groups. Each instance pins origin_spawner;
 multiple waves pin the immediately following ANY/zero wait as barrier, give each
 wave label and equal min_spawn_stagger/max_spawn_stagger, and each instance group_name.
 Schema 3 staged operations can pin a private native reserve and its commit/finish triggers.
+Schema 4 also stages single and staggered sources within finite, control-free phases.
+Schema 5 combines reinforcements by phase and accepts removed spawn calls.
 """
 
 import hashlib
@@ -18,7 +20,7 @@ import math
 import re
 
 from doom_eap.content.enemy_options import SPECIES_IDS
-from doom_eap.content.enemy_species import validate_enemy_speed_percent
+from doom_eap.content.enemy_species import enemy_spawn_mask, enemy_tracking_suffix, validate_enemy_speed_percent
 from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace
 from tools.maps.encounter_catalog import ENTITY_HEADER, entity_records, list_items, walk_values
 from tools.maps.encounter_source_definitions import SourceDefinitions
@@ -107,6 +109,44 @@ def _replace_events(body, events, changes):
     return _set(body, ("num",), next_index)
 
 
+def finite_population_cleared(events, barrier_index):
+    live = []
+    pending = []
+    for index, item in enumerate(events[:barrier_index + 1]):
+        call = item["eventCall"]
+        kind = call["eventDef"]
+        args = list_items(call.get("args"))
+        if kind in ("spawnSingleAI", "spawnAI", "staggeredAISpawn"):
+            if kind != "spawnSingleAI" and (type(args[1].get("int")) is not int or args[1]["int"] <= 0):
+                return False
+            cohort = (enemy_spawn_mask(args[0]["eEncounterSpawnType_t"]), args[2 if kind == "spawnSingleAI" else 3]["string"])
+            live.append(cohort)
+            if kind == "staggeredAISpawn":
+                pending.append(cohort)
+        elif kind == "waitStaggeredSpawnComplete":
+            if len(args) == 4 and type(args[1].get("int")) is int and args[1]["int"] == 0:
+                mask = enemy_spawn_mask(args[0]["eEncounterSpawnType_t"])
+                label = args[2]["string"]
+                pending = [(source, cohort) for source, cohort in pending if source & ~mask or (label and cohort != label)]
+        elif kind == "waitAIRemaining":
+            if len(args) != 4 or type(args[1].get("int")) is not int or args[1]["int"] < 0:
+                return False
+            if args[1]["int"]:
+                continue
+            mask = enemy_spawn_mask(args[0]["eEncounterSpawnType_t"])
+            label = args[2]["string"]
+            # A temporarily empty cohort can still have pending native emissions.
+            if any(source & mask and (not label or cohort == label) for source, cohort in pending):
+                return False
+            remaining = [(source, cohort) for source, cohort in live if source & ~mask or (label and cohort != label)]
+            if index == barrier_index:
+                return bool(live) and not remaining
+            live = remaining
+        elif kind not in ("wait", "waitStaggeredSpawnComplete"):
+            return False
+    return False
+
+
 def materialize_frozen_encounters(source_text, plan, source_maps, *, species_profiles, source_registry=None, source_root=None):
     """Return a complete map only after every frozen operation passes validation.
 
@@ -117,7 +157,7 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
     need separate qualification. Inline base_properties is unsupported.
     """
     _keys(plan, ("schema", "map_key", "source_sha256", "operations"), "plan")
-    if type(plan["schema"]) is not int or plan["schema"] not in (1, 2, 3):
+    if type(plan["schema"]) is not int or plan["schema"] not in (1, 2, 3, 4, 5, 6, 7):
         raise ValueError("Unsupported frozen plan schema")
     map_key = plan["map_key"]
     if not isinstance(map_key, str) or text_sha256(source_text) != plan["source_sha256"]:
@@ -185,13 +225,58 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
     replacements = []
     clones = []
     scripts = {}
+    phase_waves = {}
+    phase_queues = {}
+    phase_supplies = {}
+    source_ready_flags = {}
     wave_labels = set()
     reserve_tokens = set()
 
     def reserve_recipe(reserve, manager, manager_record, origin):
         _keys(reserve, ("commit_template", "finish_template", "manager_name", "commit_name", "finish_name",
-            "label", "completion_flag", "desired_count", "min_spawn_delay", "max_spawn_delay"), "reserve")
-        if origin["species"] != "zombie_tier_1" or origin["spawn_type"] != "ENCOUNTER_SPAWN_ZOMBIE_TIER_1":
+            "label", "completion_flag", "desired_count", "min_spawn_delay", "max_spawn_delay",
+            *(("supply_source",) if isinstance(reserve, dict) and "supply_source" in reserve else ())), "reserve")
+        supply = reserve.get("supply_source")
+        if supply:
+            _keys(supply, ("species", "spawn_type", "ai", "spawners"), "supply source")
+            if supply["species"] != "imp" or supply["spawn_type"] != "ENCOUNTER_SPAWN_IMP":
+                raise ValueError("Native reserve needs normal Imp supply")
+            if not isinstance(supply["spawners"], list) or not supply["spawners"]:
+                raise ValueError("Native reserve source points are missing")
+            ai, ai_record, _ = entity(supply["ai"], "idAI2")
+            species(supply, ai_record)
+            ai_name = reserve["label"] + "_ai__ap_v070_s00100"
+            group_name = reserve["label"] + "_spawns"
+            names = [ai_name, group_name]
+            ai_clone = _rename(ai, ai_name).replace('"' + ai_record["name"] + '"', '"' + ai_name + '"')
+            foreign = entity_names(supply["ai"]["map_key"]) - original_names - {ai_record["name"]}
+            if any('"' + name + '"' in ai_clone for name in foreign):
+                raise ValueError("Native reserve AI has unresolved foreign entity references")
+            points = []
+            definitions = {"num": 1, "item[0]": {"name": ai_name}}
+            for index, reference in enumerate(supply["spawners"]):
+                if reference["map_key"] != map_key:
+                    raise ValueError("Native reserve source points must belong to the map")
+                point, _, _ = entity(reference, "idTarget_Spawn")
+                point_name = reserve["label"] + "_point_" + str(index)
+                point = _rename(point, point_name)
+                point = _edit(point, ("entityDefs",), definitions)
+                point = _edit(point, ("initialEntityDefs",), definitions)
+                point = _edit(point, ("targetSpawnParent",), "")
+                points.append(point_name)
+                names.append(point_name)
+                clones.append(point)
+            if any(name in original_names or name in generated_names for name in names):
+                raise ValueError("Native reserve identifier collision")
+            settings = {"spawners": {"num": len(points), **{f"item[{i}]": name for i, name in enumerate(points)}},
+                        "exclusive": True, "includeTouchingSpawners": False, "targetSpawnSubGroups": {"num": 0},
+                        "remainActiveAfterTouch": False, "includeInGlobalOverrideGroup": False}
+            group = ('entity { entityDef ' + group_name + ' { inherit = "encounter/spawn_group/zone"; '
+                     'class = "idTargetSpawnGroup"; edit = ' + _render(settings, 2) + ' } }')
+            clones.extend((_layers(group, manager_record["layers"]), ai_clone))
+            generated_names.update(names)
+            origin = {**supply, "spawner": {"entity": group_name}}
+        elif origin["species"] != "zombie_tier_1" or origin["spawn_type"] != "ENCOUNTER_SPAWN_ZOMBIE_TIER_1":
             raise ValueError("Native reserve requires authored ZombieT1 supply")
         tokens = [reserve[field] for field in ("manager_name", "commit_name", "finish_name", "label", "completion_flag")]
         if any(not isinstance(token, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token) is None for token in tokens):
@@ -223,7 +308,25 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
                 trigger = _edit(trigger, ("userFlag",), reserve["completion_flag"])
             trigger_blocks.append(trigger)
         label, flag = reserve["label"], reserve["completion_flag"]
-        reserve_calls = [
+        ready_calls = []
+        start_calls = [_call("activateTarget", [{"entity": reserve["commit_name"]}, {"string": label}])]
+        if supply and plan["schema"] >= 5:
+            ready_name, ready_flag = reserve["manager_name"] + "_ready", flag + "_ready"
+            if ready_name in original_names or ready_name in generated_names:
+                raise ValueError("Native reserve readiness identifier collision")
+            trigger_blocks.append(_edit(_rename(trigger_blocks[-1], ready_name), ("userFlag",), ready_flag))
+            generated_names.add(ready_name)
+            source_ready_flags.setdefault(manager_record["name"], []).append(ready_name)
+            ready_calls = [
+                ("staggeredAISpawn", [{"eEncounterSpawnType_t": origin["spawn_type"]}, {"int": 1},
+                    {"entity": origin["spawner"]["entity"]}, {"string": label}, {"float": 0}, {"float": 0}]),
+                ("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
+                    {"int": 0}, {"string": label}, {"bool": False}]),
+                ("activateTarget", [{"entity": ready_name}, {"string": ready_flag}]),
+            ]
+            start_calls.append(_call("waitForEventFlag", [{"eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_USER_EVENT"},
+                {"string": ready_flag}, {"bool": True}, {"bool": False}]))
+        reserve_calls = [*ready_calls,
             ("maintainAICount", [{"eEncounterSpawnType_t": origin["spawn_type"]}, {"int": count}, {"int": 0},
                 {"float": minimum}, {"int": 0}, {"entity": origin["spawner"]["entity"]}, {"string": label}, {"float": maximum}]),
             ("waitForEventFlag", [{"eEncounterEventFlags_t": "ENCOUNTER_EVENT_FLAG_USER_EVENT"}, {"string": flag},
@@ -247,17 +350,19 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
         generated_names.update(tokens[:3])
         reserve_tokens.update(tokens)
         clones.extend((private_manager, *trigger_blocks))
-        return (_call("activateTarget", [{"entity": reserve["commit_name"]}, {"string": label}]),
-            _call("activateTarget", [{"entity": reserve["finish_name"]}, {"string": flag}]))
+        return (start_calls, _call("activateTarget", [{"entity": reserve["finish_name"]}, {"string": flag}]))
 
     for operation in plan["operations"]:
         waves = operation.get("waves")
-        if not isinstance(waves, list) or not waves:
+        if not isinstance(waves, list) or (not waves and plan["schema"] < 5):
             raise ValueError("Frozen operation requires at least one wave")
         staged = len(waves) > 1
+        ambient = plan["schema"] >= 6 and operation.get("barrier") is None
+        if ambient and staged:
+            raise ValueError("Ambient emissions require a single frozen queue")
         operation_keys = ("manager", "script_index", "event_index", "event_def", "event_sha256", "from", "waves")
-        extra = ("barrier",) if staged and plan["schema"] >= 2 else ()
-        if staged and plan["schema"] == 3 and "reserve" in operation:
+        extra = ("barrier",) if (staged and plan["schema"] >= 2) or plan["schema"] >= 4 else ()
+        if "reserve" in operation and (plan["schema"] >= 5 or staged and plan["schema"] == 3):
             extra += ("reserve",)
         _keys(operation, (*operation_keys, *extra), "operation")
         _keys(operation["manager"], ("entity", "sha256"), "manager")
@@ -278,16 +383,21 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
             raise ValueError("Frozen event hash mismatch")
         event = _get(manager_record["edit"], event_path)
         event_def = event.get("eventDef")
-        if operation["event_def"] != event_def or event_def not in (("spawnSingleAI",) if plan["schema"] == 1 else ("spawnSingleAI", "spawnAI")):
+        supported = ("spawnSingleAI",) if plan["schema"] == 1 else ("spawnSingleAI", "spawnAI")
+        if plan["schema"] >= 4:
+            supported += ("staggeredAISpawn",)
+        if operation["event_def"] != event_def or event_def not in supported:
             raise ValueError("Unsupported frozen spawn event")
         args = list_items(event.get("args"))
-        grouped = event_def == "spawnAI"
+        grouped = event_def != "spawnSingleAI"
         layout = ("eEncounterSpawnType_t", "int", "entity", "string") if grouped else ("eEncounterSpawnType_t", "entity", "string")
+        if event_def == "staggeredAISpawn":
+            layout += ("float", "float")
         if len(args) != len(layout) or any(set(arg) != {kind} for arg, kind in zip(args, layout)):
             raise ValueError("Unqualified spawn argument layout")
         if grouped and (type(args[1]["int"]) is not int or args[1]["int"] <= 0):
             raise ValueError("Frozen spawnAI requires a positive finite total")
-        if staged and not grouped:
+        if staged and not grouped and plan["schema"] < 4:
             raise ValueError("Staged waves require an authored spawnAI group")
         origin = operation["from"]
         _keys(origin, ("species", "spawn_type", "spawner"), "origin")
@@ -301,48 +411,106 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
         if plan["schema"] >= 2:
             _keys(source_event_items[event_index], ("eventCall",), "event wrapper")
         generated_calls = []
-        if staged:
+        if ambient:
+            source_scripts = list_items(manager_record["edit"]["encounterComponent"]["entityEvents"])
+            allowed = {"spawnSingleAI", "spawnAI", "wait", "waitStaggeredSpawnComplete"}
+            if (len(source_scripts) != 1 or source_scripts[0].get("entity") != manager_name
+                    or any(row.get("eventCall", {}).get("eventDef") not in allowed for row in source_event_items)):
+                raise ValueError("Ambient emissions cannot alter encounter control or death gates")
+            for row in source_event_items:
+                call = row["eventCall"]
+                if call["eventDef"] in ("spawnAI", "staggeredAISpawn"):
+                    native_args = list_items(call["args"])
+                    if type(native_args[1].get("int")) is not int or native_args[1]["int"] <= 0:
+                        raise ValueError("Ambient emissions require positive finite source requests")
+        if not ambient and (staged or plan["schema"] >= 4):
             barrier = operation["barrier"]
             _keys(barrier, ("event_index", "event_sha256"), "barrier")
-            if type(barrier["event_index"]) is not int or barrier["event_index"] != event_index + 1 or barrier["event_index"] >= len(source_event_items):
+            if type(barrier["event_index"]) is not int or not event_index < barrier["event_index"] < len(source_event_items):
+                raise ValueError("Frozen barrier must follow the spawn event")
+            if plan["schema"] < 4 and barrier["event_index"] != event_index + 1:
                 raise ValueError("Frozen barrier must immediately follow the spawn event")
             barrier_index = barrier["event_index"]
+            if plan["schema"] >= 4:
+                scripts_in_source = list_items(manager_record["edit"]["encounterComponent"]["entityEvents"])
+                if len(scripts_in_source) != 1 or scripts_in_source[0].get("entity") != manager_name:
+                    raise ValueError("Finite phase waves require one manager script")
+                finite_calls = {"spawnSingleAI", "spawnAI", "staggeredAISpawn", "wait", "waitStaggeredSpawnComplete"}
+                if any(item.get("eventCall", {}).get("eventDef") not in finite_calls
+                       for item in source_event_items[event_index + 1:barrier_index]):
+                    raise ValueError("Finite phase waves cannot cross control or death-count gates")
+                for item in source_event_items:
+                    source_call = item.get("eventCall", {})
+                    source_def = source_call.get("eventDef")
+                    if source_def in ("maintainAICount", "waitKillCount"):
+                        raise ValueError("Finite phase waves cannot alter renewable or kill-count scripts")
+                    if source_def in ("spawnAI", "staggeredAISpawn"):
+                        source_args = list_items(source_call.get("args"))
+                        if len(source_args) < 2 or type(source_args[1].get("int")) is not int or source_args[1]["int"] <= 0:
+                            raise ValueError("Finite phase waves require finite source requests")
+                pending_labels = dict.fromkeys(list_items(item["eventCall"]["args"])[3]["string"]
+                    for item in source_event_items[:event_index] if item.get("eventCall", {}).get("eventDef") == "staggeredAISpawn")
+                for pending_label in pending_labels if staged and plan["schema"] == 4 else ():
+                    generated_calls.append(_call("waitStaggeredSpawnComplete", [
+                        {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, {"int": 0}, {"string": pending_label}, {"bool": False}]))
             _keys(source_event_items[barrier_index], ("eventCall",), "barrier wrapper")
             barrier_path = (*event_path[:-2], f"item[{barrier_index}]", "eventCall")
             barrier_start, barrier_end = _value_span(manager, barrier_path)
             barrier_call = source_event_items[barrier_index]["eventCall"]
             if text_sha256(manager[barrier_start:barrier_end].strip()) != barrier["event_sha256"]:
                 raise ValueError("Frozen barrier hash mismatch")
-            if barrier_call != {"eventDef": "waitAIRemaining", "args": {"num": 4,
-                    "item[0]": {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, "item[1]": {"int": 0},
-                    "item[2]": {"string": ""}, "item[3]": {"bool": False}}}:
+            barrier_args = list_items(barrier_call.get("args"))
+            source_label = args[3 if grouped else 2]["string"]
+            clears_population = bool(barrier_args) and barrier_args[0] == {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}
+            if not clears_population and plan["schema"] >= 7:
+                clears_population = (not list_items(manager_record["edit"].get("adoptedStandAloneAI"))
+                                     and not list_items(manager_record["edit"].get("preCombatTriggers"))
+                                     and finite_population_cleared(source_event_items, barrier_index))
+            if (barrier_call.get("eventDef") != "waitAIRemaining" or len(barrier_args) != 4
+                    or not clears_population or type(barrier_args[1].get("int")) is not int or barrier_args[1]["int"] != 0
+                    or barrier_args[2] not in ({"string": ""}, {"string": source_label})
+                    or set(barrier_args[3]) != {"bool"} or type(barrier_args[3]["bool"]) is not bool
+                    or (plan["schema"] < 4 and barrier_args[2:] != [{"string": ""}, {"bool": False}])):
                 raise ValueError("Frozen barrier must wait for ANY remaining zero")
             barrier_key = manager_name, script_index, barrier_index
-            if barrier_key in selected_events:
-                raise ValueError("Duplicate frozen barrier")
-            selected_events.add(barrier_key)
+            if staged and plan["schema"] < 4 and barrier_index == event_index + 1:
+                if barrier_key in selected_events:
+                    raise ValueError("Duplicate frozen barrier")
+                selected_events.add(barrier_key)
         reserve = operation.get("reserve")
         if "reserve" in operation:
             source_scripts = list_items(manager_record["edit"]["encounterComponent"]["entityEvents"])
             if len(source_scripts) != 1 or script_index != 0 or source_scripts[0].get("entity") != manager_name:
                 raise ValueError("Native reserve requires one self-owned manager script")
-            if barrier_index != len(source_event_items) - 2:
-                raise ValueError("Native reserve barrier must be the penultimate source event")
-            relay_call = source_event_items[-1].get("eventCall", {})
-            relay_args = list_items(relay_call.get("args"))
-            if relay_call.get("eventDef") != "activateTarget" or len(relay_args) != 2 or set(relay_args[0]) != {"entity"} or set(relay_args[1]) != {"string"}:
-                raise ValueError("Native reserve requires an authored final relay")
-            _, relay, _ = source_entity(map_key, relay_args[0]["entity"])
-            if relay["class"] != "idTarget_Count" or relay["inherit"] != "target/relay":
-                raise ValueError("Unqualified native reserve final relay")
+            if plan["schema"] < 5:
+                if barrier_index != len(source_event_items) - 2:
+                    raise ValueError("Native reserve barrier must be the penultimate source event")
+                relay_call = source_event_items[-1].get("eventCall", {})
+                relay_args = list_items(relay_call.get("args"))
+                if relay_call.get("eventDef") != "activateTarget" or len(relay_args) != 2 or set(relay_args[0]) != {"entity"} or set(relay_args[1]) != {"string"}:
+                    raise ValueError("Native reserve requires an authored final relay")
+                _, relay, _ = source_entity(map_key, relay_args[0]["entity"])
+                if relay["class"] != "idTarget_Count" or relay["inherit"] != "target/relay":
+                    raise ValueError("Unqualified native reserve final relay")
             reserve_start, reserve_finish = reserve_recipe(reserve, manager, manager_record, origin)
-            generated_calls.append(reserve_start)
-        for wave in waves:
-            _keys(wave, ("instances", "label", "min_spawn_stagger", "max_spawn_stagger") if staged else ("instances",), "wave")
+            generated_calls.extend(reserve_start)
+            if plan["schema"] >= 5:
+                if ambient:
+                    raise ValueError("Renewable combat supply needs a closing native gate")
+                phase_supplies.setdefault(barrier_key, []).append(reserve_finish)
+        if plan["schema"] >= 5 and not ambient and waves:
+            queue_type = origin["spawn_type"] if plan["schema"] >= 7 else "ENCOUNTER_SPAWN_ANY"
+            phase_queues.setdefault(barrier_key, set()).add((queue_type, args[3 if grouped else 2]["string"]))
+        for wave_index, wave in enumerate(waves):
+            queued = staged and (plan["schema"] < 5 or wave_index > 0)
+            wave_calls = []
+            _keys(wave, ("instances", "label", "min_spawn_stagger", "max_spawn_stagger") if queued else ("instances",), "wave")
             instances = wave["instances"]
-            if not isinstance(instances, list) or not instances or (not grouped and len(instances) != 1):
+            if not isinstance(instances, list) or not instances or (not ambient and not grouped and len(instances) != 1):
                 raise ValueError("Frozen wave has an unsupported instance count")
-            if staged:
+            if not ambient and plan["schema"] >= 4 and len(instances) > (args[1]["int"] if grouped else 1):
+                raise ValueError("Frozen wave exceeds its finite source request")
+            if queued:
                 label = wave["label"]
                 if not isinstance(label, str) or not label or label in wave_labels or label in reserve_tokens or any(value == label for _, value in walk_values(manager_record["edit"])):
                     raise ValueError("Frozen wave needs a private unique label")
@@ -353,7 +521,15 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
                     raise ValueError("Single-member stagger commands require one finite frozen spawn time")
             for instance in instances:
                 instance_keys = ("species", "spawn_type", "ai", "ai_name", "spawner_name", "attributes")
-                _keys(instance, (*instance_keys, "origin_spawner", "group_name") if staged else (*instance_keys, "origin_spawner") if grouped else instance_keys, "instance")
+                instance_fields = (*instance_keys, "origin_spawner") if grouped else instance_keys
+                if staged or plan["schema"] >= 7:
+                    instance_fields += ("group_name",)
+                _keys(instance, instance_fields, "instance")
+                if plan["schema"] >= 7:
+                    tracking = enemy_tracking_suffix(origin["spawn_type"], instance["spawn_type"])
+                    if any(not instance[field].rsplit("_l", 1)[0].endswith(tracking)
+                           for field in ("ai_name", "spawner_name", "group_name")):
+                        raise ValueError("Frozen tracking differs from the native source slot")
                 if grouped:
                     if instance["origin_spawner"]["map_key"] != map_key:
                         raise ValueError("Frozen member spawner must belong to the target map")
@@ -409,7 +585,7 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
                 _keys(attributes, ("health_percent", "damage_percent", "speed_percent", "size_percent"), "attributes")
                 speed = attributes["speed_percent"]
                 validate_enemy_speed_percent(instance["species"], speed)
-                group_name = instance["group_name"] if staged else "owner_" + instance["spawner_name"]
+                group_name = instance["group_name"] if staged or plan["schema"] >= 7 else "owner_" + instance["spawner_name"]
                 for name in (instance["ai_name"], instance["spawner_name"], group_name):
                     match = _CLONE_NAME.fullmatch(name)
                     if match is None or int(match.group(1)) != speed:
@@ -442,8 +618,7 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
                 orientation = spawner_record["edit"].get("spawnOrientation")
                 if orientation is not None:
                     ai_clone = _edit(ai_clone, ("spawnOrientation",), orientation)
-                elif "spawnOrientation" in ai_record["edit"]:
-                    raise ValueError("Origin spawner orientation is not authored for this AI template")
+                # native spawning applies the point world axis even when its decl omits it.
                 spawner_clone = _rename(spawner, instance["spawner_name"])
                 for path, value in walk_values(spawner_record["edit"]):
                     if value == original_ai_name:
@@ -451,27 +626,53 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
                 definitions = {"num": 1, "item[0]": {"name": instance["ai_name"]}}
                 spawner_clone = _edit(spawner_clone, ("entityDefs",), definitions)
                 spawner_clone = _edit(spawner_clone, ("initialEntityDefs",), definitions)
+                spawner_clone = _edit(spawner_clone, ("targetSpawnParent",), "")
                 group_settings = {"spawners": {"num": 1, "item[0]": instance["spawner_name"]},
                     "exclusive": True, "includeTouchingSpawners": False, "targetSpawnSubGroups": {"num": 0},
                     "remainActiveAfterTouch": False, "includeInGlobalOverrideGroup": False}
-                if staged:
+                if staged and grouped:
                     group_clone = _rename(origin_block, group_name)
                     for field, value in group_settings.items():
                         group_clone = _edit(group_clone, (field,), value)
-                    generated_calls.append(_call("staggeredAISpawn", [{"eEncounterSpawnType_t": instance["spawn_type"]},
-                        {"int": 1}, {"entity": group_name}, {"string": label}, {"float": minimum}, {"float": maximum}]))
                 else:
                     group_clone = ('entity {\nentityDef ' + group_name + ' {\n'
                         'inherit = "encounter/spawn_group/zone";\nclass = "idTargetSpawnGroup";\nedit = '
                         + _render(group_settings, 2) + '\n}\n}')
-                    generated_calls.append(_call("spawnSingleAI", [{"eEncounterSpawnType_t": instance["spawn_type"]},
-                        {"entity": instance["spawner_name"]}, {"string": args[-1]["string"]}]))
+                spawn_type = origin["spawn_type"] if plan["schema"] >= 7 else instance["spawn_type"]
+                if ambient:
+                    native_label = args[3 if grouped else 2]["string"]
+                    delays = [{"float": 0}, {"float": 0}]
+                    wave_calls.append(_call("staggeredAISpawn", [{"eEncounterSpawnType_t": spawn_type},
+                        {"int": 1}, {"entity": group_name}, {"string": native_label}, *delays]))
+                elif plan["schema"] >= 5 or queued or event_def == "staggeredAISpawn":
+                    delays = ([{"float": minimum}, {"float": maximum}] if queued else args[4:6]
+                              if event_def == "staggeredAISpawn" else [{"float": 0}, {"float": 0}])
+                    wave_calls.append(_call("staggeredAISpawn", [{"eEncounterSpawnType_t": spawn_type},
+                        {"int": 1}, {"entity": group_name},
+                        {"string": label if queued else args[3 if grouped else 2]["string"]}, *delays]))
+                else:
+                    wave_calls.append(_call("spawnSingleAI", [{"eEncounterSpawnType_t": spawn_type},
+                        {"entity": instance["spawner_name"]}, {"string": args[3 if grouped else 2]["string"]}]))
                 clones.extend((group_clone, spawner_clone, ai_clone))
-            if staged:
-                generated_calls.append(_call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
+            if ambient:
+                wave_calls.append(_call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
+                    {"int": 0}, {"string": native_label}, {"bool": False}]))
+            if plan["schema"] >= 5 and wave_index:
+                wait = _call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
+                    {"int": 0}, {"string": label}, {"bool": False}])
+                clear = _call("waitAIRemaining", [*barrier_args[:2], {"string": label}, barrier_args[3]])
+                phase_waves.setdefault(barrier_key, {}).setdefault(wave_index, []).append((wave_calls, wait, clear))
+            elif staged and plan["schema"] < 5:
+                wave_calls.append(_call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
                     {"int": 0}, {"string": label}, {"bool": False}]))
-                generated_calls.append(manager[barrier_start:barrier_end])
-        if "reserve" in operation:
+                if plan["schema"] == 4:
+                    # isolate each wave while preserving the final native gate
+                    wave_calls.append(_call("waitAIRemaining", [*barrier_args[:2], {"string": label}, barrier_args[3]]))
+                else:
+                    wave_calls.append(manager[barrier_start:barrier_end])
+            if plan["schema"] < 5 or wave_index == 0:
+                generated_calls.extend(wave_calls)
+        if "reserve" in operation and plan["schema"] < 5:
             generated_calls.append(reserve_finish)
         if plan["schema"] == 1:
             instance = waves[0]["instances"][0]
@@ -481,8 +682,42 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
         else:
             key = manager_name, script_index
             scripts.setdefault(key, (manager, manager_bounds, source_event_items, {}))[3][event_index] = generated_calls
-            if staged:
+            if staged and plan["schema"] < 4 and barrier_index == event_index + 1:
                 scripts[key][3][barrier_index] = []
+
+    for (manager_name, script_index, barrier_index), rounds in phase_waves.items():
+        manager, _, events, changes = scripts[manager_name, script_index]
+        path = ("encounterComponent", "entityEvents", f"item[{script_index}]", "events", f"item[{barrier_index}]", "eventCall")
+        start, end = _value_span(manager, path)
+        barrier = manager[start:end]
+        calls = []
+        labels = dict.fromkeys(list_items(item["eventCall"]["args"])[3]["string"] for item in events[:barrier_index]
+            if item.get("eventCall", {}).get("eventDef") == "staggeredAISpawn")
+        for label in labels:
+            calls.append(_call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"},
+                {"int": 0}, {"string": label}, {"bool": False}]))
+        calls.append(barrier)
+        for index in sorted(rounds):
+            for spawns, _, _ in rounds[index]:
+                calls.extend(spawns)
+            calls.extend(wait for _, wait, _ in rounds[index])
+            calls.extend(clear for _, _, clear in rounds[index])
+        calls.append(barrier)
+        changes[barrier_index] = calls
+
+    for (manager_name, script_index, barrier_index), labels in phase_queues.items():
+        manager, _, _, changes = scripts[manager_name, script_index]
+        path = ("encounterComponent", "entityEvents", f"item[{script_index}]", "events", f"item[{barrier_index}]", "eventCall")
+        start, end = _value_span(manager, path)
+        gates = [_call("waitStaggeredSpawnComplete", [{"eEncounterSpawnType_t": source_type},
+            {"int": 0}, {"string": label}, {"bool": False}]) for source_type, label in sorted(labels)]
+        changes[barrier_index] = [*gates, *changes.get(barrier_index, [manager[start:end]])]
+
+    for (manager_name, script_index, barrier_index), finishes in phase_supplies.items():
+        manager, _, _, changes = scripts[manager_name, script_index]
+        path = ("encounterComponent", "entityEvents", f"item[{script_index}]", "events", f"item[{barrier_index}]", "eventCall")
+        start, end = _value_span(manager, path)
+        changes[barrier_index] = [*changes.get(barrier_index, [manager[start:end]]), *finishes]
 
     for (manager_name, script_index), (manager, manager_bounds, events, changes) in scripts.items():
         path = ("encounterComponent", "entityEvents", f"item[{script_index}]", "events")
@@ -492,6 +727,14 @@ def materialize_frozen_encounters(source_text, plan, source_maps, *, species_pro
     result = source_text
     for start, end, replacement in sorted(replacements, reverse=True):
         result = result[:start] + replacement + result[end:]
+    for manager_name, flags in source_ready_flags.items():
+        start, end = find_entity_block_bounds(result, manager_name)
+        block = result[start:end]
+        record = next(entity_records(block, include_names={manager_name}))
+        targets = [*list_items(record["edit"].get("userFlagTriggers")), *flags]
+        block = _edit(block, ("userFlagTriggers",), {"num": len(targets), **{
+            f"item[{index}]": name for index, name in enumerate(targets)}})
+        result = result[:start] + block + result[end:]
     if clones:
         result += "\n" + "\n".join(clones) + "\n"
     for block in clones:

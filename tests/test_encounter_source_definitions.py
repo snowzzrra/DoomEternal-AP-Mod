@@ -117,3 +117,17 @@ def test_readonly_selection_rejects_variants_with_different_unique_actors(source
     records = actors()
     with pytest.raises(ValueError, match="variants select different"):
         SourceDefinitions(registry, root).select(definitions(records), TIER1, DLC1, records.__getitem__)
+
+
+def test_equivalent_native_aliases_preserve_unique_population_selection(sources):
+    registry, root = sources
+    records = actors()
+    records["soul"] = {"name": "soul", "class": "idAI2",
+                       "inherit": registry["species"]["lost_soul"]["inherits"][0]}
+    selector = SourceDefinitions(registry, root)
+    for mask in ("ENCOUNTER_DO_NOT_USE_MAX_COMMON",
+                 "ENCOUNTER_SPAWN_LOST_SOUL ENCOUNTER_DO_NOT_USE_MAX_COMMON"):
+        assert selector.select(definitions(records), mask, DLC1, records.__getitem__) == "soul"
+    with pytest.raises(ValueError, match="one qualified native"):
+        selector.select(definitions(records), "ENCOUNTER_SPAWN_LOST_SOUL | ENCOUNTER_SPAWN_IMP",
+                        DLC1, records.__getitem__)

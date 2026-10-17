@@ -1,0 +1,12 @@
+{
+	inherit = "actorpopulation/default/dlc2";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 40;
+			item[39] = {
+				entityDef = "ai/ambient/demonic_trooper";
+				aiType = "POPULATION_TYPE_GENERIC";
+			}
+		}
+	}
+}
