@@ -80,6 +80,3 @@ class PopulationSources:
         # native assignment initialization sets aiType to enum zero (Zombie Tier 1)
         return self.conversions.get(row.get("aiType", "POPULATION_TYPE_ZOMBIE_TIER_1"), {}).get("encounter_spawn_type")
 
-    def matches(self, row, inherit, spawn_type):
-        masks = re.findall(r"\bENCOUNTER_SPAWN_[A-Z0-9_]+\b", spawn_type)
-        return row.get("entityDef") == inherit and self.encounter_type(row) in masks

@@ -12,7 +12,8 @@ from pathlib import Path
 
 from . import enemy_species
 
-ENEMY_PLAN_REVISION = 3
+ENEMY_PLAN_REVISION = 4
+ENEMY_DRAW_REVISION = 3
 
 # Relative planning costs include body resistance, not the engine's spawn-point debit.
 BASE_COMBAT_COST = {
@@ -104,7 +105,7 @@ def _secret_timers(maps, catalog):
             timers[map_key][timer["entity"]] = duration
     return timers
 
-
+
 def _limit_suffix(enemies, species):
     limits = enemies["special_limits"]
     values = "".join(f"{limits[name]:08x}" for name in ("marauder", "archvile", "spirit", "combined_special"))
@@ -112,19 +113,71 @@ def _limit_suffix(enemies, species):
     return f"_l{values}_k{kind}"
 
 
+def effective_special_limits(enemies, stage_index, stage_count):
+    if type(stage_count) is not int or type(stage_index) is not int or not 0 <= stage_index < stage_count:
+        raise ValueError("Enemy limit progression is invalid")
+    denominator = max(1, stage_count - 1)
+    early = enemies["special_limits"]
+    late = enemies.get("special_limits_late", early)
+    limits = {name: (value * (denominator - stage_index) + late[name] * stage_index
+                     + denominator // 2) // denominator for name, value in early.items()}
+    if early["combined_special"] != late["combined_special"]:
+        limits["combined_special"] = min(limits["combined_special"],
+            sum(limits[name] for name in ("marauder", "archvile", "spirit")))
+    return limits
+
+
+def _phase_supplier(phase, profile):
+    sources = [row for row in profile["encounters"] if row.get("barrier") and
+               (row["operation"]["manager"]["entity"], row["operation"]["script_index"],
+                row["barrier"]["event_index"]) == tuple(phase)]
+    supplier = next(((row, species) for species in ("imp", "zombie_tier_1", "zombie_tier_3", "hell_soldier", "shotgun_soldier", "gargoyle")
+                     for row in sources if species in row["eligible_species"]), None)
+    if supplier is None:
+        native = next((row for row in profile.get("native_phase_supply", [])
+                       if (row["manager"], row["script_index"], row["barrier_index"]) == tuple(phase)), {})
+        source = native.get("supply_source")
+        if source and source["species"] in enemy_species.AMMUNITION_SPECIES:
+            return source, source["species"]
+        raise ValueError("This combat phase has no compatible ammunition supplier")
+    return supplier
+
+
 def _phase_needs_supply(phase, profile, species):
     if phase[2] is None:
         return False
     native = next((row for row in profile.get("native_phase_supply", [])
                    if (row["manager"], row["script_index"], row["barrier_index"]) == tuple(phase)), {})
-    return bool(native.get("needs_ammunition") or any(
-        value not in ("imp", "hell_soldier", "zombie_tier_1", "zombie_tier_3") for value in species))
+    supply = native.get("native_ammunition")
+    if supply is not None:
+        sources = [row for row in profile["encounters"] if row["operation"]["manager"]["entity"] == phase[0]
+                   and row["operation"]["script_index"] == phase[1]]
+        phase_sources = [row for row in sources if (row.get('barrier') or {}).get('event_index')==phase[2]]
+        if (not isinstance(supply, dict) or set(supply) != {"event_index", "event_sha256", "event_def", "spawn_type", "label"}
+                or not phase_sources or type(supply["event_index"]) is not int
+                or not 0 <= supply["event_index"] < min(row["operation"]["event_index"] for row in phase_sources)
+                or any(row['operation']['event_index'] < supply['event_index']
+                    and (not row.get('barrier') or row['barrier']['event_index']>=supply['event_index']) for row in sources)
+                or supply["event_def"] not in {"spawnSingleAI", "spawnAI", "staggeredAISpawn", "maintainAICount"}
+                or not isinstance(supply["label"], str) or not isinstance(supply["event_sha256"], str)
+                or not re.fullmatch("[0-9a-f]{64}", supply["event_sha256"])):
+            raise ValueError("Preserved native ammunition source is invalid")
+        mask = enemy_species.enemy_spawn_mask(supply["spawn_type"])
+        reliable = enemy_species.enemy_spawn_mask(" ".join(enemy_species.AMMUNITION_SPECIES.values()))
+        if mask & ~reliable or any((row["operation"]["event_index"] == supply["event_index"] or
+                supply["event_def"] == "maintainAICount" and row['operation']['event_index']>supply['event_index']
+                and enemy_species.enemy_spawn_mask(enemy_species.selected_spawn_type(row["operation"]["from"])) & mask
+                and (not supply['label'] or not isinstance(row.get('source_label'),str) or row['source_label']==supply['label']))
+                for row in profile["encounters"] if row["operation"]["manager"]["entity"] == phase[0]
+                and row["operation"]["script_index"] == phase[1]):
+            raise ValueError("Generated enemies overlap native ammunition replenishment")
+        return Fraction(0)
+    needed = native.get("needs_ammunition") or any(
+        value not in enemy_species.AMMUNITION_SPECIES for value in species)
+    return BASE_COMBAT_COST[_phase_supplier(phase, profile)[1]] if needed else Fraction(0)
 
 
 def _phase_reserves(map_key, operations, profile, seed, catalog):
-    reliable = {"imp", "hell_soldier", "zombie_tier_1", "zombie_tier_3"}
-    originals = {(row["operation"]["manager"]["entity"], row["operation"]["script_index"],
-                  row["operation"]["event_index"]): row for row in profile["encounters"]}
     phases = {}
     for index, operation in enumerate(operations):
         if not operation.get("barrier"):
@@ -137,7 +190,8 @@ def _phase_reserves(map_key, operations, profile, seed, catalog):
         if not _phase_needs_supply(phase, profile, (actor["species"] for actor in actors)):
             continue
         first = min(rows, key=lambda row: row[1]["event_index"])[1]
-        source = originals[(first["manager"]["entity"], first["script_index"], first["event_index"])]
+        source, supplier = _phase_supplier(phase, profile)
+        template = {**catalog["species"], **profile.get("species", {})}[supplier]
         token = hashlib.sha256(json.dumps([str(seed), map_key, *phase]).encode()).hexdigest()[:20]
         names = {field: "ap_v070_supply_" + token + "_" + suffix for field, suffix in
                  (("manager_name", "manager"), ("commit_name", "commit"), ("finish_name", "finish"),
@@ -145,19 +199,70 @@ def _phase_reserves(map_key, operations, profile, seed, catalog):
         reserves[min(rows, key=lambda row: row[1]["event_index"])[0]] = {
             **deepcopy(catalog["supply_templates"]), **names, "desired_count": 1,
             "min_spawn_delay": 1, "max_spawn_delay": 2,
-            "supply_source": {"species": "imp", "spawn_type": catalog["species"]["imp"]["spawn_type"],
-                              "ai": deepcopy(catalog["species"]["imp"]["ai"]),
+            "supply_source": {"species": supplier, "spawn_type": template["spawn_type"],
+                              "ai": deepcopy(template["ai"]),
                               "spawners": deepcopy(source["spawners"])}}
     return reserves
 
 
-def build_enemy_plan(enemies, campaign, *, seed):
+def _preserve_challenge_targets(actors, encounters, targets, enemies, *, seed, map_key,
+                               stage_index, stage_count):
+    pinned = set()
+    fulfilled = set()
+    for target in sorted(targets, key=lambda target: (len(target["species"]), target["name"])):
+        species = set(target["species"])
+        original = sum(row["original_count"] for row in encounters
+                       if row["operation"]["from"]["species"] in species)
+        matching = [(row["id"], index) for row in encounters
+                    for index, (_, value, _) in enumerate(actors[row["id"]]) if value in species]
+        needed = (1 if matching else min(original, 1)) if target["map_key"] is None else min(original, target["minimum"])
+        allowed = {value for value in species if enemies["weights"].get(value, 0) > 0
+                   and enemies["special_limits"].get(value, 1) > 0
+                   and (value not in ("marauder", "archvile", "spirit")
+                        or enemies["special_limits"]["combined_special"] > 0)}
+        if not needed or not allowed:
+            continue
+        pinned.update(matching[:needed])
+        missing = needed - len(matching)
+        if missing <= 0:
+            fulfilled.add(target["name"])
+            continue
+        for row in encounters:
+            candidates = allowed.intersection(row["eligible_species"])
+            if not candidates:
+                continue
+            for index, (key, value, attributes) in enumerate(actors[row["id"]]):
+                slot = row["id"], index
+                if slot in pinned or value in species:
+                    continue
+                value = sample_species(enemies, candidates, seed=seed,
+                                       instance_key=[map_key, target["name"], key])
+                attributes = sample_instance_attributes(enemies, value, seed=seed, instance_key=key,
+                    stage_index=stage_index, stage_count=stage_count)
+                actors[row["id"]][index] = key, value, attributes
+                pinned.add(slot)
+                missing -= 1
+                if not missing:
+                    break
+            if not missing:
+                break
+        if missing:
+            if target["map_key"] is not None:
+                raise ValueError(f"{target['name']}: {map_key} has too few suitable targets at the chosen enemy count")
+        else:
+            fulfilled.add(target["name"])
+    return fulfilled
+
+
+def build_enemy_plan(enemies, campaign, *, seed, challenge_targets=()):
     if not enemies["enabled"]:
         return None
     seed = str(seed)
     catalog = _composition_catalog()
-    maps, sources, combat_costs = {}, [], {}
+    maps, sources, combat_costs, progression = {}, [], {}, {}
+    fulfilled_targets = set()
     sequence = campaign["sequence"]
+    base_enemies = enemies
     stage_count = 5 if campaign.get("mode") == "mission_access_as_items" else len(sequence)
     for stage_index, map_key in enumerate(sequence):
         if campaign.get("mode") == "mission_access_as_items":
@@ -165,9 +270,11 @@ def build_enemy_plan(enemies, campaign, *, seed):
         profile = catalog["maps"].get(map_key)
         if profile is None:
             continue
+        progression[map_key] = [stage_index, stage_count]
+        enemies = {**base_enemies, "special_limits": effective_special_limits(base_enemies, stage_index, stage_count)}
         operations = []
         source_counts = {}
-        original_cost, target_cost, actual_cost = Fraction(0), Fraction(0), Fraction(0)
+        original_cost, target_cost = Fraction(0), Fraction(0)
         phases = {}
         for encounter in profile["encounters"]:
             operation = encounter["operation"]
@@ -175,6 +282,7 @@ def build_enemy_plan(enemies, campaign, *, seed):
                      encounter["barrier"]["event_index"] if encounter["barrier"] else None)
             phases.setdefault(phase, []).append(encounter)
         actors = {row["id"]: [] for row in profile["encounters"]}
+        reductions = {}
         for phase, encounters in phases.items():
             phase = [map_key, *phase]
             roster = [row for row in encounters for _ in range(row["original_count"])]
@@ -194,13 +302,27 @@ def build_enemy_plan(enemies, campaign, *, seed):
                               and (species not in ("marauder", "archvile", "spirit")
                                    or enemies["special_limits"]["combined_special"] > 0)]
                 if not candidates:
-                    raise ValueError(f"Enemy Weights exclude every supported replacement in {map_key}: {row['id']}")
+                    continue
                 selected = {**enemies}
                 if fixed_count is None:
                     selected["weights"] = _density_weights(enemies, candidates, seed=seed, phase=phase,
                                                            stage_index=stage_index, stage_count=stage_count)
                 selection[row["id"]] = selected, candidates
                 shared[row["id"]] = sample_species(selected, candidates, seed=seed, instance_key=[phase, "group"])
+            roster = [row for row in roster if row["id"] in selection]
+            if not roster:
+                reductions[encounters[0]["id"]] = {"reason": "no_weighted_enemy_fits", "requested_count": fixed_count}
+                original_cost += baseline
+                target_cost += budget
+                continue
+            common = set.intersection(*(set(values[1]) for values in selection.values()))
+            if common:
+                grouped = enemies
+                if fixed_count is None:
+                    grouped = {**enemies, "weights": _density_weights(enemies, sorted(common), seed=seed, phase=phase,
+                                                                     stage_index=stage_index, stage_count=stage_count)}
+                shared_species = sample_species(grouped, common, seed=seed, instance_key=[phase, "group"])
+                shared = {identity: shared_species for identity in selection}
             spent, ordinal = Fraction(0), 0
             supplied = _phase_needs_supply(phase[1:], profile, ())
             while (ordinal < fixed_count if fixed_count is not None else ordinal == 0 or spent + supplied < budget):
@@ -244,7 +366,12 @@ def build_enemy_plan(enemies, campaign, *, seed):
                 ordinal += 1
             original_cost += baseline
             target_cost += budget
-            actual_cost += spent
+        fulfilled_targets.update(_preserve_challenge_targets(actors, profile["encounters"],
+            [target for target in challenge_targets if target["map_key"] in (None, map_key)
+             and target["name"] not in fulfilled_targets], enemies,
+            seed=seed, map_key=map_key, stage_index=stage_index, stage_count=stage_count))
+        actual_cost = sum((enemy_combat_cost(species, attributes)
+                           for values in actors.values() for _, species, attributes in values), Fraction(0))
         for encounter in profile["encounters"]:
             operation = deepcopy(encounter["operation"])
             count = len(actors[encounter["id"]])
@@ -255,7 +382,7 @@ def build_enemy_plan(enemies, campaign, *, seed):
             for index, (key, species, attributes) in enumerate(actors[encounter["id"]]):
                 token = hashlib.sha256(json.dumps(key, separators=(",", ":")).encode()).hexdigest()[:20]
                 template = {**catalog["species"], **profile.get("species", {})}[species]
-                tracking = enemy_species.enemy_tracking_suffix(operation["from"]["spawn_type"], template["spawn_type"])
+                tracking = enemy_species.enemy_tracking_suffix(enemy_species.selected_spawn_type(operation["from"]), template["spawn_type"])
                 suffix = f"{token}{tracking}{_limit_suffix(enemies, species)}__ap_v070_s{attributes['speed_percent']:05d}"
                 instance = {
                     "species": species, "spawn_type": template["spawn_type"], "ai": deepcopy(template["ai"]),
@@ -274,6 +401,8 @@ def build_enemy_plan(enemies, campaign, *, seed):
                                 min_spawn_stagger=0, max_spawn_stagger=0)
                 waves.append(wave)
             operation["waves"] = waves
+            if encounter["id"] in reductions:
+                operation["reduction"] = reductions[encounter["id"]]
             operations.append(operation)
             source_counts[encounter["location"]] = source_counts.get(encounter["location"], 0) + count
         # shortcut: these counts cover profiled spawns; qualify campaign routes before sizing Killsanity.
@@ -291,8 +420,9 @@ def build_enemy_plan(enemies, campaign, *, seed):
         raise ValueError("The selected missions have no supported enemy composition profiles yet")
     plan = {"revision": ENEMY_PLAN_REVISION, "seed": str(seed), "maps": maps,
             "finite_kills": sum(source["count"] for source in sources), "finite_sources": sources,
-            "combat_costs": combat_costs, "secret_timers": _secret_timers(maps, catalog)}
-    return validate_frozen_enemy_plan(plan, enemies)
+            "combat_costs": combat_costs, "secret_timers": _secret_timers(maps, catalog),
+            "progression": progression}
+    return validate_frozen_enemy_plan(plan, base_enemies)
 
 
 def validate_frozen_enemy_plan(plan, enemies):
@@ -302,9 +432,9 @@ def validate_frozen_enemy_plan(plan, enemies):
         return None
     if not isinstance(plan, dict) or set(plan) != {
         "revision", "seed", "maps", "finite_kills", "finite_sources", "combat_costs", "secret_timers"
-    }:
+    } | ({"progression"} if plan.get("revision") == ENEMY_PLAN_REVISION else set()):
         raise ValueError("Enemy generation plan fields are invalid")
-    if type(plan["revision"]) is not int or plan["revision"] != ENEMY_PLAN_REVISION:
+    if type(plan["revision"]) is not int or plan["revision"] not in (3, ENEMY_PLAN_REVISION):
         raise ValueError("Enemy generation plan revision is unsupported")
     if not isinstance(plan["seed"], str) or not plan["seed"]:
         raise ValueError("Enemy generation plan seed is missing")
@@ -316,7 +446,16 @@ def validate_frozen_enemy_plan(plan, enemies):
     costs = plan["combat_costs"]
     if not isinstance(costs, dict) or costs.keys() != maps.keys():
         raise ValueError("Enemy generation combat cost maps are invalid")
+    progression = plan.get("progression", {key: [0, 1] for key in maps})
+    if not isinstance(progression, dict) or progression.keys() != maps.keys():
+        raise ValueError("Enemy limit progression maps are invalid")
+    base_enemies = enemies
     for key, row in maps.items():
+        stage = progression[key]
+        if not isinstance(stage, list) or len(stage) != 2:
+            raise ValueError("Enemy limit progression fields are invalid")
+        enemies = ({**base_enemies, "special_limits": effective_special_limits(base_enemies, *stage)}
+                   if "special_limits" in base_enemies else base_enemies)
         if not isinstance(key, str) or re.fullmatch(r"[a-z0-9_]+", key) is None:
             raise ValueError("Enemy generation plan map key is invalid")
         if not isinstance(row, dict) or set(row) != {"schema", "map_key", "source_sha256", "operations"}:
@@ -331,6 +470,15 @@ def validate_frozen_enemy_plan(plan, enemies):
             raise ValueError("Enemizer Off cannot contain enemy replacement operations")
         try:
             for operation in row["operations"]:
+                if row["schema"] >= 7:
+                    enemy_species.selected_spawn_type(operation["from"])
+                reduction = operation.get("reduction")
+                if reduction is not None:
+                    if (not isinstance(reduction, dict) or set(reduction) != {"reason", "requested_count"}
+                            or reduction["reason"] != "no_weighted_enemy_fits" or operation["waves"]
+                            or reduction["requested_count"] is not None and (
+                                type(reduction["requested_count"]) is not int or reduction["requested_count"] < 1)):
+                        raise ValueError("Enemy generation reduction is invalid")
                 for wave in operation["waves"]:
                     for instance in wave["instances"]:
                         enemy_species.validate_enemy_speed_percent(instance["species"], instance["attributes"]["speed_percent"])
@@ -339,7 +487,7 @@ def validate_frozen_enemy_plan(plan, enemies):
                                 not instance[name].endswith(suffix) for name in ("ai_name", "spawner_name")):
                             raise ValueError("Enemy generation simultaneous limits differ from its options")
                         if row["schema"] >= 7:
-                            suffix = enemy_species.enemy_tracking_suffix(operation["from"]["spawn_type"], instance["spawn_type"]) + suffix
+                            suffix = enemy_species.enemy_tracking_suffix(enemy_species.selected_spawn_type(operation["from"]), instance["spawn_type"]) + suffix
                             if any(not instance[name].endswith(suffix) for name in ("ai_name", "spawner_name", "group_name")):
                                 raise ValueError("Enemy generation tracking differs from its source slot")
         except (KeyError, TypeError) as error:
@@ -398,7 +546,7 @@ def validate_frozen_enemy_plan(plan, enemies):
 
 
 def _random_for(seed, instance_key, field):
-    key = json.dumps([ENEMY_PLAN_REVISION, seed, instance_key, field], separators=(",", ":"), sort_keys=True)
+    key = json.dumps([ENEMY_DRAW_REVISION, seed, instance_key, field], separators=(",", ":"), sort_keys=True)
     return random.Random(int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest(), "big"))
 
 

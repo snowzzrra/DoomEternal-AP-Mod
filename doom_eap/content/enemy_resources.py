@@ -8,7 +8,7 @@ from pathlib import Path
 import struct
 import zipfile
 
-from doom_eap.content.enemy_options import DLC_SPECIES
+from doom_eap.content.enemy_options import DLC_SPECIES, SPECIES_IDS
 from doom_eap.launcher.campaign_resources import _records, prepare_resource_activation
 
 
@@ -22,13 +22,22 @@ def _load_enemy_resource_catalog(catalog_path: Path) -> dict:
     return catalog
 
 
+def native_enemy_resources_available(species_id: str, map_key: str) -> bool:
+    tier = {"e1": 0, "e2": 0, "e3": 0, "e4": 1, "e5": 2}.get(map_key[:2])
+    if tier is None or species_id not in SPECIES_IDS:
+        return False
+    return (species_id not in DLC_SPECIES or tier == 2
+            or tier == 1 and species_id in {"blood_angel", "spirit", "super_tentacle", "turret"})
+
+
 def required_enemy_resource_species(plan, *, catalog_path: Path = CATALOG) -> set[str]:
     profiles = _load_enemy_resource_catalog(catalog_path)["species"]
-    species_ids = {instance["species"]
+    return {instance["species"]
                    for map_key, row in (plan or {}).get("maps", {}).items()
                    for operation in row["operations"] for wave in operation["waves"] for instance in wave["instances"]
-                   if instance["ai"]["map_key"] != map_key}
-    return {species_id for species_id in species_ids if species_id in DLC_SPECIES or species_id in profiles}
+                   if instance["ai"]["map_key"] != map_key
+                   and (instance["species"] in profiles or instance["species"] in DLC_SPECIES
+                        and not native_enemy_resources_available(instance["species"], map_key))}
 
 
 def load_enemy_resource_profile(species_id: str, *, catalog_path: Path = CATALOG) -> dict:

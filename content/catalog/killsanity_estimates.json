@@ -1,0 +1,173 @@
+{
+  "schema_version": 1,
+  "quantity": "conservative_estimate",
+  "basis": "Partial reviewed source coverage, not an exact enemy census. Only separately qualified sources support progression.",
+  "maps": {
+    "e1m1_intro": {
+      "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+      "estimated_kills": 163,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off.",
+      "guaranteed_sources": [
+        {
+          "source_id": "barge_priest_room/initial",
+          "map_key": "e1m1_intro",
+          "count": 3,
+          "repeatable": true,
+          "region": "Hell on Earth - Barge - Hell Priest Barge"
+        },
+        {
+          "source_id": "uac_hq_encounter_uac_hq_enc04/0/2",
+          "map_key": "e1m1_intro",
+          "count": 3,
+          "repeatable": true
+        },
+        {
+          "source_id": "uac_hq_encounter_uac_hq_enc04/0/3",
+          "map_key": "e1m1_intro",
+          "count": 2,
+          "repeatable": true
+        }
+      ],
+      "alternative_source_ids": [
+        "barge_encounter_manager_priest_room_no_gk/0/0",
+        "barge_encounter_manager_priest_room_no_gk/0/1",
+        "barge_encounter_manager_priest_room_no_gk/0/2",
+        "barge_encounter_manager_priest_room_after_cp/0/0",
+        "barge_encounter_manager_priest_room_after_cp/0/1",
+        "barge_encounter_manager_priest_room_after_cp/0/2"
+      ],
+      "source_alternatives": [
+        {
+          "source_id": "barge_priest_room/initial",
+          "branches": [
+            [
+              "barge_encounter_manager_priest_room_no_gk/0/0",
+              "barge_encounter_manager_priest_room_no_gk/0/1",
+              "barge_encounter_manager_priest_room_no_gk/0/2"
+            ],
+            [
+              "barge_encounter_manager_priest_room_after_cp/0/0",
+              "barge_encounter_manager_priest_room_after_cp/0/1",
+              "barge_encounter_manager_priest_room_after_cp/0/2"
+            ]
+          ]
+        }
+      ]
+    },
+    "e1m2_war": {
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "estimated_kills": 82,
+      "coverage": "partial",
+      "basis": "Reviewed original enemy groups, including the Blood Punch tutorial; checkpoint and maintenance alternatives are counted separately."
+    },
+    "e1m3_cult": {
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "estimated_kills": 50,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e1m4_boss": {
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "estimated_kills": 15,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off."
+    },
+    "e2m1_nest": {
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "estimated_kills": 104,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e2m2_base": {
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "estimated_kills": 174,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e2m3_core": {
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "estimated_kills": 201,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off."
+    },
+    "e2m4_boss": {
+      "source_sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390",
+      "estimated_kills": 1,
+      "coverage": "protected_boss_only",
+      "basis": "One protected boss; adds are outside this estimate."
+    },
+    "e3m1_slayer": {
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "estimated_kills": 15,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off."
+    },
+    "e3m2_hell": {
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "estimated_kills": 16,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e3m2_hell_b": {
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "estimated_kills": 8,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e3m3_maykr": {
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "estimated_kills": 76,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e3m4_boss": {
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "estimated_kills": 168,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off."
+    },
+    "e4m1_rig": {
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "estimated_kills": 60,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e4m2_swamp": {
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "estimated_kills": 84,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e4m3_mcity": {
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "estimated_kills": 12,
+      "coverage": "partial",
+      "basis": "Reviewed finite opportunities and original composition calls, with initial checkpoint cohorts counted once; tutorials off."
+    },
+    "e5m1_spear": {
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "estimated_kills": 53,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e5m2_earth": {
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "estimated_kills": 1,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e5m3_hell": {
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "estimated_kills": 48,
+      "coverage": "partial",
+      "basis": "Conservative partial count covering the pinned finite composition sources; checkpoint and maintenance alternatives are separate."
+    },
+    "e5m4_boss": {
+      "source_sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
+      "estimated_kills": 1,
+      "coverage": "protected_boss_only",
+      "basis": "One protected boss; adds are outside this estimate."
+    }
+  }
+}

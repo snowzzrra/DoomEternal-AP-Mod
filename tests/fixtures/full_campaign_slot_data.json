@@ -1074,7 +1074,7 @@
   "starting_inventory": {},
   "starting_weapon": "Combat Shotgun",
   "enemies": {
-    "revision": 1,
+    "revision": 2,
     "enabled": false,
     "progressive": true,
     "intensity": [
@@ -1188,6 +1188,12 @@
       "archvile": 1,
       "spirit": 1,
       "combined_special": 2
+    },
+    "special_limits_late": {
+      "marauder": 2,
+      "archvile": 2,
+      "spirit": 2,
+      "combined_special": 4
     }
   },
   "killsanity_options": {
@@ -1213,11 +1219,12 @@
   "progressive_difficulty": true,
   "native_generation_fingerprint": "a8fe3c82ee8407ae6364013a1950243972f6a9c798fdfdd955b924af435fed17",
   "killsanity": {
-    "revision": 3,
+    "revision": 4,
     "enabled": false,
     "interval": 100,
     "maximum_milestones": 0,
     "finite_kills": 0,
+    "estimated_kills": 0,
     "finite_sources": [],
     "milestones": []
   }

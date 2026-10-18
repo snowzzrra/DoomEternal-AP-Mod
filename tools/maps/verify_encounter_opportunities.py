@@ -62,6 +62,40 @@ def _verify_staggered_completion(calls, first, last, spawn_type, label):
     raise ValueError("Staggered source needs queue completion before its population-zero gate")
 
 
+def initial_maintenance_count(calls, index, completion_index):
+    args = list_items(calls[index]['args'])
+    spawn_type, label = args[0]['eEncounterSpawnType_t'], args[6]['string']
+    desired, maximum = args[1]['int'], args[2]['int']
+    _require(type(desired) is int and desired > 0 and type(maximum) is int, 'Invalid initial maintenance count')
+    _require(type(completion_index) is int and index < completion_index < len(calls), 'Invalid initial maintenance delay')
+    completion = calls[completion_index]
+    _require(completion['eventDef'] == 'wait', 'Initial maintenance needs a timed pause')
+    completion_args = list_items(completion['args'])
+    _require(len(completion_args) == 1 or len(completion_args) == 2 and completion_args[1] == {'bool': False},
+             'Initial maintenance needs an unconditional timed pause')
+    duration = completion_args[0]['float']
+    # campaign maintenance spreads its first batch across this delay window.
+    _require(duration > max(args[3]['float'], args[7]['float']) >= 0, 'Initial maintenance pause ends before its first batch')
+    _require(all(call['eventDef'] in {'maintainAICount', 'spawnSingleAI', 'spawnAI', 'wait'}
+                 for call in calls[index + 1:completion_index]), 'Initial maintenance has an intervening control operation')
+    for call in calls[:index]:
+        previous = list_items(call['args'])
+        kind = call['eventDef']
+        if kind in {'spawnSingleAI', 'spawnAI', 'staggeredAISpawn', 'maintainAICount'}:
+            previous_type = previous[0]['eEncounterSpawnType_t']
+            previous_label = previous[6 if kind == 'maintainAICount' else 2 if kind == 'spawnSingleAI' else 3]['string']
+        elif kind == 'migrateAIFromExternalScript':
+            previous_type, previous_label = previous[1]['eEncounterSpawnType_t'], previous[2]['string']
+        else:
+            _require(kind in {'wait', 'waitAIRemaining', 'waitStaggeredSpawnComplete', 'waitMaintainComplete',
+                              'setFactionRelation', 'clearFactionOverrides', 'makeAIAwareOfPlayer', 'setMusicState'},
+                     'Initial maintenance prefix needs population review')
+            continue
+        _require(not ((not label or previous_label == label) and enemy_spawn_mask(previous_type) & enemy_spawn_mask(spawn_type)),
+                 'Initial maintenance reuses an existing cohort')
+    return min(desired, maximum) if maximum > 0 else desired
+
+
 def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None, root=None):
     """Return scoped counts after checking source pins, cohorts and species bindings."""
     _require(catalog["schema_version"] == 1, "Unsupported opportunity catalog schema")
@@ -154,6 +188,11 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
         for route in activation.get("routes", []):
             for edge in route["edges"]:
                 _require(_get(records[edge["source"]]["edit"], edge["path"]) == edge["target"], "Activation route differs")
+        for edge in activation.get("requires_targets", []):
+            _require(set(edge) == {"entity", "target"} and edge["entity"] in source_names,
+                     "Required activation edge is invalid")
+            owner = next(entity_records(source, include_names={edge["entity"]}))
+            _require(edge["target"] in list_items(owner["edit"].get("targets")), "Required activation edge differs")
         gates = []
         for index, call in enumerate(calls):
             args = list_items(call["args"])
@@ -185,6 +224,12 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
                 _require(call["eventDef"] == "activateCombatGrouping" and list_items(call["args"])[0]["entity"] == grouping["grouping"], "Combat grouping event differs")
                 _require(group["class"] == "idCombatGrouping" and list_items(group["edit"]["rolePriorities"]) == [grouping["role"]], "Combat role differs")
         finite_completion = activation.get("finite_maintenance_completion")
+        initial_completion = activation.get('initial_maintenance_completion')
+        if initial_completion:
+            _require(not finite_completion and not list_items(edit.get('adoptedStandAloneAI')),
+                     'Initial maintenance has an adopted or alternative cohort')
+            _require(initial_completion['maintenance_event_indices'] == [index for index in range(first, last + 1)
+                if calls[index]['eventDef'] == 'maintainAICount'], 'Initial maintenance source coverage differs')
         if finite_completion:
             group_index = finite_completion["condition_group_event_index"]
             maintain_index = finite_completion["maintain_wait_event_index"]
@@ -209,7 +254,8 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
             args = list_items(call["args"])
             maintenance = call["eventDef"] == "maintainAICount"
             grouped = call["eventDef"] != "spawnSingleAI"
-            count = args[2]["int"] if maintenance else args[1]["int"] if grouped else 1
+            count = (initial_maintenance_count(calls, event_index, initial_completion['delay_event_index'])
+                     if maintenance and initial_completion else args[2]["int"] if maintenance else args[1]["int"] if grouped else 1)
             _require(type(count) is int and count > 0 and type(creation["count"]) is int and creation["count"] == count,
                 f"Finite count differs: {key}")
             total += count
@@ -219,27 +265,36 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
             _require(args[0]["eEncounterSpawnType_t"] == creation["spawn_type"] and label == creation["label"], f"Spawn cohort differs: {key}")
             _require(args[5 if maintenance else 2 if grouped else 1]["entity"] == creation["spawner"], f"Origin spawner differs: {key}")
             if maintenance:
-                _require(finite_completion and event_index in finite_completion["maintenance_event_indices"], "Finite maintenance has no exhaustion proof")
-                _require(list_items(calls[finite_completion["maintain_wait_event_index"]]["args"]) ==
-                    [dict(eEncounterSpawnType_t=creation["spawn_type"]), dict(int=0), dict(string=label), dict(bool=False)], "Maintenance exhaustion cohort differs")
-                _require(creation["desired_count"] == args[1]["int"] and creation["count_kind"] == "successful_new_maintenance_emissions", "Maintenance accounting differs")
+                if initial_completion:
+                    _require(event_index in initial_completion['maintenance_event_indices']
+                             and creation['count_kind'] == 'initial_maintenance_batch', 'Initial maintenance accounting differs')
+                else:
+                    _require(finite_completion and event_index in finite_completion["maintenance_event_indices"], "Finite maintenance has no exhaustion proof")
+                    _require(list_items(calls[finite_completion["maintain_wait_event_index"]]["args"]) ==
+                        [dict(eEncounterSpawnType_t=creation["spawn_type"]), dict(int=0), dict(string=label), dict(bool=False)], "Maintenance exhaustion cohort differs")
+                    _require(creation["count_kind"] == "successful_new_maintenance_emissions", "Maintenance accounting differs")
+                _require(creation["desired_count"] == args[1]["int"], "Maintenance desired count differs")
                 _require(creation["replacement_qualification"] == "preserve_source_producer_until_maintenance_materialization_is_qualified", "Maintenance replacement is unqualified")
-                for prior_index in creation["existing_cohort_creation_indices"]:
+                for prior_index in creation.get("existing_cohort_creation_indices", []):
                     prior = next(row for row in segment["creations"] if row["event_index"] == prior_index)
                     _require(prior_index < event_index and prior["label"] == label and prior["spawn_type"] == creation["spawn_type"], "Existing maintenance cohort differs")
             origin = records[creation["spawner"]]
             _require(origin["class"] == ("idTargetSpawnGroup" if grouped else "idTarget_Spawn"), f"Spawner class differs: {key}")
             members = [name for name in list_items(origin["edit"]["spawners"]) if records[name]["class"] != "idTarget_Spawn_Parent"] if grouped else [creation["spawner"]]
             _require([row["spawner"] for row in creation["members"]] == members, f"Group member coverage differs: {key}")
-            profile = profiles[creation["species"]]
+            candidates = [creation["species"]] if "species" in creation else creation.get("species_candidates", [])
+            _require(isinstance(candidates, list) and candidates and all(isinstance(value, str) and value in profiles for value in candidates)
+                and candidates == sorted(set(candidates)) and not ("species" in creation and "species_candidates" in creation),
+                f"Invalid source species: {key}")
             concrete_any = creation["spawn_type"] == "ENCOUNTER_SPAWN_ANY" and creation.get("source_identity") == "concrete_spawner_definitions"
-            _require(profile["status"] == "qualified" and (creation["spawn_type"] in profile["source_spawn_types"] or concrete_any
+            _require(all(profile["status"] == "qualified" and (creation["spawn_type"] in profile["source_spawn_types"] or concrete_any
                 or (creation["spawn_type"] != "ENCOUNTER_SPAWN_ANY" and any(enemy_spawn_mask(creation["spawn_type"]) & enemy_spawn_mask(mask)
-                    for mask in profile["source_spawn_types"] if mask != "ENCOUNTER_SPAWN_ANY"))),
+                    for mask in profile["source_spawn_types"] if mask != "ENCOUNTER_SPAWN_ANY"))) for profile in (profiles[value] for value in candidates)),
                 f"Unqualified species mask: {key}")
             if concrete_any:
                 _require(creation.get("replacement_qualification") == "preserve_source_event_until_any_materialization_is_qualified",
                     f"ANY origin replacement is unqualified: {key}")
+            seen_species = set()
             for member in creation["members"]:
                 point = records[member["spawner"]]
                 definitions = list_items(point["edit"].get("entityDefs"))
@@ -280,10 +335,20 @@ def verify_catalog(catalog, source_bytes, registry_bytes, *, logic_sources=None,
                         initial_definitions=list_items(parent["edit"].get("initialEntityDefs")))
                     _require(parent_ai == selected_ai, f"Parent definition differs: {key}")
                 ai = records[member["ai"]]
-                _require(ai["class"] == "idAI2" and ai["inherit"] in profile["inherits"], f"Species/template binding differs: {key}")
+                matched = [value for value in candidates if ai["inherit"] in profiles[value]["inherits"]]
+                _require(ai["class"] == "idAI2" and len(matched) == 1, f"Species/template binding differs: {key}")
+                seen_species.update(matched)
+            _require(seen_species == set(candidates), f"Source species candidates differ from their templates: {key}")
         _require(type(segment["segment_N"]) is int and total == segment["segment_N"], f"Segment N differs: {segment['id']}")
     if source_definitions.ancestry_sha256 is not None:
         _require(catalog.get("definition_ancestry_sha256") == source_definitions.ancestry_sha256, "Definition ancestry pin differs")
+    if catalog.get('source_alternatives'):
+        from doom_eap.content.killsanity_plan import collapse_source_alternatives
+        rows = {f"{segment['manager']}/{segment['script_index']}/{creation['event_index']}":
+                dict(source_id=f"{segment['manager']}/{segment['script_index']}/{creation['event_index']}",
+                     map_key=catalog['map_key'], count=creation['count'], repeatable=True, **segment.get('logic', {}))
+                for segment in catalog['segments'] for creation in segment['creations']}
+        collapse_source_alternatives(rows, catalog['source_alternatives'])
     _require(catalog["counting"]["map_N"] is None and catalog["counting"]["campaign_N"] is None, "Segment qualification does not establish map/campaign N")
     return dict(segments=len(segment_ids), scoped_opportunities=sum(row["segment_N"] for row in catalog["segments"]), entities=len(records))
 
@@ -294,7 +359,8 @@ def main():
     for path in sorted((root / "content/catalog/encounter_opportunities").glob("*.json")):
         catalog = json.loads(path.read_bytes())
         logic = {name: (root / name).read_bytes() for name in catalog.get("logic_sources", {})}
-        result = verify_catalog(catalog, (root / catalog["source"]["path"]).read_bytes(), registry, logic_sources=logic, root=root)
+        source = root / 'vanillamaps' / f"{catalog['map_key']}.map"
+        result = verify_catalog(catalog, source.read_bytes(), registry, logic_sources=logic, root=root)
         print(json.dumps(dict(map_key=catalog["map_key"], **result)))
 
 

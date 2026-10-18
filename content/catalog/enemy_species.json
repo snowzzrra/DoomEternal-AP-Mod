@@ -66,14 +66,18 @@
   "species": {
     "arachnotron": {
       "speed": {
-        "status": "unsupported",
+        "status": "qualified",
         "evidence": {
-          "kind": "selected_source_consumers_inactive",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
-          "source_counterevidence_sha256": "189e1e61aefbdfdbadf75117923df85e28ee13b4edfa1cc3f6c9d1ca61c0cdeb",
-          "velocity_consumer": "0x1408c5cb0",
+          "haste_getter": "0x1407c78f0",
           "animation_consumer": "0x140891d70",
-          "behavior": "behaviors/arachnotron/default"
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
         }
       },
       "status": "qualified",
@@ -155,7 +159,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "armored_baron": {
       "status": "qualified",
@@ -217,7 +236,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "blood_angel": {
       "status": "qualified",
@@ -360,7 +394,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "chaingun_soldier": {
       "speed": {
@@ -434,7 +483,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "cursed_prowler": {
       "status": "qualified",
@@ -496,7 +560,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "demonic_trooper": {
       "speed": {
@@ -626,7 +705,24 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false,
+          "template_sha256": "40855d922f0c6fdab9ec0022d9b2c15c902896004dbabe4246738cc16f78a169",
+          "template_inherit": "ai/superheavy/doom_hunter"
+        }
+      }
     },
     "dread_knight": {
       "status": "qualified",
@@ -657,7 +753,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "gargoyle": {
       "status": "qualified",
@@ -719,26 +830,36 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "hell_soldier": {
       "speed": {
         "status": "qualified",
         "evidence": {
-          "kind": "native_displacement_and_limit_consumers",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
           "controller": "0x1408c5cb0",
           "limit_getter": "0x1407c7940",
-          "displacement_consumer": "0x1408be280",
-          "controller_mode": 1,
-          "behavior": "behaviors/soldier_blaster/soldier_blaster",
-          "source_template": {
-            "map_key": "e1m1_intro",
-            "entity": "uac_hq_ai_fodder_soldier_blaster_1",
-            "sha256": "853a94bd793bfc7c3aa98619284119ec6d675ee67798710ff05eaafccf0689ca"
-          },
+          "scope": "animation and action cadence; native projectile velocity",
           "native_contract": "native_campaign_movement_inputs_contract",
-          "scope": "normal locomotion; native animation timing",
           "gameplay_verified": false
         }
       },
@@ -824,20 +945,15 @@
       "speed": {
         "status": "qualified",
         "evidence": {
-          "kind": "native_displacement_and_limit_consumers",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
           "controller": "0x1408c5cb0",
           "limit_getter": "0x1407c7940",
-          "displacement_consumer": "0x1408be280",
-          "controller_mode": 1,
-          "behavior": "behaviors/imp/demon_imp",
-          "source_template": {
-            "map_key": "e1m1_intro",
-            "entity": "ai_fodder_imp_9_charge",
-            "sha256": "13eb81d80a4c2f7ee8fb4eb596105644c15e25dbe4e7d3d718558bcd5d8924bf"
-          },
+          "scope": "animation and action cadence; native projectile velocity",
           "native_contract": "native_campaign_movement_inputs_contract",
-          "scope": "normal locomotion; native animation timing",
           "gameplay_verified": false
         }
       }
@@ -902,7 +1018,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "marauder": {
       "status": "qualified",
@@ -933,7 +1064,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "maykr_angel": {
       "status": "gap",
@@ -1014,7 +1160,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "prowler": {
       "status": "qualified",
@@ -1045,18 +1206,37 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "revenant": {
       "speed": {
-        "status": "unsupported",
+        "status": "qualified",
         "evidence": {
-          "kind": "selected_source_consumers_inactive",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
-          "source_counterevidence_sha256": "189e1e61aefbdfdbadf75117923df85e28ee13b4edfa1cc3f6c9d1ca61c0cdeb",
-          "velocity_consumer": "0x1408c5cb0",
+          "haste_getter": "0x1407c78f0",
           "animation_consumer": "0x140891d70",
-          "behavior": "behaviors/revenant/default"
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
         }
       },
       "status": "qualified",
@@ -1091,14 +1271,18 @@
     },
     "shotgun_soldier": {
       "speed": {
-        "status": "unsupported",
+        "status": "qualified",
         "evidence": {
-          "kind": "selected_source_consumers_inactive",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
-          "source_counterevidence_sha256": "189e1e61aefbdfdbadf75117923df85e28ee13b4edfa1cc3f6c9d1ca61c0cdeb",
-          "velocity_consumer": "0x1408c5cb0",
+          "haste_getter": "0x1407c78f0",
           "animation_consumer": "0x140891d70",
-          "behavior": "behaviors/soldier_shield/default"
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
         }
       },
       "status": "qualified",
@@ -1160,7 +1344,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "spirit": {
       "status": "qualified",
@@ -1227,20 +1426,15 @@
       "speed": {
         "status": "qualified",
         "evidence": {
-          "kind": "native_displacement_and_limit_consumers",
+          "kind": "native_haste_animation_and_action_timers",
           "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
           "controller": "0x1408c5cb0",
           "limit_getter": "0x1407c7940",
-          "displacement_consumer": "0x1408be280",
-          "controller_mode": 1,
-          "behavior": "behaviors/imp_stone/default",
-          "source_template": {
-            "map_key": "e5m1_spear",
-            "entity": "ai_combat_ai_fodder_imp_stone_2",
-            "sha256": "29bfe0aee160c9023158469f3feea966c751c0f9474d59a759683b0d461d56d4"
-          },
+          "scope": "animation and action cadence; native projectile velocity",
           "native_contract": "native_campaign_movement_inputs_contract",
-          "scope": "normal locomotion; native animation timing",
           "gameplay_verified": false
         }
       }
@@ -1424,7 +1618,36 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false,
+          "template_sha256": "b73338b0381a1a3ebd4cebd4429a037ccfbf4ce049e73b04e6daa36fee9f8c37",
+          "template_inherit": "ai/superheavy/tyrant",
+          "definition_sources": {
+            "ai/superheavy/tyrant": {
+              "sha256": "a6010a70383bba7b0d5f2f9d4af1d568483aca780bc31119b35b6c82f594c523",
+              "inherit": "ai/default_superheavy"
+            },
+            "ai/default_superheavy": {
+              "sha256": "0fb8a8b3351ac5e2ed3175020a84f6b6eb46066fb1e4a64fca0502dcf6399f47",
+              "inherit": "ai/default"
+            }
+          },
+          "ground_path_component": "aicomponent/pathmanager/baron",
+          "walk_ik": "walkik/hellknight"
+        }
+      }
     },
     "whiplash": {
       "status": "qualified",
@@ -1474,7 +1697,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "zombie_maykr": {
       "status": "qualified",
@@ -1506,7 +1744,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "zombie_t1_screecher": {
       "status": "qualified",
@@ -1625,7 +1878,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     },
     "zombie_tier_3": {
       "status": "qualified",
@@ -1656,7 +1924,22 @@
           }
         }
       ],
-      "gaps": []
+      "gaps": [],
+      "speed": {
+        "status": "qualified",
+        "evidence": {
+          "kind": "native_haste_animation_and_action_timers",
+          "native_executable_sha256": "9809708c823f8db4304201ab0006ff2395d0d484ae9c846d98a56ce8c87c1247",
+          "haste_getter": "0x1407c78f0",
+          "animation_consumer": "0x140891d70",
+          "attack_timer_consumer": "0x1407e2340",
+          "controller": "0x1408c5cb0",
+          "limit_getter": "0x1407c7940",
+          "scope": "animation and action cadence; native projectile velocity",
+          "native_contract": "native_campaign_movement_inputs_contract",
+          "gameplay_verified": false
+        }
+      }
     }
   },
   "actorpopulation_sources": {

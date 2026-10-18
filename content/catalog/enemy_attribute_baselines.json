@@ -108,7 +108,7 @@
   "source_surveys": {
     "templates_sha256": "1ec6937cfecff3617ecc89b3c6a6f313de82ede3439638aded5d75c37957ec87",
     "declarations_sha256": "5fd86b09706f98c14022b017f25ed363dd9e786a1e2d15501bc44ce78e3b9e8a",
-    "definition_ancestry_sha256": "9c01e82f0abfd48ff9d236adb3e51a24de95a5e29298dab7632bc4a5decca081"
+    "definition_ancestry_sha256": "170e14cac6963110265e2df568b3bfc410cf36cb83cb4da18cb5a01bb1003e91"
   },
   "decompressor_sha256": "11ba96139174b206c38c36f177ed88991cef4f68aee3e81cda106210bcfbe18d",
   "declarations": {
@@ -4759,6 +4759,85 @@
         "decoded_sha256": "bc3c5655a703c7cd3d9e48d8c5854020c955a785213d006318d28ea5c2790f67",
         "inherit": "ai/fodder/zombie_tier_1"
       }
+    ],
+    "ai/superheavy/archvile_dlc2": [
+      {
+        "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 13265,
+        "offset": 105024960,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 15584,
+        "offset": 102652800,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 12671,
+        "offset": 103810944,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 9196,
+        "offset": 90210432,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 15777,
+        "offset": 135941056,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 15397,
+        "offset": 104741824,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      },
+      {
+        "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+        "member": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+        "index": 13637,
+        "offset": 123743168,
+        "stored_size": 243,
+        "decoded_size": 243,
+        "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+        "inherit": "ai/superheavy/archvile"
+      }
     ]
   },
   "templates": {
@@ -6620,6 +6699,5764 @@
         "x": 1,
         "y": 1,
         "z": 1
+      }
+    },
+    "192644050e53487b2e7a3d34607d00ea0c933029f5d815b6ab62dacd40604ca3": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m1_intro",
+      "entity": "ai_fodder_zombie_tier_1_2",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1507ff3f019dc5ac6b3ecafe65b6d52562947e8a8fb6986146e5cf2dc5f7e687": {
+      "species": "cueball",
+      "map_key": "e2m1_nest",
+      "entity": "game_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c82c0fcb7145e76a96f6d6dc317a2ac44fc76394c16c89ff3c1c8df734244f44": {
+      "species": "cueball",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "83004713ce500c567f4036bf59bf9a85562fe0fab7f64f886f4f7c38616423ef": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_zombie_t1_scientist_7",
+      "inherit": "ai/fodder/zombie_t1_scientist",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_scientist",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e41462fe84ae39485819cc04118b99ea59cb4569405f8cd79d9327692a083954": {
+      "species": "archvile",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_superheavy_archvile_2",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1bc74f26dcec1df75f0722e430f2adbb5e60056ac9b81d1491d4eb8306350187": {
+      "species": "carcass",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "09684eff42c0d01b53845eb8f9855e378a9be5750deee59337fb8ec4c8e8fb9e": {
+      "species": "marauder",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_superheavy_marauder_2",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f2cffc490c1f1749379e89f399018a02bf8fb127321d9437a5160b7e011a72b3": {
+      "species": "prowler",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_prowler_4",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4b0425a8f392a1bc54d53ef996840380bfce51341cf2236bb2de33d0410785c0": {
+      "species": "shotgun_soldier",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_soldier_shield_3",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2ffe7e6c418823015d965436b5e4d48fc13d2e056650aef6ad1b985b56c2e26d": {
+      "species": "whiplash",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_whiplash_4",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a232be67247cf709b2207f9dc94fc90e7bba97fbc73a95fd7a27784a8b7943d5": {
+      "species": "cyber_mancubus",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_mancubus_goo_2",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0ab0737689c5009f61cad78e21c97a5f28ed425ed6ac1607ebe8fbf2b40b9ba9": {
+      "species": "dread_knight",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_dreadknight_3",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fb99d64585d1580278af2a83b6a7025480040dcf7ec3e8975b54b2a07fdd7f31": {
+      "species": "hell_knight",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_hellknight_5",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2eac6b74c877f7da58dcdb6bcec857e6ac0e9ff6aee1bbdcb7c73a80b72dbd9a": {
+      "species": "mancubus",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_mancubus_fire_3",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "af1203fa700874b46bb1ad9f8b0f9ca55df818025228ad80b423b3b7b6ef0aca": {
+      "species": "pinky",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_pinky_3",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3fe3d7cc7c21b38466be97e5704932c94be5fd02b7b50d22d4a4d826b5bcc62c": {
+      "species": "spectre",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a71e4e0d64e21ec5711e728425e68fed22b93d0821c423ff30b31cda3dd8b8c0": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_zombie_tier_3_2",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bf40fb7584bcecb3c6345a8cbe303d29b06670e7a6a5344b6ae28527a5e5209a": {
+      "species": "carcass",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "63f73f0b5b704d1e12779efbeee73d260f9ab9899737a1ab4d363b74b9c924a6": {
+      "species": "marauder",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "713bef8508573c1a87ba14c7e9cfe7e75e62052a9be88f9371fab1496a6d0ce3": {
+      "species": "prowler",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f8ce32211ce22dc25903d9691fa1691c234e224ea6cc9ff8407e821b422ee421": {
+      "species": "shotgun_soldier",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7898038999d5de33ad28f677c73eab121cf9efb0590d51493a5422f8eebd84fb": {
+      "species": "whiplash",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "24f7ee30d4ae17f6953a3df7012a1139338aa4e753d4064bfb8531c77b49b0fe": {
+      "species": "zombie_tier_1",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6d88375015665fb5a9d7d01d4f30f9ad4a3720e042fca6e72fc6e69b08457483": {
+      "species": "zombie_tier_3",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8c917f8b105274fa99fdca0de7d767d385770a61c3319640f84b8c4e18e7e296": {
+      "species": "zombie_tier_1",
+      "map_key": "e5m3_hell",
+      "entity": "_ai_fodder_zombie_tier_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bfe645f610df395e08e5f5bc77ca3cc3b4d8c5cae17b2967d2ac4ed370f73c30": {
+      "species": "carcass",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a8066447a7e881298a1c7d92bf94336ac038dece795a2beca80211eac84c3315": {
+      "species": "dread_knight",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ff81efa7a656179189f64489d3cd2c297a3f0f4153001d243a1c313cdc6b4ddf": {
+      "species": "hell_knight",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6ac4229addd4d81e111c36be257ad0a8ffa511d58a832a897aec2c4975df96f8": {
+      "species": "marauder",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wasteland_arena_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f6f06a375154e0565754aaa9e79d4275736a16cb189f4137dbbb069f1f02ac5f": {
+      "species": "prowler",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "43986defd71d3c07c646b6730e415a66eaf2be60621329bb4d36fade12c1e9eb": {
+      "species": "shotgun_soldier",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "52c198081a8c1d4b72fec421143fe89c478bff8eaaafe08f8fa9a0d0ddb7a778": {
+      "species": "whiplash",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3c56c9d55df06dbb24fb7c2ec2ddd27cd7204b2b24a21651b288f3f0a1dad050": {
+      "species": "zombie_tier_3",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d7f03114d273c1b84cbe6bdee55066ed273e636fa641b2adc30e42b2c4ce78d3": {
+      "species": "arachnotron",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "31d1ca531c253ca2b7c3df4ea6b44a2fe1c2f5b628d4286ab86eefae3e5d61ad": {
+      "species": "pinky",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "21a91116aca628f77110ac5fef7cad0b12715f93c523e7836c1fa615ff222121": {
+      "species": "revenant",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_revenant_2",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9e9b7c494fd6797aa08387e849005466946ea770eb61f1f4b80124b91c34c0cb": {
+      "species": "cueball",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d8dd490c8342f52aec5088a38c32db7e7bfa4398e4b98f531c6e18fc5bca2e4a": {
+      "species": "zombie_tier_1",
+      "map_key": "e2m2_base",
+      "entity": "fort_ai_fodder_zombie_tier_1_1",
+      "inherit": "ai/fodder/zombie_tier_1",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e8a493741d440df8aeadbad6fa6f520bf5a60f62ee47fefc54c5d3225773e92c": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_zombie_t1_hell_3",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4a8e276be15db9acc63a37fe9f455578614c487b04fe9015d6310232681dcb01": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_zombie_tier_3_4",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b3f56af169a566d2e9a8e03e1f676a61e83b645269060d68df3b4d18cd1e3cb5": {
+      "species": "zombie_tier_1",
+      "map_key": "e3m3_maykr",
+      "entity": "green_control_tower_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7f90634722bc5264eb69f5060f95b0554c00c1c939338366afe5777ec0358409": {
+      "species": "zombie_tier_3",
+      "map_key": "e3m3_maykr",
+      "entity": "hub_exterior_ai_fodder_zombie_tier_3_11",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a9c1b7535bf257b346533841978a5983358ebd8dd46fda159fb39284c32a36ff": {
+      "species": "archvile",
+      "map_key": "e3m3_maykr",
+      "entity": "hub_exterior_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4f5b31e806bd4e038fc75dfa24d631e2f4cc79e671f05182c6fabf3060cfe29e": {
+      "species": "dread_knight",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "444eb88bec295b80021f73f306b82f2740155e53b043af8835fc43680003d74e": {
+      "species": "hell_knight",
+      "map_key": "e3m3_maykr",
+      "entity": "temp_all_scripting_ai_heavy_hellknight_14",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "49fdba99dc9c47608243b8ae532a44d867633d369cb52d592ee85506c8688807": {
+      "species": "marauder",
+      "map_key": "e3m3_maykr",
+      "entity": "green_control_tower_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a0233f42f22011c9a5f4938602dc14b5d17f9fe57ded5d538d0884ee95dec7ea": {
+      "species": "prowler",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3389072b3a1301e6eec7798244debda105e6c34bff5e1b4e349eb64c6b3461f6": {
+      "species": "shotgun_soldier",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "75bf7ffe9f20636c192fb9de406c6babdf075347a02dc30fc3e2f5a77b48aa7a": {
+      "species": "whiplash",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a2896a28046ea22a9845644d8be212b2d887a385f2a3c11d64133c8e33c7b78b": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cdef62fd94717cf8691cb41a732db56e101bbeefd720690dd8bd57ce4e837bd4": {
+      "species": "shotgun_soldier",
+      "map_key": "e1m2_war",
+      "entity": "capitol_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "950f5345e79f2e5dd5c6bf40238e0e7f66b1084c45e2f404892e1dfa5d05d768": {
+      "species": "cueball",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "47009f0e44a132656bbec5271bdbed271bcd66f77f90ffed13922f4264451d1c": {
+      "species": "zombie_tier_1",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_fodder_zombie_t1_scientist_1",
+      "inherit": "ai/fodder/zombie_t1_scientist",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_scientist",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "38efab4ed9c15799d9284fa144b04e7a679ea4bb50bad0df354cd1732fdfdbe3": {
+      "species": "carcass",
+      "map_key": "e1m4_boss",
+      "entity": "catwalk_platform_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "70a065ba105af412813452fea7e82f142da43b39a9a76bb7c8b8cbdd873e5439": {
+      "species": "prowler",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "34f4da2572ead9d055e6c7117921c069d49fa94271827f5b27dd2d92060abfd8": {
+      "species": "whiplash",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ffa140b75457014f2e7809cf2047f9a8691d4cafda8ef60fc3590e23a57b1821": {
+      "species": "archvile",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "739a2b92b46b95ea635c228e15bb1bae9bb90b143680f652956ecda4fed75b4c": {
+      "species": "baron",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "46449928697bc5af7579e21bb54b1d470d149b2244d698d5ded460c8cf652d56": {
+      "species": "carcass",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "94a75ae296f12c3728af18ceb4eaa076a1fd5358f6ecff19341a0f0def198684": {
+      "species": "cueball",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e7c4ca420e78764174bec85caf10e129a6fd32c0030130968d3a0186aee53c9b": {
+      "species": "dread_knight",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2371f3dd8faf86eacddc7922054ab5ff00a3e900edb2f693bd35c93f044e7643": {
+      "species": "hell_knight",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "95de4eaad6db8ffd43ea8594f699d06812194483c130cfc861b56d07d4ee5e2a": {
+      "species": "marauder",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2ae9c465da8691cf38fd2589890b11d491f36932ebc35c68c03889c32a35a707": {
+      "species": "pinky",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e5f70f6417536ca335336f98ca0e6a42cc5beaa9af2643dd10aac18441add364": {
+      "species": "prowler",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e69e442f67e6d46e6d6af4c76ffe16f3b0091efbe7b1770924e749c46a1ae68b": {
+      "species": "revenant",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "823874b70cb77d5d7536b1aa3fcfe90603c5c1295ec35fa236dea7ae106d4850": {
+      "species": "spectre",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cca903428b6020d12e7dcd3ab0214469720f70721b2455669a52b931bed65283": {
+      "species": "whiplash",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "18f93d797e9c218021cca63a7db1121bc1980a4dcccd2b97e1744038aba85382": {
+      "species": "zombie_tier_1",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "162b24d039d7320afb812d0749d1dc60eb587bddbf24b40d89179ad5a60b6a83": {
+      "species": "zombie_tier_3",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b530f1a4466062390973fe5ab7ebe9e140f8d6deb48fe99534473419cb63fd11": {
+      "species": "cueball",
+      "map_key": "e4m3_mcity",
+      "entity": "ai_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "874ba70ca520e7c0dcdb7e8b56b3449bd97fbb28500e103e39cee909a04d3c92": {
+      "species": "zombie_tier_1",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "75f778918a010a50c691719ef3a5bd35bcf574d66b058b38ef4d29573d0b90ce": {
+      "species": "archvile",
+      "map_key": "e4m3_mcity",
+      "entity": "ai_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3530ed90cb7ab720a73d8bbd53213c456518295610049161b7ab90885b661ba9": {
+      "species": "carcass",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fabb10b946a3053f927605ade79a857baf29209c7002631be8519659ebf88d3c": {
+      "species": "marauder",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0a7e94dcb32aec1d6fd4d4ddd681eff1aebdafe1591d2704af3ca022e8953a7b": {
+      "species": "prowler",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_canyon_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "855d00013243fdc0f90e2a513bb541baa51209a92f2af30e61670eeed5441287": {
+      "species": "shotgun_soldier",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "40a05e6ea34e63e47a1ae5d7a75182e990cfa15da48cf6efc6d7d312ea62e6b1": {
+      "species": "whiplash",
+      "map_key": "e4m3_mcity",
+      "entity": "ai_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "09477636c5a75064f0ebcd9367f926e9c0acea3fad297e9dc324dec4875aabf3": {
+      "species": "dread_knight",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_canyon_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "25e1d88b09942d4e1b7a6a5a0acb7a04ef07bc3f73d52f59ef826aa5104cfc77": {
+      "species": "hell_knight",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2761cd279cb5cab815cd18bde92ae0592f0eee6ac9889e918bb183c9cfea7976": {
+      "species": "zombie_tier_3",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_canyon_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8cdeac89681f4302bbeefd315fe89f4da853f909c64797f3966f279163c4ea5b": {
+      "species": "arachnotron",
+      "map_key": "e1m1_intro",
+      "entity": "cathedral_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "69f59e911b1688c39dc180ef8e7df2c956fb7667018f1e6f9fe9630ba85f2ed5": {
+      "species": "baron",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d728a0741cb4ef98537d1eb8d564863aa94f09f8250d790e4ce73977e496fd1c": {
+      "species": "revenant",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_revenant_2",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "59d5698051a5865ccb95bce9b1daa4bdffec92e2f3ff2379f3b5db5487931cdd": {
+      "species": "dread_knight",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cd37191efbf500bc342f7caed02313e87c2194e437677d7890d718a8e48c4b7b": {
+      "species": "hell_knight",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9f8a9a40e5f2f16d6120190f8725477b9e0eadb97f58c8a253ef9bfe1839a05d": {
+      "species": "mancubus",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e60a16ffde7cb673a1bf76047c473c127ae5778ceafb8ab032e4fe0235c49ea0": {
+      "species": "revenant",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "dcf50fe4eefd79ac173b48adda57ddbb50da4a8a00308a55f29cda9856bcec0e": {
+      "species": "cyber_mancubus",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bbacdec510f20bcc166e1d2b53ba94f2b93b414bed38a43cde4a2cd656849e5a": {
+      "species": "pinky",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6242621a81862c7f2deb913d58809fc1df0fd158936975e72de1f3c33f5bb9d3": {
+      "species": "spectre",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "85ee56a063180370c4f5a3ada34f6aa615c5eb566b48476b190254f325d8ab96": {
+      "species": "dread_knight",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "5254eff251ba162ec69c620e247be4b87943f0e426b7760cce7b51748870ede6": {
+      "species": "hell_knight",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8389937ce8cdc79d46251e5459d9b1a70e8544e87a23fcc9feadfd68bd92a3bd": {
+      "species": "cyber_mancubus",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ccb349c0310174db73e6f378fdc55c765c42338d95515932a2552c3452e5dee0": {
+      "species": "revenant",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_revenant_2",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d6a3bde2b680f6d25e3dc15187475dae666af50ad37415cb516eee9852814f4b": {
+      "species": "mancubus",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "71548f114fa0ce8d0b408b0615b4644b9face2569cef20f6f142521d0937f63c": {
+      "species": "pinky",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "49e8788944538feaa63b864dcf7ec82d53dfcfa15fee9721ad62a3947c6e8c1a": {
+      "species": "spectre",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "713811e113e9f9de0fc54912c39d3611cd303f70389dc64737a205314a38919c": {
+      "species": "zombie_tier_3",
+      "map_key": "e2m2_base",
+      "entity": "fort_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b871240fb69268e011d594cfd026f68def1a8f71c02b3efa4f00f85dccdbc570": {
+      "species": "mancubus",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7dd5b803596f5dba0d8e7f0e8c77367dd3df520633cf91afdffc610521aa0d6a": {
+      "species": "pinky",
+      "map_key": "e4m2_swamp",
+      "entity": "boss_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d2614218e2a376c250d476fc8bca0710704c348a043ca15e03c0aac2b53d2605": {
+      "species": "baron",
+      "map_key": "e3m3_maykr",
+      "entity": "temple_final_section_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a11ac0c1e3d44bf75367e811b8576b8f28224fcddfe681f11a7d90baf806418d": {
+      "species": "pinky",
+      "map_key": "e3m3_maykr",
+      "entity": "hub_exterior_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c9edbbb31aba844c6545608d0df0d7400f9aa1fb1c35a25458f3eb8e1f95c57b": {
+      "species": "revenant",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_revenant_8",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fa743445748fa78e1e16387e75642e2b378f25a0c0f314a42bc893377a50694f": {
+      "species": "spectre",
+      "map_key": "e3m3_maykr",
+      "entity": "temp_all_scripting_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d8a368a82aa05071493e461e5e944171da34249c116ee9e9c2682f693b673f4c": {
+      "species": "cyber_mancubus",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3959b77e68107b313e3f2c3b4833e5082b2664ab21632f5929fd075a57223357": {
+      "species": "mancubus",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1f53ce038aa846cb9dc794bf318a26af457c7dd54a9016e17cad680f0178484e": {
+      "species": "arachnotron",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_heavy_arachnotron_3",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "40855d922f0c6fdab9ec0022d9b2c15c902896004dbabe4246738cc16f78a169": {
+      "species": "doom_hunter",
+      "map_key": "e3m3_maykr",
+      "entity": "temp_all_scripting_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ba4f271664ec1c6d5c84eebf205deb6b50cce46ec8131df8e293264a1b774248": {
+      "species": "carcass",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f1fa8128ab47268c4feb3e044092be9ced6c403d752bb6341caecece2d7288a7": {
+      "species": "prowler",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_fodder_prowler_2",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6b4bfb2f2f482fec6a3a218c70744593be574d0ac9a995d726cbad5008b9d8f3": {
+      "species": "hell_knight",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0c8386060360916c56e395320ca8a15375d8298912f33b4e14b940271c250a17": {
+      "species": "hell_knight",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "13bacccec37a85d11c08cda9843e16682a8c9a192818fdeb77aca24fd4aa8037": {
+      "species": "revenant",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_heavy_revenant_4",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "babe53372ae8e97dc823447772ac2ff27199272fe041980b4b32388e2b4f021c": {
+      "species": "arachnotron",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_heavy_arachnotron_4",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c304a7048c8ceb170634c33f364fa3754618d1c27e224b4297021c8f2c083e9c": {
+      "species": "shotgun_soldier",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_fodder_soldier_shield_4",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a95b8f450d30e60986b7a67cf1e014f97d318c64a980f946230feed28d471e74": {
+      "species": "whiplash",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "771e99cb142ad4c359ad16e5d6b8a0cb2906799681d7daf39c872d6628c92602": {
+      "species": "archvile",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e52674c1a8f04628cf34837642fd80e2138d8cb836157fe9146be3d80c68edf3": {
+      "species": "carcass",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9e6a7861c48de937dec1cc42492e7dfd5dfdbf0d3c0f92b7659f076099393306": {
+      "species": "marauder",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "851cf9ef13af8f5d3ca4e2893eda0ace421b3e5da8785fd281d699fac52ec768": {
+      "species": "pinky",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "89d4b6eb91d59c65e6448243cd2703467f74ddbbe869bbe153a7040a9f586b80": {
+      "species": "prowler",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "eea1eae1b81c27d0192d0db0454dd257d5e691c86dd5956881cbb008f6549720": {
+      "species": "shotgun_soldier",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f69c90b2d3d277eda29989f79cbf53704b220bd1d8a3b6f2245bffe83d5ae4ff": {
+      "species": "spectre",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "88fcb67471cdd948a359b0717448bb8ae98013bdb08ea4aca8ee965188e68af8": {
+      "species": "whiplash",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9453fe92f706ffe9e064d2cd55fffa34a499fc76b52710da3240e2245cc868dd": {
+      "species": "baron",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1a7312ff790415916053be0700b48afd5fb7c34f4f89bed97c4106fd8a3e081e": {
+      "species": "arachnotron",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "dabd27b2125808bb6851a962db5aad370d28ffdfc1b21f9618f2864a396c6fc6": {
+      "species": "hell_knight",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "664b7a1dfe1e2e5a277dcaf98c91bee9963c044f14bd77aa7b493c158421d354": {
+      "species": "dread_knight",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c8a134f8383d6e940dd7beb57720b5e15e575dabbab466f9eb26df83bc012a07": {
+      "species": "prowler",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4880e49c5e1a44aa0612e2a817c756794118326a36c3ac8361ae2ef933d50467": {
+      "species": "archvile",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "67f5e582a88a755c1d5873fff81310ee71a6a0e6d6cc66e9b615239ce68c07c7": {
+      "species": "carcass",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "04ea714cf263f13fa95ce30f139741eda44d433aeccdd6a589697d1c6669b4b3": {
+      "species": "cueball",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "05d1ff10f955d6c4310c6f3c13caabc214be2fde9b826dfbbbd6962a18f99f7e": {
+      "species": "marauder",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8377bcaee3ae649c377eeeaf74c258960c45bcb7deff57491518e302b1cc79e7": {
+      "species": "shotgun_soldier",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ee5ec2d2f7d96294f2aae169343bd5481acf9bf0c10aba636869504a789e8b3b": {
+      "species": "whiplash",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "66004ab1f88363bc3f65040f69bb89d57a7abf9e4e2c031575a73aa57e59ec34": {
+      "species": "zombie_tier_1",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_zombie_t1_hell_1",
+      "inherit": "ai/fodder/zombie_t1_hell",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_hell",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "14f8d4817c1e00d940a8a509aff04c5c6fa30adf70f11a953773496fe8a5bac1": {
+      "species": "pinky",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "37ac2cb30d231a8b13f1d7c742ed42e0af755db7843dc6da9610155644e52b1b": {
+      "species": "carcass",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7eabf6203419aa9b9c6475433b2b493a74c17c173bb4f024e1b630f1ba659b59": {
+      "species": "cueball",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_ambient_zombie_cueball_1",
+      "inherit": "ai/ambient/zombie_cueball",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/ambient/zombie_cueball",
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "163b22feefa1b5bbdd381d84292845257ed18b29aa6c5df1c9e182d33ecb336c": {
+      "species": "dread_knight",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f80058f4980b0743ab431458f5d5d4efed8a559ac720ee3853725e1ae0e72a89": {
+      "species": "hell_knight",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "98272a293b814d18909c1601ed71b3feb0c8efae0c4bafb067661bddf51d14fc": {
+      "species": "marauder",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "eaa6830ed102b34a8ac6a90a9a83c878a249c5adfce3eca64ea53b8f66358440": {
+      "species": "prowler",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2f883c6c2c04424fa95881f18eb33dfd2af85e945a693f971d09e0770ec79151": {
+      "species": "shotgun_soldier",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a00dc97abfc3a416caf32daae887b71676063d32cbd9f592beaafd8f307ffdc0": {
+      "species": "whiplash",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_whiplash_spectre_1",
+      "inherit": "ai/heavy/whiplash_spectre",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base",
+        "ai/heavy/whiplash_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "af37ee96c67ed77113ebba65900b6b7eafc9299ae9506b61e4117c80fd758f91": {
+      "species": "zombie_tier_1",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_zombie_t1_scientist_1",
+      "inherit": "ai/fodder/zombie_t1_scientist",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_scientist",
+        "ai/fodder/zombie_tier_1"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3291573dd7f9d11a31f29694a7147ba167281613a21d642ba377e4218e9d5653": {
+      "species": "zombie_tier_3",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "52d51a14000b7e6e587fec89c6a355030057650538e40bb3da9a081d974b069a": {
+      "species": "arachnotron",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "98da2bbfe5ec5f6616bfaa623f17cabb9c1bea777d883c74f3019185457a6197": {
+      "species": "baron",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4f67a98b495438c59a2768e5410cfc1edb297d71f8a746155986d10b31a9ec06": {
+      "species": "whiplash",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0ec0993d4890c2e212a876e7c625a1a8f11058879a243cc23563286c178f1397": {
+      "species": "archvile",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "add49c58cc0429b761b07860315b5c418ff1a859e7e1970e3ca2c6016636ea22": {
+      "species": "carcass",
+      "map_key": "e3m4_boss",
+      "entity": "building_1_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "eb1ede92820931ba511aeea474ac232119282f100aa1f05bde0db83d6f272fb3": {
+      "species": "marauder",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "5ffb6b19f43d71484cd3a1545030c32f584ac28242e3f245fea3b093ef0e5485": {
+      "species": "prowler",
+      "map_key": "e3m4_boss",
+      "entity": "building_1_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b5d91f7a56f619b61a1674867c716c04a7793ebeaf0be0527bbcb430a642de6e": {
+      "species": "shotgun_soldier",
+      "map_key": "e3m4_boss",
+      "entity": "building_1_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c6c275ab8c344b5e3d76390e45509de00f4acf3015ffbd5b33b5f350fbea8233": {
+      "species": "whiplash",
+      "map_key": "e3m4_boss",
+      "entity": "building_1_ai_heavy_whiplash_1",
+      "inherit": "ai/heavy/whiplash",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/whiplash",
+        "ai/heavy/whiplash_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c69a3ff4c2a7584142a4409960401c24f603b5ddafcca8f40f113be866bdb5ec": {
+      "species": "pinky",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f660ab0a96e026fb36add0d6875d6e8c1b588ff3a65df6828bd98c226e89e644": {
+      "species": "cyber_mancubus",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8d8f26bd7059dbcd3b270b9687cad2eca595ace2b404891db1716882aea5842b": {
+      "species": "arachnotron",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fa6085bd3a71bce77b0fee4e5bbe350f3e46067e8f2f721fbf2262934c5ac781": {
+      "species": "revenant",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ca1d28c59043145051bba8e325427def31ebc2f2962cb4b923d75aa17e3753ba": {
+      "species": "tyrant",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "99dc49dc846e663ecaa16a36ca8b2e34be432122a7c3f83374bb31a7c4b8b042": {
+      "species": "tyrant",
+      "map_key": "e3m3_maykr",
+      "entity": "blue_control_tower_ai_superheavy_tyrant_2",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a44dd6e390fe1f52c757959ead922159cff8f57529f7eb658c7ed0cbf2b0fecf": {
+      "species": "cacodemon",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_cacodemon_2",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "416e724006925060542d93abb3f9c9c4c0a76fca971563e492c8e41ecfda234b": {
+      "species": "cacodemon",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "79b289c5aac9a4b0fe800a8871aaf470c8b1953e86d2bcaf836e4f44e14cab6e": {
+      "species": "cacodemon",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "126a2637b955c3459f921c6689743bd8659c62524b3533dc925b3df38d562619": {
+      "species": "gargoyle",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b5abb058183deb7c5acaa502ebf39a998a91aaaeb6339768b7f936eb4431bc70": {
+      "species": "cacodemon",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_cacodemon_5",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9119e940515fbe61e2bb218c90a910521591749f325cfa9bf30f8e73ddf5a1bf": {
+      "species": "cacodemon",
+      "map_key": "e3m3_maykr",
+      "entity": "temp_all_scripting_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6f96c6bea840e2940c4002902c3f0d2414cc772cf3a369240b5ad1b65c2aa1d0": {
+      "species": "gargoyle",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a73244f3ee085ee5518a200150e01958975c510a9db783ef1410e977f5df99e7": {
+      "species": "cacodemon",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9f0c26aec24f104b6d7cf04bc91aeedc0f6d561bf07da3d7da6c5a4177655f99": {
+      "species": "gargoyle",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "34092bd3a89699184e4443a3d1f7940f4776dfcd2bb18a78e6a9dc363ca4b97d": {
+      "species": "cacodemon",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2ae54386e2f4bfea180669d822fde7007086d93f032fe023dea4248301e0dd66": {
+      "species": "gargoyle",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_fodder_gargoyle_2",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4a011a8b87d2625ee173e23edda782d438d487f4e4426c042a3ccbdb88f0b77f": {
+      "species": "cacodemon",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "86eee36a8f8e077a4f052eba6d5a7f56d8215d815ad5e47b5dba94c10a51bcb4": {
+      "species": "gargoyle",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "eca9e2d35f6febec596f3c4d6fa8f8b1f8cc39351365e4f7d006bbee65329ecb": {
+      "species": "archvile",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_superheavy_archvile_1",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1cf847608c04165b678786fe0310605d95679c2b173654b38bd00fd68bec04bd": {
+      "species": "carcass",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0353260f912fbcdd02c1d597accb1cbb066f4cf71c89cc283a1fb24c91ba0b5a": {
+      "species": "marauder",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a375f9efb1f1c8eb59bc0a6bdc29efe3c9ec442469004128e03b3c7f23defe0c": {
+      "species": "prowler",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_fodder_prowler_3",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f6640b6ad605d66223d62cd1f13d6db780c5226bfa165a493a7e6a8c5db75ae4": {
+      "species": "cyber_mancubus",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "46c5db820ca1134bf7e33f362f5db2ec65e6756240402f29a743bf342cfb1888": {
+      "species": "dread_knight",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bd8d70895a5a0b05f35e394a8419a42eb5b62ea39d085edd19e8549fcf86f000": {
+      "species": "mancubus",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_heavy_mancubus_fire_4",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "eee8e883c89493e694895edafbf6195a1dab58944a877024d5c829d339641465": {
+      "species": "pinky",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f81a189a2e0f33a302532d990ad30489b402d90b71ae9c3090556c671cc0005a": {
+      "species": "spectre",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cc974fad30ed5b2f3e28665c0f47cf1360be7686f1fa97ed2d33610ef3764284": {
+      "species": "zombie_tier_3",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8476f5797ad20d279d000993b07c5ad16e8be6b0f87ab422168fc81b646211b1": {
+      "species": "revenant",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4fbd5c8d6d04616eb57ed136b685f5ae7cafab82c2867a9a9e34480bbd021828": {
+      "species": "arachnotron",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_arachnotron_4",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "15b1ac8659eaf8473c3d77f2aebf0cd203ce74536e91c26bebf6573c8e15dd00": {
+      "species": "archvile",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_superheavy_archvile_3",
+      "inherit": "ai/superheavy/archvile",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/archvile"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6ee26df345e1958b8cae530fa6923d1b6899ffe2d991e1b35c831f0ff9769224": {
+      "species": "carcass",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_carcass_1",
+      "inherit": "ai/fodder/carcass",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/carcass"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2b6d518062f823769917a558cc966f0962be8d64dec14e57bcbf810243d2883d": {
+      "species": "marauder",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_superheavy_marauder_1",
+      "inherit": "ai/superheavy/marauder",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/marauder"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8a060d71eff17919dafc813f837042fb276e32dc7bb5669e321de21f91f8a354": {
+      "species": "prowler",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_prowler_1",
+      "inherit": "ai/fodder/prowler",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/prowler"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ecbc1124593dc5dfa54541f8d19d98de09772ecb759e4c7ef994c4c95adf1012": {
+      "species": "shotgun_soldier",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_soldier_shield_1",
+      "inherit": "ai/fodder/soldier_shield",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_shield"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8f8cd1aad76968ba3b27889f9b687eeaf165ec590c5d3850f6cac475b3d35384": {
+      "species": "hell_knight",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_hellknight_4",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6e924d08b6b3a9da7bfdf311ccf383cadddb1ac9ef1791e7569a2d474251b12a": {
+      "species": "arachnotron",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "05f461abbc262b120242a0d0397e8b4e75679df2dcc4f0d825f46e096f132399": {
+      "species": "cyber_mancubus",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "89207a59b8150a69ddf39283d80f51a6f3c4f183e9d74b0f92656667662654ac": {
+      "species": "doom_hunter",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0e39f10e9eee82ace591236cf160b0568c7abe81bf03d54c3a2c2645986d64db": {
+      "species": "mancubus",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "cc10531c65361de59afc5f80d3f2155ba1da39a8f3029045634b2636fac084fa": {
+      "species": "tyrant",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "98a9be3439dfc63650a0259b7f53530c6725635ceb759fb63992dc7a3e8fcc01": {
+      "species": "zombie_tier_3",
+      "map_key": "e3m4_boss",
+      "entity": "building_1_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fd1c5acf28c5af584a3eb144c07eda17840fabf96f09059d7d6abf380fa52a8f": {
+      "species": "spectre",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "592b5c12d1958b793fc4b2be6607cb67f6e89b54188fbe00efa793be66db17d6": {
+      "species": "gargoyle",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_fodder_gargoyle_2",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3ab5a91a467a97cb0ab7f7cf765152fa4852660acc464f377bb8ee8ff068c48b": {
+      "species": "pinky",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8d4be1361a74717a460fff1ef93982223abe0cfc2ab5fdb4ce51aa6ec9e0e26a": {
+      "species": "spectre",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "47234400b52fc79df1a2a50349c6f1e4ff5d7a0c76d479a0fe0b06e77809fc00": {
+      "species": "chaingun_soldier",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_fodder_soldier_chaingun_1",
+      "inherit": "ai/fodder/soldier_chaingun",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/soldier_base",
+        "ai/fodder/soldier_chaingun"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "35e5d8b2bed1edad388facd6ec8bd81bbb142d8a638e35acad6a7ba9c1ee05be": {
+      "species": "baron",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "508549bff04882828cb8df215c3c93bff8c8522bba24f295717f0b9ea75a5358": {
+      "species": "cyber_mancubus",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c5d630b2f2808d0ae9de4abd0b11d0da52a7c9dc07d8df7244fbf614eea46627": {
+      "species": "doom_hunter",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wasteland_arena_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c5f0f20f1d285eabde18c48daa2fb24c438f0d87a7446d2aa92aee7766a1ac90": {
+      "species": "mancubus",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f9580f8a5149bd4290a08fd188eb167785b991f97dcb5e41df8139f04b24e804": {
+      "species": "tyrant",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_deck_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ae74e20a9252f258450393a5872bfcaf6cb1127e2ebc2fcc906968196af6c03a": {
+      "species": "cacodemon",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "472db4022265561387f2b48b32a01c7db4ea7fbfe814d0148a52b484da2e2945": {
+      "species": "arachnotron",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "780f16fba50141857da65c0ad9d562bbeb2652475dfae8d9deddd9acae33f6ef": {
+      "species": "cacodemon",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_cacodemon_2",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b0b485bafa0bca2fd06fd27ab1e8072557aaac4843ccc730382cf8154b8c68dd": {
+      "species": "mancubus",
+      "map_key": "e3m4_boss",
+      "entity": "building_2_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c21985cdf9724f3bd23fa90d3a73ae0cab8e421e850657b80554ce7a64c167a3": {
+      "species": "hell_knight",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "31749b5a29cce3a1c436d5d58cc04b9710418fd8e12ad921e0322b50436482ea": {
+      "species": "baron",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ee96828e9779d33cfcce65dedcbdbded4e458ebdd57d2172577248189e684f1c": {
+      "species": "revenant",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f8209e4d7e1ff45f48a55d008975b5e22069ae391ec64cd2aafa9d757b06a18b": {
+      "species": "arachnotron",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2b323032e2ff7faa744b77662dbd355e08044fa5a895a916351a9f59a7483b1d": {
+      "species": "cyber_mancubus",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c45b31a27c50bbcd34ca4b84dcb07d86ccad53fabdf20b42cf7954ac37cbf980": {
+      "species": "mancubus",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "86822973413e03ac475f60be391bfef31d5f84e41ac2f643b48c8891ce48166f": {
+      "species": "cacodemon",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b06f87622900348da94036112200a97cf4d572429c57d36b2d0cd05aa276986b": {
+      "species": "cyber_mancubus",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "abd3965c1c555b0e1adfee050e0b24a0645738c9807c0e9507b2897ebe359f9b": {
+      "species": "mancubus",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_glade_ai_heavy_mancubus_fire_2",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "03a69bf4c4c4f0d2cad5e3ee390f816a3d519209ccf8eed640a0ea8b63e23796": {
+      "species": "spectre",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_glade_ai_heavy_pinky_spectre_2",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "33e6497477dea16992c87463a5abd78281f899d75840d8e72d46cb43686999ff": {
+      "species": "cyber_mancubus",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3782557761df2aa85d848e8050cf805920abd6625f5e4ea499e9e1c2917f2b22": {
+      "species": "mancubus",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "db373699ab00eb59b7c136994ec3de492ff67756e384bd6d7d42243ddf153a55": {
+      "species": "pinky",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8fca3785e44daf577ff2be354e37f828c5b88a1e095a356d77821db52539762c": {
+      "species": "spectre",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "14e188b983db4a678b8ff375212ccb880302d58e065a2be1ec2835aae16cd609": {
+      "species": "revenant",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_revenant_3",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9076f567de340b4ed91af30e7dcce079a445bebefa47ca7c9f52fb1d0daca91b": {
+      "species": "baron",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bad2dc3079bee9387cff405fcadc02191fe5121ce1524b3e68192b5207731a5d": {
+      "species": "hell_knight",
+      "map_key": "e1m4_boss",
+      "entity": "wing_c_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2e7ebd633bbcd614b5a89f9d4e9f2568961eabb67f1a5d50600a31d07dc6d968": {
+      "species": "zombie_tier_3",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2e55a6f77d5eb2ece7f9ca692757a3ad35720e4a35ba58d5ed05cc6b0afac3dd": {
+      "species": "arachnotron",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0abbec5914aa7f0162cee688338bdb74a8e8d62ee1eb93ddfd7bf543f7aa313e": {
+      "species": "cacodemon",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_glade_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "980238e7420764cfef890b987762c7c6e305b2f62f5991d8ac9a0c607a6197d1": {
+      "species": "baron",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_superheavy_baron_2",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "5474a0f955a1c7544aac4b6cb69796b7e5e9e57974c39de52c4c12bafe440e7d": {
+      "species": "tyrant",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "35ef48e108674ef6bcbfc22436ad24f759ffc2e3cb9ba08258663133880648ca": {
+      "species": "doom_hunter",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_superheavy_doom_hunter_2",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b51b913efeff5002fef3ef04bc4e1651e40b0bff111b46be3f5a95de66cf573a": {
+      "species": "baron",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "23694a162f85f0f58170ac21c979f91161a6781cf839b20144669bc84082fbce": {
+      "species": "tyrant",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "5c31614615c3c16a0c39bf3770141abe5982b246e365bbe727f890bb232f78a9": {
+      "species": "doom_hunter",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "9a7a0d7a867693e2b0a73e70e4c64f192596b4bbd4888cecac8fd6da3a02c8da": {
+      "species": "doom_hunter",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "47708eb0b3da127ff4802af6b0d7b43730eb786f1123673b9f90050249a0d313": {
+      "species": "tyrant",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "dfb7d489c26903133c442733f0624ac338c671149b3906da42be4ce9c8712481": {
+      "species": "cyber_mancubus",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_mancubus_goo_3",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a8e0613dbf0861d61bfd5fc769cf8e9cec8a36ba2707be74e20ba96fa6887831": {
+      "species": "arachnotron",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_arachnotron_2",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0331e221b353074c3e21478609fc476639fe9a5700f0ad28f4030f99598658fb": {
+      "species": "pinky",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_pinky_2",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0b347ec8da39cdbd47d63b3c4ccf83a2997ac49bf5885872fa7193638c45dcae": {
+      "species": "spectre",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "422ca1a8182556337361a0772db39931cc83d84643935114013877b9d6eca884": {
+      "species": "mancubus",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_mancubus_fire_2",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "de821ee8ada173e6d4df5755ec40dd8d03d5e877816614a603a7f2567313fea4": {
+      "species": "revenant",
+      "map_key": "e1m2_war",
+      "entity": "battle_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6a8d961f2093c0612c06ef223e9d9979d3a1283bd3911f78a9ba4ae6501fbc39": {
+      "species": "dread_knight",
+      "map_key": "e1m2_war",
+      "entity": "capitol_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "023e0d840651bfadce6a4f7de4ff4d7e5ab0e30c3927468a16f8625085310eba": {
+      "species": "zombie_tier_3",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c88703c767db07877b565fa6df3f3e5cce7bee3a3c5bec633b1487d2bab29ef6": {
+      "species": "mancubus",
+      "map_key": "e1m4_boss",
+      "entity": "intro_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "63ba1bbeef3d3eedbe0ea8432472310eb1ba15c9980ba2c9823950e6fbb37a53": {
+      "species": "gargoyle",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2c8e0857db8bb50fd7fb27e45fd35af84eca721341da5062a419677744defcc5": {
+      "species": "baron",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "09e9f9004a1de48ccd75de5b69068fb36483228828c4e2cc9be5f1bc60745dfc": {
+      "species": "arachnotron",
+      "map_key": "e4m3_mcity",
+      "entity": "forest_canyon_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "024ded6abcaa1f9060b83a1c636adf3d6c5b0651f6f7a163fc896fc85e305b6b": {
+      "species": "baron",
+      "map_key": "e4m3_mcity",
+      "entity": "ai_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f9c9047d17512fb97e443bbfdc56e7b56a50b241774694710ce45833aaba0a53": {
+      "species": "doom_hunter",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4e48b761d3bdc885d359bfb172f8a1e47fc7d137f18b3ed3645470b8e984787e": {
+      "species": "revenant",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2b04ce2666d6ccddeba27ffc5572223fc0b4e40e1a6e5c380d6f9308a8c59504": {
+      "species": "tyrant",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "b8b4b34db2df5793d47aaaa0b34b505985d2ae4eab0ede46aad96d2a332c5421": {
+      "species": "doom_hunter",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "910945f9b9182a0c58ec93b58b66abfeac83fa43115e6076c66ac8b460b4eec6": {
+      "species": "baron",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c4ca21c427e5a1e59cdba96ed1a440a4626b7bc4ec84c2276e0cdca2a6c2d281": {
+      "species": "revenant",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "54f35d15183e6f8c1297567898e31813336344f5f00863f0130071bdb787194e": {
+      "species": "tyrant",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d6e7672cb894c222bd921bc080d4eb290dfb7a3f49596dae67ed8fdf3becdaf4": {
+      "species": "pain_elemental",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_heavy_painelemental_2",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d84ca098128147021cbd349c7d80e4a97a6c487cfd093e9aa4796fee14c3539a": {
+      "species": "pain_elemental",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e8572399c9143934b80b5b85b0f385b336e3888eda82e17d241a5646e85efaab": {
+      "species": "pain_elemental",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wall_base_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "881824d8dd372509f7004c8a3a046cfd4ef91ce9d87f454735b8e3245f0aebf8": {
+      "species": "dread_knight",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_dreadknight_4",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "081a9f28c517174d40a7a71cd6a64baa60a33b32c550acf20cc394ff491eaaef": {
+      "species": "spectre",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_pinky_spectre_2",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "19041526e7532c8f4e4a5ac3c6aae29ff478668888d952e8847d7f6b07b360a8": {
+      "species": "pain_elemental",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "921f4b81900be578808f2afd100b24fbd3b6bfe9896ef10dd4047d6a39d1e5a9": {
+      "species": "pain_elemental",
+      "map_key": "e3m3_maykr",
+      "entity": "hub_exterior_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "f2053dc32a7593c386f4a01f88a3db290edb9939dc3f151178c8066394a47657": {
+      "species": "pain_elemental",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6395009b1c06952561a14b2c554d0c97f4d5f9491efc2986a426840878cddc64": {
+      "species": "pain_elemental",
+      "map_key": "e2m3_core",
+      "entity": "gameplay_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a39a477e912aa209435de595bb86b976653a38465f321c05799fd6ef6c4cfeb3": {
+      "species": "dread_knight",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "49a3221614f08470229d2feb03ca820bbaacb4a26f4cd153f428686401aec814": {
+      "species": "pain_elemental",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "636d6fd9dada4841df9ffee99e34b8e9c9abb30bb8bf9f8495f5d318983a2119": {
+      "species": "pain_elemental",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a9f2015f2db0faddfcb8b1220d3ac6310aa75344b3910f1df68dc9a17762a27e": {
+      "species": "pain_elemental",
+      "map_key": "e4m3_mcity",
+      "entity": "ai_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "3cd6ea18ec55623a08041c431c8d71927e90b64dd4a1b3843c50572047a747e2": {
+      "species": "cacodemon",
+      "map_key": "e1m1_intro",
+      "entity": "crack_building_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "53dc5b6d5b5bc704281f63794bb7bd735db7233a8e55e87268cb947f532b24db": {
+      "species": "blood_angel",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_heavy_bloodangel_1",
+      "inherit": "ai/heavy/bloodangel",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/bloodangel"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7c48c2da56d13323af72b6a15d411e25a0c9f1d5de405635043df35a957f10a9": {
+      "species": "armored_baron",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_superheavy_baron_armored_1",
+      "inherit": "ai/superheavy/baron_armored",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron_armored"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "086cb3083a7aad98e621cf7c9469935129e980302d8ccdfa9fa7c5d6553f9c30": {
+      "species": "armored_baron",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wasteland_arena_ai_superheavy_baron_armored_2",
+      "inherit": "ai/superheavy/baron_armored",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron_armored"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "428b8533ab19509e2e5f23a99eb23303a6c198b721686e7031aaafeb353a44e3": {
+      "species": "blood_angel",
+      "map_key": "e5m3_hell",
+      "entity": "breach_wasteland_arena_ai_heavy_bloodangel_1",
+      "inherit": "ai/heavy/bloodangel",
+      "source_sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/bloodangel"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4287ec571e963f13ca601c4cc973cf0aad1ecf43e2aea04b8a5013d9d0aa9e20": {
+      "species": "blood_angel",
+      "map_key": "e4m3_mcity",
+      "entity": "arena_ai_heavy_bloodangel_2",
+      "inherit": "ai/heavy/bloodangel",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/bloodangel"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7f164066b9099bfa8d4277fdc6605d9c0bc9b3735e32668fb9e0e78ba833fa2e": {
+      "species": "arachnotron",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2f5aecc440b88819ab275eea8616e069c4dffd4aabd9dc47636cfe0fe5568d95": {
+      "species": "armored_baron",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_superheavy_baron_armored_1",
+      "inherit": "ai/superheavy/baron_armored",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron_armored"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e7e0065429a42736eaae93b4f43fa7fe790f5d626275222bc8320e70b07ba3e5": {
+      "species": "cacodemon",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_cacodemon_1",
+      "inherit": "ai/heavy/cacodemon",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/cacodemon"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d2a78088dbef0b7486de4365684e0079d16ecde67abaa9e2d067dc3b04b5e851": {
+      "species": "pain_elemental",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6cc4ee7d45efcd49275ab66d3e59d4ba0682d547275734248e327ef5cfeda738": {
+      "species": "blood_angel",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_heavy_bloodangel_1",
+      "inherit": "ai/heavy/bloodangel",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/bloodangel"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "164f28bd86884fe2864189b9eabc2488c65bde7c4f1a8d595cd814a25662d2f0": {
+      "species": "revenant",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "95dc172cbde1ceec1b65330e9374a60a3dc2405a300e557922f9f38a05149a3d": {
+      "species": "arachnotron",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_heavy_arachnotron_5",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c77c1bbcc635cb562adde5cc6fa12c0908ceb1fde5663370da4d1aa32d1978fd": {
+      "species": "doom_hunter",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_superheavy_doom_hunter_4",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e958b69af26e128c8c35b29eade78a9e18161880dd455b64137d0ba3f0d06ede": {
+      "species": "tyrant",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_superheavy_tyrant_4",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d54f1af7e463a4009e5cec0f12698cf931647d439068790d09f9f049aa20c63f": {
+      "species": "gargoyle",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "db048d24708322b78bf3e27e1534e45c631ccb1367d8fd72b5b40a5f0573bb17": {
+      "species": "gargoyle",
+      "map_key": "e4m1_rig",
+      "entity": "destroyed_rig_ai_fodder_gargoyle_2",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "097ef04f4be607c0f8e2249eeb2fb2bd4f599fa6de162ca00f7cfb5881478743": {
+      "species": "gargoyle",
+      "map_key": "e5m1_spear",
+      "entity": "arena_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fa4878dfd63b60f3191c2e5c54d5f600932a587244eddad6d3fd965d3e35d07a": {
+      "species": "zombie_t1_screecher",
+      "map_key": "e5m1_spear",
+      "entity": "ai_combat_ai_fodder_zombie_t1_screecher_1",
+      "inherit": "ai/fodder/zombie_t1_screecher",
+      "source_sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_t1_screecher"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "4957907b9a418ba78450b6d09bfa0075b897dfc51e3834163ea34e0cf49639b8": {
+      "species": "gargoyle",
+      "map_key": "e4m2_swamp",
+      "entity": "ai_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2e3fad8de5ceed9d7873aee37871baad8ea991f11c84db113c2fbca952e7cae2": {
+      "species": "gargoyle",
+      "map_key": "e3m3_maykr",
+      "entity": "temp_all_scripting_ai_fodder_gargoyle_17",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "fbb6e763483622533182a31c1882bf3ec294342f24e22ff1e3ecadf72214d1b0": {
+      "species": "pain_elemental",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a0750115061f061267e1f19315b5877c8b76f95a9ae65ef241fb48145cf0001d": {
+      "species": "pain_elemental",
+      "map_key": "e1m3_cult",
+      "entity": "_ai_heavy_painelemental_3",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "280f29a0a9ee51d494c9de244cee8938215ad911995a273a936258c713c413bd": {
+      "species": "gargoyle",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6adf91ca466f5e68fd0abde55f04529fb22e8486920924f89764d05d94fdbdd5": {
+      "species": "pain_elemental",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "65c7a25f2e6b1841c499d01a214cd84a25a098cacf5194bc814aac93e12648ea": {
+      "species": "doom_hunter",
+      "map_key": "e3m2_hell",
+      "entity": "ai_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "da49178bc110eeed4c9829acd22a8e68d4443b8294f98ee16c3e102400354730": {
+      "species": "gargoyle",
+      "map_key": "e4m3_mcity",
+      "entity": "bridge_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "465351ec2570ed6cd7686739b7f192d7697d36dfa0e0c032eb30c12e1bebbaa6": {
+      "species": "gargoyle",
+      "map_key": "e5m2_earth",
+      "entity": "ai_ai_fodder_gargoyle_1",
+      "inherit": "ai/fodder/gargoyle",
+      "source_sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/gargoyle"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "6dfe54e056779827668352a69f35f7fcf341b4e0bea974713c8c12e7f57f3445": {
+      "species": "arachnotron",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_heavy_arachnotron_2",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "7444665773483a215966cd8a8e3f4d4bf9ac7f41924f80a58ecf80f672dd7e3c": {
+      "species": "doom_hunter",
+      "map_key": "e2m1_nest",
+      "entity": "_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "96a5d7f92fece05addc00385f32fe3a0139a33d2bb167d267ffaafdab3214779": {
+      "species": "pain_elemental",
+      "map_key": "e2m2_base",
+      "entity": "fract_ai_heavy_painelemental_1",
+      "inherit": "ai/heavy/painelemental",
+      "source_sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/painelemental"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c8d7ddab4ba9047448c4eeab3fe6eb9f1ac7adf55b7acb185621223729d4930c": {
+      "species": "tyrant",
+      "map_key": "e3m1_slayer",
+      "entity": "_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "2ef7984d4066838eab2ab095c96cab2b3d21efb32ec6a478174b513bbe5bb5c6": {
+      "species": "baron",
+      "map_key": "e1m2_war",
+      "entity": "capitol_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "dfe76c67548b71e9cc79543e939bd3206fa35e1f918a734632a626a031e25867": {
+      "species": "cyber_mancubus",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c316d992102489b9b99d36e70669675f9a077e7c25b3bcb4f43c968f4891ddd4": {
+      "species": "doom_hunter",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ab55dbfc6b029d097747cae32daf63af50226f0d4687b9c7540b01a9d2198d60": {
+      "species": "mancubus",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "afcb1b01de67401066df6811eea61f5a8b7cf657d1e4b8b66026787dea719d72": {
+      "species": "tyrant",
+      "map_key": "e1m2_war",
+      "entity": "gameplay_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "0f7c7524c00994faaaf753c60dba2cafa492504322cfea7dc3bc705f8fa70f34": {
+      "species": "baron",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_superheavy_baron_1",
+      "inherit": "ai/superheavy/baron",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/baron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d5f5edde32543204b9afc43fa12017f6c50d3dc8efb0065ac3690460bdd42c7d": {
+      "species": "doom_hunter",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bf8b09e13c7a76df625b5dcb07469ea6365f7ea3bcf248244acd94f17c2eb1fd": {
+      "species": "tyrant",
+      "map_key": "e1m3_cult",
+      "entity": "gameplay_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "60b966eb6bbdf08bbaf024603a7c77e00fb1619cd50b67885c4d4a5bad4ac8a5": {
+      "species": "doom_hunter",
+      "map_key": "e3m4_boss",
+      "entity": "building_2_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bd14cb99121904b8a8ba1b8ad51c65058eae35af7c085c38a447bcec7e20fb16": {
+      "species": "tyrant",
+      "map_key": "e3m4_boss",
+      "entity": "atrium_arena_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "45d35a3bc7417681ffe398d8369ee9ece6ad497a9558b3799de20f0ea6d68da1": {
+      "species": "arachnotron",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_arachnotron_1",
+      "inherit": "ai/heavy/arachnotron",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/arachnotron"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "d1eadeb1f53d8a062ab072c356f1c9ed6419236a802112f38f03fb282a9746f6": {
+      "species": "cyber_mancubus",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_mancubus_goo_1",
+      "inherit": "ai/heavy/mancubus_goo",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_goo"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "84e8970b5111bf95e24a2163750ccbd09898c3f8c3aa10c176f01ed5c03538f7": {
+      "species": "doom_hunter",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_superheavy_doom_hunter_1",
+      "inherit": "ai/superheavy/doom_hunter",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/doom_hunter"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "a173d42249435e4f344be3e6aa0c1b4495c80affead0e1c7b31a72079eefd119": {
+      "species": "dread_knight",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_dreadknight_1",
+      "inherit": "ai/heavy/dreadknight",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/dreadknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "22a9d9fd75d3d0c3b35b828926f7a2a2b79c42efe24ae0743af1c988decb3624": {
+      "species": "hell_knight",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_hellknight_1",
+      "inherit": "ai/heavy/hellknight",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/hellknight"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "e0f9c4e9dd41ecb2a0cc481433ad2c0574192f1991343ba932161e837121f04b": {
+      "species": "mancubus",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_mancubus_fire_1",
+      "inherit": "ai/heavy/mancubus_fire",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/mancubus_base",
+        "ai/heavy/mancubus_fire"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "bf169a4f65bb82b59f49b4911181fed9a4d4ba2dca5c9ab2a0f69eac786a1c8c": {
+      "species": "pinky",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_pinky_1",
+      "inherit": "ai/heavy/pinky",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky",
+        "ai/heavy/pinky_base"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "c7257c73ed57b026e0c03b087690bfb337a76fe65f2d56c4de5e729e269a56c1": {
+      "species": "revenant",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_revenant_1",
+      "inherit": "ai/heavy/revenant",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/revenant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "12b3e07e574e34f2b3069a93eed40557afa1cbaaf0f47b5c5e756d9278ea5d85": {
+      "species": "spectre",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_heavy_pinky_spectre_1",
+      "inherit": "ai/heavy/pinky_spectre",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_heavy",
+        "ai/heavy/pinky_base",
+        "ai/heavy/pinky_spectre"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "1c19917058bfdc2395bff4b0ede5025fbaa9f84744c3786f9e39e7961376e479": {
+      "species": "tyrant",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_superheavy_tyrant_1",
+      "inherit": "ai/superheavy/tyrant",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_superheavy",
+        "ai/superheavy/tyrant"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "8334b7e1e00264d458e93aa3b21b78757a01c528a8ec24f3feab957f3af79337": {
+      "species": "zombie_tier_3",
+      "map_key": "e3m2_hell_b",
+      "entity": "ai_ai_fodder_zombie_tier_3_1",
+      "inherit": "ai/fodder/zombie_tier_3",
+      "source_sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/zombie_base",
+        "ai/fodder/zombie_tier_3"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      }
+    },
+    "ffb2db0c09ba02a96f3d16db1384ff9e254a21cec3bc7b3012d28484b67ef6f1": {
+      "species": "lost_soul",
+      "map_key": "e1m3_cult",
+      "entity": "game_ai_fodder_lostsoul_1",
+      "inherit": "ai/fodder/lostsoul",
+      "source_sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/lostsoul"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "hitpoint_input": {
+        "max": 100,
+        "starting": 100
+      },
+      "hitpoint_input_proof": {
+        "sha256": "c9ffed558e077ea2019082e5863950ee21d2859202727e1c7a13298293668114",
+        "checks_passed": 83
+      }
+    },
+    "e15e2a15ed203ef0e6897f5e932130dcc0eefe068cc9d5b0cada846592d94952": {
+      "species": "lost_soul",
+      "map_key": "e4m1_rig",
+      "entity": "first_arena_ai_fodder_lostsoul_1",
+      "inherit": "ai/fodder/lostsoul",
+      "source_sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "decl_ancestry": [
+        "ai/default",
+        "ai/default_fodder",
+        "ai/fodder/lostsoul"
+      ],
+      "scale": {
+        "x": 1,
+        "y": 1,
+        "z": 1
+      },
+      "hitpoint_input": {
+        "max": 100,
+        "starting": 100
+      },
+      "hitpoint_input_proof": {
+        "sha256": "c9ffed558e077ea2019082e5863950ee21d2859202727e1c7a13298293668114",
+        "checks_passed": 83
       }
     }
   }

@@ -1362,7 +1362,6 @@ class LauncherUI(QMainWindow):
     def _enemy_option_changed(self) -> None:
         if self._syncing_create_dependencies:
             return
-        self._set_option_values({"enemy_preset": "custom"})
         self._refresh_create_dependencies()
 
     def _refresh_enemy_dependencies(self) -> None:
@@ -2434,6 +2433,13 @@ class LauncherUI(QMainWindow):
             ("Campaign", campaign),
             ("Logic Difficulty", logic),
         )
+        enemy_plan = slot_data.get("enemy_plan")
+        if isinstance(enemy_plan, dict) and isinstance(enemy_plan.get("maps"), dict):
+            reduced = sum(bool(operation.get("reduction"))
+                          for stage in enemy_plan["maps"].values() if isinstance(stage, dict)
+                          for operation in stage.get("operations", []) if isinstance(operation, dict))
+            if reduced:
+                fields += (("Enemy choices", f"{reduced} small fights skipped because your chosen enemies cannot spawn there."),)
         self.room_summary.setText("<br>".join(
             f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}"
             for label, value in fields

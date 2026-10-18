@@ -179,6 +179,950 @@
           ],
           "segment_N": 5,
           "evidence": "Pinned normal-campaign single script; concrete finite emissions and queue/population completion verified by the canonical extractor."
+        },
+        {
+          "id": "slayer_gate_encounter_manager_slayer_side_closet_finite_0_0",
+          "manager": "slayer_gate_encounter_manager_slayer_side_closet",
+          "manager_sha256": "10b097324ef8058bf00ddbadfce7a664e2225447ab040f7ce59442eb0bfe6343",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "slayer_gate_encounter_manager_ammo_room_finite_1_5",
+          "manager": "slayer_gate_encounter_manager_ammo_room",
+          "manager_sha256": "c53197c1256f652c065fc50b208d498e391960ea97af13253c718f44682558a4",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 5
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "slayer_gate_encounter_manager_slayer_lobby_finite_1_7",
+          "manager": "slayer_gate_encounter_manager_slayer_lobby",
+          "manager_sha256": "1571413e35454fb983c04b0056a1cfde2496752a96f87baac3e2ce69f820d715",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 7
+          },
+          "segment_N": 5,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_hell_phase_2_finite_0_1",
+          "manager": "hell_chunk_2_encounter_manager_hell_phase_2",
+          "manager_sha256": "87fc670cfc27be19fc229e7fda1e0ecd16bb0da3057a7f8b6b3c43f245290d03",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_hell_phase_2_finite_5_5",
+          "manager": "hell_chunk_2_encounter_manager_hell_phase_2",
+          "manager_sha256": "87fc670cfc27be19fc229e7fda1e0ecd16bb0da3057a7f8b6b3c43f245290d03",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 5,
+            "last_event_index": 5
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_hell_arachnatron_finite_0_0",
+          "manager": "hell_chunk_2_encounter_manager_hell_arachnatron",
+          "manager_sha256": "4dfdf328e6395de46c6c6d2a4c0d7a8ea11ee08ae77fbacf56d389873de53360",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_16_finite_6_6",
+          "manager": "hell_chunk_2_encounter_manager_16",
+          "manager_sha256": "67667e773d3aaef4163bdb10a131c81c01d7b2ad5b46bc95627e2c7af3d5f185",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 6,
+            "last_event_index": 6
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_16_finite_10_10",
+          "manager": "hell_chunk_2_encounter_manager_16",
+          "manager_sha256": "67667e773d3aaef4163bdb10a131c81c01d7b2ad5b46bc95627e2c7af3d5f185",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 10,
+            "last_event_index": 10
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "hell_chunk_2_encounter_manager_hell_manc_finite_0_6",
+          "manager": "hell_chunk_2_encounter_manager_hell_manc",
+          "manager_sha256": "904edc2fe5aa590a85c3d422fe8f7efe0f35e8cc81bc1b3cc739c6a5af0f6ac4",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 6
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_deck_main_finite_1_3",
+          "manager": "uac_chunk_1_encounter_manager_deck_main",
+          "manager_sha256": "afe6e399ed36184f20ec78eeddc35faf5c7c56ea6e5338a3687676986fa49efd",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 3
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_deck_main_finite_5_7",
+          "manager": "uac_chunk_1_encounter_manager_deck_main",
+          "manager_sha256": "afe6e399ed36184f20ec78eeddc35faf5c7c56ea6e5338a3687676986fa49efd",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 5,
+            "last_event_index": 7
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_deck_main_finite_9_10",
+          "manager": "uac_chunk_1_encounter_manager_deck_main",
+          "manager_sha256": "afe6e399ed36184f20ec78eeddc35faf5c7c56ea6e5338a3687676986fa49efd",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 9,
+            "last_event_index": 10
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_intro_hall_finite_0_0",
+          "manager": "uac_chunk_1_encounter_manager_intro_hall",
+          "manager_sha256": "4442f7d2d842df57434b73641aed0188c98fbe1291b781bcbedbd81edb137412",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "uac_chunk_1_encounter_manager_intro_hall_finite_2_3",
+          "manager": "uac_chunk_1_encounter_manager_intro_hall",
+          "manager_sha256": "4442f7d2d842df57434b73641aed0188c98fbe1291b781bcbedbd81edb137412",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_4_finite_0_7",
+          "manager": "phobos_encounter_manager_4",
+          "manager_sha256": "64f2a69b042be520aca4eceafcb1ec307b1f5b0edc9467908da9f6ca67aa1197",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 7
+          },
+          "segment_N": 8,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_4_finite_11_11",
+          "manager": "phobos_encounter_manager_4",
+          "manager_sha256": "64f2a69b042be520aca4eceafcb1ec307b1f5b0edc9467908da9f6ca67aa1197",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 11,
+            "last_event_index": 11
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_2_finite_3_3",
+          "manager": "phobos_encounter_manager_2",
+          "manager_sha256": "8bb7fc251a6c978a3bf14374ed74bd180312f69a23a506bf7c134782228d3c9d",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 3,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_2_finite_5_8",
+          "manager": "phobos_encounter_manager_2",
+          "manager_sha256": "8bb7fc251a6c978a3bf14374ed74bd180312f69a23a506bf7c134782228d3c9d",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 5,
+            "last_event_index": 8
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_lower_deck_01_finite_5_5",
+          "manager": "phobos_encounter_manager_lower_deck_01",
+          "manager_sha256": "03116e4681a7b01e32783cfd865a69f1a119d0fcc0f7670ba0a18555141808fb",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 5,
+            "last_event_index": 5
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_lower_deck_01_finite_7_11",
+          "manager": "phobos_encounter_manager_lower_deck_01",
+          "manager_sha256": "03116e4681a7b01e32783cfd865a69f1a119d0fcc0f7670ba0a18555141808fb",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 11
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_11_finite_0_1",
+          "manager": "phobos_encounter_manager_11",
+          "manager_sha256": "c7fe71f0cefd5af9df20d7ffdb9b290a9bd0710507b3c8954bae09427611f745",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_15_finite_1_2",
+          "manager": "phobos_encounter_manager_15",
+          "manager_sha256": "aad038a9049f324fcbafc7a443037f6f8e4291bce7f43b0fc4d3a968d03f78a3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 9,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_18_finite_0_7",
+          "manager": "phobos_encounter_manager_18",
+          "manager_sha256": "cc7af127c59c77220b657be2193abe043eaa53593c71482024916e6aa0197a4a",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 7
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_20_finite_0_1",
+          "manager": "phobos_encounter_manager_20",
+          "manager_sha256": "be739d08b3097e531d6fe0e04c577736dae28caecd18f8a26a2caadc0609e39f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_20_finite_4_7",
+          "manager": "phobos_encounter_manager_20",
+          "manager_sha256": "be739d08b3097e531d6fe0e04c577736dae28caecd18f8a26a2caadc0609e39f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 4,
+            "last_event_index": 7
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_20_finite_9_9",
+          "manager": "phobos_encounter_manager_20",
+          "manager_sha256": "be739d08b3097e531d6fe0e04c577736dae28caecd18f8a26a2caadc0609e39f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 9,
+            "last_event_index": 9
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_20_finite_12_13",
+          "manager": "phobos_encounter_manager_20",
+          "manager_sha256": "be739d08b3097e531d6fe0e04c577736dae28caecd18f8a26a2caadc0609e39f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 12,
+            "last_event_index": 13
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_19_finite_0_0",
+          "manager": "phobos_encounter_manager_19",
+          "manager_sha256": "8c28a5e5bebfe7def13f3702df816306456d653eaa76ed2782665c1dd2f67d7e",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_19_finite_2_6",
+          "manager": "phobos_encounter_manager_19",
+          "manager_sha256": "8c28a5e5bebfe7def13f3702df816306456d653eaa76ed2782665c1dd2f67d7e",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 6
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_teleport_control_precombat_finite_1_2",
+          "manager": "phobos_encounter_manager_teleport_control_precombat",
+          "manager_sha256": "dde7183e43f4567d8a8b8601308fdb2430ea26395ece197e95da8e095251f8d3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_teleport_control_precombat_finite_6_7",
+          "manager": "phobos_encounter_manager_teleport_control_precombat",
+          "manager_sha256": "dde7183e43f4567d8a8b8601308fdb2430ea26395ece197e95da8e095251f8d3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 6,
+            "last_event_index": 7
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_teleport_control_precombat_finite_11_11",
+          "manager": "phobos_encounter_manager_teleport_control_precombat",
+          "manager_sha256": "dde7183e43f4567d8a8b8601308fdb2430ea26395ece197e95da8e095251f8d3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 11,
+            "last_event_index": 11
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_teleport_control_precombat_finite_13_15",
+          "manager": "phobos_encounter_manager_teleport_control_precombat",
+          "manager_sha256": "dde7183e43f4567d8a8b8601308fdb2430ea26395ece197e95da8e095251f8d3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 13,
+            "last_event_index": 15
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_telport_a_pc_finite_0_2",
+          "manager": "phobos_encounter_manager_telport_a_pc",
+          "manager_sha256": "8c14635123dd746964cddcb947a310cf9c5f45b5403fe2c27bd48b6d9881bd02",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_bridge_platform_finite_1_2",
+          "manager": "phobos_encounter_manager_bridge_platform",
+          "manager_sha256": "f0beb37ba066133aa0a99c3393515c5047fd56bc603f3b55722a7d78e5944b55",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 5,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_bridge_porch_finite_0_1",
+          "manager": "phobos_encounter_manager_bridge_porch",
+          "manager_sha256": "68d7fffaa0c3e8f9a9277df9dfbc714a028cbc7315ef5f20e5857a02dd8e5e74",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_13_finite_0_0",
+          "manager": "phobos_encounter_manager_13",
+          "manager_sha256": "c7c93ff9953e16bc48f3aaf98c361f108460c720c80fe010ddbfd2b9859a6cb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_13_finite_2_2",
+          "manager": "phobos_encounter_manager_13",
+          "manager_sha256": "c7c93ff9953e16bc48f3aaf98c361f108460c720c80fe010ddbfd2b9859a6cb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 2
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_13_finite_4_5",
+          "manager": "phobos_encounter_manager_13",
+          "manager_sha256": "c7c93ff9953e16bc48f3aaf98c361f108460c720c80fe010ddbfd2b9859a6cb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 4,
+            "last_event_index": 5
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_21_finite_0_1",
+          "manager": "phobos_encounter_manager_21",
+          "manager_sha256": "32991f926f4c09b8c9a3fcdeac8971059db50737b71e28a740532bd44df4699a",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_21_finite_3_3",
+          "manager": "phobos_encounter_manager_21",
+          "manager_sha256": "32991f926f4c09b8c9a3fcdeac8971059db50737b71e28a740532bd44df4699a",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 3,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_14_finite_0_1",
+          "manager": "phobos_encounter_manager_14",
+          "manager_sha256": "f3ff94846f8aa8f4cbe5601028460635823472ec88726ec3ffb49fd78b64b68b",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_10_finite_2_3",
+          "manager": "meteors_encounter_manager_10",
+          "manager_sha256": "790ee0d7a43e4182c5b4a6d82032e482ff699a21016bf02042ba0a1e4fb12b85",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_9_finite_0_5",
+          "manager": "meteors_encounter_manager_9",
+          "manager_sha256": "58df213d4c3b7fa75a564576d47efb76ac43cb284014c034c34f9afb9f6c25b7",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 5
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_8_finite_0_1",
+          "manager": "meteors_encounter_manager_8",
+          "manager_sha256": "04e4455886d0ce9806edde0dbf4d9c6f0f8b1a3ccadbfebe7487e62a9dd02fca",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_big_chunk_arachnatron_finite_2_3",
+          "manager": "meteors_encounter_manager_big_chunk_arachnatron",
+          "manager_sha256": "020e8c3ad2b8ca480e9615f49458b95d6510296a257fc6f54c8afba9b77b8f66",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_pipe_hall_tents_finite_1_2",
+          "manager": "meteors_encounter_manager_pipe_hall_tents",
+          "manager_sha256": "7cebbe8111ab70a483812be3a224be231588890d06abe177cc8c274d4f83f944",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 9,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_caco_cloud01_finite_2_5",
+          "manager": "meteors_encounter_manager_caco_cloud01",
+          "manager_sha256": "9625bc0606d9aacc0b88477cb59f8fabf00c218c50effe75a3cc2df98a050b00",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 5
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_secret_enc_01_finite_1_2",
+          "manager": "meteors_encounter_manager_secret_enc_01",
+          "manager_sha256": "fd8297df7074d4e8e110ce1344ec8cb089114fdefbffaec37fe147a7b33fa4ec",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_secret_enc_01_finite_4_5",
+          "manager": "meteors_encounter_manager_secret_enc_01",
+          "manager_sha256": "fd8297df7074d4e8e110ce1344ec8cb089114fdefbffaec37fe147a7b33fa4ec",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 4,
+            "last_event_index": 5
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_secret_enc_01_finite_7_8",
+          "manager": "meteors_encounter_manager_secret_enc_01",
+          "manager_sha256": "fd8297df7074d4e8e110ce1344ec8cb089114fdefbffaec37fe147a7b33fa4ec",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 8
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_19_finite_1_3",
+          "manager": "meteors_encounter_manager_19",
+          "manager_sha256": "7257c5930c8f28d1084a3fbc553d73a1a5027a59396e6b0c3bbb9e786bfe1b97",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 3
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_5_finite_0_1",
+          "manager": "meteors_encounter_manager_5",
+          "manager_sha256": "0def23607368e1fb42b4720c9d8a6896bc639ba5ec0477a3aac9689346e1f2d3",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_electro_imp_finite_0_0",
+          "manager": "meteors_encounter_manager_electro_imp",
+          "manager_sha256": "79b24e0191a14f3083d9fd48d883f27e453d5235fbecc26e04444ad46007053b",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_lower_hall_tents_finite_0_1",
+          "manager": "meteors_encounter_manager_lower_hall_tents",
+          "manager_sha256": "748cafcea54414c4a3bf139968ffa0d554257373ac29c40ce7d5bd09ebb1fc43",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_6_finite_0_0",
+          "manager": "meteors_encounter_manager_6",
+          "manager_sha256": "024cbabacdf58e1755c7f1b6c792144016706909aae15d8dd390dc70d44139e5",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_21_finite_0_5",
+          "manager": "meteors_encounter_manager_21",
+          "manager_sha256": "fd89c4049dacd4aa8d544c3d2537670215dfc538ed21c606b5baa82350d9120c",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 5
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_2_finite_13_13",
+          "manager": "meteors_encounter_manager_2",
+          "manager_sha256": "b010f05fa1595638fb6dea9cc5228895f94527735908a7c2d12b735295cddbb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 13,
+            "last_event_index": 13
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_2_finite_20_22",
+          "manager": "meteors_encounter_manager_2",
+          "manager_sha256": "b010f05fa1595638fb6dea9cc5228895f94527735908a7c2d12b735295cddbb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 20,
+            "last_event_index": 22
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_last_chunk_b_finite_0_2",
+          "manager": "meteors_encounter_manager_last_chunk_b",
+          "manager_sha256": "9b54e233d1bb925833612c9beb38d22c85403d04215455d018ae783ff7e55aaa",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_secret_area_upper_finite_0_1",
+          "manager": "meteors_encounter_manager_secret_area_upper",
+          "manager_sha256": "18d83e131e8f5783417dfe2ffe19084d62f944613b15478b24632339bbe3df40",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_12_finite_2_3",
+          "manager": "meteors_encounter_manager_12",
+          "manager_sha256": "2bc1d5a6d05c5fcfa898b5ddd5a27e8b51f6b353562ad3f1e3a7a57c001aff2f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_12_finite_11_12",
+          "manager": "meteors_encounter_manager_12",
+          "manager_sha256": "2bc1d5a6d05c5fcfa898b5ddd5a27e8b51f6b353562ad3f1e3a7a57c001aff2f",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 11,
+            "last_event_index": 12
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "phobos_encounter_manager_3_finite_0_2",
+          "manager": "phobos_encounter_manager_3",
+          "manager_sha256": "3f8c25f2bf55511f50bc1fb25f92b1f99171989003c209395431b98aa3eec22e",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 8,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_2_finite_5_7",
+          "manager": "meteors_encounter_manager_2",
+          "manager_sha256": "b010f05fa1595638fb6dea9cc5228895f94527735908a7c2d12b735295cddbb8",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 5,
+            "last_event_index": 7
+          },
+          "segment_N": 6,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_16_finite_0_1",
+          "manager": "meteors_encounter_manager_16",
+          "manager_sha256": "8a7e1922ec7f14d9ff92a4553c9054ce051c0017fbbcd238a1f10d1910ac2911",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 9,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "meteors_encounter_manager_secret_enc_01_initial_supply_0",
+          "manager": "meteors_encounter_manager_secret_enc_01",
+          "manager_sha256": "fd8297df7074d4e8e110ce1344ec8cb089114fdefbffaec37fe147a7b33fa4ec",
+          "layers": [
+            "game/sp/e2m3_core/main_level"
+          ],
+          "segment_N": 3,
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "initial_maintenance_completion": {
+            "delay_event_index": 1,
+            "maintenance_event_indices": [
+              0
+            ]
+          },
+          "evidence": "The mandatory pause exceeds the native first-batch window; this cohort has no preceding matching actors. Count the initial batch once and leave later replenishment outside the guaranteed budget."
         }
       ]
     },
@@ -590,6 +1534,1005 @@
           ],
           "segment_N": 3,
           "evidence": "one conditional initial pass with exact source definitions, positive-health actors and zero barrier; selected manager, actors, points and triggers are outside Master layers; native Exit defaults do not reset, while authored flee/disable and shared exits remain preserved; physical activation, forced kills, checkpoint/replay and operational replacement remain separate"
+        }
+      ]
+    },
+    "e1m1_intro": {
+      "map_key": "e1m1_intro",
+      "source": {
+        "path": "vanillamaps/e1m1_intro.map",
+        "sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6"
+      },
+      "segments": [
+        {
+          "id": "infighting_alcove",
+          "manager": "secret_encounter_encounter_manager_1",
+          "manager_sha256": "167e6d0be9980289846d8ee0bb4929a95cb2ecf86e746aff7f16ff770124d327",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 10
+          },
+          "segment_N": 6,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "portal_first_cohorts",
+          "manager": "portal_encounter_manager_p_enc01",
+          "manager_sha256": "feca08a1835ed111980cb10d6114350b2596ca0df716f6ebb1ee2bddd301c3f1",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 4
+          },
+          "segment_N": 10,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "uac_hq_initial_pair",
+          "manager": "uac_hq_encounter_uac_hq_enc02",
+          "manager_sha256": "0ea756f1a98512f5b1dd02e2034acfed9684de1571f3e629bf8be24eddcc2832",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 7,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "uac_hq_charging_imp",
+          "manager": "uac_hq_encounter_uac_hq_enc02",
+          "manager_sha256": "0ea756f1a98512f5b1dd02e2034acfed9684de1571f3e629bf8be24eddcc2832",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 8,
+            "last_event_index": 8
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "uac_hq_cacodemons",
+          "manager": "uac_hq_encounter_uac_hq_enc02",
+          "manager_sha256": "0ea756f1a98512f5b1dd02e2034acfed9684de1571f3e629bf8be24eddcc2832",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 14,
+            "last_event_index": 16
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "basement_lower_group",
+          "manager": "uac_basement_encounter_subway_zombies",
+          "manager_sha256": "d932c1e4b3acd19a0a50a54d2e38738565baf1d14398ce27c252b514adfaeab3",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "basement_garage_cacodemon",
+          "manager": "uac_basement_encounter_base_03",
+          "manager_sha256": "2393d1f119f66c266e26d0dc2157333c8000da5ade8126f252d591150da5a159",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 6,
+            "last_event_index": 6
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "cracked_building_first_cohorts",
+          "manager": "crack_building_encounter_manager_crack_e01",
+          "manager_sha256": "2aa00ae638952821fbc03b2f82e4688648964db9ba39749539b4f2727baebea6",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "cracked_building_ambient_cacodemons",
+          "manager": "crack_building_encounter_manager_1",
+          "manager_sha256": "af59d6f63197df92e30de5a8728a143d3ae1e9feadb01d835ef0ffe15624a268",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "corner_street_upper_groups",
+          "manager": "corner_street_encounter_manager_zombies",
+          "manager_sha256": "de6da9fb495cc7e3aaa5b2802601633b2a66271337553f5c8d6ee83230bdb3ac",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 10,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "back_lot_zombies",
+          "manager": "corner_street_encounter_manager_back_building_zombies",
+          "manager_sha256": "9ee6da53df8f7079c2621c3e87ca154cf06aa0f74ddb8b82e392d19adf88ff4f",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 5,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "back_lot_first_imp",
+          "manager": "corner_street_encounter_manager_back_building_zombies",
+          "manager_sha256": "9ee6da53df8f7079c2621c3e87ca154cf06aa0f74ddb8b82e392d19adf88ff4f",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 2
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "back_lot_last_imp",
+          "manager": "corner_street_encounter_manager_back_building_zombies",
+          "manager_sha256": "9ee6da53df8f7079c2621c3e87ca154cf06aa0f74ddb8b82e392d19adf88ff4f",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 9,
+            "last_event_index": 9
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "corner_street_arachnotron_group",
+          "manager": "corner_street_encounter_manager_c_street_arachnatron",
+          "manager_sha256": "44ec0b33aedfb0bb17c336c919de2800a30801dede6d1590fb9f213e3aa28a7f",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "cathedral_first_heavies",
+          "manager": "cathedral_encounter_manager_combat",
+          "manager_sha256": "5bace39358c72d4de6bff955b841cf4d019b143ea32d342837b7d4e32e822e14",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "cathedral_ground_zombies",
+          "manager": "cathedral_encounter_manager_zombie",
+          "manager_sha256": "a5e569cf62fc5cc599fefc86c9cbc19d38960366402080edcc6bf1a56b44e450",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 3
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "mech_building_flying_cacodemon",
+          "manager": "mech_building_enc_manager_caco_flyer",
+          "manager_sha256": "1522beb054dc241e2457987b121ecf4a0469aa7566867add9a17870cf032789d",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "mech_building_second_pit",
+          "manager": "mech_building_enc_manager_pit_b",
+          "manager_sha256": "3a80d7615ecbe6c8d37ca092c09f43dec605b883c4457fac88a48babb837e3a8",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "barge_arena_last_imp",
+          "manager": "barge_encounter_manager_barge_arena",
+          "manager_sha256": "9fe7aea54adc3df9ee5c4734ed1e44d1567c8f51fd4fa8f031697f821a463ca5",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 16,
+            "last_event_index": 16
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "portal_second_arachnotron",
+          "manager": "portal_encounter_manager_p_enc02",
+          "manager_sha256": "0e30b25c15ef16ec605d252250b9e6daf3c2ea80afb33582aded4bbbb6aec7ef",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 12,
+            "last_event_index": 12
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "portal_second_final_imps",
+          "manager": "portal_encounter_manager_p_enc02",
+          "manager_sha256": "0e30b25c15ef16ec605d252250b9e6daf3c2ea80afb33582aded4bbbb6aec7ef",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 21,
+            "last_event_index": 22
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity."
+        },
+        {
+          "id": "mech_street_ambient_cacodemons",
+          "manager": "mech_street_encounter_manager_amb_caco",
+          "manager_sha256": "7d07f8e3b647da5e3471d6905c76d8b2a0e28e9527487fe9265dd07c6b2f038a",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 4
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign with tutorials off; distinct finite source calls before replenishment. Infighting does not remove enemy deaths from Killsanity.",
+          "incoming_targets": [
+            {
+              "entity": "mech_street_target_relay_combat_start",
+              "path": "targets.item[0]"
+            }
+          ]
+        },
+        {
+          "id": "uac_hq_initial_supply",
+          "manager": "uac_hq_encounter_uac_hq_enc04",
+          "manager_sha256": "b78e0704df4521a9c3f0b2c81c7190f73e7d340d7d81e08f333bda2073720185",
+          "layers": [
+            "game/sp/e1m1_intro/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 3
+          },
+          "segment_N": 5,
+          "evidence": "The mandatory five-second pause exceeds both initial three-second batch windows. Native constructor/tick tracking sees no prior actors with either new label. Count three Imps and two Zombies once; subsequent emissions are variable replenishment. The additional delay branch is BattleMode, outside the supported campaign.",
+          "initial_maintenance_completion": {
+            "delay_event_index": 5,
+            "maintenance_event_indices": [
+              2,
+              3
+            ]
+          }
+        },
+        {
+          "id": "barge_priest_room_normal",
+          "manager": "barge_encounter_manager_priest_room_no_gk",
+          "manager_sha256": "d914efb5caa129667d7450758fa6b9c9a8f6931fdee5201bfa53c22a4ab86f43",
+          "layers": [
+            "game/sp/e1m1_intro/cp_01"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 3,
+          "evidence": "Three ordinary priest-room Zombies in the named initial layer. The normal and mission-select scripts offer the same three source actors; count this occurrence once. The separate Glory Kill tutorial cohort is outside the supported tutorials-Off setup.",
+          "logic": {
+            "region": "Hell on Earth - Barge - Hell Priest Barge"
+          }
+        },
+        {
+          "id": "barge_priest_room_mission_select",
+          "manager": "barge_encounter_manager_priest_room_after_cp",
+          "manager_sha256": "2e75bb3cdd9949f5e6387e9e25ff619fda89b8bfbc7fc7870233c30fc426e66d",
+          "layers": [
+            "game/sp/e1m1_intro/cp_01_mission_select"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 2
+          },
+          "segment_N": 3,
+          "evidence": "Three ordinary priest-room Zombies in the named initial layer. The normal and mission-select scripts offer the same three source actors; count this occurrence once. The separate Glory Kill tutorial cohort is outside the supported tutorials-Off setup.",
+          "logic": {
+            "region": "Hell on Earth - Barge - Hell Priest Barge"
+          }
+        }
+      ],
+      "source_alternatives": [
+        {
+          "source_id": "barge_priest_room/initial",
+          "branches": [
+            [
+              "barge_encounter_manager_priest_room_no_gk/0/0",
+              "barge_encounter_manager_priest_room_no_gk/0/1",
+              "barge_encounter_manager_priest_room_no_gk/0/2"
+            ],
+            [
+              "barge_encounter_manager_priest_room_after_cp/0/0",
+              "barge_encounter_manager_priest_room_after_cp/0/1",
+              "barge_encounter_manager_priest_room_after_cp/0/2"
+            ]
+          ],
+          "evidence": "cp_01 and cp_01_mission_select are alternative initial contexts for the same three priest-room Zombies; checkpoint reload and replay do not add to the first-pass budget."
+        }
+      ]
+    },
+    "e3m4_boss": {
+      "map_key": "e3m4_boss",
+      "source": {
+        "path": "e3m4_boss.map",
+        "sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398"
+      },
+      "segments": [
+        {
+          "id": "atrium_arena_encounter_manager_d_part1_finite_28_30",
+          "manager": "atrium_arena_encounter_manager_d_part1",
+          "manager_sha256": "c0364dcda05e4ba74f5430b006f2c2fe274fa92f6645b26b513e30bfe8e15a35",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 28,
+            "last_event_index": 30
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_d_part2_finite_3_5",
+          "manager": "atrium_arena_encounter_manager_d_part2",
+          "manager_sha256": "902cabea76f47390fa3126ab267414cdb8a9b6c0f1cfeac505cfe58b79ff2f29",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 3,
+            "last_event_index": 5
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_d_part2_finite_7_11",
+          "manager": "atrium_arena_encounter_manager_d_part2",
+          "manager_sha256": "902cabea76f47390fa3126ab267414cdb8a9b6c0f1cfeac505cfe58b79ff2f29",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 11
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_d_part3_finite_1_11",
+          "manager": "atrium_arena_encounter_manager_d_part3",
+          "manager_sha256": "a31e85fced52f0165311d72295e029ab46dc454000d84a623f8a42e0a3806a06",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 11
+          },
+          "segment_N": 11,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_d_part3_finite_27_34",
+          "manager": "atrium_arena_encounter_manager_d_part3",
+          "manager_sha256": "a31e85fced52f0165311d72295e029ab46dc454000d84a623f8a42e0a3806a06",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 27,
+            "last_event_index": 34
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_add_1_finite_0_0",
+          "manager": "atrium_arena_encounter_manager_add_1",
+          "manager_sha256": "dfb978f07813a281d704b51a0a67db5a70d053e353f4bde9e4d00920622dabe7",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_add_2_finite_0_0",
+          "manager": "atrium_arena_encounter_manager_add_2",
+          "manager_sha256": "af9db5f0e51b34e8cc0adbb314216118bd086b8ffb2e5ad3c50ff8059d3d7883",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_add_3_finite_0_0",
+          "manager": "atrium_arena_encounter_manager_add_3",
+          "manager_sha256": "8b218721a0de8ca3535f1a9177c50229e9eadaa24bd921766974ffb6e071901b",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "atrium_arena_encounter_manager_add_4_finite_0_0",
+          "manager": "atrium_arena_encounter_manager_add_4",
+          "manager_sha256": "5aa3b376409944d4924b24a72656515ba1ec695b08c7891baafbeadda284225a",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "chasm_encounter_manager_1_finite_2_7",
+          "manager": "chasm_encounter_manager_1",
+          "manager_sha256": "bce1eb04a2e7109a0d69934aa22ea85cc125d885ce3ece56bf391edac89be9f5",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 7
+          },
+          "segment_N": 6,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "chasm_encounter_manager_1_finite_12_16",
+          "manager": "chasm_encounter_manager_1",
+          "manager_sha256": "bce1eb04a2e7109a0d69934aa22ea85cc125d885ce3ece56bf391edac89be9f5",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 12,
+            "last_event_index": 16
+          },
+          "segment_N": 5,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_post_atrium1_finite_0_1",
+          "manager": "precombat_encounter_manager_post_atrium1",
+          "manager_sha256": "c1704d891c7d25dc1ef7fbcc178cd292fbf19e024eefeea2602585bf6f77a437",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_post_atrium2_finite_0_1",
+          "manager": "precombat_encounter_manager_post_atrium2",
+          "manager_sha256": "3b23f1a33f6c36f79f02e7af01873bbfd57fc5be3265d5797fe0ad33ae8a2499",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_post_atrium3_finite_0_1",
+          "manager": "precombat_encounter_manager_post_atrium3",
+          "manager_sha256": "81dbc13df2e35fbc2ae54da4e603e1926c9e21768a487755225bae7726bd062c",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 1
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_encounter_b2_finite_1_6",
+          "manager": "precombat_encounter_manager_encounter_b2",
+          "manager_sha256": "2575e0de82ec1496a641542f097c024b34967afff7794b55b551e068f01930ae",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 6
+          },
+          "segment_N": 6,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_right_hallway_finite_0_0",
+          "manager": "building_2_encounter_manager_right_hallway",
+          "manager_sha256": "56f828ac64bff55a5d1ca0179c9c91bc9285e1a09c57afa5028b619676f23e01",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_door_a_finite_0_0",
+          "manager": "building_2_encounter_manager_door_a",
+          "manager_sha256": "ef11d807f4ca33ba811da333bcb6e21301dfd6adc5ef37b955601a84e042103e",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_door_b_finite_0_0",
+          "manager": "building_2_encounter_manager_door_b",
+          "manager_sha256": "dbc1ebf7b74e51fc2748585f958ccd6f284f9c0b41aeb64217aa47fdb63dae79",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 0
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_bottom_floor_finite_3_6",
+          "manager": "building_2_encounter_manager_bottom_floor",
+          "manager_sha256": "8c19a7d75ad5bc46662dc179ae82b2349a7f4bb4474349cd6f891b8377db8f90",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 3,
+            "last_event_index": 6
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_bottom_floor_finite_8_12",
+          "manager": "building_2_encounter_manager_bottom_floor",
+          "manager_sha256": "8c19a7d75ad5bc46662dc179ae82b2349a7f4bb4474349cd6f891b8377db8f90",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 8,
+            "last_event_index": 12
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_bottom_floor_finite_23_30",
+          "manager": "building_2_encounter_manager_bottom_floor",
+          "manager_sha256": "8c19a7d75ad5bc46662dc179ae82b2349a7f4bb4474349cd6f891b8377db8f90",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 23,
+            "last_event_index": 30
+          },
+          "segment_N": 7,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_bottom_floor_finite_33_37",
+          "manager": "building_2_encounter_manager_bottom_floor",
+          "manager_sha256": "8c19a7d75ad5bc46662dc179ae82b2349a7f4bb4474349cd6f891b8377db8f90",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 33,
+            "last_event_index": 37
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_top_floor_finite_1_4",
+          "manager": "building_2_encounter_manager_top_floor",
+          "manager_sha256": "524c1c460975a1995856d484f75c22394346bc559eec73b0a565a623331dd465",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 4
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_top_floor_finite_9_13",
+          "manager": "building_2_encounter_manager_top_floor",
+          "manager_sha256": "524c1c460975a1995856d484f75c22394346bc559eec73b0a565a623331dd465",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 9,
+            "last_event_index": 13
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_encounter_c_rooftop_finite_2_12",
+          "manager": "precombat_encounter_manager_encounter_c_rooftop",
+          "manager_sha256": "1a2c6d37832ff7c714e4284b5900c68672e00f9dc92293a42f161f659c204cac",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 12
+          },
+          "segment_N": 11,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_encounter_c1_finite_1_6",
+          "manager": "precombat_encounter_manager_encounter_c1",
+          "manager_sha256": "7ba88b7e050778a00d5ecb04d85229899b02186e12f96efec5d8f91b34150777",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 6
+          },
+          "segment_N": 6,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_secondfloor2_finite_2_6",
+          "manager": "building_1_encounter_manager_secondfloor2",
+          "manager_sha256": "a7028eff3e6cbfda5271f85778a69af1cf34a5edd36a9eaee56aeb1d00f54a17",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 6
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_secondfloor_finite_1_2",
+          "manager": "building_1_encounter_manager_secondfloor",
+          "manager_sha256": "c92fcf6eaa7a016192ba0128a413a4858e5950c62ae0f97befcfee595aaae573",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 2
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_secondfloor_finite_7_9",
+          "manager": "building_1_encounter_manager_secondfloor",
+          "manager_sha256": "c92fcf6eaa7a016192ba0128a413a4858e5950c62ae0f97befcfee595aaae573",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 9
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_secondfloor_finite_11_19",
+          "manager": "building_1_encounter_manager_secondfloor",
+          "manager_sha256": "c92fcf6eaa7a016192ba0128a413a4858e5950c62ae0f97befcfee595aaae573",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 11,
+            "last_event_index": 19
+          },
+          "segment_N": 9,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_secondfloor_finite_21_22",
+          "manager": "building_1_encounter_manager_secondfloor",
+          "manager_sha256": "c92fcf6eaa7a016192ba0128a413a4858e5950c62ae0f97befcfee595aaae573",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 21,
+            "last_event_index": 22
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_mainfloor_finite_1_5",
+          "manager": "building_1_encounter_manager_mainfloor",
+          "manager_sha256": "3a114e3858ed4ad1aabe8d2e0d4b8d7d6f66f560438a4279e94cbfc74594be2f",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 5
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_mainfloor_finite_7_16",
+          "manager": "building_1_encounter_manager_mainfloor",
+          "manager_sha256": "3a114e3858ed4ad1aabe8d2e0d4b8d7d6f66f560438a4279e94cbfc74594be2f",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 16
+          },
+          "segment_N": 8,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_1_encounter_manager_mainfloor_finite_20_22",
+          "manager": "building_1_encounter_manager_mainfloor",
+          "manager_sha256": "3a114e3858ed4ad1aabe8d2e0d4b8d7d6f66f560438a4279e94cbfc74594be2f",
+          "layers": [],
+          "source_slice": {
+            "first_event_index": 20,
+            "last_event_index": 22
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_b2_finite_2_6",
+          "manager": "precombat_encounter_manager_b2",
+          "manager_sha256": "f5335da79772e20f84002d82a56c9799e72a44ba005ee8736def85d82f607c31",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 6
+          },
+          "segment_N": 5,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_encounter_b1_finite_2_16",
+          "manager": "precombat_encounter_manager_encounter_b1",
+          "manager_sha256": "7da0a88bcbc4be53732e849dc47e9149aaeec58218333b187b0e6bb342647a96",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 16
+          },
+          "segment_N": 15,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_finite_4_11",
+          "manager": "rooftop_encounter_manager_a_main",
+          "manager_sha256": "dcbaed55bc90bde0696bb903621a445805e629e1851fe4eb72f0148b6c88527c",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 4,
+            "last_event_index": 11
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_finite_13_16",
+          "manager": "rooftop_encounter_manager_a_main",
+          "manager_sha256": "dcbaed55bc90bde0696bb903621a445805e629e1851fe4eb72f0148b6c88527c",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 13,
+            "last_event_index": 16
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_finite_18_21",
+          "manager": "rooftop_encounter_manager_a_main",
+          "manager_sha256": "dcbaed55bc90bde0696bb903621a445805e629e1851fe4eb72f0148b6c88527c",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 18,
+            "last_event_index": 21
+          },
+          "segment_N": 2,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_finite_23_27",
+          "manager": "rooftop_encounter_manager_a_main",
+          "manager_sha256": "dcbaed55bc90bde0696bb903621a445805e629e1851fe4eb72f0148b6c88527c",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 23,
+            "last_event_index": 27
+          },
+          "segment_N": 3,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_tyrant_finite_1_3",
+          "manager": "rooftop_encounter_manager_a_main_tyrant",
+          "manager_sha256": "677b221804041506de92896cb9dd25c1867e89b5d3f76de1f9194f346d9a0520",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 1,
+            "last_event_index": 3
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "rooftop_encounter_manager_a_main_tyrant_finite_7_8",
+          "manager": "rooftop_encounter_manager_a_main_tyrant",
+          "manager_sha256": "677b221804041506de92896cb9dd25c1867e89b5d3f76de1f9194f346d9a0520",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 7,
+            "last_event_index": 8
+          },
+          "segment_N": 1,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "precombat_encounter_manager_encounter_a_finite_2_12",
+          "manager": "precombat_encounter_manager_encounter_a",
+          "manager_sha256": "f2af6034fb2f6360b744f0c4590d74852d7bb1fd3175fc65ad32ffbeab734b5e",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 2,
+            "last_event_index": 12
+          },
+          "segment_N": 11,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
+        },
+        {
+          "id": "building_2_encounter_manager_left_hallway_finite_0_6",
+          "manager": "building_2_encounter_manager_left_hallway",
+          "manager_sha256": "a24288c13c833831e09e255488a7a5626fd9f5dc5c7118b59e61beb5d607bb25",
+          "layers": [
+            "game/sp/e3m4_boss/main_level"
+          ],
+          "source_slice": {
+            "first_event_index": 0,
+            "last_event_index": 6
+          },
+          "segment_N": 4,
+          "evidence": "Normal campaign source; distinct direct finite emissions in the named phase, separate from subsequent replenishment and replay."
         }
       ]
     }

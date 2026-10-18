@@ -3,27 +3,16 @@
 import hashlib
 import json
 
-from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace
+from tools.maps.ap_map_generator import find_entity_block_bounds
 from tools.maps.encounter_catalog import entity_records
 from tools.maps.encounter_materializer import _edit
 from tools.maps.encounter_population_sources import PopulationSources
-from tools.maps.enemy_attributes import _member
+from tools.maps.encounter_source_definitions import SourceDefinitions
+from tools.maps.enemy_attributes import _render
 
 
 PRIVATE_POPULATION_PREFIX = "gameresources_patch2/generated/decls/actorpopulation/actorpopulation/ap_v070/"
 PRIVATE_POPULATION_ASSETSINFO_PREFIX = "gameresources_patch2/EternalMod/assetsinfo/ap_v070_population_"
-
-
-def _object_body(text, path):
-    body = text.strip()[1:-1]
-    for name in path:
-        member = _member(body, name)
-        if member is None or not member[2]:
-            raise ValueError(f"Population source has no object: {name}")
-        start, _, _ = member
-        end = find_matching_brace(body, start)
-        body = body[start + 1:end - 1]
-    return body
 
 
 def materialize_frozen_populations(materialized_map_text, map_plan, registry, root):
@@ -33,27 +22,22 @@ def materialize_frozen_populations(materialized_map_text, map_plan, registry, ro
         return materialized_map_text, {}
     sources = registry["actorpopulation_sources"]
     populations = PopulationSources(registry, root)
-    load, variants = populations.load, populations.variants
-    matches = populations.matches
+    matches = SourceDefinitions(registry, root).population_matches
 
     def additional_assignment(inherit, spawn_type):
-        candidates = []
-        for name in sorted(sources):
-            values = variants(name)
-            for variant in values:
-                document, rows, _, text = load(name, variant)
-                for index, row in sorted(rows.items()):
-                    if not matches(row, inherit, spawn_type):
-                        continue
-                    if len(values) != 1:
-                        raise ValueError(f"Ambiguous actor population variant: {name}")
-                    parent = document.get("inherit")
-                    if parent and any(index < load(parent, value)[2] for value in variants(parent)):
-                        raise ValueError(f"Population assignment has unresolved inherited fields: {name}/{index}")
-                    candidates.append(_object_body(text, ("edit", "aiTypeDefAssignments", f"item[{index}]")))
-        if len(candidates) != 1:
-            raise ValueError(f"Missing or ambiguous population assignment: {inherit}/{spawn_type}")
-        return candidates[0]
+        common = {f'actorpopulation/default/{name}' for name in ('default_no_bosses', 'dlc1', 'dlc2')}
+        for names in (sources.keys() & common, sources.keys() - common):
+            candidates = {}
+            for name in sorted(names):
+                for rows in populations.resolved_variants(name):
+                    for row in rows.values():
+                        if matches(row, inherit, spawn_type):
+                            candidates[json.dumps(row, sort_keys=True)] = row
+            if candidates:
+                if len(candidates) != 1:
+                    raise ValueError(f"Missing or ambiguous population assignment: {inherit}/{spawn_type}")
+                return _render(next(iter(candidates.values())), 3)[1:-1]
+        raise ValueError(f"Missing or ambiguous population assignment: {inherit}/{spawn_type}")
 
     selected = {operation["manager"]["entity"] for operation in operations}
     selected.update(instance["ai_name"] for operation in operations for wave in operation["waves"]

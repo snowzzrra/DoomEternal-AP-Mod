@@ -30,7 +30,8 @@
     "work\\v070-attribute-decl-closure\\SOURCE-PROOF.json": "5fd86b09706f98c14022b017f25ed363dd9e786a1e2d15501bc44ce78e3b9e8a",
     "work\\v070-multi-definition-decl-ancestry\\SOURCE-PROOF.json": "46d846bf6eedb0fc5aaf3a498314e16f16c88059b8cad5d25bcad94b21785e6f",
     "work\\v070-multi-definition-native-proof.json": "7adf7548d13a5368dc33c03a7f6860a7100c139f7aada1fa9ff818225cf5ec24",
-    "work\\v070-spawn-group-admission-decls\\SOURCE-PROOF.json": "618595c9397e9d65c1665159d4864a139845b9a9b7df4cb52b2ac78084808523"
+    "work\\v070-spawn-group-admission-decls\\SOURCE-PROOF.json": "618595c9397e9d65c1665159d4864a139845b9a9b7df4cb52b2ac78084808523",
+    "work\\v070-finalizacao-branches\\dlc2-archvile-decls\\SOURCE-PROOF.json": "fbc76a920eeeb26ba1557aa600ed75ed519772cdbed19a87b5550b65087e6af3"
   },
   "declarations": {
     "ai/ambient/buffpod": {
@@ -2871,6 +2872,75 @@
           "size": 4130,
           "sha256": "ba6e9a26a1ac0e165c4780a96eca77205d20a7afc56cd8f7ca7d9d6c8f5dd385",
           "stored_sha256": "ba6e9a26a1ac0e165c4780a96eca77205d20a7afc56cd8f7ca7d9d6c8f5dd385"
+        }
+      ]
+    },
+    "ai/superheavy/archvile_dlc2": {
+      "inherit": "ai/superheavy/archvile",
+      "resource_name": "generated/decls/entitydef/ai/superheavy/archvile_dlc2.decl",
+      "variants": [
+        {
+          "bank": "game/dlc2/e5m1_spear/e5m1_spear.resources",
+          "index": 13265,
+          "offset": 105024960,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/dlc2/e5m2_earth/e5m2_earth.resources",
+          "index": 15584,
+          "offset": 102652800,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/dlc2/e5m3_hell/e5m3_hell.resources",
+          "index": 12671,
+          "offset": 103810944,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/dlc2/e5m4_boss/e5m4_boss.resources",
+          "index": 9196,
+          "offset": 90210432,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/horde/e6m1_cult_horde/e6m1_cult_horde.resources",
+          "index": 15777,
+          "offset": 135941056,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/horde/e6m2_earth_horde/e6m2_earth_horde.resources",
+          "index": 15397,
+          "offset": 104741824,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
+        },
+        {
+          "bank": "game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources",
+          "index": 13637,
+          "offset": 123743168,
+          "stored_size": 243,
+          "size": 243,
+          "sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
+          "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334"
         }
       ]
     },

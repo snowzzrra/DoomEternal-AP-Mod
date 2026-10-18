@@ -8,6 +8,19 @@ from pathlib import Path
 from .enemy_options import SPECIES_IDS
 
 
+AIRBORNE_SPECIES = frozenset({'gargoyle', 'cacodemon', 'pain_elemental', 'lost_soul', 'blood_angel'})
+
+
+AMMUNITION_SPECIES = {
+    "imp": "ENCOUNTER_SPAWN_IMP",
+    "hell_soldier": "ENCOUNTER_SPAWN_HELL_SOLDIER",
+    "shotgun_soldier": "ENCOUNTER_SPAWN_SHOTGUN_SOLDIER",
+    "gargoyle": "ENCOUNTER_SPAWN_GARGOYLE",
+    "zombie_tier_1": "ENCOUNTER_SPAWN_ZOMBIE_TIER_1",
+    "zombie_tier_3": "ENCOUNTER_SPAWN_ZOMBIE_TIER_3",
+}
+
+
 def load_species_registry(path):
     registry = json.loads(Path(path).read_bytes().decode("utf-8"))
     project_species_profiles(registry)
@@ -93,6 +106,14 @@ def enemy_spawn_mask(spawn_type):
     if not 0 < value < 1 << 44:
         raise ValueError("Unqualified native actor mask")
     return value
+
+
+def selected_spawn_type(source):
+    selected = source.get("selected_spawn_type", source["spawn_type"])
+    mask = enemy_spawn_mask(selected)
+    if mask & (mask - 1) or mask & ~enemy_spawn_mask(source["spawn_type"]):
+        raise ValueError("Selected source type must be one member of the native request")
+    return selected
 
 
 def enemy_tracking_suffix(source_type, physical_type):

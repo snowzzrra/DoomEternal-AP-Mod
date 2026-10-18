@@ -38,15 +38,17 @@ def _items(edit, field, *, native_null_members=False):
         raise ValueError(f'Unqualified spawn admission list: {field}') from error
 
 
-def _position(edit):
+def spawn_position(edit):
     if any(re.search(r'bind|transform', path, re.I) and value for path, value in walk_values(edit)):
         raise ValueError('Spawn admission with bound transforms needs review')
     position = edit.get('spawnPosition', {})
+    if not isinstance(position,dict) or set(position)-set('xyz'):
+        raise ValueError('Unqualified spawn admission coordinate')
     return [_f32(position.get(axis, 0)) for axis in 'xyz']
 
 
 def _cylinder_contains(position, edit):
-    origin = _position(edit)
+    origin = spawn_position(edit)
     floor = _f32(edit.get('floorHeight', -RADIUS))
     ceiling = _f32(edit.get('ceilingHeight', RADIUS))
     radius = _f32(edit.get('radius', RADIUS))
@@ -56,6 +58,54 @@ def _cylinder_contains(position, edit):
     horizontal = _f32(_f32(dx * dx) + _f32(dy * dy))
     vertical = abs(_f32(position[2] - center_z))
     return horizontal <= _f32(radius * radius) and vertical <= half_height
+
+
+def source_group_points(name, point_names, group_names, record, context_layers):
+    group = record(name)
+    if group['class'] != 'idTargetSpawnGroup' or group['inherit'] not in (
+            'encounter/spawn_group/zone', 'encounter/spawn_group/cylinder'):
+        raise ValueError('Unqualified source spawn group defaults')
+    if group['layers'] and group['layers'] != context_layers:
+        raise ValueError('Source group layer activation needs review')
+    edit = group['edit']
+    subgroups = _items(edit, 'targetSpawnSubGroups', native_null_members=True)
+    if any(not isinstance(child, str) or child == name
+           or _items(record(child)['edit'], 'targetSpawnSubGroups', native_null_members=True) for child in subgroups):
+        raise ValueError('Nested source subgroup expansion needs activation-order review')
+    members = _items(edit, 'spawners', native_null_members=True)
+    touching = edit.get('includeTouchingSpawners', True)
+    cylinder = edit.get('usesCylinderForBounds', group['inherit'] == 'encounter/spawn_group/cylinder')
+    if touching:
+        if cylinder:
+            members += [point for point in point_names if _cylinder_contains(spawn_position(record(point)['edit']), edit)]
+        else:
+            members += _items(edit, 'spawnersTouchingPrimitives', native_null_members=True)
+    if any(not isinstance(member, str) for member in members):
+        raise ValueError('Unqualified spawn-group member reference')
+    members = list(dict.fromkeys(members))
+    for point in members:
+        row = record(point)
+        if row['class'] != 'idTarget_Spawn' or row['inherit'] != 'target/spawn':
+            raise ValueError('Source group member is not a qualified spawn point')
+        if row['layers'] and row['layers'] != context_layers:
+            raise ValueError('Source point layer activation needs review')
+        if row['edit'].get('flags', {}).get('touchesTriggers', False):
+            raise ValueError('Physical spawn-group touches need review')
+    if not edit.get('exclusive', False):
+        for other in group_names:
+            candidate = record(other)
+            if other == name or not candidate['edit'].get('exclusive', False):
+                continue
+            if candidate['edit'].get('includeTouchingSpawners', True):
+                raise ValueError('Exclusive spawn groups need admission review')
+            claimed = _items(candidate['edit'], 'spawners', native_null_members=True)
+            if set(members) & set(claimed):
+                if candidate['layers'] and candidate['layers'] != context_layers:
+                    raise ValueError('Exclusive spawn group layer activation needs review')
+                members = [point for point in members if point not in claimed]
+    for child in subgroups:
+        members += source_group_points(child, point_names, group_names, record, context_layers)
+    return list(dict.fromkeys(members))
 
 
 def admitted_parent_definitions(point, group_names, record, context_layers):
@@ -68,33 +118,41 @@ def admitted_parent_definitions(point, group_names, record, context_layers):
         raise ValueError('Physical spawn-group touches need review')
     if point['layers'] and point['layers'] != context_layers:
         raise ValueError('Source point layer activation needs review')
-    position = _position(edit)
+    position = spawn_position(edit)
     parents = set()
     guaranteed = set()
-    # startup applies parents from every map group, including groups outside the script.
+    admitted = []
+    # all map groups apply parents to their own members before subgroup merging.
     for name in sorted(group_names):
         group = record(name)
         if group['class'] != 'idTargetSpawnGroup' or group['inherit'] not in (
                 'encounter/spawn_group/zone', 'encounter/spawn_group/cylinder'):
             raise ValueError('Unqualified source spawn group defaults')
         properties = group['edit']
-        if properties.get('exclusive', False) or _items(properties, 'targetSpawnSubGroups'):
-            raise ValueError('Exclusive spawn groups or subgroups need admission review')
         members = _items(properties, 'spawners', native_null_members=True)
         primitives = _items(properties, 'spawnersTouchingPrimitives')
         if any(not isinstance(member, str) for member in members + primitives):
             raise ValueError('Unqualified spawn-group member reference')
         explicit = point['name'] in members
         saved = point['name'] in primitives
-        _position(properties)
-        parent = properties.get('targetSpawnParent')
-        if not parent:
-            continue
+        spawn_position(properties)
         touching = properties.get('includeTouchingSpawners', True)
         cylinder = properties.get('usesCylinderForBounds', group['inherit'] == 'encounter/spawn_group/cylinder')
-        if explicit or (touching and (saved or (cylinder and _cylinder_contains(position, properties)))):
+        if explicit or (touching and (_cylinder_contains(position, properties) if cylinder else saved)):
+            exclusive=properties.get('exclusive',False)
+            if exclusive and touching:
+                raise ValueError('Exclusive spawn groups need admission review')
+            admitted.append((exclusive,properties.get('targetSpawnParent'),group['layers'] in (point['layers'],context_layers)))
+    exclusive=[entry for entry in admitted if entry[0]]
+    if exclusive:
+        # native exclusive groups remove their points from nonexclusive groups before applying parents.
+        if any(not active for _,_,active in exclusive) or len({parent for _,parent,_ in exclusive if parent})>1:
+            raise ValueError('Exclusive spawn groups have uncertain parent selection')
+        admitted=exclusive
+    for _,parent,active in admitted:
+        if parent:
             parents.add(parent)
-            if group['layers'] in (point['layers'], context_layers):
+            if active:
                 guaranteed.add(parent)
     definitions = {}
     guaranteed_definitions = set()

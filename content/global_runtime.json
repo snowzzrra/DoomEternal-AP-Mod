@@ -35,6 +35,12 @@
       "requirement": {
         "kind": "repetitions",
         "original_count": 25
+      },
+      "enemy_targets": {
+        "species": [
+          "arachnotron"
+        ],
+        "minimum": 1
       }
     },
     {
@@ -71,6 +77,13 @@
       "requirement": {
         "kind": "repetitions",
         "original_count": 15
+      },
+      "enemy_targets": {
+        "species": [
+          "pinky",
+          "spectre"
+        ],
+        "minimum": 1
       }
     },
     {
@@ -251,6 +264,12 @@
       "requirement": {
         "kind": "repetitions",
         "original_count": 15
+      },
+      "enemy_targets": {
+        "species": [
+          "prowler"
+        ],
+        "minimum": 1
       }
     },
     {
@@ -359,6 +378,12 @@
       "requirement": {
         "kind": "repetitions",
         "original_count": 20
+      },
+      "enemy_targets": {
+        "species": [
+          "cacodemon"
+        ],
+        "minimum": 1
       }
     },
     {

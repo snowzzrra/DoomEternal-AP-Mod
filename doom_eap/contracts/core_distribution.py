@@ -10,7 +10,7 @@ ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
        "campaign_menu": 1, "inventory": 7, "arsenal": 1, "runes": 1,
        "special": 1, "deathlink": 1, "automap": 1, "commands": 1,
-       "combat": 2, "combat_presentation": 1, "enemy_movement": 1, "enemy_supply": 1, "enemy_limits": 1, "enemy_tracking": 1}
+       "combat": 2, "combat_presentation": 1, "enemy_movement": 2, "enemy_supply": 1, "enemy_limits": 1, "enemy_tracking": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}

@@ -14,7 +14,7 @@ from .encounter_catalog import ENTITY_HEADER, entity_records, list_items, walk_v
 from .encounter_materializer import _value_span, text_sha256
 from .encounter_source_definitions import SourceDefinitions
 from .enemy_attribute_baselines import resolve_enemy_attribute_baselines, positive_enemy_hitpoints
-from .verify_encounter_opportunities import verify_catalog, typed_consumers
+from .verify_encounter_opportunities import verify_catalog, typed_consumers, initial_maintenance_count
 
 
 def _require(condition, message):
@@ -70,10 +70,18 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
         scripts = list_items(edit['encounterComponent']['entityEvents'])
         _require(len(scripts) == 1 and not list_items(edit.get('preCombatTriggers')), f'Alternative activation needs review: {name}')
         calls = [event['eventCall'] for event in list_items(scripts[0]['events'])]
-        _require(calls and all(call['eventDef'] in {'spawnSingleAI', 'spawnAI', 'staggeredAISpawn', 'waitStaggeredSpawnComplete', 'wait', 'waitAIRemaining', 'activateTarget'} for call in calls),
+        scope = selection.get('source_slice', dict(first_event_index=0, last_event_index=len(calls) - 1))
+        first, last = scope['first_event_index'], scope['last_event_index']
+        _require(type(first) is int and type(last) is int and 0 <= first <= last < len(calls), 'Invalid source slice')
+        selected_calls = list(enumerate(calls))[first:last + 1]
+        initial_completion = selection.get('initial_maintenance_completion')
+        allowed = {'spawnSingleAI', 'spawnAI', 'staggeredAISpawn', 'waitStaggeredSpawnComplete', 'wait', 'waitAIRemaining', 'activateTarget'}
+        if initial_completion:
+            allowed.add('maintainAICount')
+        _require(all(call['eventDef'] in allowed for _, call in selected_calls),
             f'Unsupported cohort or control operation: {name}')
         controls = []
-        for index, call in enumerate(calls):
+        for index, call in selected_calls:
             if call['eventDef'] != 'activateTarget':
                 continue
             args = list_items(call['args'])
@@ -88,16 +96,20 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
             _require(target_row['sha256'] == digest, f'Reviewed control entity differs: {target}')
             _require(all(child in control_entities for child in list_items(target_row['edit'].get('targets'))),
                 f'Unreviewed downstream control target: {target}')
-        population_indices = [index for index, call in enumerate(calls) if call['eventDef'] != 'activateTarget']
+        population_indices = [index for index, call in selected_calls if call['eventDef'] != 'activateTarget']
         _require(population_indices, f'No final population barrier: {name}')
         phase_index = population_indices[-1]
-        _require(calls[phase_index]['eventDef'] == 'waitAIRemaining' and list_items(calls[phase_index]['args'])[1]['int'] == 0,
-            f'No final population barrier: {name}')
+        if 'source_slice' not in selection:
+            _require(calls[phase_index]['eventDef'] == 'waitAIRemaining' and list_items(calls[phase_index]['args'])[1]['int'] == 0,
+                f'No final population barrier: {name}')
         bindings = {}
         for field, class_name in [('commitTriggers', 'idEncounterTrigger_Commit'), ('exitTriggers', 'idEncounterTrigger_Exit'),
                 ('userFlagTriggers', 'idEncounterTrigger_RaiseUserFlag')]:
             bindings[field] = []
             for target in list_items(edit.get(field)):
+                if target not in source_names:
+                    bindings[field].append(dict(entity=target, source_resolved=False))
+                    continue
                 trigger = record(target)
                 _require(trigger['class'] == class_name, f'Invalid trigger class: {target}')
                 binding = dict(entity=target)
@@ -106,11 +118,19 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 if field == 'userFlagTriggers':
                     binding['label'] = trigger['edit']['userFlag']
                 bindings[field].append(binding)
-        _require(bindings['commitTriggers'], f'No reviewed Commit binding: {name}')
+        incoming = selection.get('incoming_targets', [])
+        for edge in incoming:
+            _require(edge['entity'] != name, f'Activation target points to its own script: {name}')
+            value = record(edge['entity'])['edit']
+            for field in edge['path'].split('.'):
+                value = value[field]
+            _require(value == name, f'Reviewed activation target differs: {name}')
+        _require(any(binding.get('source_resolved') is not False for binding in bindings['commitTriggers']) or incoming,
+            f'No reviewed activation: {name}')
         creations = []
         event_gates = []
         used_points = set()
-        for index, call in enumerate(calls):
+        for index, call in selected_calls:
             args = list_items(call['args'])
             if call['eventDef'] == 'activateTarget':
                 continue
@@ -127,10 +147,12 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 continue
             if call['eventDef'] == 'waitStaggeredSpawnComplete':
                 continue
-            grouped = call['eventDef'] in {'spawnAI', 'staggeredAISpawn'}
-            count = args[1]['int'] if grouped else 1
+            maintenance = call['eventDef'] == 'maintainAICount'
+            grouped = call['eventDef'] in {'spawnAI', 'staggeredAISpawn', 'maintainAICount'}
+            count = (initial_maintenance_count(calls, index, initial_completion['delay_event_index'])
+                     if maintenance else args[1]['int'] if grouped else 1)
             spawn_type = args[0]['eEncounterSpawnType_t']
-            origin_name = args[2 if grouped else 1]['entity']
+            origin_name = args[5 if maintenance else 2 if grouped else 1]['entity']
             origin = record(origin_name)
             _require(type(count) is int and count > 0, f'Unqualified finite request: {name}/{index}')
             source_mask = enemy_spawn_mask(spawn_type)
@@ -145,8 +167,12 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
             else:
                 point_names = [origin_name]
             queued = call['eventDef'] == 'staggeredAISpawn' or (grouped and count > 1)
+            unrestricted = dict(maxCount=0, reuseDelaySec=0, doBoundsTest=False, boundsTestType='BOUNDSTEST_NONE',
+                fovCheck=0, minDistance=0, maxDistance=0, neighborSpawnerDistance=-1, LOS_Test='LOS_NONE',
+                playerToTest='PLAYER_SP', conditionProxy='')
+            reused = used_points.intersection(point_names)
             _require(point_names and len(point_names) == len(set(point_names))
-                and (queued or not used_points.intersection(point_names)),
+                and (queued or not reused or all(record(point)['edit'].get('spawnConditions') == unrestricted for point in reused)),
                 f'Source point reuse without an empty-population barrier: {name}/{index}')
             used_points.update(point_names)
             members = []
@@ -210,31 +236,41 @@ def extract_reviewed_catalog(source_bytes, registry_bytes, profile, *, root=None
                 elif definition_source != point_name:
                     member['definition_source'] = definition_source
                 members.append(member)
-            _require(len(identities) == 1, f'Mixed source group needs review: {origin_name}')
             event_path = ('encounterComponent', 'entityEvents', 'item[0]', 'events', f'item[{index}]', 'eventCall')
             left, right = _value_span(blocks[name], event_path)
-            label = args[3 if grouped else 2]['string']
+            label = args[6 if maintenance else 3 if grouped else 2]['string']
             creations.append(dict(event_index=index, event_def=call['eventDef'], event_sha256=text_sha256(blocks[name][left:right].strip()),
-                species=identities.pop(), spawn_type=spawn_type, count=count, label=label, spawner=origin_name,
+                **(dict(species=next(iter(identities))) if len(identities) == 1 else dict(species_candidates=sorted(identities))),
+                spawn_type=spawn_type, count=count, label=label, spawner=origin_name,
                 members=members, replacement_constraints=typed_consumers(calls, spawn_type, label)))
+            if maintenance:
+                creations[-1].update(desired_count=args[1]['int'], count_kind='initial_maintenance_batch',
+                    replacement_qualification='preserve_source_producer_until_maintenance_materialization_is_qualified')
             if spawn_type == 'ENCOUNTER_SPAWN_ANY':
                 creations[-1].update(source_identity='concrete_spawner_definitions',
                     replacement_qualification='preserve_source_event_until_any_materialization_is_qualified')
         total = sum(creation['count'] for creation in creations)
         _require(total == selection['segment_N'] and total > 0, f'Reviewed segment N differs: {name}')
-        barrier = list_items(calls[phase_index]['args'])
-        for creation in creations:
-            source_mask = enemy_spawn_mask(creation['spawn_type'])
-            _require(enemy_spawn_mask(barrier[0]['eEncounterSpawnType_t']) & source_mask == source_mask,
-                f'Final barrier omits source species: {name}')
-            _require(barrier[2]['string'] in {'', creation['label']}, f'Final barrier omits source cohort: {name}')
+        if 'source_slice' not in selection:
+            barrier = list_items(calls[phase_index]['args'])
+            for creation in creations:
+                source_mask = enemy_spawn_mask(creation['spawn_type'])
+                _require(enemy_spawn_mask(barrier[0]['eEncounterSpawnType_t']) & source_mask == source_mask,
+                    f'Final barrier omits source species: {name}')
+                _require(barrier[2]['string'] in {'', creation['label']}, f'Final barrier omits source cohort: {name}')
         left, right = _value_span(blocks[name], ('encounterComponent', 'entityEvents', 'item[0]', 'events', f'item[{phase_index}]', 'eventCall'))
         segments.append(dict(id=selection['id'], manager=name, script_index=0, segment_N=total,
             qualification='finite_authored_opportunities_if_activated', review=selection['evidence'],
-            activation=dict(kind='reviewed_single_script_initial_pass', bindings=bindings, incoming_targets=[], event_gates=event_gates,
-                required_phase='selected_source_population_zero',
-                phase_anchor=dict(event_index=phase_index, event_def='waitAIRemaining', event_sha256=text_sha256(blocks[name][left:right].strip())),
-                gaps=['physical_commit_route_and_kill_attribution_are_not_established_by_source_population_zero']), creations=creations))
+            activation=dict(kind='reviewed_single_script_initial_pass', bindings=bindings, incoming_targets=incoming, event_gates=event_gates,
+                required_phase='reviewed_finite_emissions' if 'source_slice' in selection else 'selected_source_population_zero',
+                phase_anchor=dict(event_index=phase_index, event_def=calls[phase_index]['eventDef'], event_sha256=text_sha256(blocks[name][left:right].strip())),
+                gaps=['physical_commit_route_requires_review']), creations=creations))
+        if 'source_slice' in selection:
+            segments[-1]['source_slice'] = dict(scope)
+        if initial_completion:
+            segments[-1]['activation']['initial_maintenance_completion'] = dict(initial_completion)
+        if 'logic' in selection:
+            segments[-1]['logic'] = dict(selection['logic'])
         if controls:
             segments[-1]['activation']['control_events'] = controls
     selected = {segment['manager'] for segment in segments}
@@ -269,6 +305,9 @@ def extract_snapshot_catalogs(root, payload_root, review):
             _require(profile['source'] == dict(path=descriptor['source_owner'], sha256=descriptor['source_sha256'])
                 and descriptor['source_sha256'] == snapshot['sha256'], f'Canonical source descriptor differs: {map_key}')
             catalog = extract_reviewed_catalog(source_bytes, registry, profile, root=root)
+            if profile.get('source_alternatives'):
+                catalog['source_alternatives'] = profile['source_alternatives']
+                verify_catalog(catalog, source_bytes, registry, root=root)
             catalog['source_snapshot'] = snapshot
             catalogs[map_key] = catalog
     return catalogs

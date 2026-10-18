@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 1
+ENEMY_OPTIONS_REVISION = 2
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -175,11 +175,24 @@ def normalize_enemy_options(raw):
         if key not in limits:
             raise ValueError(f"Unknown Special Enemy Limit: {key!r}")
         limits[key] = _integer(value, f"Special Enemy Limit {key}", maximum=2147483647)
+    late_limits = {"marauder": max(1, recipe.combined_special),
+                   "archvile": max(1, recipe.combined_special),
+                   "spirit": max(1, recipe.combined_special),
+                   "combined_special": recipe.combined_special * 2, **overrides}
+    for endpoint in (limits, late_limits):
+        if "combined_special" not in overrides:
+            endpoint["combined_special"] = min(endpoint["combined_special"],
+                sum(endpoint[name] for name in ("marauder", "archvile", "spirit")))
+        for name in ("marauder", "archvile", "spirit"):
+            if name not in overrides:
+                endpoint[name] = min(endpoint[name], endpoint["combined_special"])
+    if not progressive:
+        late_limits = dict(limits)
     return {"revision": ENEMY_OPTIONS_REVISION, "enabled": enabled, "progressive": progressive,
             "intensity": intensity, "density": density, "variety": variety, "count_mode": count_mode,
             "count_multiplier": multiplier, "weights": weights, "attributes": attributes,
             "size_variation_chance": chance, "size_variation_exclusions": size_exclusions,
-            "special_limits": limits}
+            "special_limits": limits, "special_limits_late": late_limits}
 
 
 def enemy_options_for_editing(raw):
@@ -192,7 +205,8 @@ def enemy_options_for_editing(raw):
         "enemy_intensity_late": values["intensity"][1],
         **{f"enemy_{key}": values[key] for key in (
             "density", "variety", "count_mode", "count_multiplier", "weights",
-            "size_variation_chance", "special_limits")},
+            "size_variation_chance")},
+        "enemy_special_limits": dict(raw.get("enemy_special_limits", {})),
         "enemy_size": dict(raw.get("enemy_size", {})),
     }
     for attribute in ("health", "damage", "speed"):
