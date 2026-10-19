@@ -9,6 +9,7 @@ from pathlib import Path
 
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
 from doom_eap.content.campaign_stages import campaign_stages
+from doom_eap.contracts.source_bytes import first_party_text_bytes
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
@@ -171,7 +172,7 @@ def _compile_catalog(
     write_artifact(catalog.root / "data/item_classifications.json", json.dumps({
         "schema_version": 1, "item_mapping_revision": 9,
         "source": "Archipelago/worlds/doometernal/items.py",
-        "source_sha256": hashlib.sha256(item_source.read_bytes()).hexdigest(),
+        "source_sha256": hashlib.sha256(first_party_text_bytes(item_source.read_bytes())).hexdigest(),
         "items": {str(code): {"name": name, "classification": classifications[code]}
                   for name, code in sorted(item_ids.items(), key=lambda pair: pair[1])},
     }, indent=2, ensure_ascii=False) + "\n")

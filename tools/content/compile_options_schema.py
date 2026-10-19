@@ -14,6 +14,8 @@ from types import ModuleType, SimpleNamespace
 from pathlib import Path
 from typing import Any
 
+from doom_eap.contracts.source_bytes import first_party_text_bytes
+
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = ROOT.parent / "Archipelago"
@@ -216,7 +218,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
         "schema_version": 2,
         "game": world.game,
         "source": "Archipelago/worlds/doometernal/options.py",
-        "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+        "source_sha256": hashlib.sha256(first_party_text_bytes(source.read_bytes())).hexdigest(),
         "options": options,
         "excluded_options": excluded,
     }

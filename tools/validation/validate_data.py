@@ -27,6 +27,7 @@ from doom_eap.contracts.foundation import (
 )
 from doom_eap.content.item_classification import load_item_classification_identity
 from doom_eap.content.map_registry import load_map_registry, validation_plan
+from doom_eap.contracts.source_bytes import first_party_text_bytes
 from tools.decls.devinv_builder import load_devinv_mapping
 from tools.content.compile_start_inventory_catalog import compile_catalog
 from tools.maps import ap_map_generator
@@ -806,7 +807,7 @@ def main(argv: list[str] | None = None) -> int:
             errors.append(
                 "Packaged item classifications have an unauthenticated source path"
             )
-        expected_source_sha256 = hashlib.sha256((APWORLD / "items.py").read_bytes()).hexdigest()
+        expected_source_sha256 = hashlib.sha256(first_party_text_bytes((APWORLD / "items.py").read_bytes())).hexdigest()
         if classification_document.get("source_sha256") != expected_source_sha256:
             errors.append("Packaged item classifications have a stale source SHA-256")
         packaged_item_names = {

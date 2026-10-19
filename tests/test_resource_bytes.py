@@ -93,6 +93,31 @@ def test_source_fingerprint_normalizes_only_owned_text_and_preserves_real_change
         assert compiler_source_bytes(raw) == b"opaque\r\nbytes"
 
 
+def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edits(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tools.content import compile_options_schema as compiler
+
+    class Toggle:
+        default = False
+
+    unused = type("UnusedOption", (), {})
+    world = SimpleNamespace(game="DOOM Eternal", options_dataclass=SimpleNamespace(type_hints={"death_link": Toggle}))
+    monkeypatch.setattr(compiler, "_load_apworld", lambda _: (world, Toggle, unused, unused, unused, unused))
+    source = tmp_path / "worlds/doometernal/options.py"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"death_link = False\n")
+    projection = tmp_path / "options_schema.json"
+    compiler.materialize_schema(tmp_path, projection)
+    original = projection.read_bytes()
+    source.write_bytes(b"death_link = False\r\n")
+    compiler.check_schema(tmp_path, projection)
+    assert compiler.materialize_schema(tmp_path, projection) == ()
+    assert projection.read_bytes() == original
+    source.write_bytes(b"death_link = True\r\n")
+    with pytest.raises(ValueError, match="stale"):
+        compiler.check_schema(tmp_path, projection)
+
+
 
 
 
