@@ -5,6 +5,7 @@ import json
 import re
 import sys
 import tempfile
+import time
 import types
 import zipfile
 from pathlib import Path
@@ -61,7 +62,9 @@ def check(resources, room, decompressor, output, frozen_launcher=None):
             document = json.loads(json.dumps(manifest.document()))
             assert all(document[key] == frozen[key] for key in fields)
             before, _ = assemble_room_files(compiler.base_resource, compiler.payload_resource, compiler.payload_manifest, manifest.options)
+            started = time.perf_counter()
             package = compiler.build(manifest, output, force=True)
+            compile_seconds = time.perf_counter() - started
             active = set(manifest.active_location_ids)
             checked = {}
             with zipfile.ZipFile(package) as result:
@@ -80,7 +83,7 @@ def check(resources, room, decompressor, output, frozen_launcher=None):
                     checked[identity] = len(names)
             assert compiler.validate_cached_package(package, manifest)
             report = {"result": "PASS", "method": "actual frozen launcher_core PYZ" if frozen_launcher else "source compiler",
-                      "candidate": str(package), "manifest_hash": manifest.manifest_hash,
+                      "candidate": str(package), "manifest_hash": manifest.manifest_hash, "compile_seconds": compile_seconds,
                       "sha256": hashlib.sha256(package.read_bytes()).hexdigest(),
                       "static_content_digest": compiler.static_content_digest,
                       "frozen_fields_preserved": list(fields), "dlc_ap_entities_preserved": checked,

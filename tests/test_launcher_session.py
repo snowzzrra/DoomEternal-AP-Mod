@@ -162,6 +162,24 @@ def test_support_condump_uses_workflow_session_owner(tmp_path):
     assert owner.observe.call_count >= 2 and controller._condump_pending is None
 
 
+def test_support_does_not_query_the_session_owner_while_installation_is_busy():
+    import threading
+    from doom_eap.launcher.launcher_controller import LauncherController
+    from doom_eap.launcher.launcher_workers import LauncherWorkers, LauncherJob
+    controller = LauncherController.__new__(LauncherController)
+    controller.workers = LauncherWorkers(lambda job, error: pytest.fail(str(error)))
+    entered, release = threading.Event(), threading.Event()
+    try:
+        controller.workers.submit('install', lambda job: (entered.set(), release.wait(3)))
+        assert entered.wait(3)
+        job = LauncherJob('support', 0, threading.Event())
+        result = controller._request_support_condump(job=job)
+        assert result['status'] == 'unavailable' and result['reason'] == 'launcher_busy'
+    finally:
+        release.set()
+        controller.workers.close(3)
+
+
 def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeypatch):
     from pathlib import Path
     import zipfile

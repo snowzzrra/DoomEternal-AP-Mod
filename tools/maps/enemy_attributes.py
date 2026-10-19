@@ -3,6 +3,7 @@
 import json
 import math
 import re
+from functools import lru_cache
 
 from tools.maps.ap_map_generator import find_matching_brace
 from tools.maps.encounter_catalog import ENTITY_HEADER, MEMBER, list_items, parse_object
@@ -112,6 +113,20 @@ def _scaled(value, percent, field, *, zero=False):
     return result
 
 
+@lru_cache(maxsize=128)
+def _attribute_source(source_block):
+    headers = list(ENTITY_HEADER.finditer(source_block))
+    if len(headers) != 1 or headers[0].group(3) != "idAI2":
+        raise ValueError("Enemy attributes require exactly one idAI2 entity definition")
+    header = headers[0]
+    edit_match = re.search(r"\bedit\s*=\s*\{", source_block[header.end():])
+    if edit_match is None:
+        raise ValueError("Enemy entity definition has no edit object")
+    begin = header.end() + edit_match.end() - 1
+    end = find_matching_brace(source_block, begin)
+    return header, begin, end, parse_object(source_block[begin + 1:end - 1])
+
+
 def materialize_enemy_attributes(
     source_block,
     clone_name,
@@ -132,17 +147,8 @@ def materialize_enemy_attributes(
     for name, value in (("health", health_percent), ("damage", damage_percent), ("size", size_percent)):
         if type(value) is not int or not 1 <= value <= 10000:
             raise ValueError(f"{name}_percent must be an integer in 1..10000")
-    headers = list(ENTITY_HEADER.finditer(source_block))
-    if len(headers) != 1 or headers[0].group(3) != "idAI2":
-        raise ValueError("Enemy attributes require exactly one idAI2 entity definition")
-    header = headers[0]
-    edit_match = re.search(r"\bedit\s*=\s*\{", source_block[header.end():])
-    if edit_match is None:
-        raise ValueError("Enemy entity definition has no edit object")
-    begin = header.end() + edit_match.end() - 1
-    end = find_matching_brace(source_block, begin)
+    header, begin, end, properties = _attribute_source(source_block)
     body = source_block[begin + 1:end - 1]
-    properties = parse_object(body)
     if base_properties is not None and not isinstance(base_properties, dict):
         raise ValueError("base_properties must contain qualified edit properties")
 

@@ -42,6 +42,16 @@ def test_neutral_clone_preserves_authored_bytes():
     assert result == SOURCE.replace("entityDef authored_imp", "entityDef ap_v070_ai_imp__ap_v070_s00100", 1)
 
 
+def test_reusing_a_source_keeps_independent_attributes_and_detects_source_changes():
+    first = materialize_enemy_attributes(SOURCE, 'ap_v070_ai_first__ap_v070_s00100', health_percent=200)
+    second = materialize_enemy_attributes(SOURCE, 'ap_v070_ai_second__ap_v070_s00100', health_percent=50)
+    assert properties(first)['aiHealth']['components']['components[0]']['max'] == 400
+    assert properties(second)['aiHealth']['components']['components[0]']['max'] == 100
+    changed = SOURCE.replace('max = 200;', 'max = 400;', 1)
+    third = materialize_enemy_attributes(changed, 'ap_v070_ai_third__ap_v070_s00100', health_percent=50)
+    assert properties(third)['aiHealth']['components']['components[0]']['max'] == 200
+
+
 def test_instance_attributes_preserve_shield_collision_and_source():
     original = properties(SOURCE)
     result = materialize_enemy_attributes(

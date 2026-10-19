@@ -97,3 +97,26 @@ def test_bank_publication_failure_rolls_back_other_resource_metadata(tmp_path, m
     with pytest.raises(OSError, match="bank publication"):
         campaign_resources.publish_resource_activation(tmp_path, {name: b"changed" for name in names}, report)
     assert {name: (tmp_path / name).read_bytes() for name in names} == originals
+
+
+def test_finalizer_digest_matches_metadata_after_bank_registration(tmp_path, monkeypatch):
+    from doom_eap.launcher import native_enemy_resources, resource_bank
+    base = tmp_path / 'base'
+    base.mkdir()
+    originals = {name: name.encode() for name in ('meta.resources', 'idRehash.map', 'packagemapspec.json')}
+    for name, payload in originals.items():
+        (base / name).write_bytes(payload)
+    hashes = {name: hashlib.sha256(data).hexdigest() for name, data in originals.items()}
+    monkeypatch.setattr(native_enemy_resources, 'prepare_native_resource_banks', lambda *args:
+        ({'packagemapspec.json': b'changed specification'},
+         {'maps': {}, 'consolidated': {'bank': {}}, 'source_hashes': hashes}))
+    monkeypatch.setattr(resource_bank, 'register_banks', lambda base, banks, updates:
+        updates.update({'meta.resources': b'updated resource metadata'}))
+    monkeypatch.setattr(launcher_platform, 'detect_doom_processes', lambda: [])
+    monkeypatch.setattr(launcher_platform, 'publish_file', lambda source, destination, **kwargs: source.replace(destination))
+    package = tmp_path / 'room.zip'
+    with zipfile.ZipFile(package, 'w') as archive:
+        archive.writestr('seed_manifest.json', '{}')
+    result = campaign_resources.enable_campaign_resources(tmp_path, package)
+    assert result['meta_sha256'] == hashlib.sha256((base / 'meta.resources').read_bytes()).hexdigest()
+    assert (base / 'meta.resources').read_bytes() != originals['meta.resources']

@@ -12,6 +12,13 @@ def sample(enemies, key="actor", index=0, count=3):
                                       stage_index=index, stage_count=count)
 
 
+def test_zero_variation_keeps_standard_size_for_nonexcluded_species():
+    enemies = normalize_enemy_options({'enemy_size_variation_chance': 0,
+                                      'enemy_size': {'minimum': 140, 'maximum': 140}})
+    enemies['size_variation_exclusions'] = []
+    assert sample(enemies)['size_percent'] == 100
+
+
 
 def test_attributes_replay_independently_and_use_fixed_species_ranges():
     options = {

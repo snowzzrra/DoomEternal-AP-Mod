@@ -7,6 +7,8 @@ import re
 import struct
 from fractions import Fraction
 from importlib.resources import files
+from collections import OrderedDict
+from threading import Lock
 
 from .enemy_plan import (BASE_COMBAT_COST, _density_weights, _limit_suffix, _random_for, enemy_combat_cost,
                          effective_special_limits, sample_instance_attributes, sample_species)
@@ -323,6 +325,10 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None):
     return plan
 
 
+_VALIDATED_PLANS = OrderedDict()
+_VALIDATION_LOCK = Lock()
+
+
 def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
     if plan is None:
         if enemies["enabled"]:
@@ -333,7 +339,17 @@ def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
     campaign = plan.get("campaign") if campaign is None else campaign
     if not isinstance(campaign, dict) or not isinstance(campaign.get("sequence"), list):
         raise ValueError("Native recipe campaign is invalid")
-    expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog)
-    if plan != expected:
-        raise ValueError("Native recipes differ from the seed, options or source catalog")
+    if catalog is None:
+        catalog = json.loads(files(__package__).joinpath("native_enemy_catalog.json").read_bytes())
+    key = hashlib.sha256(json.dumps([plan, enemies, campaign, catalog], sort_keys=True,
+                                   separators=(",", ":"), allow_nan=False).encode("utf-8")).digest()
+    with _VALIDATION_LOCK:
+        if key not in _VALIDATED_PLANS:
+            expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog)
+            if plan != expected:
+                raise ValueError("Native recipes differ from the seed, options or source catalog")
+            _VALIDATED_PLANS[key] = None
+            if len(_VALIDATED_PLANS) > 8:
+                _VALIDATED_PLANS.popitem(last=False)
+        _VALIDATED_PLANS.move_to_end(key)
     return plan

@@ -915,16 +915,18 @@ class LauncherController:
     def request_support_bundle(self, destination: Path, *, logs: list[str]) -> bool:
         generation = self.workers.generation
         logs = list(logs)
+        requested = time.monotonic()
 
         def operation(job):
             try:
+                self._setup_event("support_bundle_started", job.event({"queue_wait_ms": round((time.monotonic() - requested) * 1000)}))
                 self.create_support_bundle(destination, logs=logs, job=job)
             except LauncherWorkCancelled:
                 raise
             except Exception as error:
                 self._setup_event("support_bundle_failed", job.event({"message": str(error)}))
 
-        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation)
+        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation, serialized=False)
 
     def request_problem_report(self, *, logs: list[str]) -> bool:
         generation = self.workers.generation
@@ -978,6 +980,8 @@ class LauncherController:
         degrade to an unavailable marker while the bundle still records logs,
         configuration evidence, and the last setup failure.
         """
+        started = time.monotonic()
+        timings = {}
         try:
             support_condump: dict[str, object] | None = (
                 self._request_support_condump() if job is None else self._request_support_condump(job=job)
@@ -989,6 +993,8 @@ class LauncherController:
                 "status": "unavailable",
                 "reason": f"{type(error).__name__}: {error}",
             }
+        timings["condump_ms"] = round((time.monotonic() - started) * 1000)
+        stage = time.monotonic()
         try:
             report = self.run_doctor() if job is None else self.run_doctor(job=job)
         except LauncherWorkCancelled:
@@ -1007,6 +1013,7 @@ class LauncherController:
                 f"Support bundle collected without a doctor report: {error}",
                 {},
             )
+        timings["doctor_ms"] = round((time.monotonic() - stage) * 1000)
         diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
         with self._lifecycle_lock:
             room = self.setup.last_event or {}
@@ -1019,6 +1026,7 @@ class LauncherController:
         }
         support_diagnostics = {
             **report.support_diagnostics,
+            "collection_timings": timings,
             "session": {
                 "connected": connected,
                 "identity_source": "connected" if connected else "last_known" if room else "unavailable",
@@ -1047,6 +1055,7 @@ class LauncherController:
             support_diagnostics["release"] = {"status": "unavailable"}
         if job is not None:
             job.check()
+        stage = time.monotonic()
         bundle = write_support_bundle(
                 destination,
                 report,
@@ -1061,10 +1070,13 @@ class LauncherController:
                 support_diagnostics=support_diagnostics,
                 archive_directory=self.user_paths.data_dir / "support-bundles",
         )
+        timing = {"archive_ms": round((time.monotonic() - stage) * 1000),
+                  "total_ms": round((time.monotonic() - started) * 1000), **timings}
         if support_condump and support_condump.get("owned_capture"):
             capture = Path(str(support_condump["path"]))
             if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
                 capture.unlink(missing_ok=True)
+        self._setup_event("support_bundle_timing", job.event(timing) if job is not None else timing)
         if job is None:
             self.emit("support_bundle_ready", path=str(bundle))
         else:
@@ -1073,6 +1085,14 @@ class LauncherController:
 
     def _request_support_condump(self, *, job=None) -> dict[str, object]:
         """Attempt one diagnostic condump, recording closed-game availability."""
+        if job is None:
+            return self._capture_support_condump()
+        job.check()
+        result = self.workers.try_serialized(lambda: self._capture_support_condump(job=job))
+        return result if result is not None else {
+            'status': 'unavailable', 'reason': 'launcher_busy', 'requested_at': time.time()}
+
+    def _capture_support_condump(self, *, job=None) -> dict[str, object]:
         if job is not None:
             job.check()
         requested_at = time.time()

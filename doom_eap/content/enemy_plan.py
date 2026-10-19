@@ -35,11 +35,12 @@ def enemy_combat_cost(species, attributes):
     if set(attributes) != {f"{name}_percent" for name in ("health", "damage", "speed", "size")} or any(
             type(value) is not int or not 1 <= value <= 10000 for value in attributes.values()):
         raise ValueError("Enemy combat attributes require integer percentages in 1..10000")
-    health, damage, speed, size = (Fraction(attributes[f"{name}_percent"])
-                                   for name in ("health", "damage", "speed", "size"))
+    health, damage, speed, size = (attributes[f"{name}_percent"] for name in ("health", "damage", "speed", "size"))
+    cost = BASE_COMBAT_COST[species]
+    size_numerator, size_denominator = (300 + size, 400) if size >= 100 else (3 * size + 100, 4 * size)
     # One kill still takes a targeting action when health is below a normal shot.
-    return (BASE_COMBAT_COST[species] * max(health / 100, Fraction(1, 4)) * (100 + damage) / 200
-            * (300 + speed) / 400 * (3 + max(size / 100, 100 / size)) / 4)
+    return Fraction(cost.numerator * max(health, 25) * (100 + damage) * (300 + speed) * size_numerator,
+                    cost.denominator * 100 * 200 * 400 * size_denominator)
 
 
 
@@ -118,14 +119,14 @@ def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_in
              + bounds["late"][edge] * stage_index + denominator // 2) // denominator
             for edge in (0, 1)
         )
-        attributes[f"{attribute}_percent"] = _random_for(seed, instance_key, attribute).randint(lower, upper)
+        attributes[f"{attribute}_percent"] = lower if lower == upper else _random_for(seed, instance_key, attribute).randint(lower, upper)
 
     if enemy_species.enemy_speed_capabilities().get(species) != "qualified":
         attributes["speed_percent"] = 100
 
     if species not in enemies["size_variation_exclusions"]:
         chance = enemies["size_variation_chance"]
-        draw = _random_for(seed, instance_key, "size_variation").randrange(200)
+        draw = _random_for(seed, instance_key, "size_variation").randrange(200) if chance else 0
         attributes["size_percent"] = 50 if draw < chance else 200 if draw < 2 * chance else 100
     return attributes
 

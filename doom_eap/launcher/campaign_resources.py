@@ -210,6 +210,18 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         report["source_hashes"] = {**({"meta.resources": report["source_meta_sha256"],
             "idRehash.map": report["source_rehash_sha256"]} if targets else {}), **banks["source_hashes"]}
         updates.update(bank_updates)
+    if banks.get('consolidated'):
+        from .resource_bank import register_banks
+        report.setdefault('source_hashes', {})
+        for name in ('meta.resources', 'idRehash.map'):
+            original = (base / name).read_bytes()
+            expected_hash = banks['source_hashes'][name]
+            if hashlib.sha256(original).hexdigest() != expected_hash:
+                raise RuntimeError('Resource metadata changed during bank consolidation')
+            report['source_hashes'].setdefault(name, expected_hash)
+            updates.setdefault(name, original)
+        register_banks(base, banks['consolidated'], updates)
+        report['updated_meta_sha256'] = hashlib.sha256(updates['meta.resources']).hexdigest()
     table = report["containers"].get(CONTAINER, {"previously_enabled": {}, "changed_bits": 0, "added_mask_words": 0})
     entries = [{"name": name, "index": row[0], "previously_enabled": table["previously_enabled"][row[0]]}
                for name, row in records.items()]

@@ -67,6 +67,16 @@ def test_delayed_reward_requires_relay_activation_before_touch():
     assert properties(visual, "ap_location_visual_1")["whenToSave"] == "SGT_CHECKPOINT"
 
 
+def test_crystal_contact_is_armed_without_requiring_the_vanilla_use_relay():
+    source = entity('crystal', 'idInteractable_WorldCache',
+                    'automapPropertiesDecl = "argent_cell"; spawnPosition = { x = 16; y = 22; z = 4; }')
+    source = source.replace('inherit = "test";', 'inherit = "progress/argent_cell";')
+    trigger = generate_independent_pickup_trigger('crystal', 'AP_CHECK_CRYSTAL', source,
+                {'gate_relay': 'target_relay_argent_cell_useable'})
+    assert properties(trigger, 'ap_independent_crystal').get('triggerFirst', False) is False
+    assert properties(trigger, 'ap_independent_crystal')['triggerOnce'] is True
+
+
 @pytest.mark.parametrize("changed", [
     source().replace('hide = true;', 'hide = false;'),
     source().replace('item[0] = "pickup";', 'item[0] = "another_pickup";'),

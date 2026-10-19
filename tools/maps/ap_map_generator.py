@@ -141,14 +141,12 @@ def remove_balanced_entity_blocks(content, name_prefix):
         result.append(content[pos:m.start()])
         depth = m.group(0).count('{') - m.group(0).count('}')
 
-        i = m.end()
-        while depth > 0 and i < len(content):
-            if content[i] == '{':
-                depth += 1
-            elif content[i] == '}':
-                depth -= 1
-            i += 1
-        pos = i
+        pos = len(content)
+        for brace in _BRACES.finditer(content, m.end()):
+            depth += 1 if brace[0] == '{' else -1
+            if depth == 0:
+                pos = brace.end()
+                break
     result.append(content[pos:])
     return ''.join(result)
 
@@ -161,14 +159,12 @@ def remove_property_blocks(content, property_name):
             continue
         result.append(content[pos:match.start()])
         depth = 1
-        i = match.end()
-        while depth > 0 and i < len(content):
-            if content[i] == '{':
-                depth += 1
-            elif content[i] == '}':
-                depth -= 1
-            i += 1
-        pos = i
+        pos = len(content)
+        for brace in _BRACES.finditer(content, match.end()):
+            depth += 1 if brace[0] == '{' else -1
+            if depth == 0:
+                pos = brace.end()
+                break
     result.append(content[pos:])
     return ''.join(result)
 
@@ -386,18 +382,19 @@ def retain_single_stat_increase(content, property_name, stat_name):
     return content[:match.start()] + replacement + content[close_brace + 1:]
 
 
+_BRACES = re.compile(r"[{}]")
+
+
 def find_matching_brace(content, open_brace_index):
     depth = 1
-    i = open_brace_index + 1
-    while depth > 0 and i < len(content):
-        if content[i] == "{":
+    for match in _BRACES.finditer(content, open_brace_index + 1):
+        if match[0] == "{":
             depth += 1
-        elif content[i] == "}":
+        else:
             depth -= 1
-        i += 1
-    if depth != 0:
-        raise ValueError("Unbalanced braces while parsing entities content")
-    return i
+        if depth == 0:
+            return match.end()
+    raise ValueError("Unbalanced braces while parsing entities content")
 
 
 def find_entity_block_bounds(content, entity_name):
@@ -1250,7 +1247,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
     target_lines = "\n".join(
         f'\t\t\t\titem[{index}] = "{target}";' for index, target in enumerate(targets)
     )
-    trigger_first = "\t\t\ttriggerFirst = true;\n" if policy.get("gate_relay") else ""
+    trigger_first = "\t\t\ttriggerFirst = true;\n" if policy.get("gate_relay") and not is_sentinel_crystal_source(block) else ""
     return f'''entity {{
 {layers}\tentityDef {independent_name} {{
 \t\tinherit = "trigger/trigger";

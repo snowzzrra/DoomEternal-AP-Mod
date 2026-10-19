@@ -13,6 +13,22 @@ from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, Roo
 from test_install_workflow import _snapshot
 
 
+def test_support_collection_can_finish_while_installation_owns_the_serial_lane():
+    entered, release, reported = (threading.Event() for _ in range(3))
+    errors = []
+    workers = LauncherWorkers(lambda job, error: errors.append(error))
+    try:
+        assert workers.submit('install', lambda job: (entered.set(), release.wait(3)))
+        assert entered.wait(3)
+        assert workers.try_serialized(lambda: pytest.fail('native collection overlapped installation')) is None
+        assert workers.submit('support', lambda job: (job.check(), reported.set()), serialized=False)
+        assert reported.wait(1)
+        assert 'install' in workers.active and not errors
+    finally:
+        release.set()
+        workers.close(3)
+
+
 def test_serialization_cancelled_queue_and_same_key_replacement():
     errors, calls = [], []
     entered, release, completed = threading.Event(), threading.Event(), threading.Event()

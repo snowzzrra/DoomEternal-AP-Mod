@@ -18,6 +18,7 @@ from doom_eap.contracts.publisher_contracts import (
 from tools.maps.ap_map_generator import (
     extract_target_names,
     find_entity_block_bounds,
+    find_matching_brace,
     generate_check_event,
     generate_event_relay,
     replace_targets_block,
@@ -29,15 +30,10 @@ def _sha256(data: bytes) -> str:
 
 
 def _matching_brace(text: str, opening: int) -> int:
-    depth = 0
-    for index in range(opening, len(text)):
-        if text[index] == "{":
-            depth += 1
-        elif text[index] == "}":
-            depth -= 1
-            if depth == 0:
-                return index + 1
-    raise ValueError("unbalanced DECL braces")
+    try:
+        return find_matching_brace(text, opening)
+    except ValueError as error:
+        raise ValueError("unbalanced DECL braces") from error
 
 
 def _target_list(text: str, context: str) -> list[str]:

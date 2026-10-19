@@ -24,6 +24,25 @@ def settings(**options):
         **options})
 
 
+def test_cached_validation_rechecks_plan_options_and_catalog_mutations():
+    source, options = catalog(), settings()
+    campaign = {'sequence': ['base']}
+    plan = build_native_recipes(options, campaign, seed=351, catalog=source)
+    validate_native_recipes(plan, options, campaign, catalog=source)
+    assert validate_native_recipes(deepcopy(plan), options, campaign, catalog=source) == plan
+    changed = deepcopy(plan)
+    changed['maps']['base']['recipes'][0]['physical_count'] += 1
+    with pytest.raises(ValueError):
+        validate_native_recipes(changed, options, campaign, catalog=source)
+    changed_source = deepcopy(source)
+    changed_source['maps']['base']['source_sha256'] = 'f' * 64
+    with pytest.raises(ValueError):
+        validate_native_recipes(plan, options, campaign, catalog=changed_source)
+    changed_options = settings(enemy_count_mode='multiplier', enemy_count_multiplier=900)
+    with pytest.raises(ValueError):
+        validate_native_recipes(plan, changed_options, campaign, catalog=source)
+
+
 def test_frozen_native_maintenance_recipe_keeps_logical_identity_and_scales_emission_quota():
     options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=300,
                        enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
