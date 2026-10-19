@@ -340,27 +340,6 @@
     {
       "choices": [
         {
-          "key": "late_game",
-          "label": "Late Game",
-          "value": 0
-        },
-        {
-          "key": "from_the_beginning",
-          "label": "From the Beginning",
-          "value": 1
-        }
-      ],
-      "default": "late_game",
-      "description": "Choose when The Ancient Gods can enter your Archipelago progression.\n\nLate Game \u2014 DLC mission paths enter logic once your inventory reaches their intended combat readiness.\n\nFrom the Beginning \u2014 Removes the extra late-game combat-readiness gate. DLC paths become logical as soon as their real traversal, equipment, and internal mission requirements are satisfied (fixed Dash follows the campaign's starting kit or first included mission completion; The World Spear requires Super Shotgun / Meat Hook traversal and a sustainable ammo-resource tool).\n\nThis changes Archipelago progression only. It does not change DOOM Eternal's difficulty or hide missions from the campaign menus.",
-      "display_name": "DLC Logic Timing",
-      "group": "Game Options",
-      "key": "dlc_logic_timing",
-      "source_class": "DLCLogicTiming",
-      "ui_type": "choice"
-    },
-    {
-      "choices": [
-        {
           "key": "vanilla_order",
           "label": "Vanilla Order",
           "value": 0
@@ -807,5 +786,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "9fd81d75ba431d56d681712c309f72e6100313b4b1a41ba03362d5a443b16129"
+  "source_sha256": "0b8d9b31d4b6a67be56d1474fa3b108999e5a6b93d3bcce96116dfbbfb35bb76"
 }

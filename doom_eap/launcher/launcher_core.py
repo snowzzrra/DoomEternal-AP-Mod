@@ -65,7 +65,6 @@ SUPPORTED_CAPABILITIES = frozenset({
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
     "include_dlc_missions": True,
-    "dlc_logic_timing": "Late Game",
     "goal": "Acquire the Unmaykr",
     "goal_endpoint_event": "Internal Goal Endpoint: Acquire the Unmaykr",
     "additional_victory_requirements": [],
@@ -173,8 +172,6 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"Connected.slot_data.{key} must be boolean")
     if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
         raise ValueError("Connected.slot_data.include_dlc_missions requires use_dlc_content")
-    if slot_data["dlc_logic_timing"] not in {"Late Game", "From the Beginning"}:
-        raise ValueError("Connected.slot_data.dlc_logic_timing is invalid")
     if slot_data["goal"] not in GOAL_VALUES:
         raise ValueError("Connected.slot_data.goal is invalid")
     requirements = slot_data["additional_victory_requirements"]
@@ -560,7 +557,6 @@ class SeedManifest:
                 "native_generation_fingerprint": slot_data["native_generation_fingerprint"],
                 "use_dlc_content": slot_data["use_dlc_content"],
                 "include_dlc_missions": slot_data["include_dlc_missions"],
-                "dlc_logic_timing": slot_data["dlc_logic_timing"],
                 "goal": slot_data["goal"],
                 "goal_endpoint_event": slot_data["goal_endpoint_event"],
                 "additional_victory_requirements": list(

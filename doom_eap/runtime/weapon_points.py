@@ -340,13 +340,17 @@ class WeaponPointReceipts:
     def __init__(self, session_state, persist, link, namespace):
         self.state, self.persist, self.link, self.namespace = session_state, persist, link, namespace
 
-    def _ledger(self):
+    def _ledger(self, authoritative):
         ledger = self.state.get("weapon_points")
         if ledger is None:
             facts = self.link.observe()
-            if facts["gained_after"] != 0:
-                raise WeaponPointsBlocked("Unowned native WUP history; refusing to reconstruct a lost receipt ledger")
-            ledger = {"version": 1, "namespace": self.namespace, "receipts": []}
+            gained = facts["gained_after"]
+            history = sorted(authoritative.items())
+            if type(gained) is not int or gained < 0 or gained % AMOUNT or gained > len(history) * AMOUNT:
+                raise WeaponPointsBlocked("Native earned WUP needs the complete matching AP item history")
+            ledger = {"version": 1, "namespace": self.namespace, "receipts": [
+                {"index": index, "receipt": receipt, "amount": AMOUNT}
+                for index, receipt in history[:gained // AMOUNT]]}
             self.state["weapon_points"] = ledger
             try:
                 self.persist()
@@ -366,7 +370,7 @@ class WeaponPointReceipts:
         return ledger
 
     def reconcile(self, authoritative):
-        ledger = self._ledger()
+        ledger = self._ledger(authoritative)
         for record in ledger["receipts"]:
             if authoritative.get(record["index"]) != record["receipt"]:
                 raise WeaponPointsBlocked("AP history does not own the persisted WUP receipt")
@@ -381,9 +385,9 @@ class WeaponPointReceipts:
             gained += AMOUNT
 
     def deliver(self, index, receipt, authoritative):
-        ledger = self._ledger()
         if authoritative.get(index) != receipt or not receipt:
             raise WeaponPointsBlocked("WUP receipt is not authoritative")
+        ledger = self._ledger(authoritative)
         existing = next((r for r in ledger["receipts"] if r["index"] == index), None)
         if existing is not None:
             if existing["receipt"] != receipt:

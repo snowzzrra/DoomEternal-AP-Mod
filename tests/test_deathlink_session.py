@@ -19,10 +19,15 @@ def setup_session(tmp_path):
     class Native:
         calls = []
         event_id = 0
+        event_hash = None
         def deathlink_request(self, kind, **args):
             self.calls.append(kind)
             if kind == 2:
                 self.event_id = args["event_id"]
+                self.event_hash = args["event_hash"]
+            if kind == 5:
+                assert args["event_id"] == self.event_id != 0
+                assert args["event_hash"] == self.event_hash
             return dict(outcome=0, remote_state=2, remote_event_id=self.event_id)
     native = Native()
     publication = DeathLinkPublication(lambda: native, None, owner.mode)
@@ -99,3 +104,24 @@ def test_current_outbound_failure_is_not_reported_as_confirmation(tmp_path):
     with pytest.raises(OSError, match="current connection"):
         asyncio.run(owner.report_local_death("Slayer", failed, publication))
     assert events == []
+
+
+def test_cancel_failure_does_not_stop_later_receives_or_local_deaths(tmp_path, monkeypatch):
+    owner, _, publication, _ = setup_session(tmp_path)
+    clock = SimpleNamespace(monotonic=lambda: 10)
+    monkeypatch.setattr(domain, "time", clock)
+    assert owner.receive({"time": 3, "source": "friend"}, lambda: None)
+    publication._event = owner.active_event
+    owner.advance(True, publication)
+    monkeypatch.setattr(publication, "cancel", lambda _: (_ for _ in ()).throw(RuntimeError("native unavailable")))
+    sent = []
+
+    async def send(cause):
+        sent.append(cause)
+
+    asyncio.run(owner.report_local_death("Slayer", send, publication))
+    clock.monotonic = lambda: 1000
+    owner.advance(True, publication)
+    asyncio.run(owner.report_local_death("Slayer", send, publication))
+    assert sent == ["Slayer fell."]
+    assert owner.receive({"time": 4, "source": "friend"}, lambda: None)

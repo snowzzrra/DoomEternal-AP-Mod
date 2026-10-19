@@ -910,7 +910,6 @@
   ],
   "active_location_count": 440,
   "cr_dataset_version": "0.1",
-  "dlc_logic_timing": "Late Game",
   "goal": "Kill the Dark Lord",
   "goal_endpoint_event": "Internal Goal Endpoint: Kill the Dark Lord",
   "goal_endpoint_available": true,

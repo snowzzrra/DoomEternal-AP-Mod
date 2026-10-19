@@ -127,7 +127,7 @@ class DeathLinkSession:
                 result.detail,
             )
         elif result.state in {ReceiveState.EXPIRED, ReceiveState.FAILED}:
-            publication.cancel(self._state_key)
+            self._cancel(publication)
             state_name = result.state.value.lower() if result.state else "unknown"
             self._logger.warning(
                 "[DeathLink] %s %s (%s); event cleared without claiming success.",
@@ -135,7 +135,6 @@ class DeathLinkSession:
                 state_name,
                 result.detail,
             )
-
 
     async def report_local_death(self, player, send, publication):
         if not self._enabled:
@@ -147,7 +146,7 @@ class DeathLinkSession:
             "late_echo_suppressed",
             "second_hit_cancelled_player_dead",
         }:
-            publication.cancel(self._state_key)
+            self._cancel(publication)
             self._logger.info(
                 "[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=%s event=%s",
                 receive_result.detail,
@@ -173,5 +172,11 @@ class DeathLinkSession:
             cause=cause,
             message=cause,
         )
+
+    def _cancel(self, publication):
+        try:
+            publication.cancel(self._state_key)
+        except (RuntimeError, OSError) as error:
+            self._logger.warning("[DeathLink] Native cancellation unavailable: %s", error)
 
 

@@ -1098,7 +1098,7 @@ class LauncherUI(QMainWindow):
             for option in cast(list[dict[str, object]], self.controller.options_schema["options"])
         }
         groups = (
-            ("GOAL & CAMPAIGN", ("mission_pool", "custom_missions", "custom_dark_lord", "mission_order", "mission_count", "starting_missions", "full_saga_final_boss", "goal", "goal_mission_as_item", "use_dlc_content", "dlc_logic_timing", "additional_victory_requirements")),
+            ("GOAL & CAMPAIGN", ("mission_pool", "custom_missions", "custom_dark_lord", "mission_order", "mission_count", "starting_missions", "full_saga_final_boss", "goal", "goal_mission_as_item", "use_dlc_content", "additional_victory_requirements")),
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
             ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "include_weapon_mastery_challenges", "include_slayer_gates", "include_secret_encounters", "praetor_suit_upgrades_in_pool")),
             ("COMBAT & QoL", ("campaign_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
@@ -1151,7 +1151,7 @@ class LauncherUI(QMainWindow):
         layout.setSpacing(3)
         layout.addWidget(self._label("EFFECTIVE CONFIGURATION", "eyebrow"), 0, 0, 1, 3)
         self.effective_config_values: dict[str, QLabel] = {}
-        cells = (("goal", "GOAL"), ("campaign", "CAMPAIGN"), ("dlc", "DLC LOGIC"), ("special", "SPECIAL WEAPON"), ("starting", "STARTING WEAPON"), ("victory", "VICTORY"))
+        cells = (("goal", "GOAL"), ("campaign", "CAMPAIGN"), ("dlc", "DLC CONTENT"), ("special", "SPECIAL WEAPON"), ("starting", "STARTING WEAPON"), ("victory", "VICTORY"))
         for index, (key, label) in enumerate(cells):
             cell = QWidget()
             cell_layout = QVBoxLayout(cell)
@@ -1170,7 +1170,7 @@ class LauncherUI(QMainWindow):
             control = self.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 cast(QCheckBox, control).toggled.connect(self._refresh_create_dependencies)
-        for key in ("goal", "special_weapon", "starting_weapon", "dlc_logic_timing", "mission_pool", "mission_order", "full_saga_final_boss", "campaign_difficulty"):
+        for key in ("goal", "special_weapon", "starting_weapon", "mission_pool", "mission_order", "full_saga_final_boss", "campaign_difficulty"):
             control = self.option_controls.get(key)
             if isinstance(control, QComboBox):
                 cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
@@ -1244,15 +1244,12 @@ class LauncherUI(QMainWindow):
             dlc_missions = pool in {"full_saga", "dlc_only", "custom"}
             special_weapon = self.option_controls.get("special_weapon")
             special_row = self.option_rows.get("special_weapon")
-            dlc_timing_row = self.option_rows.get("dlc_logic_timing")
             self._set_choice_enabled("goal", "kill_the_dark_lord", dlc_missions)
             self._set_choice_enabled("goal", "complete_the_full_saga", dlc_missions)
             self._set_choice_enabled("goal", "acquire_the_unmaykr", self._choice_value("include_slayer_gates") is not False,
                                      "Requires Include Slayer Gates.")
             if special_row is not None:
                 special_row.setVisible(dlc_enabled)
-            if dlc_timing_row is not None:
-                dlc_timing_row.setVisible(dlc_missions)
             self._refresh_inventory_picker(dlc_enabled)
             goal_key = self._choice_value("goal")
             mastery_control = self.option_controls.get("include_weapon_mastery_challenges")
@@ -1283,7 +1280,7 @@ class LauncherUI(QMainWindow):
             values = {
                 "goal": goal_label,
                 "campaign": self._selected_label("mission_pool") + " · " + self._selected_label("mission_order"),
-                "dlc": self._selected_label("dlc_logic_timing") if dlc_missions else "Not active",
+                "dlc": "Enabled" if dlc_enabled else "Disabled",
                 "special": special_label,
                 "starting": self._selected_label("starting_weapon"),
                 "victory": victory_summary,
@@ -2196,14 +2193,13 @@ class LauncherUI(QMainWindow):
         goal = self._room_option_value(slot_data, "goal", "Not supplied")
         dlc_enabled = slot_data.get("use_dlc_content") is True
         campaign = "Full Saga" if dlc_enabled else "Base Campaign"
-        dlc_logic = self._room_option_value(slot_data, "dlc_logic_timing", "Base Campaign only") if dlc_enabled else "Base Campaign only"
         fields = (
             ("Seed", seed),
             ("Player", f"{player} · Team {team} · Slot {slot}"),
             ("Server", endpoint),
             ("Goal", goal),
             ("Campaign", campaign),
-            ("DLC Logic", dlc_logic),
+            ("DLC Content", "Enabled" if dlc_enabled else "Disabled"),
         )
         self.room_summary.setText("<br>".join(
             f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}"
@@ -2334,7 +2330,6 @@ class LauncherUI(QMainWindow):
     def _choice_purpose(key: str, fallback: object) -> str:
         return {
             "goal": "Choose how this world is won.",
-            "dlc_logic_timing": "Choose when the DLC mission paths enter progression.",
             "special_weapon": "Choose how the Crucible and Sentinel Hammer are randomized.",
         }.get(key, str(fallback).split("\n\n", 1)[0])
 
@@ -2345,8 +2340,6 @@ class LauncherUI(QMainWindow):
             ("goal", "kill_the_icon_of_sin"): "Defeat the Icon of Sin at the end of the Base Campaign.",
             ("goal", "kill_the_dark_lord"): "Defeat the Dark Lord in The Ancient Gods Part Two.",
             ("goal", "complete_the_full_saga"): "Finish every enabled Full Saga mission, claim the Unmaykr, defeat the Icon of Sin, and defeat the Dark Lord.",
-            ("dlc_logic_timing", "late_game"): "DLC mission paths enter logic once your inventory is strong enough.",
-            ("dlc_logic_timing", "from_the_beginning"): "Hell on Earth, UAC Atlantica Facility, and The World Spear are logical starting paths, subject to their required equipment and movement.",
             ("special_weapon", "progressive_special_weapon"): "Crucible → Sentinel Hammer → fully upgraded Sentinel Hammer.",
             ("special_weapon", "progressive_sentinel_hammer"): "Sentinel Hammer → fully upgraded Sentinel Hammer.",
             ("special_weapon", "the_crucible"): "Only the Crucible is randomized as the Special Weapon.",

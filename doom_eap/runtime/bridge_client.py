@@ -4887,15 +4887,17 @@ class DoomEternalContext(CommonContext):
     def quarantine_unbound_physical_events(
         self, old_state_key=None, new_state_key=None, reason="session_changed"
     ):
-        for path in check_event_files():
-            if os.path.basename(path) in PUBLISHER_MAP_EVENT_FILENAMES:
-                continue
+        paths = set(check_event_files()) | {
+            os.path.join(INV_DUMP_DIR, filename) for filename in PUBLISHER_MAP_EVENT_FILENAMES}
+        for path in sorted(paths):
             quarantine_event_file(
                 path,
                 old_state_key=old_state_key,
                 new_state_key=new_state_key,
                 reason=reason,
             )
+            if os.path.exists(path):
+                raise RuntimeError("Unbound event could not be quarantined: " + path)
 
     def initialize_item_state(self, slot_data):
         self.reset_queue_session_authority("initialize_item_state")
@@ -6356,6 +6358,8 @@ class DoomEternalContext(CommonContext):
 
     async def check_campaign_goal_event(self):
         """Consume independent map files and native transition triggers."""
+        if not self.check_and_update_event_session():
+            return False
         receipt_token = self.receipt_session.capture(self.state_key)
         observed = False
         quarantine_root = Path(INV_DUMP_DIR) / "quarantine"
@@ -6581,9 +6585,6 @@ class DoomEternalContext(CommonContext):
             await self.check_mission_challenge_locations()
             if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
                 continue
-            await self.check_campaign_goal()
-            if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                continue
             self._consume_ammo_refill_request_file()
             sleep_duration = 0.05 if self.deathlink.receiving else 1.0
             await asyncio.sleep(sleep_duration)
@@ -6761,9 +6762,21 @@ class DoomEternalContext(CommonContext):
                     continue
 
                 await self.flush_check_event_files()
+                await self.check_campaign_goal()
                 await self.synchronize_campaign_menu()
 
             await asyncio.sleep(4.0)
+
+    async def death_monitor_supervisor(self):
+        while not self.exit_event.is_set():
+            try:
+                await self.death_monitor_loop()
+                return
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("[DeathLink] Monitor interrupted; retrying")
+                await asyncio.sleep(1.0)
 
     async def tracker_supervisor(self):
         logger.info("[Supervisor] TRACKER_STARTED")
@@ -6943,7 +6956,7 @@ async def amain(launch_args=None):
         cleanup_ammo_refill_request_files()
         cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
-    ctx.death_task = asyncio.create_task(ctx.death_monitor_loop())
+    ctx.death_task = asyncio.create_task(ctx.death_monitor_supervisor())
 
     log_mission_bridge_identity()
     emit_launcher_event("client_started")

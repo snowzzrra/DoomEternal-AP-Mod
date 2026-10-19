@@ -423,6 +423,9 @@ class APSessionOwner:
                     raise RuntimeError("AP campaign identity or immutable options differ from this room")
                 if intent == "resume" and not any((path / "GAME-AUTOSAVE0").is_dir() for path in native_dirs):
                     raise RuntimeError("The AP native campaign is missing; use compatible recovery")
+                if intent == "resume":
+                    archive = self.backup_local_files(snapshot, config)
+                    logging.getLogger(__name__).info("AP_RESUME_LOCAL_COPY path=%s", archive)
             self.state_dir.mkdir(parents=True, exist_ok=True)
             descriptor_path = self.state_dir / "ap-session-descriptor.txt"
             if intent == "recover":

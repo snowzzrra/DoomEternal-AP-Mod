@@ -33,4 +33,5 @@ class DeathLinkPublication:
 
     def cancel(self, state_key):
         if self._event and self._event.attempts:
-            return self._link().deathlink_request(5)
+            event_id, event_hash = self._identity()
+            return self._link().deathlink_request(5, event_id=event_id, event_hash=event_hash)

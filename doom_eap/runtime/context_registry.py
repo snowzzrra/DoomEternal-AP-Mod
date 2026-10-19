@@ -138,10 +138,6 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("use_dlc_content must be boolean")
     if not isinstance(slot_data.get("include_dlc_missions"), bool):
         raise ValueError("include_dlc_missions must be boolean")
-    if slot_data.get("dlc_logic_timing") not in {
-        "late_game", "from_the_beginning", "Late Game", "From the Beginning",
-    }:
-        raise ValueError("dlc_logic_timing is invalid")
     if slot_data.get("special_weapon") not in {
         "progressive_special_weapon", "progressive_sentinel_hammer", "the_crucible",
         "Progressive Special Weapon", "Progressive Sentinel Hammer", "The Crucible",
