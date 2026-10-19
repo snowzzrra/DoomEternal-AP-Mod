@@ -5,6 +5,17 @@ import json
 import subprocess
 
 
+class ProtonSelectionError(RuntimeError):
+    failure_domain = "proton_runtime"
+
+    def __init__(self, reason, *, candidates=(), selected=None):
+        super().__init__("Select the Proton version used by DOOM Eternal in Steam. "
+                         "Choose the file named proton, not wine, DOOM Eternal or the pfx folder.")
+        self.proton_reason = reason
+        self.proton_candidates = sorted(str(path) for path in candidates)[:12]
+        self.proton_selected = str(selected) if selected else None
+
+
 def windows_path(path) -> str:
     value = str(Path(path).expanduser().resolve())
     return "Z:" + value.replace("/", "\\") if value.startswith("/") else value
@@ -22,15 +33,21 @@ def runtime(configuration):
         proton = Path(selected).resolve()
     else:
         info = prefix / "config_info"
-        if not info.is_file() or info.stat().st_size > 65536:
-            raise RuntimeError("Choose DOOM Eternal's Proton executable under Join a Room > PROTON EXECUTABLE")
-        candidates = {Path(line) / "proton" for line in info.read_text(encoding="utf-8").splitlines()
+        if not info.is_file():
+            raise ProtonSelectionError("missing_config_info")
+        if info.stat().st_size > 65536:
+            raise ProtonSelectionError("invalid_config_info")
+        try:
+            lines = info.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeError) as error:
+            raise ProtonSelectionError("unreadable_config_info") from error
+        candidates = {Path(line) / "proton" for line in lines
                       if line.startswith("/") and (Path(line) / "proton").is_file()}
         if len(candidates) != 1:
-            raise RuntimeError("Choose DOOM Eternal's Proton executable under Join a Room > PROTON EXECUTABLE")
+            raise ProtonSelectionError("ambiguous" if candidates else "no_candidate", candidates=candidates)
         proton = candidates.pop().resolve()
     if proton.name != "proton" or not proton.is_file():
-        raise RuntimeError("Select a valid installed Proton executable")
+        raise ProtonSelectionError("invalid_selected_path", selected=proton)
     remote = Path(configuration["steam_remote_dir"]).resolve()
     if remote.name != "remote" or remote.parent.name != "782330" or remote.parents[2].name != "userdata":
         raise RuntimeError("Select DOOM Eternal's Steam userdata directory")

@@ -1372,6 +1372,10 @@ class LauncherUI(QMainWindow):
                 button.setObjectName("primary")
             button.clicked.connect(callback)
             buttons.addWidget(button)
+        self.doctor_proton_button = QPushButton("SELECT PROTON")
+        self.doctor_proton_button.clicked.connect(self._select_proton)
+        self.doctor_proton_button.setVisible(False)
+        buttons.addWidget(self.doctor_proton_button)
         self.uninstall_button = QPushButton("UNINSTALL MOD")
         self.uninstall_button.setObjectName("secondary")
         self.uninstall_button.setEnabled(False)
@@ -1513,6 +1517,12 @@ class LauncherUI(QMainWindow):
     def _refresh_help_room_package(self) -> None:
         if not hasattr(self, "doctor_room_status"):
             return
+        failure = getattr(self.controller, "last_setup_failure", None) or {}
+        proton_pending = failure.get("failure_domain") == "proton_runtime"
+        self.doctor_proton_button.setVisible(proton_pending)
+        if proton_pending:
+            self.doctor_status.setText("SELECT PROTON")
+            self.doctor_action.setText(str(failure.get("user_message") or ""))
         presentations = {
             "package_incompatible": (
                 "ROOM PACKAGE NEEDS REBUILDING",
@@ -1577,6 +1587,8 @@ class LauncherUI(QMainWindow):
         self.connection_badge.setWordWrap(False)
 
     def _set_inventory_tile(self, detail: str, color: str) -> None:
+        if detail == "synced" and not self.controller.workflow.session_owner.status.get("ready"):
+            detail, color = "waiting for AP session", self.COLORS["ap"]
         self._set_status("inventory", detail, color)
 
     def _fade_in(self, widget: QWidget) -> None:
@@ -1600,8 +1612,8 @@ class LauncherUI(QMainWindow):
 
     def _set_setup_state(self, state: str, detail: str = "") -> None:
         failure = getattr(self.controller, "last_setup_failure", None)
-        if state == "failed" and isinstance(failure, dict) and failure.get("failure_domain") == "campaign_session":
-            state = "campaign_failed"
+        if state == "failed" and isinstance(failure, dict) and failure.get("failure_domain") in {"campaign_session", "proton_runtime"}:
+            state = "proton_needed" if failure["failure_domain"] == "proton_runtime" else "campaign_failed"
             detail = str(failure.get("user_message") or "")
         presentations = {
             "disconnected": ("ROOM PACKAGE", "Connect to a room to check its package.", "", False, "READY"),
@@ -1624,6 +1636,7 @@ class LauncherUI(QMainWindow):
             ),
             "failed": ("GAME SETUP NEEDS ATTENTION", "Game setup did not finish. Repair game integration and try again.", "FIX SETUP", True, "ACTION NEEDED"),
             "campaign_failed": ("AP SESSION NEEDS ATTENTION", "The room package is retained. Inspect AP SAVE and the preparation diagnostic, then retry with DOOM closed.", "AP SAVE", True, "ACTION NEEDED"),
+            "proton_needed": ("SELECT PROTON", "Select the Proton version used by DOOM Eternal in Steam.", "SELECT PROTON", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
@@ -1642,7 +1655,7 @@ class LauncherUI(QMainWindow):
         if strip_visible and state != self._previous_setup_state:
             self._fade_in(self.session_setup)
         self._previous_setup_state = state
-        if state == "campaign_failed":
+        if state in {"campaign_failed", "proton_needed"}:
             self.controller.request_doctor()
         self.session_manual_complete_action.setVisible(state == "manual_install_required")
         self.session_manual_retry_action.setVisible(state == "manual_install_required")
@@ -1664,6 +1677,8 @@ class LauncherUI(QMainWindow):
             self._show_page(4)
         elif self._setup_state == "campaign_failed":
             self._ap_save_actions()
+        elif self._setup_state == "proton_needed":
+            self._select_proton()
         elif self._setup_state == "game_link_needed":
             self._prepare(force=True)
         elif self._setup_state == "manual_install_required":
@@ -1795,7 +1810,7 @@ class LauncherUI(QMainWindow):
         if self._setup_state == "ready":
             self._show_page(2)
             return
-        if self._setup_state in {"install_needed", "update_required", "package_failed", "package_incompatible", "failed", "campaign_failed", "manual_install_required"}:
+        if self._setup_state in {"install_needed", "update_required", "package_failed", "package_incompatible", "failed", "campaign_failed", "proton_needed", "manual_install_required"}:
             self._run_setup_action()
             return
         text = self.hero_action.text()
@@ -1887,13 +1902,39 @@ class LauncherUI(QMainWindow):
             self._append_log("Room package uninstall failed.")
 
     def _ap_save_actions(self) -> None:
-        choices=["Create backup", "Open backup folder", "Restore compatible backup", "New DOOM save in this room"]
-        action,accepted=QInputDialog.getItem(self,"AP game save",
-            "Manage this room's DOOM Eternal save.\nA new game save keeps the same multiworld and backs up your local progress first.",choices,0,False)
-        if not accepted:
-            return
         try:
-            if action=="Open backup folder":
+            self.controller.request_ap_save_inspection()
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(self, "AP save", str(error))
+
+    def _show_ap_save_actions(self, inspection) -> None:
+        choices=["Details / Copy details", "Back up local files", "Create backup", "Open backup folder",
+                 "Restore compatible backup", "New DOOM save in this room"]
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Inspect AP save")
+        dialog.setLabelText(f"Room {inspection['seed']} / slot {inspection['slot']}\n"
+                            f"Local files: {inspection['status'].replace('_', ' ')}\n"
+                            "Native backup requires the game in an active AP session.")
+        dialog.setComboBoxItems(choices)
+        combo = dialog.findChild(QComboBox)
+        combo.model().item(2).setEnabled(inspection.get("native_backup_available") is True)
+        if not dialog.exec():
+            return
+        action = dialog.textValue()
+        try:
+            if action == "Details / Copy details":
+                details = json.dumps(inspection, indent=2, ensure_ascii=False)
+                message = QMessageBox(self)
+                message.setWindowTitle("AP save details")
+                message.setText("Files present or missing are listed below. Native gameplay validity is unverified.")
+                message.setDetailedText(details)
+                copy = message.addButton("Copy details", QMessageBox.ButtonRole.ActionRole)
+                copy.clicked.connect(lambda: QApplication.clipboard().setText(details))
+                message.addButton(QMessageBox.StandardButton.Close)
+                message.exec()
+            elif action == "Back up local files":
+                self.controller.request_ap_save_inspection(copy_files=True)
+            elif action=="Open backup folder":
                 from PySide6.QtCore import QUrl
                 from PySide6.QtGui import QDesktopServices
                 QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.controller.user_paths.data_dir / "campaigns")))
@@ -1901,7 +1942,8 @@ class LauncherUI(QMainWindow):
                 self.controller.request_ap_backup()
             elif action=="New DOOM save in this room":
                 if QMessageBox.question(self,"New DOOM Eternal save",
-                        "Back up this room's game save and local AP progress, then start a fresh DOOM Eternal save in the same room?\n\n"
+                        f"Room {inspection['seed']} / slot {inspection['slot']}\n"
+                        "Back up this room's local files, then discard its local checkpoint and start a fresh DOOM Eternal save?\n\n"
                         "Exit DOOM Eternal first. The launcher will disconnect. Reconnect to the same room, wait for AP save preparation, then start the game through Steam. "
                         "Server progress is kept; its current items will be delivered to the new save. Other rooms and vanilla saves are kept.",
                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -1988,7 +2030,7 @@ class LauncherUI(QMainWindow):
     def _is_room_package_failure(event: dict[str, object] | None = None, detail: str = "") -> bool:
         event = event or {}
         domain = str(event.get("failure_domain", "")).casefold()
-        if domain == "campaign_session":
+        if domain in {"campaign_session", "proton_runtime"}:
             return False
         recovery = str(event.get("recovery_action", "")).casefold()
         if domain in {"room_package", "room-package", "package", "mod_package"}:
@@ -2094,6 +2136,12 @@ class LauncherUI(QMainWindow):
             self.proton_executable.setText(value)
             self._save_proton()
 
+    def _select_proton(self) -> None:
+        self._show_page(1)
+        if self.proton_executable is not None:
+            self.proton_executable.setFocus(Qt.FocusReason.OtherFocusReason)
+            self._browse_proton()
+
     def _browse_saves(self) -> None:
         start_dir = ""
         try:
@@ -2135,7 +2183,7 @@ class LauncherUI(QMainWindow):
         self.player_team.setText(f"Team {team}")
         self.player_slot.setText(f"Slot {slot} · {player}")
         self.player_inventory.setText("Inventory ready")
-        self._set_inventory_tile("synced", self.COLORS["good"])
+        self._set_inventory_tile("history received; waiting for AP session", self.COLORS["ap"])
         self._set_ammo_refill_indicator(event.get("ammo_refills_available"))
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
         history = self.controller.item_history_status
@@ -2766,6 +2814,12 @@ class LauncherUI(QMainWindow):
         self.controller.request_integration_status()
 
     def _render_native_health(self, event) -> None:
+        proton = event.get("session", {}).get("proton_runtime")
+        if proton and self.proton_executable is not None:
+            self.proton_executable.setPlaceholderText("Automatic: " + proton["executable"])
+            self.proton_executable.setToolTip(f"Effective Proton: {proton['tool']}\n{proton['executable']}")
+        if not event.get("session", {}).get("ready") and self._room_connected:
+            self._set_inventory_tile("waiting for AP session", self.COLORS["ap"])
         if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
             if event["meathook_ok"]:
                 self._set_status("rpc", "waiting", self.COLORS["ap"])
@@ -2923,6 +2977,12 @@ class LauncherUI(QMainWindow):
         if kind == "ap_backup_result":
             self._append_log(str(event["message"]))
             QMessageBox.information(self,"AP save",str(event["message"]))
+            return
+        if kind == "ap_save_inspection":
+            self._show_ap_save_actions(event["inspection"])
+            return
+        if kind == "ap_save_error":
+            QMessageBox.warning(self, "AP save", str(event["message"]))
             return
         if kind == "problem_report_submitted":
             self._append_log("Problem report submitted: " + event["url"])
@@ -3107,8 +3167,11 @@ class LauncherUI(QMainWindow):
                 if readiness == "blocked":
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "setup needed", self.COLORS["warn"])
                     self._show_page(2)
-                    target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
-                    self._set_setup_state(target_state, "Game integration needs setup before play.")
+                    if event.get("failure_domain") in {"campaign_session", "proton_runtime"}:
+                        self._set_setup_state("failed", str(event.get("user_message") or readiness_reason))
+                    else:
+                        target_state = "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+                        self._set_setup_state(target_state, "Game integration needs setup before play.")
                 else:
                     self._set_status("mod", "ready", self.COLORS["good"]); self._set_status("game", "ready", self.COLORS["good"]); self._set_status("rpc", "waiting", self.COLORS["ap"])
                     self._show_page(2)

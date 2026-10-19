@@ -508,6 +508,8 @@ class LauncherController:
                 self.supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
             except (OSError, RuntimeError) as error:
                 self.emit("core_runtime_rebind_pending", message=str(error))
+        if proton_changed and self.connected_room and self.setup.current_event:
+            self._queue_room_readiness(self.setup.current_event)
 
     def resolve_saved_games_dir(
         self,
@@ -1027,6 +1029,11 @@ class LauncherController:
             },
         }
         try:
+            support_diagnostics["campaign_inspection"] = self.workflow.session_owner.inspect_campaign(
+                RoomSnapshot.from_event(room), dict(self.config)) if room else {"status": "room_unavailable"}
+        except (OSError, RuntimeError, ValueError, KeyError) as error:
+            support_diagnostics["campaign_inspection"] = {"status": "unavailable", "reason": str(error)}
+        try:
             support_diagnostics["release"] = release_identity()
         except Exception:
             support_diagnostics["release"] = {"status": "unavailable"}
@@ -1316,19 +1323,20 @@ class LauncherController:
                 game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
                 meathook = probe_meathook(Path(str(game_root)).expanduser().resolve() if game_root else None)
                 payload = {**payload, "meathook_ok": meathook.ok, "meathook_status": meathook.status.value}
-            if kind == "setup_failed":
+            if kind == "setup_failed" or (kind == "room_install_state" and payload.get("readiness") == "blocked"
+                                          and payload.get("failure_domain") in {"campaign_session", "proton_runtime"}):
                 self.last_setup_failure = dict(payload)
                 if payload.get("failure_domain") in {"room_package", "installed_room_package"}:
                     self.last_room_package_issue = dict(payload)
             elif kind == "room_install_state" and (
-                payload.get("state") == "update_required" or payload.get("failure_domain")
+                payload.get("state") == "update_required" or payload.get("failure_domain") in {"room_package", "installed_room_package"}
             ):
                 self.last_room_package_issue = {"type": kind, **payload}
             elif kind == "setup_ready":
                 self.last_setup_failure = None
                 self.last_room_package_issue = None
             elif kind in {"ap_session_status", "room_install_state"} and (payload.get("state") in {"prelaunch_ready", "admitted"} or payload.get("readiness") == "ready"):
-                if self.last_setup_failure and self.last_setup_failure.get("failure_domain") == "campaign_session":
+                if self.last_setup_failure and self.last_setup_failure.get("failure_domain") in {"campaign_session", "proton_runtime"}:
                     self.last_setup_failure = None
             self.emit(kind, **payload)
         if runtime_changed:
@@ -1687,6 +1695,30 @@ class LauncherController:
         if not self.connected_room or not self.setup.current_event:
             raise RuntimeError("Connect to a room before selecting its AP backups")
         return self.workflow.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
+
+    def request_ap_save_inspection(self, *, copy_files=False) -> bool:
+        if not self.connected_room or not self.setup.current_event:
+            raise RuntimeError("Connect to a room before inspecting its AP save")
+        snapshot = RoomSnapshot.from_event(self.setup.current_event)
+        configuration = dict(self.config)
+
+        def operation(job):
+            job.check()
+            try:
+                if copy_files:
+                    archive = job.publish(lambda: self.workflow.session_owner.backup_local_files(snapshot, configuration))
+                    self.emit("ap_backup_result", **job.event({"message":
+                        f"Local files copied and archive verified: {archive}. Native restore and gameplay are unverified."}))
+                else:
+                    inspection = self.workflow.session_owner.inspect_campaign(snapshot, configuration)
+                    job.check()
+                    self.emit("ap_save_inspection", **job.event({"inspection": inspection}))
+            except LauncherWorkCancelled:
+                raise
+            except (OSError, RuntimeError, ValueError, KeyError) as error:
+                self.emit("ap_save_error", **job.event({"message": str(error)}))
+
+        return self.workers.submit("ap_save_inspection", operation, generation=self.workers.generation)
 
     def request_new_ap_save(self) -> bool:
         if not self.connected_room or not self.setup.current_event:

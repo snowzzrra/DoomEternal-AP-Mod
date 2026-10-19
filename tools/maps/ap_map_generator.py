@@ -592,6 +592,7 @@ TARGET_POLICY_CONSUMERS = {
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
     "preserve_original_visual": "generate_map original-owner branch",
     "native_entity_contract": "apply_native_entity_contract",
+    "activation_state": "add_ap_check_target",
     "checkpoint_cleanup": "apply_checkpoint_cleanup_contract",
     "ap_touch_only": "native_entity_contract touch-only policy",
     "duplicate_policy": "native_entity_contract duplicate policy",
@@ -1581,7 +1582,24 @@ def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
             target for target in existing_targets if target in preserve_set
         ]
 
-    target_names.append(ap_check_id)
+    activation_state = target_policy.get("activation_state")
+    if activation_state is not None:
+        if not isinstance(activation_state, str) or not activation_state:
+            raise ValueError(f"Invalid check activation state: {entity_name}")
+        states = list(re.finditer(
+            rf'\bitem\[\d+\]\s*=\s*\{{\s*stateName\s*=\s*"{re.escape(activation_state)}";', block
+        ))
+        if len(states) != 1:
+            raise ValueError(f"Check activation state missing or ambiguous: {entity_name}")
+        state = states[0]
+        end = find_matching_brace(block, block.index("{", state.start()))
+        if "stateActivateList" in block[state.end():end]:
+            raise ValueError(f"Check activation state already has targets: {entity_name}")
+        block = (block[:state.end()] + '\n\t\t\t\t\tstateActivateList = {\n'
+                 f'\t\t\t\t\t\tnum = 1;\n\t\t\t\t\t\titem[0] = "{ap_check_id}";\n'
+                 '\t\t\t\t\t}' + block[state.end():])
+    else:
+        target_names.append(ap_check_id)
     block = replace_targets_block(block, target_names)
     if target_policy.get("gate_relay"):
         if not re.search(r'flags\s*=\s*\{\s*hide\s*=\s*true;', block):
@@ -2975,6 +2993,7 @@ def generate_map(
                             ),
                             "drop_targets": target_policy.get("drop_targets", []),
                             "preserve_targets": target_policy.get("preserve_targets"),
+                            "activation_state": target_policy.get("activation_state"),
                         },
                     )
                     new_blocks.append("entity {" + native)

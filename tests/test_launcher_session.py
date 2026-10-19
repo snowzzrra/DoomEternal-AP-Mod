@@ -7,6 +7,42 @@ import pytest
 from doom_eap.launcher.launcher_session import APSessionOwner
 
 
+def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
+    from doom_eap.runtime.weapon_points import namespace_id
+    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
+    snapshot = SimpleNamespace(seed_name="fixture", team=0, slot=1,
+        slot_data={"native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 0}})
+    config = {"steam_remote_dir": str(tmp_path / "remote"), "save_games_dir": str(tmp_path / "local")}
+    assert owner.inspect_campaign(snapshot, config)["status"] == "absent"
+    assert not (tmp_path / "data").exists()
+    namespace = namespace_id(snapshot.seed_name, 0, 1, "a" * 64)
+    directory = tmp_path / "data/campaigns" / namespace
+    directory.mkdir(parents=True)
+    native = "ap-" + namespace[:40]
+    (directory / "native.root").write_text(f"sentinel-native-root-v1\nnamespace={namespace}\nroot={native}\n", newline="\n")
+    (directory / "campaign.contract").write_text(f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={'a' * 64}\n"
+        "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=0\nslot=AUTOSAVE0\n", newline="\n")
+    assert owner.inspect_campaign(snapshot, config)["status"] == "partial_metadata"
+    save = tmp_path / "remote" / native / "GAME-AUTOSAVE0/game.details"
+    save.parent.mkdir(parents=True)
+    save.write_bytes(b"native checkpoint")
+    receipt = tmp_path / "client_state.json"
+    receipt.write_text(json.dumps({"version": 2, "sessions": {
+        "fixture:0:1:" + "a" * 64: {"processed_items": 7}, "other-room:0:1": {"processed_items": 99}}}))
+    config["client_state_file"] = str(receipt)
+    before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    with patch.object(owner, "game_processes", return_value=()):
+        archive = owner.backup_local_files(snapshot, config)
+    import zipfile
+    with zipfile.ZipFile(archive) as saved:
+        assert b"native checkpoint" in [saved.read(name) for name in saved.namelist()]
+        assert json.loads(saved.read("client_state.json"))["sessions"] == {
+            "fixture:0:1:" + "a" * 64: {"processed_items": 7}}
+    assert all(path.read_bytes() == contents for path, contents in before.items())
+    (directory / "campaign.contract").write_bytes(b"invalid metadata")
+    assert owner.inspect_campaign(snapshot, config)["status"] == "metadata_invalid"
+
+
 def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
     from doom_eap.launcher.launcher_integration import classify_setup_failure, setup_failure_payload
     from doom_eap.launcher.launcher_doctor import _preparation_failure_summary

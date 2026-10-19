@@ -13,8 +13,8 @@ def build(output: Path) -> Path:
     output = output.resolve()
     if not output.is_relative_to(root / "build/release"):
         raise ValueError("Session owner output must remain under build/release")
-    command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", "--console",
-               "--hide-console", "hide-early", "--name", "APSessionOwner",
+    command = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--onefile", "--windowed",
+               "--name", "APSessionOwner",
                "--distpath", str(output), "--workpath", str(output / "work"),
                "--specpath", str(output / "spec"), "--paths", str(root)]
     for name, source in (("data", root / "data"), ("manifests", root / "manifests"), ("content", root / "content")):

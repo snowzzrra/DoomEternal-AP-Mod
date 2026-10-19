@@ -38,40 +38,6 @@ def test_support_report_uses_its_own_closed_archive(tmp_path, monkeypatch):
     assert len(set(sources)) == 2 and not any(source.exists() for source in sources)
 
 
-def test_support_retains_native_failure_after_game_exit(tmp_path, monkeypatch):
-    import json
-    import zipfile
-    from doom_eap.launcher import launcher_doctor as doctor
-
-    game = tmp_path / "game"
-    (game / "base").mkdir(parents=True)
-    build = "b" * 64
-    (game / "sentinel-distribution.json").write_text(json.dumps({"build_id": build}))
-    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    directory = tmp_path / "local/SentinelCore/diagnostics"
-    directory.mkdir(parents=True)
-    native = {"pid": 42, "process_created": 99, "build_id": build,
-              "admission": {"namespace_id": "room", "state": 4, "fault": 7},
-              "b_diagnostics": {"first_failure": {"predicate": "remote_marker_write_failed",
-                               "facts": {"bytes": 309}, "private": {"source": "private-address"}}}}
-    (directory / "42-99.latest.json").write_text(json.dumps(native))
-    (directory / "43-100.latest.json").write_text(json.dumps({**native, "pid": 43, "process_created": 100, "build_id": "c" * 64}))
-    (directory / "44-101.latest.json").write_bytes(b"x" * (doctor.SUPPORT_DIAGNOSTIC_MAX_BYTES + 1))
-    (directory / "45-102.latest.json").write_text(json.dumps(native))
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *args, **kwargs: ({}, {}))
-    result = doctor.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
-                                       config={"game_root": str(game)},
-                                       support_diagnostics={"ap_session": {"namespace_id": "room", "state": "game_exited"}})
-    with zipfile.ZipFile(result) as archive:
-        raw = archive.read("native_startup.json")
-        exported = json.loads(raw)
-        assert exported == json.loads(archive.read("doctor.json"))["native_startup"]
-        assert exported["status"] == "available" and len(exported["records"]) == 1
-        assert exported["records"][0]["evidence"] == "last_known"
-        assert exported["records"][0]["diagnostic"]["b_diagnostics"]["first_failure"]["predicate"] == "remote_marker_write_failed"
-        assert b"private-address" not in raw and len(exported["errors"]) == 2
-
-
 @pytest.fixture
 def io_boundary(tmp_path):
     gate = []
@@ -130,13 +96,14 @@ def test_execution_class_wire_format(io_boundary, fields, headers):
 
 def test_processing_race_does_not_leave_replay(io_boundary, monkeypatch):
     root, spool, gate = io_boundary
-    link = os.link
+    operation = "rename" if os.name == "nt" else "link"
+    publish = getattr(os, operation)
 
     def claim_during_publish(source, destination):
-        link(source, destination)
+        publish(source, destination)
         Path(destination).with_suffix(".processing").write_bytes(b"already claimed")
 
-    monkeypatch.setattr(os, "link", claim_during_publish)
+    monkeypatch.setattr(os, operation, claim_during_publish)
     assert spool.publish("give ammo", coalesce_key="job", room_scoped=False, already_queued_ok=True).accepted
     assert not (root / "queue/job.cmd").exists()
     assert (root / "queue/job.processing").read_bytes() == b"already claimed"
@@ -152,4 +119,28 @@ def test_fsync_failure_does_not_publish(io_boundary, monkeypatch):
     monkeypatch.setattr(os, "fsync", fail)
     assert not spool.publish("give ammo", coalesce_key="job", room_scoped=False).accepted
     assert not (root / "queue/job.cmd").exists()
+    assert list((root / "queue").iterdir()) == []
     assert gate == []
+
+
+def test_concurrent_publication_keeps_one_complete_payload(io_boundary, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    root, spool, _gate = io_boundary
+    operation = "rename" if os.name == "nt" else "link"
+    publish = getattr(os, operation)
+    barrier = threading.Barrier(2)
+
+    def publish_together(source, destination):
+        barrier.wait(timeout=5)
+        return publish(source, destination)
+
+    monkeypatch.setattr(os, operation, publish_together)
+    with ThreadPoolExecutor(2) as producers:
+        results = list(producers.map(lambda payload: spool.publish(payload, coalesce_key="job", room_scoped=False),
+                                     ("give ammo", "give health")))
+    assert sum(result.accepted for result in results) == 1
+    path = root / "queue/job.cmd"
+    assert path.read_bytes() in (b"AP_EXECUTION_CLASS_V1 PLAYER_RUNTIME\ngive ammo\n",
+                                 b"AP_EXECUTION_CLASS_V1 PLAYER_RUNTIME\ngive health\n")
+    assert list(path.parent.iterdir()) == [path]

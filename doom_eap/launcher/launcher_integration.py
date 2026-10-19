@@ -88,6 +88,8 @@ UNINSTALL_OWNED_STATES = frozenset({
 
 def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
     """Classify setup failures without weakening any validation boundary."""
+    if getattr(error, "failure_domain", None) == "proton_runtime":
+        return "proton_runtime"
     if phase == "campaign_session" or getattr(error, "failure_domain", None) == "campaign_session":
         return "campaign_session"
     text = f"{type(error).__name__}: {error}".casefold()
@@ -161,6 +163,11 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
             user_title = ROOM_PACKAGE_FAILURE_TITLE
             user_message = ROOM_PACKAGE_FAILURE_MESSAGE
             user_action = ROOM_PACKAGE_FAILURE_ACTION
+    elif failure_domain == "proton_runtime":
+        recovery_action = "select_proton"
+        user_title = "Select DOOM Eternal's Proton version"
+        user_message = raw_message
+        user_action = "SELECT PROTON"
     elif failure_domain == "campaign_session":
         recovery_action = "inspect_campaign"
         user_title = "AP campaign preparation needs attention"
@@ -197,6 +204,9 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "user_title": user_title,
         "user_message": user_message,
         "user_action": user_action,
+        "proton_reason": getattr(error, "proton_reason", None),
+        "proton_candidates": getattr(error, "proton_candidates", None),
+        "proton_selected": getattr(error, "proton_selected", None),
     }
 
 

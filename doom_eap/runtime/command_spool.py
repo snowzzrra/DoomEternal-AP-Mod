@@ -149,13 +149,18 @@ class CommandSpool:
             if materialization_lease is not None:
                 payload += f"{MATERIALIZATION_LEASE_HEADER} {materialization_lease}\n"
             payload += cmd.strip() + "\n"
-            with open(temporary_path, "x", encoding="utf-8", newline="\n") as f:
-                f.write(payload)
-                f.flush()
-                os.fsync(f.fileno())
             if coalesce_key:
+                temporary_owned = False
                 try:
-                    os.link(temporary_path, command_path)
+                    with open(temporary_path, "x", encoding="utf-8", newline="\n") as f:
+                        temporary_owned = True
+                        f.write(payload)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    if os.name == "nt":
+                        os.rename(temporary_path, command_path)
+                    else:
+                        os.link(temporary_path, command_path)
                     evidence = CommandEvidence.DURABLY_PUBLISHED
                 except FileExistsError:
                     evidence = CommandEvidence.SPOOL_PRESENT
@@ -168,10 +173,11 @@ class CommandSpool:
                         self.arm_rpc(True)
                     return PublicationResult(already_queued_ok, evidence, command_id)
                 finally:
-                    try:
-                        os.remove(temporary_path)
-                    except FileNotFoundError:
-                        pass
+                    if temporary_owned:
+                        try:
+                            os.remove(temporary_path)
+                        except FileNotFoundError:
+                            pass
                 processing_path = os.path.join(self.queue_dir, f"{command_id}.processing")
                 if os.path.exists(os.path.join(self.queue_dir, f"{command_id}.failed")):
                     try:
@@ -194,6 +200,10 @@ class CommandSpool:
                         self.arm_rpc(True)
                     return PublicationResult(already_queued_ok, evidence, command_id)
             else:
+                with open(temporary_path, "x", encoding="utf-8", newline="\n") as f:
+                    f.write(payload)
+                    f.flush()
+                    os.fsync(f.fileno())
                 os.replace(temporary_path, command_path)
                 evidence = CommandEvidence.DURABLY_PUBLISHED
             if arm_rpc:

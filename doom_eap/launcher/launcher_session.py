@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import ctypes
-from itertools import chain
 from dataclasses import asdict
 from ctypes import wintypes
 import hashlib
@@ -18,6 +17,7 @@ import selectors
 import subprocess
 import sys
 import threading
+import time
 import stat
 import zipfile
 from types import SimpleNamespace
@@ -98,12 +98,54 @@ def _campaign_native_root(campaign_root, namespace):
     return text[len(header):-1].decode("ascii")
 
 
+def _archive_campaign_files(archive, snapshot, namespace, sources, raw=None):
+    files = {}
+    for index, source in enumerate(sources):
+        if archive.resolve().is_relative_to(source.resolve()):
+            raise RuntimeError("AP backup destination must be outside its sources")
+        pending = [source]
+        while pending:
+            path = pending.pop()
+            info = path.lstat()
+            if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                    or stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))):
+                raise RuntimeError("AP backup refuses linked or special save files")
+            if stat.S_ISDIR(info.st_mode):
+                with os.scandir(path) as entries:
+                    pending.extend(Path(entry.path) for entry in entries)
+            if stat.S_ISREG(info.st_mode):
+                name = f"{index}/{path.relative_to(source).as_posix() if source.is_dir() else source.name}"
+                files[name] = (path, hashlib.sha256(path.read_bytes()).hexdigest())
+    archive.parent.mkdir(parents=True, exist_ok=False)
+    with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as output:
+        for name, (path, digest) in files.items():
+            output.write(path, name)
+        if raw is not None:
+            output.writestr("client_state.json", raw)
+        output.writestr("room.json", json.dumps({"seed": snapshot.seed_name, "team": snapshot.team,
+            "slot": snapshot.slot, "namespace": namespace, "sources": [str(path) for path in sources],
+            "sha256": {name: digest for name, (_, digest) in files.items()}}))
+    with archive.open("r+b") as stream:
+        os.fsync(stream.fileno())
+    with zipfile.ZipFile(archive) as saved:
+        if saved.testzip() is not None or any(hashlib.sha256(saved.read(name)).hexdigest() != digest
+                                            for name, (_, digest) in files.items()):
+            raise RuntimeError("AP backup verification failed; existing saves were kept")
+        if raw is not None and saved.read("client_state.json") != raw:
+            raise RuntimeError("AP receipt backup verification failed; existing saves were kept")
+    return archive
+
+
 class _ProtonSessionOwner:
     def __init__(self, client_dir, data_dir, state_dir):
         self.client_dir, self.data_dir, self.state_dir = client_dir, data_dir, state_dir
         self.process = None
         self.closable = False
         self._config_identity = None
+        self._next_process_query = 0
+        self._game_observed = False
+        self._channel_failure = None
+        self._runtime_details = None
         self.status = {"state": "not_prepared", "ready": False}
 
     def request(self, action, *, timeout=10, **payload):
@@ -124,13 +166,16 @@ class _ProtonSessionOwner:
         if "error" in response:
             error = RuntimeError(response["error"])
             for key, value in response.get("failure", {}).items():
-                if key in {"failure_domain", "stage", "operation", "source_path", "destination_path", "errno", "winerror", "filename", "filename2"}:
+                if key in {"failure_domain", "stage", "operation", "source_path", "destination_path", "errno", "winerror", "filename", "filename2", "proton_reason", "proton_candidates", "proton_selected"}:
                     setattr(error, key, value)
             raise error
         if "status" in response:
             if not isinstance(response["status"], dict):
                 raise RuntimeError("Invalid Windows session status")
             self.status = response["status"]
+            if self._runtime_details is not None:
+                self.status["proton_runtime"] = self._runtime_details
+            self._game_observed |= bool(self.status.get("pid"))
         return self.status
 
     def prepare(self, snapshot, config, *, recover_prelaunch=False):
@@ -153,6 +198,10 @@ class _ProtonSessionOwner:
         if not executable.is_file():
             raise RuntimeError("The packaged Windows AP session supervisor is unavailable")
         command, environment = runtime(config)
+        self._runtime_details = {"source": "manual" if config.get("proton_executable") else "config_info",
+            "executable": command[0], "tool": Path(command[0]).parent.name,
+            "compat_data_path": environment["STEAM_COMPAT_DATA_PATH"],
+            "wineprefix": environment["WINEPREFIX"], "steam_install": environment["STEAM_COMPAT_CLIENT_INSTALL_PATH"]}
         converted = {key: config[key] for key in _INSTALL_KEYS if key in config}
         for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file"):
             if converted.get(key):
@@ -161,6 +210,9 @@ class _ProtonSessionOwner:
             converted["game_root"] = windows_path(Path(config["doom_base_dir"]).parent)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         with (self.state_dir / "session_supervisor.log").open("ab") as log:
+            self._game_observed = False
+            self._next_process_query = 0
+            self._channel_failure = None
             self.process = subprocess.Popen([*command, windows_path(executable)], env=environment,
                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=log,
                                             text=True, encoding="utf-8", bufsize=1)
@@ -170,22 +222,37 @@ class _ProtonSessionOwner:
                                 recover_prelaunch=recover_prelaunch,
                                 client_dir=windows_path(self.client_dir), data_dir=windows_path(self.data_dir),
                                 state_dir=windows_path(self.state_dir))
-        except (OSError, ValueError, RuntimeError):
+        except (OSError, ValueError, RuntimeError) as error:
+            self.status.update(state="supervisor_unavailable", ready=False, first_failure=str(error))
             self.process.stdin.close()
             self.closable = False
             raise
 
     def observe(self):
+        if self.process is None:
+            return self.status
         if self.process is not None and (self.process.poll() is not None or self.process.stdin.closed):
             from doom_eap.runtime.proton import windows_processes
+            self.closable = False
+            self.status.update(state="supervisor_unavailable", ready=False)
+            if time.monotonic() < self._next_process_query:
+                return self.status
+            self._next_process_query = time.monotonic() + 10
             configuration = dict(zip(_INSTALL_KEYS, self._config_identity))
             processes = windows_processes(configuration, self.client_dir / "APSessionOwner.exe")
             self.closable = processes == ()
-            self.status.update(state="game_exited" if self.closable else "supervisor_unavailable", ready=False)
+            self._game_observed |= bool(processes)
+            if self.closable and self._game_observed:
+                self.status["state"] = "game_exited"
             return self.status
         try:
             return self.request("observe")
-        except (OSError, ValueError, RuntimeError):
+        except (OSError, ValueError, RuntimeError) as error:
+            if self._channel_failure is None:
+                self._channel_failure = str(error)
+                self.status["first_failure"] = self._channel_failure
+                logging.getLogger(__name__).warning("AP_SUPERVISOR_UNAVAILABLE exit=%s channel_closed=%s error=%s",
+                    self.process.poll(), self.process.stdin.closed, error)
             self.closable = False
             self.status.update(state="supervisor_unavailable", ready=False)
             return self.status
@@ -227,7 +294,9 @@ class APSessionOwner:
             raise RuntimeError("Core session probe returned an invalid object")
         if result.returncode and "--save-admission" not in arguments:
             outcome = value.get("outcome", value.get("result", "unknown"))
-            raise RuntimeError(f"Core session refused: {outcome} (error {value.get('win32_error', 0)})")
+            refused = RuntimeError(f"Core session refused: {outcome} (error {value.get('win32_error', 0)})")
+            refused.storage_outcome = outcome
+            raise refused
         return value
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
@@ -242,13 +311,19 @@ class APSessionOwner:
                 return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
         except (RuntimeError, OSError, ValueError) as error:
             from .launcher_integration import setup_failure_payload
-            error.failure_domain = "campaign_session"
+            if not getattr(error, "failure_domain", None):
+                error.failure_domain = "campaign_session"
             diagnostic = setup_failure_payload(error, phase="campaign_session")
             import traceback
             diagnostic["traceback"] = traceback.format_exc()
             from datetime import datetime, timezone
             diagnostic["at_utc"] = datetime.now(timezone.utc).isoformat()
             diagnostic["metadata"] = getattr(error.__cause__, "private_metadata", None)
+            if snapshot is not None:
+                try:
+                    diagnostic["campaign_inspection"] = self.inspect_campaign(snapshot, config)
+                except (OSError, RuntimeError, ValueError, KeyError) as inspection_error:
+                    diagnostic["campaign_inspection"] = {"status": "unavailable", "reason": str(inspection_error)}
             try:
                 self.state_dir.mkdir(parents=True, exist_ok=True)
                 (self.state_dir / "session_prepare_failure.json").write_text(
@@ -439,6 +514,146 @@ class APSessionOwner:
         from doom_eap.runtime.proton import windows_processes
         return windows_processes(config, self.client_dir / "APSessionOwner.exe")
 
+    def inspect_campaign(self, snapshot, config):
+        namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
+                                 snapshot.slot_data["native_generation_fingerprint"])
+        campaign_root = self.data_dir / "campaigns"
+        directory = campaign_root / namespace
+
+        def inspect_path(path, kind):
+            result = {"path": str(path), "status": "present"}
+            try:
+                info = path.lstat()
+                if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                        or not (stat.S_ISDIR(info.st_mode) if kind == "directory" else stat.S_ISREG(info.st_mode))):
+                    result["status"] = "wrong_type"
+                elif kind == "directory":
+                    with os.scandir(path) as entries:
+                        result["entries"] = [entry.name for _, entry in zip(range(32), entries)]
+            except FileNotFoundError:
+                result["status"] = "missing"
+            except OSError as error:
+                result.update(status="inaccessible", error=str(error), errno=error.errno,
+                              winerror=getattr(error, "winerror", None))
+            return result
+
+        paths = {name: inspect_path(directory / name, "file")
+                 for name in ("native.root", "campaign.contract", "campaign.checkpoint")}
+        result = {"namespace_id": namespace, "seed": snapshot.seed_name, "team": snapshot.team,
+                  "slot": snapshot.slot, "paths": paths, "native_root_source": "derived",
+                  "session": dict(self.status), "native_load_verified": False,
+                  "native_backup_available": os.name == "nt" and self.status.get("ready") is True
+                      and self.status.get("namespace_id") == namespace}
+        if paths["native.root"]["status"] in {"inaccessible", "wrong_type"}:
+            result["status"] = paths["native.root"]["status"]
+            return result
+        try:
+            native = _campaign_native_root(campaign_root, namespace)
+            if paths["native.root"]["status"] == "present":
+                result["native_root_source"] = "native.root"
+        except OSError as error:
+            result.update(status="inaccessible", reason=str(error))
+            return result
+        except (RuntimeError, UnicodeError) as error:
+            result.update(status="metadata_invalid", reason=str(error))
+            return result
+        for name, key in (("steam_native", "steam_remote_dir"), ("local_native", "save_games_dir")):
+            if config.get(key):
+                root = Path(str(config[key])).expanduser().resolve() / native
+                paths[name] = inspect_path(root, "directory")
+                paths[name + "_autosave"] = inspect_path(root / "GAME-AUTOSAVE0", "directory")
+            else:
+                paths[name] = {"status": "not_configured", "path": None}
+        expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
+                    f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\n"
+                    f"difficulty={snapshot.slot_data['campaign_plan']['difficulty']}\nslot=AUTOSAVE0\n").encode()
+        for name in ("campaign.contract", "campaign.checkpoint"):
+            if paths[name]["status"] == "present":
+                try:
+                    with (directory / name).open("rb") as stream:
+                        raw = stream.read(65537)
+                    if len(raw) > 65536 or (raw != expected if name.endswith("contract") else not (
+                            raw.startswith(expected) and raw.endswith(b"state=native_saved_readback_verified\n"))):
+                        paths[name]["status"] = "metadata_invalid"
+                except OSError as error:
+                    paths[name].update(status="inaccessible", error=str(error))
+        statuses = {item["status"] for item in paths.values()}
+        metadata = [paths[name]["status"] == "present" for name in ("campaign.contract", "campaign.checkpoint")]
+        autosave = any(paths.get(name + "_autosave", {}).get("status") == "present"
+                       for name in ("steam_native", "local_native"))
+        if "inaccessible" in statuses:
+            result["status"] = "inaccessible"
+        elif "wrong_type" in statuses:
+            result["status"] = "wrong_type"
+        elif "metadata_invalid" in statuses:
+            result["status"] = "metadata_invalid"
+        elif "not_configured" in statuses:
+            result["status"] = "not_configured"
+        elif any(metadata) and not all(metadata):
+            result["status"] = "partial_metadata"
+        elif all(metadata):
+            result["status"] = "files_present" if autosave else "metadata_only"
+        else:
+            result["status"] = "native_only" if autosave else "absent"
+        descriptor = self.state_dir / "ap-session-descriptor.txt"
+        if os.name == "nt" and descriptor.is_file() and hasattr(self, "_runtime"):
+            text = descriptor.read_text(encoding="utf-8")
+            identity = (f"seed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
+                        f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n")
+            if identity in text and f"root={campaign_root}\n" in text:
+                try:
+                    result["storage"] = self._probe("--save-session-plan", str(descriptor))
+                except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+                    result["storage"] = {"status": "refused", "reason": str(error)}
+                    if getattr(error, "storage_outcome", None) == "busy":
+                        result["status"] = "session_busy"
+        if self.status.get("namespace_id") == namespace and self.status.get("state") in {"admitted", "awaiting_admission"}:
+            result["status"] = "session_busy"
+        return result
+
+    def backup_local_files(self, snapshot, config):
+        with self._lock:
+            if self.game_processes(config) != ():
+                raise RuntimeError("Close DOOM Eternal before copying local AP files")
+            inspection = self.inspect_campaign(snapshot, config)
+            if inspection["status"] in {"inaccessible", "wrong_type", "metadata_invalid", "not_configured", "session_busy"}:
+                raise RuntimeError("Inspect AP save details before copying local files: " + inspection["status"])
+            namespace = inspection["namespace_id"]
+            directory = self.data_dir / "campaigns" / namespace
+            sources = [directory] if directory.is_dir() else []
+            for name in ("steam_native", "local_native"):
+                entry = inspection["paths"][name]
+                if entry["status"] == "present":
+                    root = Path(entry["path"])
+                    if inspection["native_root_source"] != "native.root":
+                        raise RuntimeError("The native save provider is derived; its room association is unconfirmed")
+                    sources.append(root)
+            if not sources:
+                raise RuntimeError("No local files are available for this room")
+            raw = None
+            if config.get("client_state_file"):
+                try:
+                    with Path(config["client_state_file"]).open("rb") as stream:
+                        contents = stream.read(16 * 1024 * 1024 + 1)
+                except FileNotFoundError:
+                    contents = None
+                if contents is not None:
+                    if len(contents) > 16 * 1024 * 1024:
+                        raise RuntimeError("Local AP receipt state is too large to back up")
+                    state = json.loads(contents)
+                    if not isinstance(state, dict) or not isinstance(state.get("sessions"), dict):
+                        raise RuntimeError("Local AP receipt state is unreadable")
+                    prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
+                    raw = json.dumps({"version": state.get("version"), "sessions": {
+                        key: value for key, value in state["sessions"].items()
+                        if key in {prefix, prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]}
+                    }}).encode("utf-8")
+            archive = self.data_dir / "campaigns/local-copies" / secrets.token_hex(16) / "campaign.zip"
+            _archive_campaign_files(archive, snapshot, namespace, list(dict.fromkeys(sources)), raw)
+            if self.game_processes(config) != ():
+                raise RuntimeError("DOOM Eternal started during the copy; its completeness is unconfirmed")
+            return archive
+
     def restart_campaign(self, snapshot, config: dict) -> Path:
         from doom_eap.contracts.command_publication import queue_session_namespace
         from doom_eap.runtime.client_state_store import ClientStateStore
@@ -493,34 +708,10 @@ class APSessionOwner:
                 sources.extend(local / trigger["filename"] for publisher in load_publisher_contracts()
                                for trigger in publisher.triggers_for("map_event_file"))
             sources = list(dict.fromkeys(path for path in sources if path.exists() or path.is_symlink()))
-            files = {}
-            for index, source in enumerate(sources):
-                for path in chain((source,), source.rglob("*") if source.is_dir() else ()):
-                    info = path.lstat()
-                    if getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)):
-                        raise RuntimeError("AP restart refuses linked or special save files")
-                    if path.is_file():
-                        name = f"{index}/{path.relative_to(source).as_posix() if source.is_dir() else source.name}"
-                        files[name] = (path, hashlib.sha256(path.read_bytes()).hexdigest())
             token = secrets.token_hex(16)
             backup = self.data_dir / "campaigns" / "restarts" / token
-            backup.mkdir(parents=True, exist_ok=False)
             archive = backup / "campaign.zip"
-            with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as output:
-                for name, (path, digest) in files.items():
-                    output.write(path, name)
-                if raw is not None:
-                    output.writestr("client_state.json", raw)
-                output.writestr("room.json", json.dumps({"seed": snapshot.seed_name, "team": snapshot.team,
-                    "slot": snapshot.slot, "namespace": namespace, "sources": [str(path) for path in sources],
-                    "sha256": {name: digest for name, (_, digest) in files.items()}}))
-            with archive.open("r+b") as stream:
-                os.fsync(stream.fileno())
-            with zipfile.ZipFile(archive) as saved:
-                if saved.testzip() is not None or any(hashlib.sha256(saved.read(name)).hexdigest() != digest for name, (_, digest) in files.items()):
-                    raise RuntimeError("AP backup verification failed; existing saves were kept")
-                if raw is not None and saved.read("client_state.json") != raw:
-                    raise RuntimeError("AP receipt backup verification failed; existing saves were kept")
+            _archive_campaign_files(archive, snapshot, namespace, sources, raw)
             if self.game_processes(config) != ():
                 raise RuntimeError("DOOM Eternal started during backup; existing saves were kept")
             moved = []
@@ -580,6 +771,9 @@ class APSessionOwner:
         with self._lock:
             if self._remote is not None:
                 self.status = self._remote.observe()
+                if self._remote.process is not None and self._remote.closable and (
+                        self._remote.process.poll() is not None or self._remote.process.stdin.closed):
+                    self._remote.retire()
                 return dict(self.status)
             if not self._handle:
                 return dict(self.status)

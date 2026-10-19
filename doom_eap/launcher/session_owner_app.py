@@ -1,5 +1,6 @@
 """Windows process-session owner shared by the native and Proton launchers."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -15,6 +16,21 @@ def respond(document):
 
 
 def main():
+    if sys.platform == "win32" and sys.stdin is None:
+        import ctypes
+        import msvcrt
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetStdHandle.argtypes = [ctypes.c_ulong]
+        kernel.GetStdHandle.restype = ctypes.c_void_p
+        # windowed builds keep the inherited pipes, but Python leaves these streams unset.
+        for name, number, mode, flags in (("stdin", -10, "r", os.O_RDONLY),
+                                          ("stdout", -11, "w", os.O_WRONLY),
+                                          ("stderr", -12, "w", os.O_WRONLY)):
+            handle = kernel.GetStdHandle(number & 0xffffffff)
+            if not handle or handle == ctypes.c_void_p(-1).value:
+                raise RuntimeError(f"The session supervisor requires an inherited {name} pipe")
+            descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
+            setattr(sys, name, os.fdopen(descriptor, mode, buffering=1, encoding="utf-8"))
     if "--process-identity" in sys.argv:
         respond({"processes": windows_game_processes()})
         return 0
@@ -54,7 +70,7 @@ def main():
                 else:
                     raise ValueError("Unsupported session action")
             except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as error:
-                from .launcher_integration import setup_failure_payload
+                from doom_eap.launcher.launcher_integration import setup_failure_payload
                 respond({"error": str(error), "failure": setup_failure_payload(error), "can_close": False})
     finally:
         if owner is not None:

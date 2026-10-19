@@ -377,7 +377,7 @@
         }
       ],
       "default": "random_mission_order",
-      "description": "Choose chronological progression, a fixed seeded sequence, or individual Access items.\n\nEvery completed stage remains replayable; travel returns through the Fortress.\nAccess and sequence availability do not guarantee immediate logical completion.",
+      "description": "Choose chronological progression, a fixed seeded sequence, or individual Access items.\n\nEnabled missions follow chronological order in Vanilla Order; the selected goal mission is played last.\n\nEvery completed stage remains replayable; travel returns through the Fortress.\nAccess and sequence availability do not guarantee immediate logical completion.",
       "display_name": "Mission Order",
       "group": "Game Options",
       "key": "mission_order",
@@ -807,5 +807,5 @@
   ],
   "schema_version": 2,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "a294516d14ce7082b6075d683cad053fc5c311a603fdee287d9b6357f6434569"
+  "source_sha256": "9fd81d75ba431d56d681712c309f72e6100313b4b1a41ba03362d5a443b16129"
 }
