@@ -160,6 +160,68 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     return "\n".join(lines)
 
 
+def compile_kill_sources(catalog, native):
+    reference = json.loads((catalog.root / 'content/catalog/killsanity_estimates.json').read_bytes())
+    if reference.get('schema_version') != 1 or reference.get('quantity') != 'conservative_estimate':
+        raise ValueError('Unsupported campaign kill estimate reference')
+    stage_ids = [stage['id'] for stage in campaign_stages(catalog)]
+    if set(reference.get('maps', {})) != set(stage_ids):
+        raise ValueError('Campaign kill estimates must cover the supported mission list')
+    kill_sources = {}
+    for key, estimate in reference['maps'].items():
+        descriptor = json.loads((catalog.root / 'content/maps' / key / 'descriptor.json').read_bytes())
+        if (estimate['source_sha256'] != descriptor['source_sha256']
+                or estimate.get('coverage') not in {'partial', 'protected_boss_only', 'unreviewed'}
+                or not isinstance(estimate.get('basis'), str) or not estimate['basis']):
+            raise ValueError(f'Campaign kill estimate has invalid provenance: {key}')
+        kill_sources[key] = dict(source_sha256=estimate['source_sha256'], estimated_kills=estimate['estimated_kills'],
+            coverage=estimate['coverage'], basis=estimate['basis'], sources=estimate.get('guaranteed_sources', []),
+            progression_source_ids=[row['source_id'] for row in estimate.get('guaranteed_sources', [])])
+        if estimate.get('source_alternatives'):
+            kill_sources[key]['source_alternatives'] = estimate['source_alternatives']
+    from doom_eap.content.native_enemy_plan import native_event_identity
+    secret_locations = {(item.map_key, item.policy.get("manager", item.policy.get("manager_entity"))): item.name
+                        for item in catalog.physical_locations if item.strategy == "secret_encounter"}
+    for key, estimate in reference["maps"].items():
+        original = kill_sources[key]
+        by_id = {row["source_id"]: row for row in original["sources"]}
+        alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
+                        for branch in group['branches'] for member in branch}
+        native_sources = {native_event_identity(row): row for row in native["maps"][key]["origins"] if "binding" in row}
+        seen_events = set()
+        for location, events in estimate.get("event_sources", {}).items():
+            for identity, count in events.items():
+                if identity in seen_events:
+                    raise ValueError(f"Kill estimate repeats an event: {key}/{identity}")
+                seen_events.add(identity)
+                source = native_sources.get(identity)
+                if source is None or source.get("protected_reason"):
+                    raise ValueError(f"Kill estimate refers to an absent or protected native event: {key}/{identity}")
+                secret = secret_locations.get((key, identity.split('/')[0]))
+                if secret is not None and location != secret:
+                    raise ValueError(f"Kill estimate uses the wrong Secret Encounter: {key}/{identity}")
+                if type(count) is not int or count < 1:
+                    raise ValueError(f"Kill estimate has an invalid event count: {key}/{identity}")
+                if identity in estimate.get('alternative_source_ids', []) and identity not in alternatives:
+                    raise ValueError(f'Kill estimate needs an alternative-source plan: {key}/{identity}')
+                if identity not in by_id:
+                    by_id[identity] = {"source_id": identity, "map_key": key, "count": count, "repeatable": True}
+                    if identity in alternatives:
+                        by_id[identity].update({field: value for field, value in by_id[alternatives[identity]].items()
+                                               if field not in {'source_id', 'count'}})
+                row = by_id[identity]
+                if row["count"] != count:
+                    raise ValueError(f"Guaranteed source and event counts differ: {key}/{identity}")
+                if not {"location", "region"}.intersection(row):
+                    row["location"] = location
+        original["sources"] = list(by_id.values())
+        if estimate.get("conditional_managers"):
+            original["conditional_managers"] = estimate["conditional_managers"]
+    kill_catalog = dict(schema_version=2, quantity='conservative_estimate', maps=kill_sources)
+    build_campaign_kill_budget(dict(stage_ids=stage_ids), None, catalog=kill_catalog)
+    return kill_catalog
+
+
 def _compile_catalog(
     output: Path = DEFAULT_OUTPUT,
     *,
@@ -195,88 +257,41 @@ def _compile_catalog(
             changed_paths.append(path)
 
     write_artifact(output, rendered)
+    setup_guide = (catalog.root / "docs/INSTALL.md").read_text(encoding="utf-8")
+    setup_guide = setup_guide.replace("(GAMEPLAY.md)", "(https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/GAMEPLAY.md)")
+    write_artifact(output.parent / "docs/setup_en.md", setup_guide)
     write_bytes_artifact(output.with_name("enemy_options.py"),
                          (catalog.root / "doom_eap/content/enemy_options.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_plan.py"),
                          (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_plan.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_plan.py").read_bytes())
+    from tools.maps.native_enemy_inventory import build_native_recipe_catalog
+
+    native = build_native_recipe_catalog(catalog.root)
+    native_catalog = json.dumps(native, sort_keys=True, separators=(",", ":")) + "\n"
+    write_artifact(output.with_name("native_enemy_catalog.json"), native_catalog)
+    write_artifact(catalog.root / "doom_eap/content/native_enemy_catalog.json", native_catalog)
     write_bytes_artifact(output.with_name("enemy_species.py"),
                          (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_species.json"),
                          (catalog.root / "content/catalog/enemy_species.json").read_bytes())
-    write_bytes_artifact(output.with_name("encounter_composition.json"),
-                         (catalog.root / "content/catalog/encounter_composition.json").read_bytes())
+    write_bytes_artifact(catalog.root / "doom_eap/content/enemy_species.json",
+                         (catalog.root / "content/catalog/enemy_species.json").read_bytes())
     write_bytes_artifact(output.with_name("secret_encounter_timers.py"),
                          (catalog.root / "doom_eap/content/secret_encounter_timers.py").read_bytes())
     write_bytes_artifact(output.with_name("secret_encounter_timers.json"),
                          (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
+    write_bytes_artifact(catalog.root / "doom_eap/content/secret_encounter_timers.json",
+                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
     write_bytes_artifact(output.with_name("killsanity_plan.py"),
                          (catalog.root / "doom_eap/content/killsanity_plan.py").read_bytes())
-    reference = json.loads((catalog.root / 'content/catalog/killsanity_estimates.json').read_bytes())
-    if reference.get('schema_version') != 1 or reference.get('quantity') != 'conservative_estimate':
-        raise ValueError('Unsupported campaign kill estimate reference')
-    stage_ids = [stage['id'] for stage in campaign_stages(catalog)]
-    if set(reference.get('maps', {})) != set(stage_ids):
-        raise ValueError('Campaign kill estimates must cover the supported mission list')
-    kill_sources = {}
-    for key, estimate in reference['maps'].items():
-        descriptor = json.loads((catalog.root / 'content/maps' / key / 'descriptor.json').read_bytes())
-        if (estimate['source_sha256'] != descriptor['source_sha256']
-                or estimate.get('coverage') not in {'partial', 'protected_boss_only', 'unreviewed'}
-                or not isinstance(estimate.get('basis'), str) or not estimate['basis']):
-            raise ValueError(f'Campaign kill estimate has invalid provenance: {key}')
-        kill_sources[key] = dict(source_sha256=estimate['source_sha256'], estimated_kills=estimate['estimated_kills'],
-            coverage=estimate['coverage'], basis=estimate['basis'], sources=estimate.get('guaranteed_sources', []),
-            progression_source_ids=[row['source_id'] for row in estimate.get('guaranteed_sources', [])])
-        if estimate.get('source_alternatives'):
-            kill_sources[key]['source_alternatives'] = estimate['source_alternatives']
-    composition = json.loads((catalog.root / "content/catalog/encounter_composition.json").read_bytes())
-    encounter_protections = json.loads((catalog.root / "content/catalog/encounter_profiles.json").read_bytes())["maps"]
-    secret_locations = {(item.map_key, item.policy.get("manager", item.policy.get("manager_entity"))): item.name
-                        for item in catalog.physical_locations if item.strategy == "secret_encounter"}
-    for key, profile in composition["maps"].items():
-        original = kill_sources[key]
-        if original["source_sha256"] != profile["source_sha256"]:
-            raise ValueError(f"Original source and replacement profiles use different maps: {key}")
-        by_id = {row["source_id"]: row for row in original["sources"]}
-        alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
-                        for branch in group['branches'] for member in branch}
-        for encounter in profile["encounters"]:
-            operation = encounter["operation"]
-            protection = encounter_protections.get(key, {}).get(operation["manager"]["entity"], {}).get("protection", {})
-            if protection.get("entire_encounter") or {
-                    "script": operation["script_index"], "event": operation["event_index"]
-                    } in protection.get("spawn_events", []):
-                raise ValueError(f"Enemy composition includes a protected occurrence: {key}/{encounter['id']}")
-            secret_location = secret_locations.get((key, operation["manager"]["entity"]))
-            if secret_location is not None and encounter["location"] != secret_location:
-                raise ValueError(f"Enemy source is linked to the wrong Secret Encounter: {key}/{encounter['id']}")
-            identity = f"{operation['manager']['entity']}/{operation['script_index']}/{operation['event_index']}"
-            if identity in reference['maps'][key].get('alternative_source_ids', []) and identity not in alternatives:
-                raise ValueError(f'Enemy replacement needs an alternative-source plan: {key}/{identity}')
-            if identity not in by_id:
-                by_id[identity] = {"source_id": identity, "map_key": key,
-                                   "count": encounter["original_count"], "repeatable": True}
-                if identity in alternatives:
-                    by_id[identity].update({field: value for field, value in by_id[alternatives[identity]].items()
-                                           if field not in {'source_id', 'count'}})
-            row = by_id[identity]
-            if row["count"] != encounter["original_count"]:
-                raise ValueError(f"Original source and replacement counts differ: {key}/{identity}")
-            if not {"location", "region"}.intersection(row):
-                row["location"] = encounter["location"]
-        original["sources"] = list(by_id.values())
-        conditional = profile.get("conditional_managers", [])
-        if conditional:
-            original["conditional_managers"] = conditional
-    kill_catalog = dict(schema_version=2, quantity='conservative_estimate', maps=kill_sources)
-    build_campaign_kill_budget(dict(stage_ids=stage_ids), None, catalog=kill_catalog)
+    kill_catalog = compile_kill_sources(catalog, native)
     kill_sources_payload = json.dumps(kill_catalog, indent=2) + "\n"
     write_artifact(output.with_name("campaign_kill_sources.json"), kill_sources_payload)
-    write_artifact(catalog.root / "data/campaign_kill_sources.json", kill_sources_payload)
+    write_artifact(catalog.root / "doom_eap/content/campaign_kill_sources.json", kill_sources_payload)
     write_artifact(catalog.root / "data" / "campaign_stages.json",
                    json.dumps(campaign_stages(catalog), indent=2) + "\n")
-    write_bytes_artifact(catalog.root / "data/secret_encounter_timers.json",
-                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
     from tools.validation.validate_data import extract_item_classifications, extract_namedtuple_table
     item_source = MOD_ROOT.parent / "Archipelago/worlds/doometernal/items.py"
     item_ids = extract_namedtuple_table(item_source, "item_data_table")

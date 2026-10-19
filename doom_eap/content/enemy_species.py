@@ -9,6 +9,7 @@ from .enemy_options import SPECIES_IDS
 
 
 AIRBORNE_SPECIES = frozenset({'gargoyle', 'cacodemon', 'pain_elemental', 'lost_soul', 'blood_angel'})
+STATIONARY_SPECIES = frozenset({'buff_pod', 'tentacle', 'super_tentacle', 'turret'})
 
 
 AMMUNITION_SPECIES = {
@@ -74,11 +75,15 @@ def project_speed_capabilities(registry):
 @cache
 def _registry():
     path = files(__package__).joinpath("enemy_species.json")
-    if not path.is_file():
-        path = Path(__file__).resolve().parents[2] / "content/catalog/enemy_species.json"
     registry = json.loads(path.read_bytes().decode("utf-8"))
     project_species_profiles(registry)
     return registry
+
+
+@cache
+def stationary_enemy_inherits():
+    return frozenset(inherit for species in STATIONARY_SPECIES
+                     for inherit in _registry()['species'][species]['inherits'])
 
 
 @cache

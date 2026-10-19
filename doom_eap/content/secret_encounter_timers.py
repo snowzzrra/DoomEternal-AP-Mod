@@ -2,7 +2,6 @@
 
 import json
 import re
-from pathlib import Path
 from importlib.resources import files
 
 
@@ -42,6 +41,4 @@ def apply_secret_encounter_timers(text: str, member: str, registry: dict,
 
 def load_secret_encounter_timers() -> dict:
     path = files(__package__).joinpath("secret_encounter_timers.json")
-    if not path.is_file():
-        path = Path(__file__).resolve().parents[2] / "data/secret_encounter_timers.json"
     return json.loads(path.read_text(encoding="utf-8"))

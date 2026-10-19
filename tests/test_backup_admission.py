@@ -3,7 +3,7 @@ import importlib.util
 import os
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -64,7 +64,7 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
     for name in ('tracker_loop', 'death_monitor_loop'):
         stopped = SimpleNamespace(exit_event=asyncio.Event(),
             reset_transient_effects=Mock(), invalidate_map_identity=Mock(),
-            check_rpc_autopause=Mock(), queue_received_deathlink=Mock())
+            check_rpc_autopause=Mock(), queue_received_deathlink=Mock(), check_killsanity=AsyncMock())
 
         async def stop_after_poll(_delay):
             stopped.exit_event.set()

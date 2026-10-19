@@ -137,9 +137,6 @@ def create_synthetic_room_resources(
     base_bytes = b"base_entities_content_data"
     rep_bytes = b"replacement_entities_content_data"
     source_bytes = b"canonical source\r\nentity {\r\n}\r\n"
-    enemy_bytes = b"test enemy resource"
-    enemy_path = "gameresources/ai/fodder/imp_stone"
-    enemy_member = "enemy_resources/stone_imp/" + enemy_path
     mastery_sources = {
         "gameresources/generated/decls/" + entry["decls"]["unlockable"]["path"]:
         _reward_free_override(entry)[0].encode("utf-8")
@@ -155,10 +152,6 @@ def create_synthetic_room_resources(
     manifest_doc = {
         "schema_version": 2,
         "model": "dependent_map_payloads",
-        "enemy_resources": {"stone_imp": {"members": {enemy_path: {
-            "member": enemy_member, "sha256": hashlib.sha256(enemy_bytes).hexdigest(),
-            "size": len(enemy_bytes),
-        }}}},
         "source_snapshots": {"e1m1_intro": {"member": "sources/e1m1_intro.entities",
             "sha256": hashlib.sha256(source_bytes).hexdigest(), "size": len(source_bytes)}},
         "physical_option_keys": [
@@ -213,7 +206,6 @@ def create_synthetic_room_resources(
         with zipfile.ZipFile(rep_zip, "w") as zf:
             zf.writestr(rep_file, rep_bytes)
             zf.writestr("sources/e1m1_intro.entities", source_bytes)
-            zf.writestr(enemy_member, enemy_bytes)
 
     return target_dir
 
@@ -308,16 +300,6 @@ class TestAssembleCIArtifact(unittest.TestCase):
 
 
 
-    def test_enemy_resource_hash_mismatch_rejected(self):
-        resources = create_synthetic_room_resources(Path(self.temp_dir) / "enemy-hash")
-        validate_room_resources(resources)
-        path = resources / "room_payload_manifest.json"
-        manifest = json.loads(path.read_text(encoding="utf-8"))
-        snapshot = next(iter(manifest["enemy_resources"]["stone_imp"]["members"].values()))
-        snapshot["sha256"] = "0" * 64
-        path.write_text(json.dumps(manifest), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "Enemy resource hash mismatch"):
-            validate_room_resources(resources)
 
     def test_checksum_mismatch_rejected(self):
         create_fake_handoff(self.handoff_dir, corrupt_hash=True)

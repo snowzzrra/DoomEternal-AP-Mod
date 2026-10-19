@@ -108,7 +108,7 @@
   "source_surveys": {
     "templates_sha256": "1ec6937cfecff3617ecc89b3c6a6f313de82ede3439638aded5d75c37957ec87",
     "declarations_sha256": "5fd86b09706f98c14022b017f25ed363dd9e786a1e2d15501bc44ce78e3b9e8a",
-    "definition_ancestry_sha256": "170e14cac6963110265e2df568b3bfc410cf36cb83cb4da18cb5a01bb1003e91"
+    "definition_ancestry_sha256": "84dc2c5f9ccbeaf865e7cd661d577271d1cc3e25046d7081adb4cd256edd3907"
   },
   "decompressor_sha256": "11ba96139174b206c38c36f177ed88991cef4f68aee3e81cda106210bcfbe18d",
   "declarations": {
@@ -4837,6 +4837,129 @@
         "stored_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
         "decoded_sha256": "9ce52c7debd1dea0415be4f667bfc044961584c275741927729a54922ce06334",
         "inherit": "ai/superheavy/archvile"
+      }
+    ],
+    "ai/ambient/zombie_worshipper": [
+      {
+        "bank": "game/sp/e1m3_cult/e1m3_cult.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 5047,
+        "offset": 23274560,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e1m4_boss/e1m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 3620,
+        "offset": 18846784,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e2m1_nest/e2m1_nest.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 7221,
+        "offset": 26190912,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e2m2_base/e2m2_base.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 8872,
+        "offset": 33477696,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e2m3_core/e2m3_core.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 7608,
+        "offset": 26530880,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e2m4_boss/e2m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 2496,
+        "offset": 42985984,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e3m1_slayer/e3m1_slayer.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 5155,
+        "offset": 22897728,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e3m2_hell/e3m2_hell.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 5614,
+        "offset": 103830592,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e3m2_hell_b/e3m2_hell_b.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 2828,
+        "offset": 15025216,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e3m3_maykr/e3m3_maykr.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 3024,
+        "offset": 18302016,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
+      },
+      {
+        "bank": "game/sp/e3m4_boss/e3m4_boss.resources",
+        "member": "generated/decls/entitydef/ai/ambient/zombie_worshipper.decl",
+        "index": 5339,
+        "offset": 18601024,
+        "stored_size": 1026,
+        "decoded_size": 1026,
+        "stored_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "decoded_sha256": "d363e5e17ea9077629c3fe587d81ad86ada58d2d35a6ad3f25c606f72c80bd18",
+        "inherit": "ai/fodder/zombie_t1_scientist"
       }
     ]
   },

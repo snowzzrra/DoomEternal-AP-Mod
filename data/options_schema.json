@@ -1545,7 +1545,7 @@
         }
       ],
       "default": "preset",
-      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Use Intensity and Density to choose between more weak enemies and fewer strong enemies.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nCrowded fights can split into extra waves.",
+      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Use Intensity and Density to choose between more weak enemies and fewer strong enemies.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nEnemies enter through the fight's normal spawn events.",
       "display_name": "Enemy Count",
       "group": "Game Options",
       "key": "enemy_count_mode",
@@ -1590,7 +1590,7 @@
     },
     {
       "default": {},
-      "description": "Choose how often each enemy type appears.\n\nHigher weights make an enemy more common. A weight of 20 is twice as likely as 10.\nZero leaves that type out of random picks. Empty entries use the selected preset.\nSome fights keep special enemies or add weak enemies for ammo and health.",
+      "description": "Choose how often each enemy type appears.\n\nHigher weights make an enemy more common. A weight of 20 is twice as likely as 10.\nZero leaves that type out of random picks. Empty entries use the selected preset.\nSome scripted enemies and bosses keep their native behavior.",
       "display_name": "Bestiary Weights",
       "entries": [
         {
@@ -7789,7 +7789,7 @@
     },
     {
       "default": {},
-      "description": "Choose how many special enemies can fight you at the same time.\n\nMarauder, Arch-vile and Spirit: Set the limit for that enemy type.\nCombined Specials: Set the total limit for those three types together.\nZero blocks random additions of that type. Empty entries use the selected preset.\nSome fights keep their special enemies.",
+      "description": "Choose how many special enemies can fight you at the same time.\n\nMarauder, Arch-vile and Spirit: Set the limit for that enemy type.\nCombined Specials: Set the total limit for those three types together.\nNumbers stay fixed throughout the campaign. Empty entries use the preset and grow with Progressive Difficulty.\nZero blocks random additions of that type.\nSome fights keep their special enemies.",
       "display_name": "Special Enemy Limits",
       "entries": [
         {
@@ -7824,7 +7824,7 @@
     },
     {
       "default": false,
-      "description": "Earn an Archipelago reward after every Kills per Check enemy deaths.\n\nEvery enemy death counts, including enemies spawned by traps, respawns and replayed missions.\nOn: Add kill rewards. Off: Use the campaign's other rewards.",
+      "description": "Earn an Archipelago reward after every Kills per Check enemy deaths.\n\nThe counter includes observed deaths from traps, respawns and mission replays.\nOn: Add kill rewards. Off: Use the campaign's other rewards.",
       "display_name": "Killsanity",
       "group": "Game Options",
       "key": "killsanity",
@@ -7844,7 +7844,7 @@
     },
     {
       "default": "auto",
-      "description": "Choose how many kill rewards to add to your campaign.\n\nAuto: Divide estimated campaign kills plus 10% by Kills per Check, up to 50 rewards.\n1..65,535: Add that many kill rewards. Kills per Check sets the gap between rewards.",
+      "description": "Choose how many kill rewards to add to your campaign.\n\nAuto: Divide estimated campaign kills plus 10% by Kills per Check, round down, and cap at 50 rewards.\n1..65,535: Add that many kill rewards. Kills per Check sets the gap between rewards.",
       "display_name": "Kill Rewards",
       "group": "Game Options",
       "key": "killsanity_maximum_milestones",
@@ -8049,5 +8049,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "9b63e2324c9f2add9c1fa1976cd2738a4f564676ba615e2d11615653424c7ea0"
+  "source_sha256": "754b773891fe207d553d5a846abed6a92a99dc3331193a1522cc686673f0bd25"
 }

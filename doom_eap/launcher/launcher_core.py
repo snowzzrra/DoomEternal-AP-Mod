@@ -6,14 +6,13 @@ import json
 import logging
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import zipfile
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from doom_eap.content.physical_options import (
     DEATH_LINK_MODES,
@@ -1256,10 +1255,7 @@ class RoomCompiler:
     def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> None:
         from dataclasses import replace
 
-        from doom_eap.content.enemy_resources import read_enemy_resource_payloads, required_enemy_resource_species
-        from doom_eap.content.enemy_species import load_species_registry, project_species_profiles
-        from tools.maps.encounter_materializer import materialize_frozen_encounters
-        from tools.maps.encounter_populations import materialize_frozen_populations
+        from tools.maps.native_recipe_materializer import materialize_native_recipe_calls
         from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
         from tools.release.room_payloads import read_source_snapshots
 
@@ -1267,31 +1263,16 @@ class RoomCompiler:
         validate_frozen_enemy_plan(plan, manifest.options["enemies"])
         if plan is None:
             return
-        changed_maps = {key: row for key, row in plan["maps"].items() if row["operations"]}
+        changed_maps = {key: row for key, row in plan["maps"].items() if row["recipes"]}
         if not changed_maps:
             return
         required_sources = set(changed_maps)
         try:
             for row in changed_maps.values():
-                for operation in row["operations"]:
-                    required_sources.add(operation["from"]["spawner"]["map_key"])
-                    if operation.get("reserve") is not None:
-                        for template in ("commit_template", "finish_template"):
-                            required_sources.add(operation["reserve"][template]["map_key"])
-                    for wave in operation["waves"]:
-                        for instance in wave["instances"]:
-                            required_sources.add(instance["ai"]["map_key"])
-                            if operation["event_def"] == "spawnAI":
-                                required_sources.add(instance["origin_spawner"]["map_key"])
+                required_sources.update(body["ai"]["map_key"] for recipe in row["recipes"] for body in recipe["bodies"])
         except (KeyError, TypeError) as error:
             raise ValueError("Enemy generation source references are malformed") from error
-        resources = read_enemy_resource_payloads(self.payload_resource, self.payload_manifest, required_enemy_resource_species(plan))
-        for member, payload in resources.items():
-            if member in assembled and assembled[member] != payload:
-                raise ValueError(f"Enemy resources conflict with the room payload: {member}")
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
-        registry = load_species_registry(ROOT / "content/catalog/enemy_species.json")
-        profiles = project_species_profiles(registry)
         compiler = ModCompiler(ROOT)
         neutral_manifest = replace(manifest, static_precompile=True)
         with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
@@ -1302,15 +1283,7 @@ class RoomCompiler:
                 member = self.payload_manifest["maps"][map_key]["target_member"]
                 if member not in assembled:
                     raise ValueError(f"Enemy generation map is not active: {map_key}")
-                materialized = materialize_frozen_encounters(sources[map_key], row, sources,
-                                                             species_profiles=profiles, source_registry=registry, source_root=ROOT)
-                materialized, populations = materialize_frozen_populations(materialized, row, registry, ROOT)
-                for population_member, payload in populations.items():
-                    if population_member in resources and resources[population_member] != payload:
-                        raise ValueError(f"Enemy population resources conflict: {population_member}")
-                    if population_member in assembled and assembled[population_member] != payload:
-                        raise ValueError(f"Enemy population conflicts with the room payload: {population_member}")
-                    resources[population_member] = payload
+                materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources)
                 source_path = staged / f"{map_key}.source"
                 output_path = staged / f"{map_key}.entities"
                 source_path.write_bytes(materialized.encode("utf-8"))
@@ -1322,7 +1295,6 @@ class RoomCompiler:
                 if audit["unrelated_generated_entity_diff_count"]:
                     raise ValueError(f"Enemy map publisher patch changed unrelated entities: {map_key}")
                 assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
-        assembled.update(resources)
 
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
@@ -1451,141 +1423,13 @@ class RoomCompiler:
         return destination
 
 
-@dataclass
-class InstallRecord:
-    state: str
-    game_path: str
-    game_fingerprint: str
-    endpoint: str
-    manifest_hash: str
-    installed_files: dict[str, str]
-    rollback_path: str | None
-    apworld_revision: str = ""
-    content_revision: str = ""
-    compiler_revision: int = 0
-    error: str | None = None
-
-
-class EternalModInjectorAdapter(Protocol):
-    """Runtime adapter boundary; concrete Injector process support is pending."""
-
-    def activate(self, install_root: Path, record: InstallRecord) -> None: ...
-
-
-class InstallPlan:
-    """Install launcher-owned files only, with reverse-order rollback."""
-
-    def __init__(self, target: Path, source: Path):
-        self.target = target
-        self.source = source
-
-    RECORD_NAME = ".doom_ap_install_record.json"
-
-    def _record_path(self) -> Path:
-        return self.target / self.RECORD_NAME
-
-    def _read_record(self) -> dict[str, Any] | None:
-        path = self._record_path()
-        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
-
-    def _write_record(self, record: InstallRecord) -> None:
-        self.target.mkdir(parents=True, exist_ok=True)
-        temporary = self._record_path().with_suffix(".tmp")
-        temporary.write_text(json.dumps(asdict(record), indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
-        publish_file(temporary, self._record_path(), operation="install_record_publish")
-
-    def install(self, record: InstallRecord, *, fail_after: int | None = None) -> InstallRecord:
-        files = sorted(path for path in self.source.rglob("*") if path.is_file())
-        previous = self._read_record()
-        previous_owned = set((previous or {}).get("installed_files", {}))
-        expected_hashes = {str(path.relative_to(self.source)): _sha256(path) for path in files}
-        if (
-            previous
-            and previous.get("state") == "active"
-            and previous.get("manifest_hash") == record.manifest_hash
-            and previous.get("installed_files") == expected_hashes
-            and all((self.target / relative).is_file() and _sha256(self.target / relative) == digest for relative, digest in expected_hashes.items())
-        ):
-            return InstallRecord(**previous)
-
-        collisions = [
-            relative for relative in expected_hashes
-            if (self.target / relative).exists() and relative not in previous_owned
-        ]
-        if collisions:
-            raise ValueError(f"refusing to replace files not owned by launcher: {collisions}")
-
-        rollback = self.target.parent / f".{self.target.name}.rollback-{record.manifest_hash[:12]}"
-        shutil.rmtree(rollback, ignore_errors=True)
-        rollback.mkdir(parents=True)
-        record.state = "installing"
-        record.rollback_path = str(rollback)
-        self._write_record(record)
-        applied: list[str] = []
-        try:
-            for index, source_path in enumerate(files, start=1):
-                relative = str(source_path.relative_to(self.source))
-                destination = self.target / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                if destination.exists():
-                    backup = rollback / relative
-                    backup.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(destination, backup)
-                incoming = destination.with_name(f".{destination.name}.incoming")
-                shutil.copy2(source_path, incoming)
-                publish_file(incoming, destination, operation="install_file_publish")
-                applied.append(relative)
-                if fail_after is not None and index >= fail_after:
-                    raise RuntimeError("injected install failure")
-        except Exception as error:
-            for relative in reversed(applied):
-                destination = self.target / relative
-                backup = rollback / relative
-                if backup.exists():
-                    publish_file(backup, destination, operation="install_rollback_restore")
-                else:
-                    destination.unlink(missing_ok=True)
-            record.state = "failed"
-            record.error = f"{type(error).__name__}: {error}"
-            record.installed_files = dict((previous or {}).get("installed_files", {}))
-            self._write_record(record)
-            raise
-        record.state = "active"
-        record.error = None
-        record.installed_files = expected_hashes
-        self._write_record(record)
-        return record
-
-    def rollback(self, record: InstallRecord, error: Exception) -> InstallRecord:
-        rollback = Path(record.rollback_path) if record.rollback_path else None
-        for relative in reversed(tuple(record.installed_files)):
-            destination = self.target / relative
-            backup = rollback / relative if rollback else None
-            if backup is not None and backup.exists():
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                publish_file(backup, destination, operation="install_rollback_restore")
-            else:
-                destination.unlink(missing_ok=True)
-        record.state = "failed"
-        record.error = f"{type(error).__name__}: {error}"
-        record.installed_files = {}
-        self._write_record(record)
-        return record
-
-
 class ModCompiler:
     def __init__(self, root: Path = ROOT):
         self.root = root
 
-    def active_location_ids(self, options: dict[str, Any] | bool) -> list[int]:
+    def active_location_ids(self, options: dict[str, Any]) -> list[int]:
         names = json.loads((self.root / "data" / "location_names.json").read_text(encoding="utf-8"))["locations"]
         ids = sorted(int(location_id) for location_id in names)
-        if isinstance(options, bool):
-            options = {
-                "randomize_chainsaw": False,
-                "randomize_dash": options,
-                "randomize_first_battery": True,
-            }
         physical_ids = {
             int(spec["location_id"])
             for spec in PHYSICAL_OPTIONS.values()
@@ -1604,53 +1448,13 @@ class ModCompiler:
     def known_location_ids(self) -> set[int]:
         return set(self.active_location_ids({key: True for key in PHYSICAL_OPTION_KEYS}))
 
-    def compile(self, manifest: SeedManifest, output_root: Path) -> Path:
-        output_root.mkdir(parents=True, exist_ok=True)
-        room_config = project_room_config(manifest.options)
-        (output_root / "seed_manifest.json").write_text(
-            json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        , newline="\n")
-        if not manifest.static_precompile:
-            placement_metadata = [record.document() for record in manifest.placements]
-            (output_root / "placement_metadata.json").write_text(
-                json.dumps(placement_metadata, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            newline="\n")
-            (output_root / "placement_string_inputs.json").write_text(
-                json.dumps(
-                    [
-                        {"key": f"#str_ap_location_{record.location_id}", "text": record.location_name}
-                        for record in manifest.placements
-                    ],
-                    indent=2,
-                    sort_keys=True,
-                ) + "\n",
-                encoding="utf-8",
-            newline="\n")
-        (output_root / "room_config.json").write_text(
-            json.dumps(room_config, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        , newline="\n")
-        from doom_eap.content.content_catalog import load_content_catalog
-
-        campaign_maps = tuple(
-            spec for spec in load_content_catalog(self.root).enabled_maps()
-            if spec.key != "hub"
-            and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
-        )
-        for map_spec in campaign_maps:
-            map_key = map_spec.key
-            projected = self.project_map_config(manifest, map_key)
-            (output_root / f"{map_key}.locations.json").write_text(
-                json.dumps(projected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            , newline="\n")
-        return output_root
 
     def project_map_config(self, manifest: SeedManifest, map_key: str) -> dict[str, Any]:
         """Project supported campaign config for one map-local transform state."""
         from doom_eap.content.content_catalog import load_content_catalog
 
         campaign_keys = {
-            spec.key for spec in load_content_catalog(self.root).enabled_maps()
+            spec.key for spec in load_content_catalog(self.root).compiler_maps()
             if spec.key != "hub"
             and (manifest.options.get("include_dlc_missions", True) or not spec.requires_dlc_content)
         }
@@ -1724,10 +1528,8 @@ class ModCompiler:
 
 
 class LaunchWorkflow:
-    def __init__(self, compiler: ModCompiler | None = None, *, vanilla_exultia: Path | None = None, injector: EternalModInjectorAdapter | None = None):
+    def __init__(self, compiler: ModCompiler | None = None):
         self.compiler = compiler or ModCompiler()
-        self.vanilla_exultia = vanilla_exultia
-        self.injector = injector
 
     def manifest_for(
         self,
@@ -1741,47 +1543,6 @@ class LaunchWorkflow:
             static_content_digest=static_content_digest,
         )
 
-    def execute(self, snapshot: RoomSnapshot, install_root: Path, endpoint: str = "") -> InstallRecord:
-        manifest = self.manifest_for(snapshot)
-        existing_path = install_root / InstallPlan.RECORD_NAME
-        if existing_path.is_file():
-            existing = json.loads(existing_path.read_text(encoding="utf-8"))
-            if existing.get("state") == "active" and existing.get("manifest_hash") != manifest.manifest_hash:
-                # Different identity is valid, but always produces explicit plan/record.
-                pass
-        identity = release_identity()
-        with tempfile.TemporaryDirectory(prefix="doom-ap-compile-") as temporary:
-            compiled = self.compiler.compile(manifest, Path(temporary))
-            if self.vanilla_exultia is not None:
-                self.compiler.compile_map(
-                    manifest,
-                    self.vanilla_exultia,
-                    compiled / "e1m2_war.entities",
-                )
-            manifest_path = compiled / "seed_manifest.json"
-            if not manifest_path.is_file() or json.loads(manifest_path.read_text())["manifest_hash"] != manifest.manifest_hash:
-                raise ValueError("compiler output manifest validation failed")
-            record = InstallRecord(
-                state="installing",
-                game_path=str(install_root),
-                game_fingerprint="directory-backend",
-                endpoint=endpoint,
-                manifest_hash=manifest.manifest_hash,
-                installed_files={},
-                rollback_path=None,
-                apworld_revision=identity["apworld_revision"],
-                content_revision=identity["content_revision"],
-                compiler_revision=identity["compiler_revision"],
-            )
-            plan = InstallPlan(install_root, compiled)
-            installed = plan.install(record)
-            if self.injector is not None:
-                try:
-                    self.injector.activate(install_root, installed)
-                except Exception as error:
-                    plan.rollback(installed, error)
-                    raise
-            return installed
 
     @staticmethod
     def client_config_path(client_dir: Path) -> Path:
@@ -1878,44 +1639,3 @@ class LaunchWorkflow:
             if temporary_name is not None:
                 Path(temporary_name).unlink(missing_ok=True)
         return path
-
-    def join(self, room: dict[str, Any], client_dir: Path, endpoint: str) -> SeedManifest:
-        """Offline simulation adapter. Production Join consumes RoomSnapshot."""
-        options = room.get("options", {})
-        dash = bool(options.get("randomize_dash", False))
-        physical_options = {
-            "randomize_chainsaw": bool(options.get("randomize_chainsaw", False)),
-            "randomize_dash": dash,
-            "randomize_first_battery": True,
-        }
-        active = self.compiler.active_location_ids({**physical_options, **{
-            key: options.get(key, True) for key in ("include_slayer_gates", "include_secret_encounters")
-        }})
-        slot_data = {
-            **physical_options,
-            **{key: options.get(key, True) for key in ("include_slayer_gates", "include_secret_encounters")},
-            REVEAL_AP_LOCATIONS_OPTION_KEY: bool(
-                options.get(REVEAL_AP_LOCATIONS_OPTION_KEY, False)
-            ),
-            **({"starting_inventory": options["starting_inventory"]} if "starting_inventory" in options else {}),
-            **({"starting_weapon": options["starting_weapon"]} if "starting_weapon" in options else {}),
-        }
-        snapshot = RoomSnapshot.from_packets(
-            {"seed_name": room["seed_name"]},
-            {
-                "team": room["team"], "slot": room["slot"],
-                "slot_data": slot_data,
-                "missing_locations": active, "checked_locations": [],
-            },
-        )
-        manifest = self.manifest_for(snapshot)
-        self.execute(snapshot, client_dir / "compiled_mod", endpoint)
-        self.write_client_config(client_dir, endpoint=endpoint, manifest_hash=manifest.manifest_hash)
-        return manifest
-
-
-def validate_game(game_root: Path, meathook_path: Path, client_dir: Path, saves_dir: Path) -> None:
-    required = [game_root / "DOOMEternalx64vk.exe", game_root / "base", game_root / "sentinel_core.dll", game_root / "msimg32.dll", client_dir / "bridge_client.py", saves_dir]
-    missing = [str(path) for path in required if not path.exists()]
-    if missing:
-        raise ValueError("missing required game/install paths: " + ", ".join(missing))

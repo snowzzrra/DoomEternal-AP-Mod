@@ -2,7 +2,6 @@
 import json
 from copy import deepcopy
 from importlib.resources import files
-from pathlib import Path
 
 KILLSANITY_REVISION = 4
 KILLSANITY_ADDRESS_BASE = 7800000
@@ -41,12 +40,13 @@ def collapse_source_alternatives(rows, alternatives):
     return rows
 
 
+def load_campaign_kill_sources():
+    return json.loads(files(__package__).joinpath("campaign_kill_sources.json").read_bytes())
+
+
 def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
     if catalog is None:
-        path = files(__package__).joinpath("campaign_kill_sources.json")
-        if not path.is_file():
-            path = Path(__file__).resolve().parents[2] / "data/campaign_kill_sources.json"
-        catalog = json.loads(path.read_text(encoding="utf-8"))
+        catalog = load_campaign_kill_sources()
     if catalog.get("schema_version") != 2 or not isinstance(catalog.get("maps"), dict):
         raise ValueError("Unsupported finite campaign source catalog")
     missing = [key for key in campaign["stage_ids"]
@@ -93,28 +93,22 @@ def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
         if planned is not None:
             if planned["source_sha256"] != original["source_sha256"]:
                 raise ValueError(f"Enemy plan and finite campaign sources use different maps: {key}")
-            replaced = set()
-            for operation in planned["operations"]:
-                identity = f"{operation['manager']['entity']}/{operation['script_index']}/{operation['event_index']}"
-                if identity not in by_id or identity in replaced:
-                    raise ValueError(f"Enemy replacement has no distinct reviewed finite source: {key}/{identity}")
-                replaced.add(identity)
-                count = sum(len(wave["instances"]) for wave in operation["waves"])
-                guaranteed = operation['manager']['entity'] not in conditional
-                if guaranteed and identity not in members:
-                    estimated_kills += count - by_id[identity]['count']
-                by_id[identity]["count"] = count
-                reserve = operation.get("reserve")
-                if reserve is not None and guaranteed:
-                    sources.append({**by_id[identity], "source_id": f"{reserve['manager_name']}/initial",
-                                    "count": reserve["desired_count"]})
-                    branch = next((branch for branch in branches if identity in branch), None)
-                    if branch is not None:
-                        branch.append(f"{reserve['manager_name']}/initial")
-                    elif identity in progression:
-                        progression.add(f"{reserve['manager_name']}/initial")
-                    if identity not in members:
-                        estimated_kills += reserve['desired_count']
+            if enemy_plan.get("kind") == "native_recipes":
+                from .native_enemy_plan import native_event_identity
+                counts = {}
+                for recipe in planned["recipes"]:
+                    if recipe.get("runtime_only"):
+                        continue
+                    identity = native_event_identity(recipe)
+                    if identity in by_id:
+                        logical, physical = counts.get(identity, (0, 0))
+                        counts[identity] = logical + recipe["logical_count"], physical + recipe["physical_count"]
+                for identity, (logical, physical) in counts.items():
+                    # host and Spirit can share one catalog event
+                    count = (by_id[identity]["count"] * physical + logical - 1) // logical
+                    if identity.split('/')[0] not in conditional and identity not in members:
+                        estimated_kills += count - by_id[identity]["count"]
+                    by_id[identity]["count"] = count
         collapsed = collapse_source_alternatives({row['source_id']: row for row in sources
                                                  if row['source_id'] not in groups}, alternatives)
         estimated_kills += sum(collapsed[identity]['count'] for identity in groups) - original_alternatives

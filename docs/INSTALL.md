@@ -1,296 +1,129 @@
-# Install DOOM Eternal Archipelago 0.6.7
+# Install and connect
 
-[Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
+## Before you start
 
-DOOM Eternal Archipelago **0.6.7** uses a legally obtained, player-supplied
-DOOM Eternal installation. Launcher acquires supported external modding tools
-from pinned providers after player consent and verifies each SHA-256.
+- Install DOOM Eternal through Steam. Install The Ancient Gods if your room uses
+  DLC missions, equipment or enemies.
+- Download the DOOM Eternal Archipelago release that matches the room's APWorld.
+  Extract the whole archive into its own folder. Keep `client/` beside the launcher.
+- Have the room's server address, player name and password, if required.
+- Close DOOM Eternal during mod installation, updates and repairs.
 
-## Requirements
+The launcher installs Sentinel Core and downloads the mod installer after asking
+for your consent. It checks downloaded files before using them. A local development
+package can include a separate Core folder: select its `distribution.json` with
+**HELP → LOCAL CORE…** before setup. Keep that folder intact.
 
-Game and runtime prerequisites:
+If you have Meathook's `XINPUT1_3.dll` in the game folder, keep a backup and move
+that known Meathook file out before setup. For a file from another mod, follow that
+mod's uninstall instructions. The launcher preserves files it cannot identify.
 
-- DOOM Eternal (Steam installation);
-- `doometernal.apworld`;
-- `DoomEternalArchipelagoLauncher` on Linux or
-  `DoomEternalArchipelagoLauncher.exe` on Windows;
-- the bundled `client/` support runtime and verified mod templates.
+## Get an AP room
 
-## Install APWorld
+If someone has already generated and hosted your room, go to [Join the room](#join-the-room).
 
-1. Open `doometernal.apworld` with Archipelago Launcher.
-2. Restart Archipelago Launcher.
-3. Keep the release launcher and its bundled client runtime together.
+To create one:
 
-## Launcher flow
+1. Open `doometernal.apworld` with Archipelago Launcher and restart Archipelago Launcher.
+2. Open `DoomEternalArchipelagoLauncher.exe` on Windows, or
+   `DoomEternalArchipelagoLauncher` on Linux. Choose **CREATE PLAYER**.
+3. Enter your player name, choose options and save the player YAML.
+4. Generate and host a room using that YAML in Archipelago, or give it to your host.
 
-The launcher opens on **Home**. Use **Resume** to reconnect with saved room
-identity, or open **Join** to enter a server, slot, and optional password.
+Use the APWorld bundled with this release. The room fixes your campaign options
+during generation; editing your YAML afterward does not change a running room.
 
-### Join
+## Join the room
 
-1. Confirm or select the DOOM Eternal installation and save folder.
-2. Enter room address, slot name, and optional password.
-3. Select **Join** or **Connect to Archipelago**.
-4. Wait for room data and package identity check.
+1. Open the DOOM launcher and choose **JOIN ROOM**.
+2. Confirm the detected game and save folders. Use **CHOOSE GAME FOLDER** and
+   **BROWSE** if detection fails. Select the installation containing `DOOMEternalx64vk.exe`.
+3. Enter the server address, player name and optional password, then connect.
+4. Wait for **SESSION** to show your player and room. If it requests setup,
+   choose **INSTALL ROOM PACKAGE** or **UPDATE ROOM PACKAGE**.
 
-YAML is not required for joining. Connected-room options are server-authoritative.
+The launcher prepares a mod for this room and your player. Do not copy a mod from
+another room, even if its options look the same.
 
-Join connects the prepared room and starts the bridge.
+## Windows installation
 
-## Resume
+1. Approve the EternalModInjector download, or select a verified local copy when prompted.
+2. Wait for the injector command window. Complete its prompts and close it after
+   it reports a successful installation.
+3. Return to the launcher and confirm that installation succeeded.
+4. Wait for **SETUP READY**. Start DOOM Eternal through Steam and keep the launcher open.
+   Choose the normal game launch, not Steam's **Play DOOM Eternal with mods** option.
 
-Select **Resume** to return to launcher session state. Reconnect to the room if
-requested; passwords are entered again. Launcher verifies room identity and
-package state before setup.
+The launcher places the room mod in the game's `Mods/` folder and installs the
+matching `sentinel_core.dll` and `msimg32.dll`. You do not need to copy DLLs by hand.
+If automatic installation fails, use the manual steps below.
 
-## Session and Help
+### Windows manual installation
 
-**Session** shows room, mod, game, and RPC status, room-authoritative options,
-activity, logs, setup actions, and Steam launch. Keep the launcher open while
-playing. Open **Help** for launcher guidance. Run **Setup check** for bounded
-installation, bridge, and handshake diagnostics; use **Repair/Fix** for supported
-repairs and **Support report** for sanitized troubleshooting data.
+1. Open the [Windows EternalModInjector page](https://gamebanana.com/tools/7475).
+   Download the installer version requested by the launcher.
+2. Extract its contents into the DOOM Eternal installation folder.
+   `EternalModInjector.bat` and `EternalModManager.exe` belong beside the game executable;
+   its supporting files belong in `base/`. Do not put the installer ZIP in `Mods/`.
+3. Let the launcher prepare and stage your room mod in `Mods/`.
+4. Set `:AUTO_LAUNCH_GAME=0` in `EternalModInjector Settings.txt` so installation
+   finishes before the game starts.
+5. Run `EternalModInjector.bat`, complete its prompts and wait for success.
+6. Return to the launcher. Choose **I COMPLETED MANUAL INSTALLATION** and confirm.
+7. Wait for **SETUP READY**, then start the game through Steam.
 
-Open **AP SAVE** to inspect this room's metadata and native save paths, including
-missing or inaccessible files. **Details / Copy details** shows the inspection;
-the support report includes it too. **Back up local files** copies available,
-room-scoped files with DOOM closed and verifies the archive. This copy does not
-confirm that the game can restore it. **Create backup** requires an active AP
-game session. **Restore compatible backup** lets you choose a recognized backup.
-**New DOOM save in this room** requires confirmation and a verified local backup
-before discarding the room's local checkpoint; server progress stays intact.
+## Linux / Steam / Proton installation
 
-## Create Player YAML
+Run the Linux launcher outside Proton. Steam runs the Windows game inside Proton.
 
-Use **Create Player** for room generation:
+1. In Steam, choose the Proton version under **DOOM Eternal → Properties → Compatibility**.
+2. If detection fails, use **JOIN ROOM → PROTON EXECUTABLE → BROWSE** and select
+   that version's file named `proton`.
+3. Approve the EternalModInjectorShell download or supply a verified local copy.
+   Complete the installer prompts and confirm success.
+4. In **SESSION**, copy the Steam launch option into
+   **DOOM Eternal → Properties → Launch Options**. It has this form:
 
-1. Set player name, starting inventory, and supported room options.
-2. Select **Save Player YAML**.
-3. Use saved YAML with Archipelago generation.
-
-Create Player writes player options for room generation. Active room options come
-from the server.
-
-## Prepare and Install
-
-Sentinel Core supplies the Slayer Gate indicators in Mission Select and the
-gameplay HUD correction. The key uses its native on/off icon. The gate icon is
-white while unchecked and green after server confirmation. Hidden missions do
-not reveal these states.
-
-Update/rebuild the existing room package for the global original DeathLink
-damage declaration, Elena Richardson AP pickups and Taras completion hook.
-Keep the same seed, slot and AP save.
-
-Generated seeds classify capacities as progression and promote at least one
-pooled Progressive Blood Punch. In Random Mission Order, the three missions
-after the starting mission use CR 63 or lower when the pool permits; restricted
-pools use their lowest remaining CR instead. Taras/Urdak require the existing
-endurance preparation floors. Existing seed orders and placements are retained.
-
-After room connection reports that setup is required, select the explicit
-**Prepare and install** action. Launcher then:
-
-1. selects a compatible Sentinel Core distribution from its official releases or verified local cache and installs its matching Core/bootstrap pair;
-2. validates room identity and options;
-3. builds the room-specific mod package;
-4. stages the package in DOOM Eternal's mod directory;
-5. invokes the platform external tool;
-6. reports installation state.
-
-Do not start DOOM Eternal until installation reports success. Start DOOM Eternal
-normally through Steam after setup.
-
-The launcher installs `sentinel_core.dll`, `msimg32.dll`, and
-`sentinel-distribution.json` together. A separate DLL download or manual DLL copy
-is not required.
-
-If migrating from Meathook, close DOOM Eternal and move its known `XINPUT1_3.dll`
-out of the game installation folder before setup. Keep it as a backup. If that
-file belongs to another tool, resolve it with that tool's installation guide.
-Launcher preserves files whose ownership it cannot verify.
-
-### Windows
-
-1. Approve verified EternalModInjector acquisition or provide an official
-   verified local artifact.
-2. Launcher stages the generated mod into `Mods/`, stages the injector toolchain
-   into the DOOM Eternal root folder, and opens `EternalModInjector.bat` in a
-   visible command window.
-3. Follow all prompts in the command window. Close the command window when
-   installation completes.
-4. In the launcher, confirm whether mod installation completed successfully.
-5. If automatic tool acquisition is unavailable or declined, follow the
-   [Windows Manual Mod Installer](#windows-manual-mod-installer) guide.
-6. Start DOOM Eternal through Steam.
-
-## Windows Manual Mod Installer
-
-If automatic installation is unavailable, install the mod loader manually:
-
-1. Close DOOM Eternal if it is running.
-2. Open the EternalModInjector Windows page:
-   [https://gamebanana.com/tools/7475](https://gamebanana.com/tools/7475)
-3. Download the current Windows EternalModInjector archive (`eternalmodinjector_33208.zip`).
-4. Extract the contents of the archive directly into your DOOM Eternal installation folder.
-   The resulting files in your DOOM Eternal installation folder must include:
-   - `EternalModInjector.bat`
-   - `EternalModManager.exe`
-   - `base/BlangParser.dll`
-   - `base/DEternal_loadMods.exe`
-   - `base/DEternal_patchManifest.exe`
-   - `base/EternalPatcher.def`
-   - `base/EternalPatcher.exe`
-   - `base/EternalPatcher.exe.config`
-   - `base/Newtonsoft.Json.dll`
-   - `base/idRehash.exe`
-   - `base/opusdec.exe`
-   - `base/opusenc.exe`
-   - `base/rs_data`
-   - `base/zlib64.dll`
-   - `Mods/`
-
-   Do not place the EternalModInjector ZIP file inside `Mods/`. The archive contents merge directly into the DOOM Eternal root folder.
-5. The Doom Eternal Archipelago launcher automatically places the current Archipelago room mod into `<DOOM root>/Mods/`.
-6. Ensure `EternalModInjector Settings.txt` in the DOOM Eternal folder contains:
    ```text
-   :AUTO_LAUNCH_GAME=0
+   WINEDLLOVERRIDES="msimg32=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
    ```
-   so the injector does not launch the game automatically.
-7. Run `EternalModInjector.bat`.
-8. Follow all prompts in the command window. On the first run, the tool displays informational pages and prompts.
-9. Allow the installer to finish and close the command window when prompted.
-10. Return to the Doom Eternal Archipelago launcher.
-11. Select **I completed manual installation** and confirm completion.
-12. Start DOOM Eternal through Steam.
 
-### Linux / Steam / Proton
+5. Check that the path points to the extracted release's `client/run_bridge.sh`.
+   Wait for **SETUP READY** and start DOOM Eternal through Steam.
 
-Launcher and bridge run as native Linux processes. DOOM Eternal remains managed
-by Steam inside the configured Proton prefix. Do not launch the Windows game
-executable directly through Wine.
+Proton Experimental often stores `proton` under
+`~/.local/share/Steam/steamapps/common/Proton - Experimental/`.
+GE-Proton installations often use `~/.local/share/Steam/compatibilitytools.d/`.
+Use the version selected in Steam. This candidate still needs testing on a real
+Linux/Proton installation.
 
-If Proton selection needs attention, click **SELECT PROTON** in Session or Help.
-The launcher opens **Join a Room → PROTON EXECUTABLE → BROWSE**.
-Select the file named `proton` from the version chosen in Steam's
-**DOOM Eternal → Properties → Compatibility**. Choose `proton`, not `wine`, the
-game executable or the `pfx` folder. Saving the selection retries preparation
-for the connected room. The field shows the effective automatic path when available.
-For example, Proton Experimental commonly uses
-`~/.local/share/Steam/steamapps/common/Proton - Experimental/proton`;
-GE-Proton commonly lives under `~/.local/share/Steam/compatibilitytools.d/`.
+## Start, stop and resume
 
-1. Approve verified EternalModInjectorShell 6.66-rev3.16 acquisition or provide
-   an official verified local artifact.
-2. Launcher stages the generated mod.
-3. Launcher opens the interactive EternalModInjectorShell workflow.
-4. Complete its prompts and confirm successful exit.
-5. Start DOOM Eternal through Steam.
+Wait for the launcher to finish preparing the AP save before starting the game.
+Disable tutorials in the game settings and use the campaign prepared for your connected player. Check **SESSION** for the
+game connection and item activity after loading a level.
 
+Exit DOOM Eternal normally before disconnecting. On your next session, choose
+**RESUME**, enter the room password if asked, and wait for setup checks before
+starting the game. Use one launcher/bridge for each game profile.
 
-## Steam launch option
+Use **AP SAVE…** to inspect or back up the room's AP campaign. Do not replace it
+with a save from another room. See [Gameplay and options](GAMEPLAY.md) for inventory recovery.
 
-Sentinel Core under Proton requires this Steam launch option:
+## Fix a problem
 
-```text
-WINEDLLOVERRIDES="msimg32=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
-```
+| Problem | What to do |
+|---|---|
+| Cannot connect | Check the server address, player name and password with the host. Use the player name from generation. |
+| Game or saves not found | Browse to the Steam game installation and its Windows save directory, or the save directory inside the selected Proton prefix. |
+| Setup requests an update | Close DOOM and choose **UPDATE ROOM PACKAGE**. Check that the host generated with the matching APWorld. |
+| Core missing or mismatched | Close DOOM. Open **HELP → REPAIR CORE**. For a local candidate, choose its `distribution.json` with **LOCAL CORE…** first. |
+| Installer failed | Read the installer window's error, close DOOM and retry. On Windows, follow the manual installation steps if download or automation fails. |
+| Game starts but does not connect | Keep the launcher open and connected. On Proton, check the copied Steam launch option. Run **HELP → CHECK SETUP**. |
+| AP save needs attention | Close DOOM. Open **AP SAVE…** and inspect the reported problem or restore a matching backup before retrying. |
+| An item seems missing | Load a level, choose **RESYNC INVENTORY**, return to DOOM and unpause. See the gameplay guide. |
 
-Change the path to your client and copy the option 
-into DOOM Eternal's Steam **Properties → Launch Options**.
-
-## Stop and resume safely
-
-Close DOOM Eternal normally. Stop **DOOM Eternal Client** to terminate the
-supervised bridge. Do not run two bridge clients for one profile.
-
-## Player configuration
-
-Launcher version is **0.6.7**; the compatible APWorld version is **0.6.5**. Compatible 0.6.x rooms retain their seed, placements and AP save. Update with DOOM closed and reconnect to the same room. Rebuild the room package when the launcher requests a content update.
-
-For new Vanilla Order generations, enabled missions follow chronological order
-with the selected goal mission last. Updating the launcher does not reorder a
-room generated by an earlier APWorld.
-
-**Game Setup** provides **REPAIR CORE**, **REPAIR SESSION** and **RESTORE PREVIOUS CORE**. Automatic compatible Core updates default to enabled; the checkbox preserves your choice. **LOCAL CORE** selects a complete development distribution's `distribution.json`; **USE RELEASES** restores official release selection. The launcher and its session helper use Core from the persistent user cache. A verified cached distribution supports offline preparation.
-
-| DLC Content | DLC Missions | Campaign scope |
-|---|---|---|
-| Off | Off | 13 Base Campaign missions and Base item catalog |
-| On | Off | 13 Base Campaign missions with globally useful DLC gear |
-| On | On | 19 Base, TAG1, and TAG2 missions with Full Saga content |
-
-`Include DLC Missions: On` requires `Use DLC Content: On`. Goal defaults to **Acquire the Unmaykr**. Dark Lord and Full Saga goals require DLC missions.
-
-Sentinel Battery economy contains `28` units and `13` two-Battery Fortress consumers.
-
-### Automap
-
-Automap progression items use ordinary AP inventory behavior. Native Automap
-presentation and marker cleanup remain part of map content.
-
-**Reveal AP Locations on Automap** is a player setting that controls starting
-ownership of the AP progression-item reveal capability.
-
-### Traps
-
-- **Trap Percentage** replaces that percentage of filler padding with traps. It
-  does not replace progression items or other pool items.
-- **Enabled Traps** selects trap types eligible for those filler slots. If no
-  trap types are enabled, no traps are placed.
-
-### Fast Travel
-
-After a level is complete, Fast Travel is enabled when replaying it through Mission Select.
-
-### DeathLink
-
-In Soft mode, one received event applies lethal damage once; an Extra Life or
-Saving Throw can protect the player and fulfills the event. Hardcore causes
-direct death and checkpoint reload without consuming either protection or
-repeating damage. Remote-caused deaths are echo-suppressed to prevent loops.
-
-### Temporary effects
-
-Damage Boost, Damage Resistance, Infinite Ammo, Weakness, and Vulnerability activate from live item receipts during safe gameplay. Duplicate receipts extend duration. Lifecycle cleanup restores baseline CVAR values. Reconnect restoration and Resync Inventory reconcile permanent inventory.
-
-### Inventory repair
-
-Use **RESYNC INVENTORY** from a loaded level, choose the scope, then return to
-DOOM and unpause within 30 seconds. The request waits for safe gameplay and
-cancels if the room, save or level changes. Menus are not eligible.
-Only confirmed missing items are restored; unknown ownership is preserved.
-
-## Setup checks and support
-
-When available in launcher, run **Setup check** for bounded checks covering
-platform, game installation, processes, and launcher configuration. **Repair/Fix**
-applies only explicit, supported repairs. **Support report** exports sanitized
-diagnostics and bounded logs for troubleshooting.
-Save contents are excluded and secrets are redacted. Review report contents
-before sharing.
-
-## Troubleshooting
-
-- **Game Link missing or incompatible:** use **REPAIR CORE** to acquire and verify a complete matching Core/bootstrap distribution. With an unpublished candidate, select its separate `distribution.json` through **LOCAL CORE** first.
-- **Existing XINPUT provider:** move a known Meathook `XINPUT1_3.dll` out of the game root before setup. Resolve files from other tools with their owners.
-- **Client runtime not found:** keep bundled client files with release launcher.
-- **Game integration helper missing:** Windows Security may have quarantined
-  `client/ap_client.exe`. Check Protection history, reinstall the official package,
-  and include a Support Report when asking for help. Do not disable Windows Security
-  or add antivirus exclusions.
-- **Windows application control blocked the helper (WinError 4556):** use a signed
-  official package and send the Support Report to the device administrator or
-  DoomEAP maintainer. Unsigned local builds do not have established Smart App Control reputation.
-- **Room package mismatch:** run explicit Prepare and install for current room;
-  do not reuse another room's package.
-- **Hash mismatch:** discard artifact and retry verified acquisition or provide a
-  verified official artifact.
-- **Windows manual mod installation:** follow the [Windows Manual Mod Installer](#windows-manual-mod-installer) section to extract `EternalModInjector` into the DOOM Eternal folder, set `:AUTO_LAUNCH_GAME=0` in `EternalModInjector Settings.txt`, run `EternalModInjector.bat`, and confirm installation in the launcher.
-- **Linux injector loader failure:** DoomEAP removes inherited `LD_LIBRARY_PATH`,
-  `LD_PRELOAD`, and `LD_AUDIT` while preserving the ordinary environment and the
-  script shebang. If exit 127 still reports `rl_print_keybinding`, attach the
-  Support Report with the sanitized stderr.
-- **Bridge cannot reach game:** verify mod installation, one bridge instance,
-  Sentinel Core verification, and the Proton DLL override.
+If the problem continues, use **HELP → SAVE SUPPORT REPORT** or **Report a Problem**.
+Reports exclude save contents and redact secrets; review the report before sharing it.
+**FIX SETUP** previews the repairs it can apply. **UNINSTALL MOD** removes the room mod;
+keep backups before changing a working installation.

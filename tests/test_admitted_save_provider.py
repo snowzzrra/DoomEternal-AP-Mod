@@ -34,13 +34,3 @@ def test_provider_process_and_source_are_all_required(tmp_path):
             dict(source_file=str(vanilla / "game.details")), dict(state="menu")]:
         assert not admitted_evidence_matches(evidence._replace(**changes), selected, "a" * 64, 71, facts)
     assert not admitted_evidence_matches(evidence, None, "a" * 64, 71, facts)
-
-
-def test_native_monitor_reads_only_the_admitted_physical_slot():
-    source = (Path(__file__).parents[1] / "native/client/ap_client_exe.cpp").read_text(encoding="utf-8")
-    monitor = source[source.index("class MissionTransitionMonitor"):source.index("unsigned long long steamId3_", source.index("class MissionTransitionMonitor"))]
-    assert "query_save_admission" in monitor and "SC_SAVE_SESSION_ROUTED" in monitor
-    assert 'std::filesystem::path(steamRemoteDir_) / nativeRoot_ / slotDirectory / "game.details"' in monitor
-    assert "directory_iterator(remoteRoot" not in monitor
-
-

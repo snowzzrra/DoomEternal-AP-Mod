@@ -190,19 +190,12 @@ def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs(
 
 @pytest.fixture
 def inventory_adapter():
-    import ast
-    import time
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
-    root = Path(__file__).resolve().parents[1]
-    # Load the production adapter without CommonClient's application configuration.
-    tree = ast.parse((root / "doom_eap/runtime/bridge_client.py").read_text(encoding="utf-8-sig"))
-    node = next(row for row in tree.body if isinstance(row, ast.ClassDef) and row.name == "SentinelInventoryObservation")
-    namespace = dict(InventoryObservation=InventoryObservation, ItemObservation=ItemObservation,
-        OWNED=OWNED, MISSING=MISSING, GATE_KEY_TO_MAP=GATE_KEY_TO_MAP, CONTEXT_BY_IDENTITY=CONTEXT_BY_IDENTITY,
-        time=time, logger=logging.getLogger(__name__), log_item_event=lambda *args, **kwargs: None)
-    exec(compile(ast.Module(body=[node], type_ignores=[]), "production-observation-adapter", "exec"), namespace)
+    from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
+
     link = SimpleNamespace(pid=123, namespace="offline")
-    adapter = namespace["SentinelInventoryObservation"](SimpleNamespace(state_key="published-room", native_game_link=lambda: link))
+    adapter = SentinelInventoryObservation(
+        SimpleNamespace(state_key="published-room", native_game_link=lambda: link),
+        logging.getLogger(__name__), lambda *args, **kwargs: None)
     return adapter, link
 
 

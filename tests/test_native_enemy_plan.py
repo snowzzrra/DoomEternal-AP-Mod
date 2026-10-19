@@ -1,0 +1,151 @@
+from copy import deepcopy
+
+import pytest
+
+from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
+from doom_eap.content.native_enemy_plan import build_native_recipes, validate_native_recipes
+
+
+def catalog():
+    return {"schema_version": 1, "species": {
+        "imp": {"spawn_type": "ENCOUNTER_SPAWN_IMP", "hitpoints": {"max": 200, "starting": 200},
+                "ai": {"map_key": "base", "entity": "imp", "sha256": "b" * 64}},
+        "stone_imp": {"spawn_type": "ENCOUNTER_SPAWN_STONE_IMP", "hitpoints": {"max": 200, "starting": 200},
+                      "ai": {"map_key": "dlc", "entity": "stone_imp", "sha256": "c" * 64}}}, "maps": {"base": {
+        "source_sha256": "a" * 64, "origins": [{"id": "base/source/0", "family": "maintenance",
+            "spawn_type": "ENCOUNTER_SPAWN_IMP", "logical_types": ["ENCOUNTER_SPAWN_IMP"],
+            "logical_count": 2, "maximum_emissions": 8, "combat_cost": "2"},
+            {"id": "base/protected", "protected_reason": "tutorial"}]}}}
+
+
+def settings(**options):
+    return normalize_enemy_options({"enemy_size_variation_chance": 0,
+        **{f"enemy_{name}": {"minimum": 100, "maximum": 100} for name in ("health", "damage", "speed", "size")},
+        **options})
+
+
+def test_frozen_native_maintenance_recipe_keeps_logical_identity_and_scales_emission_quota():
+    options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=300,
+                       enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
+    source = catalog()
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=12, catalog=source)
+    assert plan == build_native_recipes(options, {"sequence": ["base"]}, seed=12, catalog=source)
+    recipe, = plan["maps"]["base"]["recipes"]
+    assert recipe["logical_count"] == 2 and recipe["physical_count"] == 6
+    assert recipe["maximum_emissions"] == 24
+    assert recipe["selected_spawn_type"] == "ENCOUNTER_SPAWN_IMP"
+    assert all(body["species"] == "stone_imp" for body in recipe["bodies"])
+    assert len({body["definition"] for body in recipe["bodies"]}) == 6
+    assert plan["maps"]["base"]["protected"] == [{"id": "base/protected", "reason": "tutorial"}]
+    assert source == catalog()
+    assert validate_native_recipes(plan, options, {"sequence": ["base"]}, catalog=source) == plan
+    changed = deepcopy(plan)
+    changed["maps"]["base"]["recipes"][0]["bodies"][0]["species"] = "imp"
+    with pytest.raises(ValueError, match="differ"):
+        validate_native_recipes(changed, options, {"sequence": ["base"]}, catalog=source)
+
+
+def test_auto_and_attributes_share_the_existing_combat_budget():
+    source = catalog()
+    source["maps"]["base"]["origins"][0]["combat_cost"] = "20"
+    options = settings(enemy_weights={name: int(name == "imp") for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=12, catalog=source)
+    double = {**options, "attributes": deepcopy(options["attributes"])}
+    double["attributes"]["health"]["global"] = {"early": [200, 200], "late": [200, 200]}
+    heavier = build_native_recipes(double, {"sequence": ["base"]}, seed=12, catalog=source)
+    assert plan["maps"]["base"]["recipes"][0]["physical_count"] == 20
+    assert heavier["maps"]["base"]["recipes"][0]["physical_count"] == 10
+
+
+def test_native_plan_round_trips_seed_types_and_rejects_invalid_campaign_progression():
+    source = catalog()
+    options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=300)
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=12, catalog=source)
+    assert plan == build_native_recipes(options, plan["campaign"], seed="12", catalog=source)
+    assert validate_native_recipes(plan, options, catalog=source) == plan
+    for campaign in ({"sequence": ["base", "base"]}, {"sequence": [["base"]]},
+                     {"sequence": ["base"], "mode": "mission_access_as_items", "enemy_progression_bands": {"base": 5}}):
+        with pytest.raises(ValueError, match="campaign"):
+            build_native_recipes(options, campaign, seed=12, catalog=source)
+
+
+def test_unbounded_maintenance_and_unresolved_sources_are_distinct():
+    source = catalog()
+    source["maps"]["base"]["origins"][0]["maximum_emissions"] = 0
+    plan = build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
+    assert plan["maps"]["base"]["recipes"][0]["maximum_emissions"] == 0
+    source["maps"]["base"]["unresolved"] = [{"id": "unresolved"}]
+    with pytest.raises(ValueError, match="Unresolved native origin"):
+        build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
+
+
+def test_reduction_rounds_native_phase_once_without_forcing_zero_weight_suppliers():
+    source = catalog()
+    first = source["maps"]["base"]["origins"][0]
+    first.update(logical_count=1, maximum_emissions=1, combat_cost="1", phase="arena")
+    source["maps"]["base"]["origins"].append({**first, "id": "base/source/1"})
+    options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=50,
+        enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=7, catalog=source)
+    recipes = plan["maps"]["base"]["recipes"]
+    assert sorted(row["physical_count"] for row in recipes) == [0, 1]
+    assert all(body["species"] == "stone_imp" for row in recipes for body in row["bodies"])
+
+
+def test_auto_budget_and_zero_variety_apply_to_the_whole_native_phase():
+    source = catalog()
+    first = source["maps"]["base"]["origins"][0]
+    first.update(logical_count=1, maximum_emissions=1, combat_cost="1", phase="arena")
+    source["maps"]["base"]["origins"].append({**first, "id": "base/source/1"})
+    options = settings(enemy_variety=0, enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=7, catalog=source)
+    recipes = plan["maps"]["base"]["recipes"]
+    assert sum(row["physical_count"] for row in recipes) == 1
+    assert {body["species"] for row in recipes for body in row["bodies"]} == {"stone_imp"}
+
+
+def test_finite_maintenance_last_body_has_only_the_remaining_logical_credit():
+    source = catalog()
+    source["maps"]["base"]["origins"][0]["maximum_emissions"] = 3
+    options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=150,
+        enemy_weights={name: int(name == "imp") for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {"sequence": ["base"]}, seed=7, catalog=source)
+    recipe, = plan["maps"]["base"]["recipes"]
+    assert recipe["physical_count"] == 3 and recipe["maximum_emissions"] == 5
+    assert recipe["final_credit_units"] == 1
+    assert (4 * recipe["logical_count"] + recipe["final_credit_units"]) / recipe["physical_count"] == 3
+
+
+def test_spirit_call_metadata_preserves_native_host_filters_and_flags():
+    from doom_eap.content.native_enemy_plan import native_recipe_metadata
+
+    source = catalog()
+    origin = source["maps"]["base"]["origins"][0]
+    origin.update(family="spirit", binding={"mode": "event", "entity": "arena", "owner": "arena", "reference": "point",
+        "event_def": "spawnSpirit", "arguments": [{"entity": "point"},
+            {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, {"string": "host | filter"}, {"bool": True}]})
+    plan = build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
+    assert native_recipe_metadata(plan, "base").splitlines()[1].split("|")[9:14] == [
+        "", "686f7374207c2066696c746572", "", "00000fffffffffff", "01"]
+
+
+def test_extracted_campaign_origins_allow_cross_campaign_species_with_no_supply_weight_override():
+    from importlib.resources import files
+    import json
+
+    sources = json.loads(files("doom_eap.content").joinpath("native_enemy_catalog.json").read_bytes())
+    options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=100,
+        enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
+    campaign = {"sequence": sorted(sources["maps"])}
+    plan = build_native_recipes(options, campaign, seed=73819, catalog=sources)
+    for map_key, source in sources["maps"].items():
+        expected = {row["id"] for row in source["origins"]
+                    if not row.get("protected_reason") and not row.get("inactive_reason")}
+        recipes = plan["maps"][map_key]["recipes"]
+        assert {row["id"] for row in recipes if not row["runtime_only"]} == expected
+        assert {row["id"] for row in recipes if row["runtime_only"]} == {row["id"] for row in source["runtime_origins"]}
+        assert all(row["physical_count"] == row["logical_count"] for row in recipes if not row["runtime_only"])
+        assert all(row["quantity_ratio"] == [100, 100] and 0 < row["physical_count"] <= len(sources["species"])
+                   for row in recipes if row["runtime_only"])
+        assert all(body["species"] == "stone_imp" and body["ai"]["map_key"] == "e5m1_spear"
+                   for row in recipes for body in row["bodies"])

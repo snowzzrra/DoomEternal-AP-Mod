@@ -99,7 +99,13 @@
       "order": 23,
       "strategy": "unlockable_record",
       "category": "mission_challenges",
-      "mission_key": "e1m3"
+      "mission_key": "e1m3",
+      "enemy_targets": {
+        "species": [
+          "arachnotron"
+        ],
+        "minimum": 1
+      }
     },
     {
       "name": "Cultist Base - All Mission Challenges Completed",

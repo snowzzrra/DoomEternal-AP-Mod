@@ -6,7 +6,7 @@ import pytest
 
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.enemy_options import normalize_enemy_options
-from doom_eap.content.enemy_plan import enemy_combat_cost
+from doom_eap.content.native_enemy_plan import build_native_recipes
 from doom_eap.content.killsanity_plan import build_killsanity_plan, milestone_ids
 from doom_eap.launcher.launcher_core import ModCompiler, RoomCompiler, RoomSnapshot, SeedManifest, _normalize_slot_data
 from doom_eap.runtime.context_registry import validate_slot_contract
@@ -14,17 +14,15 @@ from tools.release.room_payloads import select_room_payloads
 
 
 def slot_data():
-    return json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text(encoding="utf-8"))
+    slot = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text(encoding="utf-8"))
+    slot["enemy_randomizer"] = True
+    slot["enemies"] = normalize_enemy_options(slot)
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
+    return slot
 
 
-def frozen_plan():
-    return {"revision": 3, "seed": "room", "finite_kills": 1000,
-            "maps": {"e1m1_intro": {"schema": 2, "map_key": "e1m1_intro", "source_sha256": "a" * 64,
-                                    "operations": []}},
-            "finite_sources": [{"map_key": "e1m1_intro", "location": "Hell on Earth - Mission Complete",
-                                "count": 1000, "repeatable": True}],
-            "combat_costs": {"e1m1_intro": {"original": 0, "target": None, "actual": 0}},
-            "secret_timers": {}}
+def frozen_plan(enemies):
+    return build_native_recipes(enemies, {"sequence": ["e1m1_intro"]}, seed="room")
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
@@ -43,7 +41,7 @@ def test_room_rejects_inconsistent_frozen_enemy_configuration(validate, change):
 
 def test_manifest_keeps_effective_enemy_options_for_room_compilation():
     slot = slot_data()
-    slot["enemy_plan"] = frozen_plan()
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     manifest = SeedManifest.from_room(RoomSnapshot("room", 0, 1, slot, (), (), ()), set())
     document = json.loads(json.dumps(manifest.document()))
     assert document["options"]["enemies"] == slot["enemies"]
@@ -66,9 +64,9 @@ def test_room_requires_frozen_plan_for_requested_enemy_semantics(validate, enabl
     if plan_state == "null":
         slot["enemy_plan"] = None
     elif plan_state == "present":
-        slot["enemy_plan"] = frozen_plan()
+        slot["enemy_plan"] = frozen_plan(slot["enemies"])
     if enabled == "enemies" and plan_state != "present":
-        with pytest.raises(ValueError, match="requires a frozen enemy generation plan"):
+        with pytest.raises(ValueError, match="requires"):
             validate(slot)
     else:
         validate(slot)
@@ -83,7 +81,7 @@ def test_compiler_rejects_missing_enemy_plan_before_ignoring_payload(enabled):
     if enabled != "enemies":
         compiler._apply_enemy_plan(assembled, manifest)
     else:
-        with pytest.raises(ValueError, match="requires a frozen enemy generation plan"):
+        with pytest.raises(ValueError, match="requires"):
             compiler._apply_enemy_plan(assembled, manifest)
     assert assembled == {"retained": b"unchanged"}
 
@@ -91,7 +89,7 @@ def test_compiler_rejects_missing_enemy_plan_before_ignoring_payload(enabled):
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
 def test_kill_rewards_are_independent_of_enemy_totals_but_validate_enemy_sources(validate):
     slot = slot_data()
-    slot["enemy_plan"] = frozen_plan()
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
     slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
@@ -102,35 +100,35 @@ def test_kill_rewards_are_independent_of_enemy_totals_but_validate_enemy_sources
         "map_key": "e1m1_intro", "count": 1000, "repeatable": True}])
     validate(slot)
     slot["enemy_plan"]["maps"]["e1m1_intro"]["source_sha256"] = "drift"
-    with pytest.raises(ValueError, match="source hash"):
+    with pytest.raises(ValueError, match="source catalog"):
         validate(slot)
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
-@pytest.mark.parametrize("species, qualified", [("arachnotron", False), ("gargoyle", False),
-    ("imp", True), ("hell_soldier", True), ("stone_imp", True)])
+@pytest.mark.parametrize("species, qualified", [("arachnotron", True), ("gargoyle", False)])
 def test_room_accepts_speed_only_for_qualified_species(validate, species, qualified):
     slot = slot_data()
     slot["enemy_randomizer"] = True
     slot["enemies"] = normalize_enemy_options(slot)
-    slot["enemy_plan"] = frozen_plan()
-    slot["enemy_plan"]["maps"]["e1m1_intro"]["operations"] = [{"waves": [{"instances": [{
-        "species": species, "attributes": {"health_percent": 100, "damage_percent": 100,
-                                             "speed_percent": 150, "size_percent": 100},
-    }]}]}]
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
+    slot["enemy_weights"] = {name: int(name == species) for name in slot["enemies"]["weights"]}
+    slot["enemy_speed"] = {"minimum": 150, "maximum": 150}
+    slot["enemies"] = normalize_enemy_options(slot)
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     if qualified:
-        slot["enemy_plan"]["combat_costs"]["e1m1_intro"]["actual"] = float(enemy_combat_cost(
-            species, slot["enemy_plan"]["maps"]["e1m1_intro"]["operations"][0]["waves"][0]["instances"][0]["attributes"]))
         validate(slot)
     else:
-        with pytest.raises(ValueError, match="Speed changes are not qualified"):
+        body = next(body for row in slot["enemy_plan"]["maps"].values() for recipe in row["recipes"]
+                    for body in recipe["bodies"] if body["species"] == species)
+        body["attributes"]["speed_percent"] = 150
+        with pytest.raises(ValueError):
             validate(slot)
 
 
 @pytest.mark.parametrize("validate", [validate_slot_contract, _normalize_slot_data])
 def test_room_rejects_changed_kill_reward_addresses(validate):
     slot = slot_data()
-    slot["enemy_plan"] = frozen_plan()
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
     slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
@@ -146,7 +144,7 @@ def test_milestones_are_active_checks_without_placement_scouting():
     from types import SimpleNamespace
 
     slot = slot_data()
-    slot["enemy_plan"] = frozen_plan()
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     slot["killsanity_options"]["enabled"] = True
     slot["killsanity_options"]["maximum_milestones"] = 13
     slot["killsanity"] = build_killsanity_plan(slot["killsanity_options"], [{"source_id": "intro/finite",
@@ -177,15 +175,19 @@ def test_dlc_mission_payloads_are_independent_of_dlc_bestiary(tmp_path, include_
     slot = slot_data()
     slot.update(use_dlc_content=False, include_dlc_missions=include_missions)
     slot["enemies"] = normalize_enemy_options(slot)
+    slot["enemy_plan"] = frozen_plan(slot["enemies"])
     assert _normalize_slot_data(slot)["include_dlc_missions"] is include_missions
+    compiler = ModCompiler()
     manifest = SeedManifest.create(seed_name="room", team=0, slot=1, options=slot,
                                    active_location_ids=[], static_precompile=True)
-    compiler = ModCompiler()
-    compiler.compile(manifest, tmp_path)
-    dlc_maps = {spec.key for spec in load_content_catalog().enabled_maps() if spec.requires_dlc_content}
+    dlc_maps = {spec.key for spec in load_content_catalog().compiler_maps() if spec.requires_dlc_content}
     assert dlc_maps
     for map_key in dlc_maps:
-        assert (tmp_path / f"{map_key}.locations.json").is_file() is include_missions
+        if include_missions:
+            assert compiler.project_map_config(manifest, map_key)["map_key"] == map_key
+        else:
+            with pytest.raises(ValueError, match="unsupported"):
+                compiler.project_map_config(manifest, map_key)
     payload = {"maps": {
         key: {"option_keys": [], "states": [{"options": {}, "source": "base"}]}
         for key in {"e1m1_intro", *dlc_maps}

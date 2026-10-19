@@ -193,11 +193,6 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
 
     for map_key, snapshot in manifest_doc["source_snapshots"].items():
         _decode_source_snapshot(payload_members[snapshot["member"]], snapshot, map_key)
-    for profile in manifest_doc.get("enemy_resources", {}).values():
-        for snapshot in profile["members"].values():
-            if hashlib.sha256(payload_members[snapshot["member"]]).hexdigest() != snapshot["sha256"]:
-                raise ValueError(f"Enemy resource hash mismatch: {snapshot['member']}")
-
     for map_key, record in manifest_doc.get("maps", {}).items():
         for state in record.get("states", []):
             if state.get("source") == "base":
@@ -215,10 +210,10 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
 
     if repo_root is not None:
         catalog = load_content_catalog(repo_root)
-        enabled_map_keys = {spec.key for spec in catalog.enabled_maps()}
+        enabled_map_keys = {spec.key for spec in catalog.compiler_maps()}
         if set(manifest_doc.get("maps", {})) != enabled_map_keys:
             raise ValueError(
-                f"Room payload map set disagrees with enabled maps: "
+                f"Room payload map set disagrees with compiler maps: "
                 f"missing={sorted(enabled_map_keys - set(manifest_doc.get('maps', {})))}, "
                 f"extra={sorted(set(manifest_doc.get('maps', {})) - enabled_map_keys)}"
             )
@@ -270,11 +265,16 @@ def assemble_platform_release(
     dst_apworld = out_root / "doometernal.apworld"
     shutil.copy2(src_apworld, dst_apworld)
 
-    # 3. Copy docs & license
-    for doc in ["README.md", "INSTALL.md", "LICENSE"]:
-        src_doc = repo_root / "docs" / doc if (repo_root / "docs" / doc).is_file() else repo_root / doc
-        if src_doc.is_file():
-            shutil.copy2(src_doc, out_root / doc)
+    for doc in ("README.md", "LICENSE"):
+        source = repo_root / doc if (repo_root / doc).is_file() else repo_root / "docs" / doc
+        if source.is_file():
+            shutil.copy2(source, out_root / doc)
+    docs = out_root / "docs"
+    docs.mkdir(exist_ok=True)
+    for name in ("INSTALL.md", "GAMEPLAY.md", "DEVELOPMENT.md", "RELEASING.md", "LICENSE"):
+        source = repo_root / "docs" / name
+        if source.is_file():
+            shutil.copy2(source, docs / name)
 
     # copy client runtime, resources & templates
     client_dir = out_root / "client"

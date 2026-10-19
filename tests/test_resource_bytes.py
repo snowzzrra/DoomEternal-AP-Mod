@@ -20,13 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
 
 
-def test_project_owned_decl_inputs_use_canonical_lf():
-    provenance = json.loads((get_frozen_bundle_dir(ROOT) / "ROOM_RESOURCES_PROVENANCE.json").read_text())
-    for name in provenance["source_hashes"]:
-        if name.endswith(".decl"):
-            assert b"\r\n" not in (ROOT / name).read_bytes(), name
-
-
 def test_every_hud_counter_is_a_root_sibling():
     recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
     variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]

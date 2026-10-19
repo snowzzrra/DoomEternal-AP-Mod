@@ -99,7 +99,13 @@
       "order": 29,
       "strategy": "unlockable_record",
       "category": "mission_challenges",
-      "mission_key": "e2m1"
+      "mission_key": "e2m1",
+      "enemy_targets": {
+        "species": [
+          "pinky"
+        ],
+        "minimum": 3
+      }
     },
     {
       "name": "Super Gore Nest - All Mission Challenges Completed",

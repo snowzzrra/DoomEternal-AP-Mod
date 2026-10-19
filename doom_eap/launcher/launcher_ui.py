@@ -1619,7 +1619,7 @@ class LauncherUI(QMainWindow):
         clear_core.clicked.connect(self._clear_local_core)
         core_actions.addWidget(clear_core)
         card_layout.addLayout(core_actions)
-        self.core_status = self._label("Local development override" if self.controller.config.get("core_runtime_manifest") else "Core distributed separately", "muted")
+        self.core_status = self._label("Using local Core files" if self.controller.config.get("core_runtime_manifest") else "Core downloads during setup", "muted")
         card_layout.addWidget(self.core_status)
         layout.addWidget(card)
         details = self._card()
@@ -1649,11 +1649,11 @@ class LauncherUI(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Select local Core distribution", "", "Core manifest (distribution.json)")
         if path:
             self.controller.save_config({"core_runtime_manifest": path})
-            self.core_status.setText("Local development override: " + path)
+            self.core_status.setText("Using local Core files: " + path)
 
     def _clear_local_core(self):
         self.controller.save_config({"core_runtime_manifest": None})
-        self.core_status.setText("Core distributed separately")
+        self.core_status.setText("Core downloads during setup")
 
     def _runtime_repair(self, action):
         if action in {"repair_session", "rollback_core"}:
@@ -1754,7 +1754,7 @@ class LauncherUI(QMainWindow):
         presentations = {
             "package_incompatible": (
                 "ROOM PACKAGE NEEDS REBUILDING",
-                "This room package was built with an older DOOM Eternal APWorld. Rebuild it with the current launcher and try again.",
+                "Use the launcher version that matches this room. If the room data is incompatible, ask the host to generate it with the matching APWorld.",
             ),
             "package_failed": (
                 "ROOM PACKAGE NEEDS ATTENTION",
@@ -1853,11 +1853,11 @@ class LauncherUI(QMainWindow):
             "game_link_needed": ("GAME INTEGRATION SETUP NEEDED", "Set up game integration required by DOOM Eternal Archipelago.", "PREPARE", True, "ACTION NEEDED"),
             "game_link_update_needed": ("GAME INTEGRATION NEEDS REPAIR", "Game integration needs repair before play.", "REPAIR", True, "ACTION NEEDED"),
             "package_failed": ("ROOM PACKAGE NEEDS ATTENTION", "This room package could not be prepared with the current launcher. Rebuild the room package and try again.", "REBUILD ROOM PACKAGE", True, "ACTION NEEDED"),
-            "package_incompatible": ("ROOM PACKAGE NEEDS REBUILDING", "This room package was built with an older DOOM Eternal APWorld. Rebuild it with the current launcher and try again.", "REBUILD ROOM PACKAGE", True, "ACTION NEEDED"),
-            "manual_install_required": ("WINDOWS PACKAGE INSTALL NEEDS MANUAL SETUP", "Automatic room package setup could not be completed. Use the Windows Manual Mod Installer guide to continue.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
+            "package_incompatible": ("ROOM PACKAGE NEEDS REBUILDING", "Use the launcher version that matches this room. If the room data is incompatible, ask the host to generate it with the matching APWorld.", "REBUILD ROOM PACKAGE", True, "ACTION NEEDED"),
+            "manual_install_required": ("WINDOWS PACKAGE INSTALL NEEDS MANUAL SETUP", "Automatic room package setup could not be completed. Use the Windows manual installation guide to continue.", "OPEN MANUAL INSTALL GUIDE", True, "ACTION NEEDED"),
             "ready": (
                 "SETUP READY",
-                "Start DOOM Eternal normally and keep this launcher open." if os.name == "nt" else "Copy the Steam launch option in Room, then start DOOM Eternal manually and keep this launcher open.",
+                "Start DOOM Eternal normally and keep this launcher open." if os.name == "nt" else "Copy the Steam launch option from Session, then start DOOM Eternal through Steam and keep this launcher open.",
                 "OPEN SESSION",
                 True,
                 "READY",
@@ -1916,9 +1916,9 @@ class LauncherUI(QMainWindow):
             confirm = QMessageBox.question(
                 self,
                 "Repair game integration",
-                "The Core runtime pair requires verification.\n\n"
-                "Repair game integration verifies the selected Core distribution "
-                "and publishes its matching pair. Foreign providers require their owner's action.\n\n"
+                "The game integration files need checking.\n\n"
+                "Repair checks the selected Core download "
+                "and installs its matching files. If another mod owns a conflicting file, follow that mod's uninstall instructions first.\n\n"
                 "Do you want to proceed with repair?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes,
@@ -1932,8 +1932,8 @@ class LauncherUI(QMainWindow):
                     self._set_setup_state("game_link_update_needed", "Game integration repair did not finish. Try Fix Setup again.")
 
     def _open_manual_install_guide(self) -> None:
-        """Open the Windows Manual Mod Installer section in INSTALL.md."""
-        manual_url = "https://github.com/DoomEAP/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-mod-installer"
+        """Open the Windows manual installation section in INSTALL.md."""
+        manual_url = "https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-installation"
         local_candidates = [
             self.controller.client_dir.parent / "docs" / "INSTALL.md",
             self.controller.client_dir / "docs" / "INSTALL.md",
@@ -1955,7 +1955,7 @@ class LauncherUI(QMainWindow):
                 webbrowser.open(manual_url)
             except Exception as error:
                 self._append_log(f"Could not open browser: {error}")
-        self._append_log("Opened manual installation guide (INSTALL.md → Windows Manual Mod Installer).")
+        self._append_log("Opened manual installation guide (INSTALL.md → Windows manual installation).")
 
     def _confirm_manual_installation(self) -> None:
         """Prompt user confirmation for manual mod installation completion."""
@@ -2080,7 +2080,7 @@ class LauncherUI(QMainWindow):
         self._set_connection_controls(False)
         self._set_connection_badge("CONNECTING", False)
         self._show_page(2)
-        self._set_home("CONNECTING TO ROOM", "Waiting for authoritative room data.", "RESUME SESSION", "CONNECTING", enabled=False)
+        self._set_home("CONNECTING TO ROOM", "Waiting for the server to send your room settings.", "RESUME SESSION", "CONNECTING", enabled=False)
 
     def _toggle_paths(self, _checked: bool = False, *, force: bool | None = None) -> None:
         show = force if force is not None else not self.game_root.isVisible()
@@ -3237,7 +3237,7 @@ class LauncherUI(QMainWindow):
         kind = str(event.get("type", ""))
         self._append_session_event(event)
         if kind in {"core_update_status", "core_runtime_selected"}:
-            self.core_status.setText(str(event.get("message") or ("Local development override: " if event.get("development_override") else "Selected Core: ") + str(event.get("path", ""))))
+            self.core_status.setText(str(event.get("message") or ("Using local Core files: " if event.get("development_override") else "Selected Core: ") + str(event.get("path", ""))))
             return
         if kind == "support_bundle_ready":
             self.doctor_action.setText(f"Support report saved: {event.get('path', '')}")
@@ -3540,7 +3540,7 @@ class LauncherUI(QMainWindow):
         elif kind == "installation_declined":
             self._set_status("mod", "failed", self.COLORS["warn"])
             self._set_setup_state("manual_install_required", "Mod installation was not confirmed in EternalModInjector. Follow the manual install guide.")
-            self._append_log("Mod installation was not confirmed. Directing to Windows Manual Mod Installer.")
+            self._append_log("Mod installation was not confirmed. Directing to Windows manual installation.")
         elif kind == "manual_install_required":
             message = str(event.get("message", "Manual mod installation required."))
             self._set_status("mod", "failed", self.COLORS["warn"])

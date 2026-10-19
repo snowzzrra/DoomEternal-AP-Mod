@@ -195,6 +195,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
         "--add-data",
         f"{REPO_ROOT / 'content'}{data_separator}content",
+        "--collect-data",
+        "doom_eap.content",
         "--add-data",
         f"{source_identity}{data_separator}data",
         "--collect-data",

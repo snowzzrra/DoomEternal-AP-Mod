@@ -23,7 +23,8 @@ def test_presets_resolve_controls_and_custom_preserves_effective_values():
                     ("early_minimum", "early_maximum", "late_minimum", "late_maximum"),
                     ranges["global"]["early"] + ranges["global"]["late"],
                 ))
-        assert normalize_enemy_options(custom) == effective
+        assert normalize_enemy_options(custom) == {**effective, "special_limits_late": effective["special_limits"]}
+        assert normalize_enemy_options(enemy_options_for_editing(raw)) == effective
         assert raw == before
 
 
@@ -32,7 +33,6 @@ def test_gimmick_weights_are_aggregate_and_dlc_selection_is_independent_of_missi
     assert {species: weight for species, weight in imps["weights"].items() if weight} == {"imp": 9, "stone_imp": 1}
     assert imps["count_mode"] == "multiplier" and imps["count_multiplier"] == 500
     scaled = enemy_options_for_editing({"enemy_preset": "oops_all_imps"})
-    scaled["enemy_preset"] = "custom"
     scaled["enemy_weights"] = {species: weight * 100 for species, weight in scaled["enemy_weights"].items()}
     assert normalize_enemy_options(scaled) == imps
     full_weights = normalize_enemy_options({"enemy_preset": "pinata_party"})["weights"]
@@ -65,6 +65,25 @@ def test_fixed_attributes_replace_curves_and_size_variation_is_separate():
     raw = {"enemy_randomizer": False, "killsanity": True, "kills_per_check": 50,
            "resource_profile": "lean", "logic_difficulty": "Expert", "easier_secret_encounters": True}
     assert normalize_enemy_options(raw) == normalize_enemy_options({"enemy_randomizer": False})
+
+
+@pytest.mark.parametrize("overrides", [{}, {"marauder": 0}, {"marauder": 3},
+    {"combined_special": 1}, {"archvile": 0, "spirit": 0},
+    {"marauder": 2, "archvile": 3, "spirit": 1, "combined_special": 4}])
+def test_special_limits_preserve_each_manual_ceiling_and_progress_inherited_fields(overrides):
+    from doom_eap.content.enemy_plan import effective_special_limits
+
+    raw = {"enemy_special_limits": overrides}
+    options = normalize_enemy_options(raw)
+    steps = [effective_special_limits(options, index, 5) for index in range(5)]
+    assert all(limits[name] == value for limits in steps for name, value in overrides.items())
+    assert all(steps[index][name] <= steps[index + 1][name]
+               for index in range(4) for name in steps[0])
+    assert all(limits["combined_special"] <= sum(limits[name] for name in ("marauder", "archvile", "spirit"))
+               for limits in steps if "combined_special" not in overrides)
+    disabled = normalize_enemy_options({**raw, "progressive_difficulty": False})
+    assert all(effective_special_limits(disabled, index, 5) == steps[0] for index in range(5))
+    assert enemy_options_for_editing(raw)["enemy_special_limits"] == overrides
 
 
 @pytest.mark.parametrize("overrides", [

@@ -30,14 +30,10 @@ done
 
 echo "Starting AP Client: ${NEW_CMD[@]}" >> "$DIR/bridge_debug.log"
 
-pkill -f '[/\\]ap_client\.exe' 2>/dev/null || true
-
-# Let DOOM and Meathook finish their initial startup before opening the RPC
-# client. AP_CLIENT_DELAY can be overridden in Steam launch options.
+# allow Core to start before the client connects; Steam can override AP_CLIENT_DELAY.
 (
     sleep "$AP_CLIENT_DELAY"
     "${NEW_CMD[@]}"
 ) &
 
-# Start the game immediately.
 exec "${GAME_CMD[@]}"

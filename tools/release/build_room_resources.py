@@ -11,7 +11,6 @@ import tempfile
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
-from doom_eap.content.enemy_resources import embed_enemy_resource_payloads
 from doom_eap.content.physical_options import PHYSICAL_OPTION_KEYS, map_physical_option_keys
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
 from doom_eap.runtime.context_registry import dlc_contexts
@@ -24,7 +23,6 @@ from tools.release.room_payloads import (
     ROOM_PAYLOAD_SCHEMA_VERSION,
     canonical_json,
     plan_map_local_states,
-    read_zip,
     validate_room_payload_manifest,
     write_deterministic_zip,
     zip_directory,
@@ -86,8 +84,7 @@ class StateCache:
 
 
 def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
-                         map_sources_path: Path, output: Path, cache_root: Path,
-                         enemy_resource_payloads: dict[str, Path] | None = None) -> None:
+                         map_sources_path: Path, output: Path, cache_root: Path) -> None:
     root, staged, work, compressor, map_sources_path, output = (
         path.resolve() for path in (root, staged, work, compressor, map_sources_path, output)
     )
@@ -98,10 +95,10 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
     compiler = ModCompiler(root)
     catalog = load_content_catalog(root)
     raw_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-    release_keys = tuple(spec.key for spec in catalog.enabled_maps())
+    release_keys = tuple(spec.key for spec in catalog.compiler_maps())
     maps = {
         key: (entry["resource_path"], entry["relative_entities_path"], root / "vanillamaps" / entry["source_file"])
-        for key, entry in raw_sources.items() if key in release_keys and entry["enabled"]
+        for key, entry in raw_sources.items() if key in release_keys
     }
     if set(maps) != set(release_keys):
         raise ValueError("room payload map set does not match the content catalog")
@@ -157,15 +154,6 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
         cache.write(material, entities.read_bytes(), packed.read_bytes())
 
-    for key, (resource_path, relative, vanilla) in maps.items():
-        target = staged / f"{Path(resource_path).stem}/maps/{relative}"
-        plan = plans[key]
-        if plan.compile_base:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            compile_state(key, vanilla, plan.base_options, work / f"{key}-base.entities", target)
-        elif not target.is_file():
-            raise ValueError(f"prepared authorial staging is missing {target}")
-
     for context in dlc_contexts():
         key = context.map_keys[0]
         spec = catalog.maps[key]
@@ -177,6 +165,16 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
                                 encoding="utf-8", newline="")
             target.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
+
+
+    for key, (resource_path, relative, vanilla) in maps.items():
+        target = staged / f"{Path(resource_path).stem}/maps/{relative}"
+        plan = plans[key]
+        if plan.compile_base:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            compile_state(key, vanilla, plan.base_options, work / f"{key}-base.entities", target)
+        elif not target.is_file():
+            raise ValueError(f"prepared authorial staging is missing {target}")
 
     base_members = zip_directory(staged, output / BASE_RESOURCE_NAME)
     payload_files: dict[str, bytes] = source_files
@@ -205,9 +203,6 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         "context_targets": {context.identity: f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
                             for context in dlc_contexts()},
     }
-    embed_enemy_resource_payloads(payload_files, manifest, {
-        species_id: read_zip(path) for species_id, path in (enemy_resource_payloads or {}).items()
-    })
     validate_room_payload_manifest(manifest, known_maps={key: value["target_member"] for key, value in records.items()})
     write_deterministic_zip(payload_files, output / ROOM_PAYLOAD_RESOURCE_NAME)
     (output / ROOM_PAYLOAD_MANIFEST_NAME).write_bytes(canonical_json(manifest))
@@ -223,16 +218,9 @@ def main() -> int:
     parser.add_argument("--map-sources", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)
-    parser.add_argument("--enemy-resource-payload", action="append", default=[], metavar="SPECIES=ZIP")
     args = parser.parse_args()
-    enemy_resource_payloads = {}
-    for value in args.enemy_resource_payload:
-        species_id, separator, filename = value.partition("=")
-        if not separator or not species_id or not filename or species_id in enemy_resource_payloads:
-            parser.error("--enemy-resource-payload requires a unique SPECIES=ZIP")
-        enemy_resource_payloads[species_id] = Path(filename)
     build_room_resources(args.repo_root, args.staged_mod, args.work_dir, args.compressor,
-                         args.map_sources, args.output_dir, args.cache_root, enemy_resource_payloads)
+                         args.map_sources, args.output_dir, args.cache_root)
     return 0
 
 

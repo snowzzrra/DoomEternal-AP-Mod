@@ -6,12 +6,15 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from doom_eap.contracts.check_observation import CheckObservation
 from doom_eap.runtime.check_publication import CheckPublication
 from doom_eap.runtime.killsanity import Killsanity
 
 
-def test_restarted_producer_replays_from_zero_then_persists_before_publication(tmp_path, monkeypatch):
+@pytest.fixture
+def bridge(tmp_path, monkeypatch):
     game, saves = tmp_path / "game/base", tmp_path / "local"
     game.mkdir(parents=True)
     saves.mkdir()
@@ -24,7 +27,10 @@ def test_restarted_producer_replays_from_zero_then_persists_before_publication(t
     root = Path(__file__).resolve().parents[2]
     monkeypatch.syspath_prepend(str(root / "Archipelago"))
     monkeypatch.syspath_prepend(str(root / "DoomEternal-AP-Mod" / "packaging" / "standalone_runtime"))
-    bridge = importlib.import_module("doom_eap.runtime.bridge_client")
+    return importlib.import_module("doom_eap.runtime.bridge_client")
+
+
+def test_restarted_producer_replays_from_zero_then_persists_before_publication(bridge, monkeypatch):
     namespace = "a" * 64
     old = ["71", "101", "b" * 32, "build"]
     current = ["72", "102", "c" * 32, "build"]
@@ -82,5 +88,106 @@ def test_restarted_producer_replays_from_zero_then_persists_before_publication(t
             'AP_CONTROL {"type":"killsanity_counter_visibility","visible":1}\n/exit\n'))
         await bridge.launcher_control_loop(ctx)
         assert ctx.killsanity_counter_visible is False
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize('phase', ['observe', 'present'])
+@pytest.mark.parametrize('same_binding', [False, True])
+def test_late_observation_or_presentation_cannot_publish_after_rebind(bridge, phase, same_binding):
+    namespace = 'a' * 64
+    session = {}
+    kills = Killsanity(logging.getLogger(__name__))
+    milestones = [{'threshold': 100, 'location_id': 1}]
+    kills.bind(session, namespace, milestones)
+    committed, sent = [], []
+
+    def rebind():
+        if not same_binding:
+            ctx.state_key, ctx.session_state = 'other', {'killsanity': {'total': 200}}
+        kills.bind(ctx.session_state, namespace if same_binding else 'b' * 64, milestones)
+
+    def observe(maps):
+        if phase == 'observe':
+            rebind()
+        return dict(producer=['71', '101', 'c' * 32, 'build'], namespace_id=namespace,
+                    qualified_kills=100, observation_gaps=0)
+
+    def present(*args):
+        if phase == 'present':
+            rebind()
+
+    async def send(messages):
+        sent.extend(messages)
+
+    ctx = SimpleNamespace(
+        killsanity=kills, item_state_ready=True, state_key='room', session_state=session,
+        native_game_link=lambda: SimpleNamespace(namespace=namespace, observe_combat=observe,
+                                                publish_combat_progress=present),
+        persist_session_state=lambda: committed.append(kills.total),
+        check_observation=lambda: CheckObservation(frozenset(), frozenset(), frozenset({1}), True, True),
+        check_publication=lambda: CheckPublication(send, lambda location: None, 30),
+    )
+    asyncio.run(bridge.DoomEternalContext.check_killsanity(ctx, True))
+    assert sent == []
+    assert committed == ([100] if phase == 'present' else [])
+    assert session.get('killsanity', {}).get('total', 0) == (100 if phase == 'present' else 0)
+
+
+def test_probe_snapshot_persists_then_retries_checks_until_server_confirmation(bridge, tmp_path):
+    from doom_eap.runtime.client_state_store import ClientStateStore
+    from doom_eap.runtime.weapon_points import SentinelWeaponPoints
+
+    namespace = 'a' * 64
+    session = {}
+    milestones = [{'threshold': number * 100, 'location_id': number} for number in range(1, 4)]
+    kills = Killsanity(logging.getLogger(__name__))
+    kills.bind(session, namespace, milestones)
+    store = ClientStateStore(tmp_path / 'progress.json', version=2, migrate=lambda value: (value, False),
+                             log_event=lambda *args, **kwargs: None, logger=logging.getLogger(__name__))
+    link = SentinelWeaponPoints(tmp_path / 'probe.exe', 71, namespace)
+    response = dict(result='ok', combat_abi=2, pid=71, process_created='101',
+                    instance_id='b' * 32, build_id='build', availability=0, namespace_id=namespace,
+                    qualified_kills='350', observation_gaps='2')
+    link._run = lambda arguments, payload: response
+    link.publish_combat_progress = lambda *args: None
+    sent, submitted, checked = [], set(), set()
+    connected, fail_send = False, True
+
+    async def send(messages):
+        nonlocal fail_send
+        assert json.loads(store.path.read_text(encoding='utf-8'))['sessions']['room']['killsanity']['total'] == 350
+        if fail_send:
+            fail_send = False
+            raise OSError('disconnected')
+        sent.extend(messages)
+
+    ctx = SimpleNamespace(
+        killsanity=kills, item_state_ready=True, state_key='room', session_state=session,
+        native_game_link=lambda: link,
+        persist_session_state=lambda: store.commit({'version': 2, 'sessions': {'room': session}}, reason='test'),
+        check_observation=lambda: CheckObservation(frozenset(checked), frozenset(submitted),
+                                                  frozenset({1, 2, 3}), True, connected),
+        check_publication=lambda: CheckPublication(send, submitted.add, 30),
+    )
+
+    async def run():
+        nonlocal connected
+        await bridge.DoomEternalContext.check_killsanity(ctx, True)
+        assert kills.total == 350 and kills.state['source_gaps'] == 2 and not sent
+        connected = True
+        await bridge.DoomEternalContext.check_killsanity(ctx, False)
+        assert not submitted
+        await bridge.DoomEternalContext.check_killsanity(ctx, False)
+        assert submitted == {1, 2, 3}
+        checked.update(submitted)
+        submitted.clear()
+        await bridge.DoomEternalContext.check_killsanity(ctx, True)
+        assert sent == [{'cmd': 'LocationChecks', 'locations': [1, 2, 3]}]
+        assert kills.total == 350
+        kills.bind(session, namespace, [])
+        link.observe_combat = lambda maps: pytest.fail('disabled Killsanity queried native combat')
+        await bridge.DoomEternalContext.check_killsanity(ctx, True)
+        assert len(sent) == 1
 
     asyncio.run(run())

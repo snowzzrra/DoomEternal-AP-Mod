@@ -153,14 +153,29 @@ def test_apworld_speed_projection_matches_sampling_and_rejects_unqualified_plans
 
 def test_speed_qualification_needs_separate_evidence_from_identity(registry):
     modified = copy.deepcopy(registry)
-    entry = modified["species"]["mancubus"]
-    assert project_speed_capabilities(modified)["mancubus"] == "unqualified"
+    entry = modified["species"]["gargoyle"]
+    assert project_speed_capabilities(modified)["gargoyle"] == "unqualified"
     entry["speed"] = {"status": "qualified"}
     with pytest.raises(ValueError, match="needs evidence"):
         project_speed_capabilities(modified)
     entry["speed"]["evidence"] = {"fixture": "synthetic qualified Speed consumer"}
-    assert project_speed_capabilities(modified)["mancubus"] == "qualified"
+    assert project_speed_capabilities(modified)["gargoyle"] == "qualified"
     assert project_species_profiles(modified) == project_species_profiles(registry)
+
+
+def test_tracking_selects_one_type_from_a_native_candidate_request():
+    from doom_eap.content.enemy_species import selected_spawn_type
+
+    source = {"spawn_type": "ENCOUNTER_SPAWN_ANY", "selected_spawn_type": "ENCOUNTER_SPAWN_IMP"}
+    assert selected_spawn_type(source) == "ENCOUNTER_SPAWN_IMP"
+    assert selected_spawn_type({"spawn_type": "ENCOUNTER_SPAWN_IMP"}) == "ENCOUNTER_SPAWN_IMP"
+    for invalid in (
+        {"spawn_type": "ENCOUNTER_SPAWN_ANY"},
+        {"spawn_type": "ENCOUNTER_SPAWN_ANY", "selected_spawn_type": "ENCOUNTER_SPAWN_IMP | ENCOUNTER_SPAWN_HELL_SOLDIER"},
+        {"spawn_type": "ENCOUNTER_SPAWN_IMP", "selected_spawn_type": "ENCOUNTER_SPAWN_STONE_IMP"},
+    ):
+        with pytest.raises(ValueError, match="one member"):
+            selected_spawn_type(invalid)
 
 
 @pytest.mark.parametrize("fault", ["species", "inherit", "mask", "preferred"])

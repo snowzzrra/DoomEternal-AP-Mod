@@ -174,25 +174,8 @@ def validate_room_payload_manifest(
         ):
             raise ValueError("room payload context target is invalid")
     seen_members = {snapshot["member"] for snapshot in snapshots.values()}
-    enemy_resources = document.get("enemy_resources", {})
-    if not isinstance(enemy_resources, Mapping):
-        raise ValueError("room payload enemy resources are invalid")
-    for species_id, profile in enemy_resources.items():
-        if (not isinstance(species_id, str) or not species_id or "/" in species_id
-                or _safe_member(species_id) != species_id
-                or not isinstance(profile, Mapping) or set(profile) != {"members"}
-                or not isinstance(profile["members"], Mapping) or not profile["members"]):
-            raise ValueError("room payload enemy resource profile is invalid")
-        for name, snapshot in profile["members"].items():
-            if (not isinstance(name, str) or _safe_member(name) != name
-                    or not isinstance(snapshot, Mapping) or set(snapshot) != {"member", "sha256", "size"}
-                    or snapshot["member"] != f"enemy_resources/{species_id}/{name}"):
-                raise ValueError(f"room payload enemy resource snapshot is invalid: {species_id}")
-            if (not isinstance(snapshot["sha256"], str) or len(snapshot["sha256"]) != 64
-                    or any(char not in "0123456789abcdef" for char in snapshot["sha256"])
-                    or type(snapshot["size"]) is not int or snapshot["size"] < 0):
-                raise ValueError(f"room payload enemy resource identity is invalid: {species_id}")
-            seen_members.add(snapshot["member"])
+    if document.get("enemy_resources"):
+        raise ValueError("Unsupported enemy resource imports. Rebuild room resources for native recipes.")
     base_members = document.get("base_members")
     if not isinstance(base_members, list) or any(not isinstance(name, str) for name in base_members):
         raise ValueError("room payload base member list is invalid")
@@ -322,19 +305,12 @@ def _payload_archive_members(archive: zipfile.ZipFile, document: Mapping[str, An
     expected = {
         state["member"] for record in document["maps"].values()
         for state in record["states"] if state["source"] == "replacement"
-    } | {snapshot["member"] for snapshot in document["source_snapshots"].values()} | {
-        snapshot["member"] for profile in document.get("enemy_resources", {}).values()
-        for snapshot in profile["members"].values()
-    }
+    } | {snapshot["member"] for snapshot in document["source_snapshots"].values()}
     if set(members) != expected:
         raise ValueError("room payload archive member set drifted")
     for map_key, snapshot in document["source_snapshots"].items():
         if members[snapshot["member"]].file_size != snapshot["size"]:
             raise ValueError(f"room payload source snapshot size drifted: {map_key}")
-    for species_id, profile in document.get("enemy_resources", {}).items():
-        for snapshot in profile["members"].values():
-            if members[snapshot["member"]].file_size != snapshot["size"]:
-                raise ValueError(f"room payload enemy resource size drifted: {species_id}")
     return members
 
 

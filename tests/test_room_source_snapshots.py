@@ -7,7 +7,6 @@ import zipfile
 
 import pytest
 
-from doom_eap.content import enemy_resources
 from doom_eap.contracts.challenge_registry import load_challenge_registry
 from tools.decls.mastery_decl_builder import _reward_free_override
 from tools.release import build_room_resources as builder
@@ -166,34 +165,6 @@ def test_read_zip_refuses_aliases_and_duplicate_names(resources):
         read_zip(resources.payload)
 
 
-@pytest.mark.parametrize("defect", [None, "missing", "size", "alias", "installed"])
-def test_enemy_snapshots_participate_in_exact_archive_inventory_without_being_installed(resources, defect):
-    name, data = "gameresources_patch3/native.asset", b"native asset"
-    member = f"enemy_resources/stone_imp/{name}"
-    snapshot = {"member": member, "size": len(data), "sha256": digest(data)}
-    resources.manifest["enemy_resources"] = {"stone_imp": {"members": {name: snapshot}}}
-    resources.payload_files[member] = data
-    if defect == "missing":
-        del resources.payload_files[member]
-    elif defect == "size":
-        snapshot["size"] += 1
-    elif defect == "alias":
-        snapshot["member"] = f"enemy_resources/stone_imp/./{name}"
-    elif defect == "installed":
-        resources.manifest["base_members"].append(member)
-    write_deterministic_zip(resources.payload_files, resources.payload)
-    if defect:
-        with pytest.raises(ValueError):
-            assemble_room_files(resources.base, resources.payload, resources.manifest,
-                                {"mastery_requirements": "Original"})
-    else:
-        assembled, _ = assemble_room_files(resources.base, resources.payload, resources.manifest,
-                                           {"mastery_requirements": "Original"})
-        assert set(assembled) == set(resources.base_files)
-        assert read_source_snapshots(resources.payload, resources.manifest, ["e1m1_intro"]) == {
-            "e1m1_intro": resources.raw["e1m1_intro"].decode("utf-8")}
-
-
 @pytest.fixture
 def build_inputs(tmp_path, monkeypatch):
     root, staged = tmp_path / "authoring", tmp_path / "staged"
@@ -208,7 +179,7 @@ def build_inputs(tmp_path, monkeypatch):
         "relative_entities_path": "game/sp/e1m1_intro/e1m1_intro.entities"}}}), encoding="utf-8")
     spec = SimpleNamespace(key=key, source_file="e1m1_intro.map", source_sha256=digest(raw),
                            resource_path="game/sp/e1m1_intro/e1m1_intro_patch3.resources")
-    catalog = SimpleNamespace(maps={key: spec}, enabled_maps=lambda: [spec])
+    catalog = SimpleNamespace(maps={key: spec}, compiler_maps=lambda: [spec])
     calls = []
 
     class Compiler:
@@ -244,7 +215,11 @@ def build(inputs):
                                  inputs.sources, inputs.output, inputs.cache)
 
 
-def test_builder_embeds_raw_sources_and_preserves_descriptor_identity(build_inputs):
+@pytest.mark.parametrize("enabled", [True, False])
+def test_builder_embeds_raw_sources_and_preserves_descriptor_identity(build_inputs, enabled):
+    registry = json.loads(build_inputs.sources.read_bytes())
+    registry["maps"]["e1m1_intro"]["enabled"] = enabled
+    build_inputs.sources.write_text(json.dumps(registry), encoding="utf-8")
     build(build_inputs)
     manifest = json.loads((build_inputs.output / "room_payload_manifest.json").read_bytes())
     snapshot = manifest["source_snapshots"]["e1m1_intro"]
@@ -263,27 +238,3 @@ def test_builder_refuses_source_drift_before_compiling_or_writing_payloads(build
         build(build_inputs)
     assert not build_inputs.calls
     assert not list(build_inputs.output.iterdir())
-
-
-def test_builder_embeds_verified_enemy_zip_for_cold_room_compilation(build_inputs, monkeypatch):
-    payload = b"native declaration"
-    name = "generated/decls/entitydef/ai/stone.decl"
-    catalog = build_inputs.root / "enemy_resources.json"
-    profile = {"resource_container": "gameresources_patch3", "streams": [], "assets": [{
-        "name": name, "metadata": {"map_resource_name": "ai/stone", "map_resource_type": "entityDef",
-            "resource_type": "rs_streamfile", "stream_hash": 0, "version": 0, "special_bytes": [0, 0, 0]},
-        "sources": [{"bank": "native.resources", "size": len(payload), "sha256": digest(payload)}]}]}
-    catalog.write_text(json.dumps({"revision": 1, "species": {"stone_imp": profile}}))
-    payloads = {"gameresources_patch3/" + name: payload,
-        "gameresources_patch3/EternalMod/assetsinfo/stone_imp.json": enemy_resources._assetsinfo_payload(profile)}
-    native_zip = build_inputs.root / "stone.zip"
-    write_deterministic_zip(payloads, native_zip)
-    monkeypatch.setattr(builder, "embed_enemy_resource_payloads", lambda *args:
-        enemy_resources.embed_enemy_resource_payloads(*args, catalog_path=catalog))
-    builder.build_room_resources(build_inputs.root, build_inputs.staged, build_inputs.work,
-        build_inputs.compressor, build_inputs.sources, build_inputs.output, build_inputs.cache,
-        {"stone_imp": native_zip})
-    manifest = json.loads((build_inputs.output / "room_payload_manifest.json").read_bytes())
-    assert enemy_resources.read_enemy_resource_payloads(build_inputs.output / "room_payloads.zip", manifest,
-        ["stone_imp"], catalog_path=catalog) == payloads
-    assert read_source_snapshots(build_inputs.output / "room_payloads.zip", manifest, ["e1m1_intro"])

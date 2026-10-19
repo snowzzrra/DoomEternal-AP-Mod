@@ -3338,7 +3338,7 @@ def generate_map(
             encoding="utf-8",
         )
 
-    print(f"Successfully generated {modified_count} GLOBAL AP Targets using idTrigger mutation!")
+    print(f"Generated {modified_count} Archipelago reward triggers")
     print(f"Manifest saved to {manifest_file}")
 
 if __name__ == "__main__":

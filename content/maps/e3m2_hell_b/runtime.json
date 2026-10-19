@@ -57,7 +57,13 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       },
-      "order": 52
+      "order": 52,
+      "enemy_targets": {
+        "species": [
+          "tyrant"
+        ],
+        "minimum": 1
+      }
     },
     {
       "category": "mission_challenges",
@@ -86,7 +92,13 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       },
-      "order": 53
+      "order": 53,
+      "enemy_targets": {
+        "species": [
+          "archvile"
+        ],
+        "minimum": 1
+      }
     },
     {
       "category": "all_mission_challenges",

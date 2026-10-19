@@ -171,6 +171,10 @@ class ContentCatalog:
     def enabled_maps(self) -> tuple[MapSpec, ...]:
         return tuple(spec for spec in self.maps.values() if spec.enabled)
 
+    def compiler_maps(self) -> tuple[MapSpec, ...]:
+        terminals = {item.mission_key for item in self.runtime_locations if item.category == "mission_complete"}
+        return tuple(spec for spec in self.maps.values() if spec.enabled or spec.key in terminals)
+
     def location_by_id(self, location_id: int) -> PhysicalLocationSpec | RuntimeLocationSpec:
         for spec in (*self.physical_locations, *self.runtime_locations):
             if spec.location_id == location_id:

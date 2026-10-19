@@ -143,8 +143,11 @@ def publish_resource_activation(base: Path, updates: dict[str, bytes], report: d
     from doom_eap.launcher.launcher_platform import publish_file
 
     originals = {name: (base / name).read_bytes() for name in updates}
-    if (hashlib.sha256(originals["meta.resources"]).hexdigest() != report["source_meta_sha256"]
-            or hashlib.sha256(originals["idRehash.map"]).hexdigest() != report["source_rehash_sha256"]):
+    hashes = report.get("source_hashes")
+    if hashes is None:
+        hashes = {"meta.resources": report["source_meta_sha256"], "idRehash.map": report["source_rehash_sha256"]}
+    if set(hashes) != set(originals) or any(hashlib.sha256(originals[name]).hexdigest() != value
+                                          for name, value in hashes.items()):
         raise RuntimeError("Resource metadata changed during installation")
     incoming, published = {}, []
     try:
@@ -174,9 +177,8 @@ def publish_resource_activation(base: Path, updates: dict[str, bytes], report: d
 
 def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
     """Finalize an injected room package; never enable unrelated resource records."""
-    from doom_eap.content.enemy_resources import load_enemy_resource_profile, required_enemy_resource_species
     from doom_eap.launcher.launcher_platform import detect_doom_processes
-    from tools.maps.encounter_populations import PRIVATE_POPULATION_PREFIX
+    from doom_eap.launcher.native_enemy_resources import prepare_native_resource_banks
 
     with zipfile.ZipFile(mod_zip) as package:
         names = set(package.namelist())
@@ -187,51 +189,31 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         expected = {name: package.read("gameresources_patch2/" + name)
                     for name in required if "gameresources_patch2/" + name in names}
         plan = manifest.get("options", {}).get("enemy_plan")
-        enemies = {}
-        for member in sorted(names):
-            if member.startswith(PRIVATE_POPULATION_PREFIX) and member.endswith(".decl"):
-                container, resource_name = member.split("/", 1)
-                enemies.setdefault(container + ".resources", {})[resource_name] = ("rs_streamfile", package.read(member))
-        for species_id in sorted(required_enemy_resource_species(plan)):
-            profile = load_enemy_resource_profile(species_id)
-            container = profile["resource_container"] + ".resources"
-            assets = enemies.setdefault(container, {})
-            for asset in profile["assets"]:
-                member = profile["resource_container"] + "/" + asset["name"]
-                value = (asset["metadata"]["resource_type"], package.read(member))
-                if asset["name"] in assets and assets[asset["name"]] != value:
-                    raise ValueError(f"Conflicting enemy resource payloads: {asset['name']}")
-                assets[asset["name"]] = value
     campaign_required = bool(expected) or "unified_campaign_v1" in manifest.get("required_capabilities", ()) or EXCLUDED_LAYER in required
-    if not campaign_required and not enemies:
+    base = game_root / "base"
+    bank_updates, banks = prepare_native_resource_banks(base, plan)
+    if not campaign_required and not bank_updates:
         return {"state": "not_applicable"}
     if campaign_required and expected.keys() != required:
         raise ValueError("Incomplete unified campaign resource package")
     if any(process["name"] == "doometernalx64vk.exe" for process in detect_doom_processes()):
         raise RuntimeError("Close DOOM before finalizing campaign resources")
 
-    base = game_root / "base"
     records = _records(base / CONTAINER, required) if campaign_required else {}
     for name, (_, kind, _, payload, flags) in records.items():
         if kind != "rs_streamfile" or flags != 0 or payload != expected[name]:
             raise ValueError(f"Installed campaign streamfile differs from the room package: {name}")
 
     targets = {CONTAINER: {row[0] for row in records.values()}} if records else {}
-    for container, expected_assets in enemies.items():
-        imported = _records(base / container, set(expected_assets))
-        for name, (_, kind, _, payload, _) in imported.items():
-            if (kind, payload) != expected_assets[name]:
-                raise ValueError(f"Installed enemy resource differs from the room package: {name}")
-        targets.setdefault(container, set()).update(row[0] for row in imported.values())
-    updates, report = prepare_resource_activation(base, targets)
+    updates, report = prepare_resource_activation(base, targets) if targets else ({}, {"containers": {}})
+    if bank_updates:
+        report["source_hashes"] = {**({"meta.resources": report["source_meta_sha256"],
+            "idRehash.map": report["source_rehash_sha256"]} if targets else {}), **banks["source_hashes"]}
+        updates.update(bank_updates)
     table = report["containers"].get(CONTAINER, {"previously_enabled": {}, "changed_bits": 0, "added_mask_words": 0})
     entries = [{"name": name, "index": row[0], "previously_enabled": table["previously_enabled"][row[0]]}
                for name, row in records.items()]
     publish_resource_activation(base, updates, report)
     return {"state": "enabled", "container": CONTAINER if records else None, "entries": entries,
             "changed_bits": table["changed_bits"], "added_mask_words": table["added_mask_words"],
-            "enemy_resources": {container: {"verified_resources": len(assets),
-                                            "changed_bits": report["containers"][container]["changed_bits"],
-                                            "added_mask_words": report["containers"][container]["added_mask_words"]}
-                                for container, assets in enemies.items()},
-            "meta_sha256": report["updated_meta_sha256"]}
+            "native_enemy_banks": banks["maps"], "meta_sha256": report.get("updated_meta_sha256")}

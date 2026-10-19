@@ -1,122 +1,98 @@
-# DOOM Eternal Archipelago Release Process
+# Build a release
 
-This document describes the procedure for producing official cross-platform release packages for DOOM Eternal Archipelago.
+Run commands from the mod repository. Use matching MOD, APWorld and Sentinel Core
+sources. Windows builds need the installed x64 MSVC tools, Windows SDK, CMake and
+the project's Windows Python environment. Reuse its installed dependencies.
+Map builds also need the verified retail inputs in `vanillamaps/` and
+`../Tools/idFileDeCompressor`.
 
----
-
-## 1. Overview & Architecture
-
-Release packages are generated through GitHub Actions:
-
-1. **Frozen Canonical Room Resources**: Prebuilt room compiler resources (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`) reside in `packaging/room_resources/v0.6.0/` along with `ROOM_RESOURCES_PROVENANCE.json` and `SHA256SUMS.txt`. These resources represent the boundary between local game-authorial compilation (requiring vanilla map and entity decl sources) and portable CI package assembly. GitHub Actions validates these resources against a deterministic content input fingerprint over all versioned gameplay/content sources before packaging them.
-
-2. **GitHub Actions Build & Release Assembly**: A single workflow run (`.github/workflows/cross-platform-build.yml`) verifies authorial content and APWorld projection contracts, validates frozen room resources against the content input fingerprint, builds native components and platform launchers, and packages both ready-to-test public archives:
-   - `DoomEternalArchipelago-<version>-windows-x86_64.zip` (standalone Windows launcher, native `client/ap_client.exe`, precompiled canonical room resources, APWorld, manifests, content, data)
-   - `DoomEternalArchipelago-<version>-linux-x86_64.zip` (standalone Linux launcher, native client, precompiled canonical room resources, APWorld, manifests, content, data)
-   - `SHA256SUMS.txt`
-   - Developer handoff bundle (`DoomEAP-crossplatform-build-<version>-<short-mod-sha>`) containing intermediate binaries and room resources for audit.
-
-3. **Offline Local Assembly (Fallback / Reproducibility)**: Maintainers can also assemble or inspect release archives locally using `scripts/release/assemble_ci_artifact.py` against a downloaded handoff bundle and local canonical room resources (`packaging/room_resources/v0.6.0/` or `build/release/client/resources/`).
-
----
-
-## 2. Maintainer Release Workflow
-
-### Step 1: Review & Commit
-1. Verify source changes and run local fast validations.
-2. If gameplay or room-affecting sources changed, refresh frozen room resources (see Section 4).
-3. Commit and push the repositories:
-   - `DoomEternal-AP-Mod`
-   - `DoomEternal-AP-World` (Archipelago world repository)
-4. Record the exact resolved commit SHAs for both repositories:
-   ```bash
-   git -C path/to/DoomEternal-AP-Mod rev-parse HEAD
-   git -C path/to/Archipelago rev-parse HEAD
-   ```
-
-### Step 2: Trigger GitHub Actions Build
-1. Navigate to **Actions** in the `DoomEternal-AP-Mod` repository.
-2. Select **DOOM Eternal AP Cross-Platform Build**.
-3. Click **Run workflow** (`workflow_dispatch`).
-4. Provide the exact inputs:
-   - `mod_ref`: Full commit SHA or branch for `DoomEternal-AP-Mod` (e.g., `main`).
-   - `apworld_ref`: Full commit SHA or branch for `Archipelago` / `DoomEternal-AP-World` (e.g., `doom_eternal`).
-   - `version_label`: Target version string (e.g., `v0.6.0`).
-5. Run the workflow. It executes portable release preflight gates, validates frozen room compiler resources against the content input fingerprint, builds the native client and standalone platform launchers, and assembles the public release packages.
-
-### Native Windows build
-
-The native client is built on Windows with Visual Studio 2022 Build Tools and
-the Desktop development with C++ workload. From PowerShell, run:
+## Check the sources
 
 ```powershell
-python -m pip install -r ..\Archipelago\requirements.txt -r requirements.txt -r requirements-launcher.txt -r requirements-ci.txt
-.\scripts\build\client_windows.ps1 -OutputDir build\release\build\client
+../.venv-windows/Scripts/python.exe -m tools.content.compile_content_catalog --source-only --check
+../.venv-windows/Scripts/python.exe -m tools.content.compile_options_schema --check
+../.venv-windows/Scripts/python.exe -m tools.validation.authorial --check-authorial
+./scripts/build/windows_release.ps1 -Preflight -Python ../.venv-windows/Scripts/python.exe -CoreSource ../Sentinel-Core
 ```
 
-The script locates the MSVC x64 toolchain, generates the RPC client stubs with
-MIDL, and writes `ap_client.exe` and `save_death_probe.exe` under the release
-build directory. It does not require WSL, Git Bash, Distrobox, Wine, or a
-Linux container.
+The checks must finish without stale projections or invalid content. Run focused
+tests for changed behavior, then the mod suite, the `doometernal` APWorld suite
+and Core's CTest harnesses before delivering a candidate. See each repository's
+development instructions for the installed test environment.
 
-### Step 3: Download Public Release Artifacts
-1. From the completed workflow run summary, download the generated public release artifact:
-   `DoomEAP-release-<version>-<short-mod-sha>`
-2. The downloaded archive contains:
-   - `DoomEternalArchipelago-<version>-windows-x86_64.zip`
-   - `DoomEternalArchipelago-<version>-linux-x86_64.zip`
-   - `SHA256SUMS.txt`
+## Rebuild room resources
 
-### Step 4: Closed Testing & Distribution
-1. Extract or send `DoomEternalArchipelago-<version>-windows-x86_64.zip` directly to Windows testers.
-2. Testers run `DoomEternalArchipelagoLauncher.exe` directly; no local compilation or map processing is needed.
+Choose unused output directories. Preserve the current bundle if it contains
+uncommitted work. These commands prepare the authored mod tree, record the exact
+input files and compile a fresh resource bundle:
 
-### Step 5: Publish Release
-1. Create the GitHub Release on `DoomEternal-AP-Mod` for `v0.6.0`.
-2. Upload `DoomEternalArchipelago-<version>-windows-x86_64.zip`, `DoomEternalArchipelago-<version>-linux-x86_64.zip`, and `SHA256SUMS.txt`.
-
----
-
-## 3. Local Assembly Tool (Reproducibility & Offline Validation)
-
-If assembling packages locally from a downloaded developer handoff artifact (`DoomEAP-crossplatform-build-*`):
-
-```bash
-python3 scripts/release/assemble_ci_artifact.py \
-    --handoff /path/to/DoomEAP-crossplatform-build-<version>-<short-mod-sha> \
-    --room-resources-dir build/release/client/resources \
-    --version v0.6.0 \
-    --output-dir build/final-release
+```powershell
+../.venv-windows/Scripts/python.exe -m tools.release.stage_room_resources --repo-root . --output-dir build/review-authorial --compressor ../Tools/idFileDeCompressor
+../.venv-windows/Scripts/python.exe -m tools.release.source_provenance --repo-root . --archipelago-source ../Archipelago --output build/review-inputs.json
+../.venv-windows/Scripts/python.exe -m tools.release.build_room_resources --repo-root . --staged-mod build/review-authorial/mod --work-dir build/review-work --compressor ../Tools/idFileDeCompressor --map-sources data/map_sources.json --output-dir build/review-resources --cache-root build/review-cache
+../.venv-windows/Scripts/python.exe -m tools.release.source_provenance --repo-root . --archipelago-source ../Archipelago --output build/review-inputs.json --verify
 ```
 
-The script validates:
-- `BUILD-MANIFEST.json` and `SHA256SUMS.txt` integrity in the handoff.
-- ELF and PE magic bytes for platform executables.
-- Canonical room resources (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`).
-- Package parity across shared runtime assets (`doometernal.apworld`, `client/ap_client.exe`, schemas, templates, data).
-- Single top-level `DoomEternalArchipelago/` root in both output archives.
+`build/review-resources/` must contain `base_mod.zip`, `room_payloads.zip` and
+`room_payload_manifest.json`. The final command checks that compiler inputs did
+not change during the build. The file named `review-inputs.json` records those
+inputs, hashes and ancestor commits, including local changes.
 
----
+Validate the resources and compile representative rooms from packaged source
+snapshots before selecting them for release. Then update the local canonical
+bundle, replacing the commit placeholders with the source commits used:
 
-## 4. Frozen Room Resources Refresh Procedure
+```powershell
+../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --publish-from build/review-resources --repo-root . --version 0.7.0 --mod-commit <mod-commit> --apworld-commit <apworld-commit> --source-state build/review-inputs.json
+../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --check --repo-root .
+```
 
-When a modification touches versioned gameplay, maps, or content sources that alter room compiler output:
+Despite its `--publish-from` name, this command only updates local
+`packaging/room_resources/v0.7.0/`. It writes checksums and
+`ROOM_RESOURCES_PROVENANCE.json`, the record of which inputs built the bundle.
 
-1. Run the local authorial release build with vanilla game sources present:
-   ```bash
-   ./scripts/pipeline.sh release --build
-   ```
-2. Copy the regenerated canonical room resources to the versioned packaging directory:
-   ```bash
-   cp build/release/client/resources/base_mod.zip packaging/room_resources/v0.6.0/
-   cp build/release/client/resources/room_payloads.zip packaging/room_resources/v0.6.0/
-   cp build/release/client/resources/room_payload_manifest.json packaging/room_resources/v0.6.0/
-   ```
-3. Update `ROOM_RESOURCES_PROVENANCE.json` and `SHA256SUMS.txt` using the updated content input fingerprint and file hashes.
-4. Verify the frozen bundle:
-   ```bash
-   python3 -m tools.release.prebuilt_room_resources --check
-   ```
-5. Commit the refreshed resources alongside the content changes.
+## Assemble Windows
 
-For changes confined to documentation, test suites, or CI workflows, the content input fingerprint remains identical and the frozen room resources require no regeneration.
+```powershell
+./scripts/build/windows_release.ps1 -Python ../.venv-windows/Scripts/python.exe -CoreSource ../Sentinel-Core
+```
+
+The script builds the native client, session helper, launcher and APWorld, runs
+the headless launcher check and assembles `build/final-release/`. It checks the
+canonical room bundle before packaging. `-SkipValidation` skips the broad suite;
+use it only after recording an integrated test run for these sources.
+
+Sentinel Core has its own distribution. Build and test it in its repository,
+assemble with `tools/distribute.py`, and verify with `tools/verify_distribution.py`.
+Use `--help` for required paths. A local dirty build must use `--dirty`; CI
+qualification requires clean source. Include the complete Core distribution
+for local candidates so testers can select its `distribution.json`.
+
+## Linux and CI
+
+`.github/workflows/cross-platform-build.yml` builds both launcher platforms,
+the Windows native client used under Proton, and the APWorld. Select exact source
+commits for MOD, APWorld and Core. `scripts/pipeline.sh release --build` runs the
+local shell build.
+
+To assemble existing build outputs, use:
+
+```text
+python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.7.0 --repo-root . --output-dir <new-output>
+```
+
+Use `--platform linux` for Linux. Here `--handoff` means a directory containing
+the launcher, shared native client, APWorld and their checksum manifest. Build
+scripts create this layout. The assembler verifies executables, checksums,
+resource membership and the final ZIP contents.
+
+## Check the delivery before publishing
+
+Extract the actual ZIP into a clean directory. Check its hashes, required package
+data, bundled player guides and headless self-test. Compile the test rooms using
+the packaged resources. Preserve their chosen presets and campaign settings;
+regenerate seeds only if generation changes make it necessary.
+
+Record the ZIP's actual path and SHA-256. State which offline checks passed and
+which gameplay or Linux/Proton checks remain. Local assembly does not publish a
+release. Uploading or publishing is a separate maintainer action after review.
