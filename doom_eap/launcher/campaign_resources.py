@@ -10,6 +10,7 @@ import hashlib
 import json
 import mmap
 from pathlib import Path
+import re
 import struct
 import tempfile
 import zipfile
@@ -22,6 +23,48 @@ DECLS = (
 )
 STREAMFILES = tuple("generated/decls/" + name for name in DECLS)
 EXCLUDED_LAYER = "generated/decls/layer/game/sp/hub/ap_excluded.decl"
+
+
+def installed_resource_fingerprints(game_root: Path) -> dict[str, str]:
+    names = ("DOOMEternalx64vk.exe", "base/meta.resources", "base/idRehash.map", "base/packagemapspec.json",
+             "base/build-manifest.bin")
+    result = {}
+    for name in names:
+        with (game_root / name).open("rb") as source:
+            result[name] = hashlib.file_digest(source, "sha256").hexdigest()
+    return result
+
+
+def verify_installed_resources(game_root: Path, receipt: dict) -> None:
+    expected = receipt.get("installed_resources")
+    if not isinstance(expected, dict) or not expected:
+        raise ValueError("Installed game resource evidence is missing; reinstall the room package")
+    actual = installed_resource_fingerprints(game_root)
+    if actual != expected:
+        changed = ", ".join(name for name, digest in actual.items() if expected.get(name) != digest)
+        raise ValueError(f"Installed game files changed: {changed}; reinstall the room package")
+
+
+def resource_mapping_lines(mask: bytes, mapping: str) -> list[str]:
+    if len(mask) < 8:
+        raise ValueError("Truncated native resource mask")
+    offsets, position = set(), 8
+    for _ in range(_u32(mask, 4)):
+        if position + 12 > len(mask):
+            raise ValueError("Truncated native resource mask")
+        offsets.add(position)
+        position += 12 + 8 * _u32(mask, position + 8)
+    if position != len(mask):
+        raise ValueError("Invalid native resource mask boundary")
+    result = []
+    for line in mapping.splitlines(keepends=True):
+        name, offset = line.rsplit(";", 1)
+        if int(offset) not in offsets:
+            if re.fullmatch(r"ap_enemy_resources/[0-9a-f]{64}\.resources", name.replace("\\", "/")):
+                continue
+            raise ValueError("Invalid native resource mask mapping")
+        result.append(line)
+    return result
 
 
 def _u32(data, offset):
@@ -80,7 +123,7 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
         raise ValueError("Resource activation requires an uncompressed native container mask")
     original_mapping = (base / "idRehash.map").read_bytes()
     mapping, selected = [], {}
-    lines = original_mapping.decode("utf-8-sig").splitlines(keepends=True)
+    lines = resource_mapping_lines(mask, original_mapping.decode("utf-8-sig"))
     for line in lines:
         name, offset = line.rsplit(";", 1)
         normalized = name.replace("\\", "/").removeprefix("./")
@@ -128,9 +171,9 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
     updated[incoming_at:incoming_at + len(updated_mask)] = updated_mask
     info_at = _u64(original, 80) + 144 * index
     struct.pack_into("<QQQ", updated, info_at + 56, incoming_at, len(updated_mask), len(updated_mask))
-    updated_mapping = original_mapping
+    encoding = "utf-8-sig" if original_mapping.startswith(b"\xef\xbb\xbf") else "utf-8"
+    updated_mapping = "".join(lines).encode(encoding)
     if any(offsets[offset] != offset for _, offset, _ in mapping):
-        encoding = "utf-8-sig" if original_mapping.startswith(b"\xef\xbb\xbf") else "utf-8"
         updated_mapping = "".join(f"{name};{offsets[offset]}{ending}" for name, offset, ending in mapping).encode(encoding)
     return {"meta.resources": bytes(updated), "idRehash.map": updated_mapping}, {
         "containers": tables, "source_meta_sha256": hashlib.sha256(original).hexdigest(),
@@ -189,16 +232,19 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         expected = {name: package.read("gameresources_patch2/" + name)
                     for name in required if "gameresources_patch2/" + name in names}
         plan = manifest.get("options", {}).get("enemy_plan")
+        roots = json.loads(package.read("seed_receipt.json")).get("native_resource_roots", {}) if "seed_receipt.json" in names else {}
     campaign_required = bool(expected) or "unified_campaign_v1" in manifest.get("required_capabilities", ()) or EXCLUDED_LAYER in required
     base = game_root / "base"
-    bank_updates, banks = prepare_native_resource_banks(base, plan)
-    if not campaign_required and not bank_updates:
+    if any(process["name"].casefold() == "doometernalx64vk.exe" for process in detect_doom_processes()):
+        raise RuntimeError("Close DOOM before finalizing campaign resources")
+    bank_updates, banks = prepare_native_resource_banks(base, plan, roots)
+    from .resource_bank import obsolete_banks, cleanup_banks
+    spec = json.loads(bank_updates.get('packagemapspec.json', (base / 'packagemapspec.json').read_bytes())) if (base / 'packagemapspec.json').is_file() else {'files': []}
+    obsolete = obsolete_banks(base, spec)
+    if not campaign_required and not bank_updates and not obsolete:
         return {"state": "not_applicable"}
     if campaign_required and expected.keys() != required:
         raise ValueError("Incomplete unified campaign resource package")
-    if any(process["name"] == "doometernalx64vk.exe" for process in detect_doom_processes()):
-        raise RuntimeError("Close DOOM before finalizing campaign resources")
-
     records = _records(base / CONTAINER, required) if campaign_required else {}
     for name, (_, kind, _, payload, flags) in records.items():
         if kind != "rs_streamfile" or flags != 0 or payload != expected[name]:
@@ -210,22 +256,25 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         report["source_hashes"] = {**({"meta.resources": report["source_meta_sha256"],
             "idRehash.map": report["source_rehash_sha256"]} if targets else {}), **banks["source_hashes"]}
         updates.update(bank_updates)
-    if banks.get('consolidated'):
+    if banks.get('consolidated') or obsolete:
         from .resource_bank import register_banks
         report.setdefault('source_hashes', {})
         for name in ('meta.resources', 'idRehash.map'):
             original = (base / name).read_bytes()
-            expected_hash = banks['source_hashes'][name]
+            expected_hash = banks['source_hashes'].get(name, hashlib.sha256(original).hexdigest())
             if hashlib.sha256(original).hexdigest() != expected_hash:
                 raise RuntimeError('Resource metadata changed during bank consolidation')
             report['source_hashes'].setdefault(name, expected_hash)
             updates.setdefault(name, original)
-        register_banks(base, banks['consolidated'], updates)
+        register_banks(base, banks.get('consolidated', {}), updates, obsolete)
         report['updated_meta_sha256'] = hashlib.sha256(updates['meta.resources']).hexdigest()
     table = report["containers"].get(CONTAINER, {"previously_enabled": {}, "changed_bits": 0, "added_mask_words": 0})
     entries = [{"name": name, "index": row[0], "previously_enabled": table["previously_enabled"][row[0]]}
                for name, row in records.items()]
+    from .build_manifest import register_resource_manifest
+    register_resource_manifest(base, banks.get("consolidated", {}), updates, report, obsolete)
     publish_resource_activation(base, updates, report)
+    cleanup = cleanup_banks(base, obsolete) if obsolete else {'removed': [], 'bytes_freed': 0, 'errors': []}
     return {"state": "enabled", "container": CONTAINER if records else None, "entries": entries,
             "changed_bits": table["changed_bits"], "added_mask_words": table["added_mask_words"],
-            "native_enemy_banks": banks["maps"], "meta_sha256": report.get("updated_meta_sha256")}
+            "native_enemy_banks": banks["maps"], "meta_sha256": report.get("updated_meta_sha256"), "bank_cleanup": cleanup}

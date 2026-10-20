@@ -58,6 +58,19 @@ def _run_self_test(arguments: list[str]) -> int:
         print(f"  [FAIL] SSL / certifi check failed: {e}", file=sys.stderr)
         return 1
 
+    try:
+        from doom_eap.launcher.build_manifest import _KEYS, decode_manifest
+        from doom_eap.runtime.save_decrypt import _aes_gcm_encrypt
+        nonce = bytes(12)
+        document = {"files": {}}
+        encoded = nonce + _aes_gcm_encrypt(_KEYS[0], nonce, json.dumps(document).encode(), b"build-manifest") + bytes(64)
+        if decode_manifest(encoded)[0] != document:
+            raise RuntimeError("Build manifest round trip differs")
+        print("  [OK] Build manifest authenticated encryption verified")
+    except Exception as e:
+        print(f"  [FAIL] Build manifest crypto check failed: {e}", file=sys.stderr)
+        return 1
+
     # 2. Check bundled resource root (sys._MEIPASS in frozen mode, repo root in source mode)
     try:
         from doom_eap.launcher.launcher_controller import (

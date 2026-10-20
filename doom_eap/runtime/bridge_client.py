@@ -6298,7 +6298,8 @@ class DoomEternalContext(CommonContext):
             await self.report_local_death()
 
     async def report_local_death(self):
-        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self))
+        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self),
+            grace=load_config().get("death_link_grace", 0), persist=self.persist_session_state)
 
     @staticmethod
     def goal_objective_ids(slot_data, server_locations):

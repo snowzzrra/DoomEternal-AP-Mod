@@ -3,7 +3,7 @@ from contextlib import ExitStack
 import hashlib
 import json
 from pathlib import Path
-import shutil
+import re
 import struct
 import subprocess
 import os
@@ -83,102 +83,129 @@ class ResourceIndex:
             self.records.append((key, (kind, row, i)))
 
 
-def consolidate_bank(destination, donors, excluded, cache, enabled):
-    """Keep destination records and append only missing donor names in priority order."""
-    indices = [ResourceIndex(path) for path in (destination, *donors)]
-    identity = [(str(i.path), i.path.stat().st_size, i.path.stat().st_mtime_ns,
-                 hashlib.sha256(i.index).hexdigest()) for i in indices]
-    cache_key = hashlib.sha256(json.dumps([2, identity, sorted(excluded),
-        [enabled[str(i.path)].hex() for i in indices]], separators=(',', ':')).encode()).hexdigest()
-    cache = Path(cache)
-    cache.mkdir(parents=True, exist_ok=True)
-    target = cache / (cache_key + '.resources')
-    receipt = target.with_suffix('.json')
-    if target.is_file() and receipt.is_file():
-        stored = json.loads(receipt.read_text())
-        stat = target.stat()
-        if stored.get('size') == stat.st_size and stored.get('mtime_ns') == stat.st_mtime_ns:
-            return target, stored
-    base = indices[0]
-    base_bits = enabled[str(base.path)]
-    selected, seen = [], {key for key, (_, _, i) in base.records
-                          if i // 8 < len(base_bits) and base_bits[i // 8] & (1 << (i % 8))} | set(excluded)
-    for donor in indices[1:]:
-        bits = enabled[str(donor.path)]
-        for key, (kind, row, number) in donor.records:
-            name = key[1]
-            if number // 8 < len(bits) and bits[number // 8] & (1 << (number % 8)) and key not in seen:
-                selected.append((donor, name, kind, row))
-                seen.add(key)
-    names = list(base.names)
-    name_ids = {name: i for i, name in enumerate(names)}
-    for _, name, kind, _ in selected:
-        for value in (kind, name):
-            if value not in name_ids:
-                name_ids[value] = len(names)
-                names.append(value)
-    for donor in indices[1:]:
-        for first, second, _ in donor.metadata:
-            for value in (first, second):
-                if value not in name_ids:
-                    name_ids[value] = len(names)
-                    names.append(value)
+def resource_records(indices, selected, masks):
+    result = {}
+    for number in sorted(selected, reverse=True):
+        if number not in indices:
+            continue
+        index = indices[number]
+        bits = masks[index.path]
+        for key, (_, row, position) in index.records:
+            if position // 8 < len(bits) and bits[position // 8] & (1 << (position % 8)):
+                result.setdefault(key, (index, row, position))
+    return result
+
+
+def select_resources(available, local, roots):
+    from collections import defaultdict
+    aliases = defaultdict(set)
+    for key in available:
+        name = key[1]
+        aliases[name].add(key)
+        if name.startswith('generated/decls/') and name.endswith('.decl'):
+            aliases[name.split('/', 3)[3][:-5]].add(key)
+    selected, streams, visited = {}, False, set()
+    pending = set(roots)
+    with ExitStack() as stack:
+        readers = {}
+        while pending:
+            token = pending.pop()
+            for key in aliases.get(token, ()):
+                if key in local or key in visited:
+                    continue
+                visited.add(key)
+                index, row, position = available[key]
+                selected[key] = available[key]
+                for value in index.types[_u64(row, 24):_u64(row, 24) + _u32(row, 132)]:
+                    kind, name, _ = index.metadata[value]
+                    pending.add(name)
+                    streams |= kind == 'rs_emb_sfile' and name not in aliases
+                if key[0] == 'rs_streamfile' and key[1].endswith('.decl'):
+                    if _u64(row, 64) != _u64(row, 72) or _u32(row, 112) != 0:
+                        raise ValueError('Expected decoded native declaration: ' + key[1])
+                    if index.path not in readers:
+                        readers[index.path] = stack.enter_context(index.path.open('rb'))
+                    source = readers[index.path]
+                    source.seek(_u64(row, 56))
+                    payload = source.read(_u64(row, 64))
+                    if len(payload) != _u64(row, 64):
+                        raise ValueError('Truncated native declaration')
+                    pending.update(json.loads(match[0]) for match in re.finditer(
+                        r'"(?:[^"\\]|\\.)*"', payload.decode('utf-8-sig')))
+    return selected, streams
+
+
+def resource_signature(value):
+    index, row, _ = value
+    with index.path.open('rb') as source:
+        source.seek(_u64(row, 56))
+        digest, remaining = hashlib.sha256(), _u64(row, 64)
+        while remaining:
+            chunk = source.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                raise ValueError('Truncated native resource payload')
+            digest.update(chunk)
+            remaining -= len(chunk)
+    return row[40:56], row[64:88], row[96:144], digest.digest()
+
+
+def write_resource_bank(selected, cache):
+    entries = sorted(selected.items())
+    names, metadata, types, ids, rows = [], [], [], [], bytearray()
+    name_ids, metadata_ids = {}, {}
+    def name_id(value):
+        if value not in name_ids:
+            name_ids[value] = len(names)
+            names.append(value)
+        return name_ids[value]
+    for key, (index, original, _) in entries:
+        row = bytearray(original)
+        struct.pack_into('<QQ', row, 0, 0, 1)
+        struct.pack_into('<QQ', row, 24, len(types), len(ids))
+        ids.extend((name_id(key[0]), name_id(key[1])))
+        for value in index.types[_u64(original, 24):_u64(original, 24) + _u32(original, 132)]:
+            item = index.metadata[value]
+            if item not in metadata_ids:
+                metadata_ids[item] = len(metadata)
+                first, second, opaque = item
+                metadata.append(struct.pack('<QQ', name_id(first), name_id(second)) + bytes.fromhex(opaque))
+            types.append(metadata_ids[item])
+        rows.extend(row)
     offsets, strings = [], bytearray()
     for name in names:
         offsets.append(len(strings))
         strings.extend(name.encode('utf-8') + b'\0')
-    encoded_names = struct.pack('<Q', len(names)) + struct.pack('<' + 'Q' * len(offsets), *offsets) + strings
-    unknown = bytearray(base.index[base.names_end:base.lookup_at])
-    types = bytearray(base.index[base.lookup_at:base.ids_at])
-    type_offsets = {}
-    for donor in indices[1:]:
-        type_offsets[donor.path] = len(types) // 4
-        metadata_offset = len(unknown) // 32
-        for first, second, opaque in donor.metadata:
-            unknown.extend(struct.pack('<QQ', name_ids[first], name_ids[second]) + bytes.fromhex(opaque))
-        types.extend(struct.pack('<' + 'I' * len(donor.types),
-                                 *(value + metadata_offset for value in donor.types)))
-    ids = bytearray(base.index[base.ids_at:base.idcl_at])
-    idcl = base.index[base.idcl_at:base.data_at]
-    rows = bytearray(base.index[base.info_at:base.names_at])
-    for donor, name, kind, original in selected:
-        row = bytearray(original)
-        struct.pack_into('<QQ', row, 0, 0, 1)
-        struct.pack_into('<Q', row, 32, len(ids) // 8)
-        struct.pack_into('<Q', row, 24, _u64(row, 24) + type_offsets[donor.path])
-        ids.extend(struct.pack('<QQ', name_ids[kind], name_ids[name]))
-        rows.extend(row)
-    names_at = base.info_at + len(rows)
-    names_end = names_at + len(encoded_names)
-    lookup_at = names_end + len(unknown)
-    ids_at = lookup_at + len(types)
-    idcl_at = ids_at + len(ids)
-    data_at = idcl_at + len(idcl)
-    delta = data_at - base.data_at
-    header = bytearray(base.index[:base.info_at])
-    struct.pack_into('<I', header, 32, base.count + len(selected))
-    struct.pack_into('<I', header, 36, len(unknown) // 32)
-    struct.pack_into('<I', header, 40, len(types) // 4)
-    struct.pack_into('<I', header, 44, _u32(header, 44) + 2 * len(selected))
-    struct.pack_into('<I', header, 56, len(encoded_names))
-    for offset, value in ((64, names_at), (72, names_end), (88, names_end), (96, lookup_at), (104, data_at), (116, idcl_at)):
-        struct.pack_into('<Q', header, offset, value)
-    for i in range(base.count):
-        struct.pack_into('<Q', rows, i * 144 + 56, _u64(rows, i * 144 + 56) + delta)
+    strings = struct.pack('<Q', len(names)) + struct.pack('<' + 'Q' * len(names), *offsets) + strings
+    header = bytearray(entries[0][1][0].header)
+    names_at = 124 + len(rows)
+    names_end = names_at + len(strings)
+    lookup_at = names_end + 32 * len(metadata)
+    idcl_at = lookup_at + 4 * len(types) + 8 * len(ids)
+    data_at = (idcl_at + 4 + 65535) & ~65535
+    for at, value in ((32, len(entries)), (36, len(metadata)), (40, len(types)), (44, len(ids)), (56, len(strings))):
+        struct.pack_into('<I', header, at, value)
+    for at, value in ((64, names_at), (72, names_end), (80, 124), (88, names_end),
+                      (96, lookup_at), (104, data_at), (116, idcl_at)):
+        struct.pack_into('<Q', header, at, value)
+    cache = Path(cache)
+    cache.mkdir(exist_ok=True)
+    if cache.resolve() != cache.parent.resolve() / cache.name:
+        raise ValueError('Generated resource directory is redirected')
     with tempfile.NamedTemporaryFile(dir=cache, suffix='.incoming', delete=False) as stream:
         incoming = Path(stream.name)
         try:
-            stream.write(header + rows + encoded_names + unknown + types + ids + idcl)
-            with base.path.open('rb') as source:
-                source.seek(base.data_at)
-                shutil.copyfileobj(source, stream, 1024 * 1024)
+            stream.write(header + rows + strings + b''.join(metadata)
+                         + struct.pack('<' + 'I' * len(types), *types)
+                         + struct.pack('<' + 'Q' * len(ids), *ids)
+                         + b'IDCL' + bytes(data_at - idcl_at - 4))
             with ExitStack() as stack:
-                sources = {index.path: stack.enter_context(index.path.open('rb')) for index in indices[1:]}
-                for number, (index, name, _, row) in enumerate(selected):
-                    padding = (-stream.tell()) % 16
-                    stream.write(b'\0' * padding)
-                    offset = stream.tell()
-                    source = sources[index.path]
+                readers = {}
+                for number, (_, (index, row, _)) in enumerate(entries):
+                    stream.write(bytes((-stream.tell()) % 16))
+                    struct.pack_into('<Q', rows, number * 144 + 56, stream.tell())
+                    if index.path not in readers:
+                        readers[index.path] = stack.enter_context(index.path.open('rb'))
+                    source = readers[index.path]
                     source.seek(_u64(row, 56))
                     remaining = _u64(row, 64)
                     while remaining:
@@ -187,8 +214,7 @@ def consolidate_bank(destination, donors, excluded, cache, enabled):
                             raise ValueError('Truncated native resource payload')
                         stream.write(chunk)
                         remaining -= len(chunk)
-                    struct.pack_into('<Q', rows, (base.count + number) * 144 + 56, offset)
-            stream.seek(base.info_at)
+            stream.seek(124)
             stream.write(rows)
         except BaseException:
             stream.close()
@@ -196,21 +222,30 @@ def consolidate_bank(destination, donors, excluded, cache, enabled):
             raise
     try:
         verified = ResourceIndex(incoming)
-        if len(verified.records) != base.count + len(selected):
-            raise ValueError('Consolidated native resource index differs')
-        incoming.replace(target)
+        if [key for key, _ in verified.records] != [key for key, _ in entries]:
+            raise ValueError('Selected native resource index differs')
+        with incoming.open('rb') as source:
+            identity = hashlib.file_digest(source, 'sha256').hexdigest()
+        target = cache / (identity + '.resources')
+        if target.is_symlink() or target.with_suffix('.json').is_symlink():
+            raise ValueError('Generated resource bank is redirected')
+        if target.exists():
+            with target.open('rb') as source:
+                if hashlib.file_digest(source, 'sha256').hexdigest() != identity:
+                    raise ValueError('Generated resource bank integrity differs')
+        else:
+            incoming.replace(target)
     finally:
         incoming.unlink(missing_ok=True)
     stat = target.stat()
-    result = {'size': stat.st_size, 'mtime_ns': stat.st_mtime_ns, 'records': base.count + len(selected),
-              'appended': len(selected), 'identity': cache_key, 'base_count': base.count,
-              'base_mask': enabled[str(base.path)].hex()}
-    receipt.write_text(json.dumps(result), encoding='utf-8')
-    return target, result
+    receipt = dict(size=stat.st_size, mtime_ns=stat.st_mtime_ns, records=len(entries), identity=identity,
+                   base_count=0, base_mask='', format=3)
+    target.with_suffix('.json').write_text(json.dumps(receipt), encoding='utf-8')
+    return target, receipt
 
 
 def read_masks(base):
-    from .campaign_resources import _records
+    from .campaign_resources import _records, resource_mapping_lines
     mask = _records(base / 'meta.resources', {'generated/buildgame/container.mask'})['generated/buildgame/container.mask'][3]
     tables, at = {}, 8
     for _ in range(_u32(mask, 4)):
@@ -222,7 +257,7 @@ def read_masks(base):
     if at != len(mask):
         raise ValueError('Invalid native resource mask boundary')
     result = {}
-    for line in (base / 'idRehash.map').read_text(encoding='utf-8-sig').splitlines():
+    for line in resource_mapping_lines(mask, (base / 'idRehash.map').read_text(encoding='utf-8-sig')):
         name, offset = line.rsplit(';', 1)
         if int(offset) not in tables:
             raise ValueError('Invalid native resource mask mapping')
@@ -230,59 +265,69 @@ def read_masks(base):
     return result
 
 
-def shared_donor_bank(base, spec, requested, by_map, maps, masks):
-    donors = set().union(*(by_map[maps[name]] for names in requested.values() for name in names))
-    native = by_map.get(maps.get('common'), set())
-    destinations = set().union(*(by_map[maps[name]] for name in requested))
-    paths = {i: base / spec['files'][i]['name'] for i in donors | native | destinations
-             if spec['files'][i]['name'].endswith('.resources')}
-    indices = {i: ResourceIndex(path) for i, path in paths.items()}
-
-    def records(selected):
-        result = {}
-        for i in sorted(selected, reverse=True):
-            if i not in indices:
+def obsolete_banks(base, spec):
+    directory = base / 'ap_enemy_resources'
+    if not directory.is_dir():
+        return {}
+    if directory.resolve() != base.resolve() / directory.name:
+        raise ValueError('Generated resource directory is redirected')
+    active = {value['name'] for value in spec['files']}
+    result = {}
+    for receipt in directory.glob('*.json'):
+        if not re.fullmatch(r'[0-9a-f]{64}', receipt.stem) or receipt.is_symlink():
+            continue
+        path = receipt.with_suffix('.resources')
+        name = path.relative_to(base).as_posix()
+        if name in active or path.is_symlink() or not path.is_file():
+            continue
+        try:
+            data = receipt.read_bytes()
+            info = json.loads(data)
+            stat = path.stat()
+            with path.open('rb') as source:
+                header = source.read(124)
+            if (info.get('identity') != receipt.stem or info.get('size') != stat.st_size
+                    or info.get('mtime_ns') != stat.st_mtime_ns or header[:8] != b'IDCL\x0c\0\0\0'
+                    or info.get('records') != _u32(header, 32)):
                 continue
-            bits = masks[spec['files'][i]['name']]
-            for key, (_, row, number) in indices[i].records:
-                if number // 8 < len(bits) and bits[number // 8] & (1 << (number % 8)):
-                    result.setdefault(key, (i, row))
-        return result
-
-    hashes = {}
-    def signature(value):
-        i, row = value
-        identity = (i, _u64(row, 56), _u64(row, 64))
-        if identity not in hashes:
-            with paths[i].open('rb') as source:
-                source.seek(identity[1])
-                digest, remaining = hashlib.sha256(), identity[2]
-                while remaining:
-                    chunk = source.read(min(remaining, 1024 * 1024))
-                    if not chunk:
-                        raise ValueError('Truncated native resource payload')
-                    digest.update(chunk)
-                    remaining -= len(chunk)
-                hashes[identity] = digest.digest()
-        return row[40:56], row[64:88], row[96:144], hashes[identity]
-
-    incoming = records(donors)
-    for target, names in requested.items():
-        local = records(by_map[maps[target]] | native)
-        expected = records(set().union(*(by_map[maps[name]] for name in names)))
-        for key, value in expected.items():
-            if key not in local and value != incoming[key] and signature(value) != signature(incoming[key]):
-                return None
-    common = records(native)
-    destination = min((i for i in native if i in paths), key=lambda i: paths[i].stat().st_size)
-    enabled = {str(path): masks[spec['files'][i]['name']] for i, path in paths.items()}
-    return consolidate_bank(paths[destination], [paths[i] for i in sorted(donors, reverse=True) if i in paths],
-                            common, base / 'ap_enemy_resources', enabled)
+            if info.get('format') != 3 and info.get('records') != info.get('base_count', -1) + info.get('appended', -1):
+                continue
+            result[name] = dict(size=stat.st_size, mtime_ns=stat.st_mtime_ns,
+                                receipt_sha256=hashlib.sha256(data).hexdigest())
+        except (OSError, ValueError, TypeError):
+            continue
+    return result
 
 
-def register_banks(base, banks, updates):
-    from .campaign_resources import _records
-    if not banks:
+def cleanup_banks(base, obsolete):
+    from .build_manifest import decode_manifest
+    spec = json.loads((base / 'packagemapspec.json').read_bytes())
+    active = {value['name'] for value in spec['files']}
+    registered = read_masks(base)
+    manifest, _ = decode_manifest((base / 'build-manifest.bin').read_bytes())
+    removed, errors, freed = [], [], 0
+    for name, before in obsolete.items():
+        if name in active or name in registered or name in manifest['files']:
+            continue
+        path = base / name
+        receipt = path.with_suffix('.json')
+        try:
+            if (path.resolve() != base.resolve() / name or path.is_symlink() or receipt.is_symlink()
+                    or path.stat().st_size != before['size'] or path.stat().st_mtime_ns != before['mtime_ns']
+                    or hashlib.sha256(receipt.read_bytes()).hexdigest() != before['receipt_sha256']):
+                continue
+            path.unlink()
+            receipt.unlink()
+            removed.append(name)
+            freed += before['size']
+        except OSError as error:
+            errors.append(str(error))
+    return dict(removed=removed, bytes_freed=freed, errors=errors)
+
+
+def register_banks(base, banks, updates, obsolete=()):
+    from .campaign_resources import _records, resource_mapping_lines
+    if not banks and not obsolete:
         return
     original = updates.get('meta.resources', (base / 'meta.resources').read_bytes())
     mapping = updates.get('idRehash.map', (base / 'idRehash.map').read_bytes()).decode('utf-8-sig')
@@ -293,8 +338,20 @@ def register_banks(base, banks, updates):
         number, _, _, payload, flags = _records(meta, {'generated/buildgame/container.mask'})['generated/buildgame/container.mask']
         if flags:
             raise ValueError('Expected uncompressed native resource mask')
-        mask, entries = bytearray(payload), []
-        known = {line.rsplit(';', 1)[0].replace('\\', '/') for line in mapping.splitlines()}
+        mapping = ''.join(resource_mapping_lines(payload, mapping))
+        lines = [line.rsplit(';', 1) for line in mapping.splitlines()]
+        removed = {int(offset) for name, offset in lines if name.replace('\\', '/').removeprefix('./') in obsolete}
+        mask, remap, at = bytearray(payload[:8]), {}, 8
+        for _ in range(_u32(payload, 4)):
+            end = at + 12 + 8 * _u32(payload, at + 8)
+            if at not in removed:
+                remap[at] = len(mask)
+                mask.extend(payload[at:end])
+            at = end
+        struct.pack_into('<I', mask, 4, _u32(payload, 4) - len(removed))
+        mapping = ''.join(f'{name};{remap[int(offset)]}\n' for name, offset in lines if int(offset) not in removed)
+        entries = []
+        known = {line.rsplit(';', 1)[0].replace('\\', '/').removeprefix('./') for line in mapping.splitlines()}
         for name, info in banks.items():
             if name in known:
                 continue
@@ -306,7 +363,7 @@ def register_banks(base, banks, updates):
                 bits[index // 8] |= 1 << (index % 8)
             mask.extend(b'\0' * 8 + struct.pack('<I', len(bits) // 8) + bits)
             entries.append((name, offset))
-        if not entries:
+        if not entries and mask == payload:
             return
         struct.pack_into('<I', mask, 4, _u32(mask, 4) + len(entries))
         updated = bytearray(original)
@@ -315,12 +372,13 @@ def register_banks(base, banks, updates):
         updated.extend(mask)
         struct.pack_into('<QQQ', updated, _u64(updated, 80) + number * 144 + 56, at, len(mask), len(mask))
         meta.write_bytes(updated)
-        (directory / 'idRehash.map').write_text(''.join(f'{(base / name).resolve()};{offset}\n' for name, offset in entries), encoding='utf-8')
-        tool = base / ('idRehash.exe' if os.name == 'nt' else 'idRehash')
-        result = subprocess.run([str(tool.resolve())], cwd=directory, capture_output=True, timeout=120,
-                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-        if result.returncode:
-            raise RuntimeError('Native resource header registration failed: ' + result.stderr.decode(errors='replace')[-1000:])
+        if entries:
+            (directory / 'idRehash.map').write_text(''.join(f'{(base / name).resolve()};{offset}\n' for name, offset in entries), encoding='utf-8')
+            tool = base / ('idRehash.exe' if os.name == 'nt' else 'idRehash')
+            result = subprocess.run([str(tool.resolve())], cwd=directory, capture_output=True, timeout=120,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            if result.returncode:
+                raise RuntimeError('Native resource header registration failed: ' + result.stderr.decode(errors='replace')[-1000:])
         verified = meta.read_bytes()
         actual = _records(meta, {'generated/buildgame/container.mask'})['generated/buildgame/container.mask'][3]
         for _, offset in entries:

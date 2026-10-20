@@ -1,4 +1,4 @@
-"""Load frozen bodies through the native resource closure of their donor maps."""
+"""Load the missing resources referenced by frozen enemy bodies."""
 
 import hashlib
 import json
@@ -31,7 +31,7 @@ def native_resource_maps(plan):
     return result
 
 
-def prepare_native_resource_banks(base, plan):
+def prepare_native_resource_banks(base, plan, roots=None):
     requested = native_resource_maps(plan)
     path = base / "packagemapspec.json"
     if not path.is_file() and not requested:
@@ -74,83 +74,69 @@ def prepare_native_resource_banks(base, plan):
     for ref in spec["mapFileRefs"]:
         by_map.setdefault(ref["map"], set()).add(ref["file"])
     donor_files, targets, consolidated = set(), {}, {}
-    masks = None
-    shared = None
     source_hashes = {path.name: hashlib.sha256(original).hexdigest()}
-    for target, donors in requested.items():
-        if target not in maps or not donors <= maps.keys():
-            raise ValueError("Native enemy resource map is absent from the installation")
-        destination = by_map.get(maps[target], set())
-        selected = set()
-        for donor in donors:
-            candidates = by_map.get(maps[donor], set())
-            if not candidates:
-                raise ValueError("Native enemy resource donor has no banks")
-            for index in candidates:
-                value = spec["files"][index]
-                name = value.get("name") if isinstance(value, dict) else None
-                if not isinstance(name, str):
-                    raise ValueError("Invalid native resource bank")
-                bank = PurePosixPath(name)
-                if "\\" in name or bank.is_absolute() or ".." in bank.parts or ":" in name:
-                    raise ValueError("Invalid native resource bank path")
-                if bank.suffix not in {".resources", ".streamdb"}:
-                    continue
-                source = base.joinpath(*bank.parts)
-                if not source.is_file() or not source.stat().st_size:
-                    raise ValueError(f"Missing native enemy resource bank: {name}")
-                if index not in destination:
-                    selected.add(index)
-        targets[target] = selected
-    for target, selected in targets.items():
-        destination = by_map.get(maps[target], set())
+    if requested:
+        expected = {stage['runtime_map'] for stage in plan['maps'].values() if stage['recipes']}
+        if (not isinstance(roots, dict) or set(roots) != expected
+                or any(not isinstance(values, list) or any(not isinstance(v, str) for v in values)
+                       for values in roots.values())):
+            raise ValueError('Rebuild the room package with native enemy resource roots')
+        from .resource_bank import ResourceIndex, read_masks, resource_records, select_resources, resource_signature, write_resource_bank
         common = by_map.get(maps.get('common'), set())
-        closure = destination | common | selected
-        names = {spec['files'][index]['name'] for index in closure
-                 if PurePosixPath(spec['files'][index]['name']).suffix in {'.resources', '.streamdb'}}
-        if len(names) > 64:
-            from .resource_bank import ResourceIndex, consolidate_bank, read_masks
-            if masks is None:
-                source_hashes.update({name: hashlib.sha256((base / name).read_bytes()).hexdigest()
-                                      for name in ('meta.resources', 'idRehash.map')})
-                masks = read_masks(base)
-                from .resource_bank import shared_donor_bank
-                shared = shared_donor_bank(base, spec, requested, by_map, maps, masks)
-            resources = [index for index in sorted(selected, reverse=True)
-                         if spec['files'][index]['name'].endswith('.resources')]
-            native = [index for index in sorted(destination | common, reverse=True)
-                      if spec['files'][index]['name'].endswith('.resources')]
-            if not resources or not native:
-                raise ValueError('Native resource closure cannot fit the database limit')
-            if shared is not None:
-                bank, info = shared
-            else:
-                paths = {index: base / spec['files'][index]['name'] for index in native + resources}
-                enabled = {str(path): masks[spec['files'][index]['name']] for index, path in paths.items()}
-                excluded = set()
-                for index in native:
-                    bits = enabled[str(paths[index])]
-                    for name, (_, _, number) in ResourceIndex(paths[index]).records:
-                        if number // 8 < len(bits) and bits[number // 8] & (1 << (number % 8)):
-                            excluded.add(name)
-                smallest = min(native, key=lambda index: paths[index].stat().st_size)
-                bank, info = consolidate_bank(paths[smallest], [paths[index] for index in resources], excluded,
-                                              base / 'ap_enemy_resources', enabled)
-            name = bank.relative_to(base).as_posix()
-            known = name in consolidated
-            consolidated[name] = info
-            selected.difference_update(resources)
-            if known:
-                selected.add(next(i for i, value in enumerate(spec['files']) if value['name'] == name))
-            else:
-                selected.add(len(spec['files']))
-                spec['files'].append({'name': name})
-            closure_names = {spec['files'][index]['name'] for index in destination | common | selected
-                             if PurePosixPath(spec['files'][index]['name']).suffix in {'.resources', '.streamdb'}}
-            if len(closure_names) > 64:
+        needed = set(common)
+        for target, donors in requested.items():
+            if target not in maps or not donors <= maps.keys():
+                raise ValueError('Native enemy resource map is absent from the installation')
+            needed.update(by_map.get(maps[target], set()))
+            for donor in donors:
+                if not by_map.get(maps[donor]):
+                    raise ValueError('Native enemy resource donor has no banks')
+                needed.update(by_map[maps[donor]])
+        indices = {}
+        for number in sorted(needed):
+            name = spec['files'][number]['name']
+            bank = PurePosixPath(name)
+            if bank.is_absolute() or '..' in bank.parts or '\\' in name or ':' in name:
+                raise ValueError('Invalid native resource bank path')
+            if bank.suffix not in {'.resources', '.streamdb'}:
+                continue
+            source = base / name
+            if not source.is_file() or not source.stat().st_size:
+                raise ValueError('Missing native enemy resource bank: ' + name)
+            if bank.suffix == '.resources':
+                indices[number] = ResourceIndex(source)
+        source_hashes.update({name: hashlib.sha256((base / name).read_bytes()).hexdigest()
+                              for name in ('meta.resources', 'idRehash.map')})
+        raw_masks = read_masks(base)
+        masks = {index.path: raw_masks[spec['files'][number]['name']] for number, index in indices.items()}
+        shared, missing = {}, set()
+        for target, donors in requested.items():
+            native = by_map.get(maps[target], set()) | common
+            candidates = common | set().union(*(by_map[maps[name]] for name in donors))
+            local = resource_records(indices, native, masks)
+            available = resource_records(indices, candidates, masks)
+            selected, streamed = select_resources(available, local, roots[target])
+            for key, value in selected.items():
+                if key in shared and value != shared[key] and resource_signature(value) != resource_signature(shared[key]):
+                    raise ValueError('Conflicting native enemy resource: ' + key[1])
+                shared.setdefault(key, value)
+            missing.update([target] if selected else [])
+            targets[target] = {i for i in candidates - native
+                               if streamed and spec['files'][i]['name'].endswith('.streamdb')}
+            names = {spec['files'][i]['name'] for i in native | targets[target]
+                     if PurePosixPath(spec['files'][i]['name']).suffix in {'.resources', '.streamdb'}}
+            if len(names) + bool(selected) > 64:
                 raise ValueError('Native enemy resource closure exceeds the database limit')
-        targets[target] = sorted(selected)
-        donor_files.update(selected)
+        if shared:
+            bank, info = write_resource_bank(shared, base / 'ap_enemy_resources')
+            name = bank.relative_to(base).as_posix()
+            consolidated[name] = info
+            number = len(spec['files'])
+            spec['files'].append({'name': name})
+            for target in missing:
+                targets[target].add(number)
+        for selected in targets.values():
+            donor_files.update(selected)
     if donor_files:
         ordered = sorted(donor_files)
         cloned = [spec["files"][index] for index in ordered]

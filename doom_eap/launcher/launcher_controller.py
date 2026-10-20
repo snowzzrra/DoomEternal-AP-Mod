@@ -145,6 +145,7 @@ class LauncherController:
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
         self.config.setdefault("core_auto_update", True)
+        self.config.setdefault("death_link_grace", 0)
         if not self.config.get("client_state_file"):
             receipt_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) if os.name == "nt" else Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
             self.config["client_state_file"] = str(receipt_root / "doom-eternal-ap/client_state.json")
@@ -1718,6 +1719,16 @@ class LauncherController:
                 supervisor.send_command(f"AP_CONTROL {control}")
             except (OSError, RuntimeError) as error:
                 self.emit("killsanity_counter_status", state="pending", message=str(error))
+
+    def set_death_link_grace(self, deaths: int) -> None:
+        if type(deaths) is not int or not 0 <= deaths <= 2147483647:
+            raise ValueError("DeathLink Grace must be a whole number from 0 to 2147483647")
+        previous = self.config.get("death_link_grace", 0)
+        try:
+            self.save_config({"death_link_grace": deaths})
+        except OSError:
+            self.config["death_link_grace"] = previous
+            raise
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:

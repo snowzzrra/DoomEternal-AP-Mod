@@ -137,6 +137,7 @@ CLIENT_CONFIG_FIELDS = frozenset({
     "server_address",
     "seed_manifest_hash",
     "killsanity_counter_visible",
+    "death_link_grace",
     "core_runtime_manifest",
     "selected_core_runtime_manifest",
     "proton_executable",
@@ -1252,7 +1253,7 @@ class RoomCompiler:
                 raise ValueError("idFileDeCompressor produced no encoded overlay")
             return compressed.read_bytes()
 
-    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> None:
+    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> dict[str, list[str]]:
         from dataclasses import replace
 
         from tools.maps.native_recipe_materializer import materialize_native_recipe_calls
@@ -1262,10 +1263,10 @@ class RoomCompiler:
         plan = manifest.options.get("enemy_plan")
         validate_frozen_enemy_plan(plan, manifest.options["enemies"])
         if plan is None:
-            return
+            return {}
         changed_maps = {key: row for key, row in plan["maps"].items() if row["recipes"]}
         if not changed_maps:
-            return
+            return {}
         required_sources = set(changed_maps)
         try:
             for row in changed_maps.values():
@@ -1273,6 +1274,17 @@ class RoomCompiler:
         except (KeyError, TypeError) as error:
             raise ValueError("Enemy generation source references are malformed") from error
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
+        from tools.maps.ap_map_generator import find_entity_block_bounds
+        resource_roots = {}
+        for row in changed_maps.values():
+            references = {tuple(body["ai"][key] for key in ("map_key", "entity"))
+                          for recipe in row["recipes"] for body in recipe["bodies"]}
+            roots = set()
+            for map_key, entity in references:
+                source = sources[map_key]
+                start, end = find_entity_block_bounds(source, entity)
+                roots.update(json.loads(match[0]) for match in re.finditer(r'"(?:[^"\\]|\\.)*"', source[start:end]))
+            resource_roots[row["runtime_map"]] = sorted(roots - {""})
         compiler = ModCompiler(ROOT)
         neutral_manifest = replace(manifest, static_precompile=True)
         with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
@@ -1295,6 +1307,7 @@ class RoomCompiler:
                 if audit["unrelated_generated_entity_diff_count"]:
                     raise ValueError(f"Enemy map publisher patch changed unrelated entities: {map_key}")
                 assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
+        return resource_roots
 
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
@@ -1308,7 +1321,7 @@ class RoomCompiler:
         assembled, selected = assemble_room_files(
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
-        self._apply_enemy_plan(assembled, manifest)
+        resource_roots = self._apply_enemy_plan(assembled, manifest)
         seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(manifest.options)
         receipt = {
@@ -1319,6 +1332,7 @@ class RoomCompiler:
             "starting_inventory": manifest.options.get("starting_inventory", {}),
             "starting_weapon": manifest.options.get("starting_weapon"),
             "room_config": room_config,
+            "native_resource_roots": resource_roots,
         }
         devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY

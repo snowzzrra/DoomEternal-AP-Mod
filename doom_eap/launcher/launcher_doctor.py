@@ -1723,6 +1723,16 @@ class LauncherDoctor:
                     "Installer keeps file backups and verifies installed hash.",
                 ))
                 return tuple(actions)
+            if os.name == "nt" and adapter_state == "applied" and root is not None:
+                try:
+                    from .campaign_resources import verify_installed_resources
+                    verify_installed_resources(root, receipt)
+                except (OSError, ValueError) as error:
+                    actions.append(RepairAction(
+                        "reinstall_room_mod", "Repair changed game resources",
+                        (f"Reapply room package: {staged.name}",), True, str(error),
+                    ))
+                    return tuple(actions)
             if os.name != "nt" and adapter_state == "applied":
                 try:
                     _verify_linux_receipt(receipt, self.config, application_dir=self._application_dir())
@@ -1872,9 +1882,18 @@ class LauncherDoctor:
                             checks.append(Diagnostic("mod_injection", "ok", "Linux mod installation applied and verified", details))
                             room_receipt_applied = True
                     else:
-                        checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
-                        checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
-                        room_receipt_applied = True
+                        from .campaign_resources import verify_installed_resources
+                        try:
+                            if root is None:
+                                raise ValueError("Installed game resource directory is unavailable")
+                            verify_installed_resources(root, receipt)
+                        except (OSError, ValueError) as error:
+                            for key in ("mod_injection", "windows_mod_installer"):
+                                checks.append(Diagnostic(key, "failed", str(error), {"adapter_state": adapter_state}))
+                        else:
+                            checks.append(Diagnostic("mod_injection", "ok", "Installed game resource hashes verified", {"adapter_state": adapter_state, "installation_mode": mode}))
+                            checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                            room_receipt_applied = True
                 elif adapter_state in UNINSTALL_OWNED_STATES:
                     details = {"adapter_state": adapter_state, "installation_mode": mode}
                     if adapter_state == "uninstalled":

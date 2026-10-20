@@ -125,3 +125,57 @@ def test_cancel_failure_does_not_stop_later_receives_or_local_deaths(tmp_path, m
     asyncio.run(owner.report_local_death("Slayer", send, publication))
     assert sent == ["Slayer fell."]
     assert owner.receive({"time": 4, "source": "friend"}, lambda: None)
+@pytest.mark.parametrize('interval', [0, 1, 3])
+def test_grace_sends_every_selected_local_death_and_survives_reconnect(tmp_path, interval):
+    owner, state, publication, events = setup_session(tmp_path)
+    sent, persisted = [], []
+    async def send(cause):
+        sent.append(cause)
+    for death in range(1, 8):
+        if death == 3:
+            owner, _, publication, _ = setup_session(tmp_path)
+            owner.bind('room-A', state)
+        asyncio.run(owner.report_local_death('Slayer', send, publication, grace=interval,
+                    persist=lambda: persisted.append(dict(state))))
+        assert len(sent) == death // max(1, interval)
+    if interval > 1:
+        assert persisted and state['death_link_grace']['deaths'] == 7 % interval
+        other = {}
+        owner.bind('room-B', other)
+        asyncio.run(owner.report_local_death('Slayer', send, publication, grace=interval))
+        assert other['death_link_grace']['deaths'] == 1
+        assert state['death_link_grace']['deaths'] == 7 % interval
+
+
+def test_received_death_applies_and_does_not_consume_outgoing_grace(tmp_path, monkeypatch):
+    monkeypatch.setattr(domain, 'time', SimpleNamespace(monotonic=lambda: 10))
+    owner, state, publication, _ = setup_session(tmp_path)
+    async def send(cause):
+        pytest.fail('incoming link or grace emitted an outgoing link')
+    for _ in range(2):
+        asyncio.run(owner.report_local_death('Slayer', send, publication, grace=3))
+    owner.receive({'time': 3, 'source': 'player'}, lambda: None)
+    publication._event = owner.active_event
+    owner.advance(True, publication)
+    asyncio.run(owner.report_local_death('Slayer', send, publication, grace=3))
+    assert publication._link().calls == [1, 2, 5]
+    assert state['death_link_grace']['deaths'] == 2
+
+
+def test_grace_counts_deaths_when_threshold_send_fails(tmp_path):
+    owner, state, publication, _ = setup_session(tmp_path)
+    async def send(cause):
+        raise OSError('connection lost')
+    asyncio.run(owner.report_local_death('Slayer', send, publication, grace=2))
+    with pytest.raises(OSError):
+        asyncio.run(owner.report_local_death('Slayer', send, publication, grace=2))
+    assert state['death_link_grace']['deaths'] == 0
+    asyncio.run(owner.report_local_death('Slayer', send, publication, grace=2))
+    assert state['death_link_grace']['deaths'] == 1
+
+
+def test_launcher_publishes_grace_as_local_runtime_configuration(tmp_path):
+    import json
+    from doom_eap.launcher.launcher_core import LaunchWorkflow
+    path = LaunchWorkflow.write_client_config(tmp_path, runtime_config={'death_link_grace': 3})
+    assert json.loads(path.read_bytes())['death_link_grace'] == 3

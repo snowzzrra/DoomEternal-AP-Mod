@@ -1,6 +1,18 @@
 import struct
 
-from doom_eap.launcher.resource_bank import ResourceIndex, consolidate_bank, _u64
+import pytest
+
+from doom_eap.launcher.resource_bank import ResourceIndex, resource_records, select_resources, write_resource_bank, _u64
+
+
+def test_steam_restored_mask_discards_only_unregistered_generated_banks():
+    from doom_eap.launcher.campaign_resources import resource_mapping_lines
+    mask = struct.pack('<IIQIQI', 0, 2, 17, 0, 29, 0)
+    valid = 'native.resources;8\r\n' + 'ap_enemy_resources/' + 'a' * 64 + '.resources;20\r\n'
+    stale = 'ap_enemy_resources/' + 'b' * 64 + '.resources;32\r\n'
+    assert ''.join(resource_mapping_lines(mask, valid + stale)) == valid
+    with pytest.raises(ValueError, match='mapping'):
+        resource_mapping_lines(mask, valid + 'other_mod.resources;32\r\n')
 
 
 def write_bank(path, entries):
@@ -54,30 +66,75 @@ def payloads(path):
     return result
 
 
-def test_consolidation_preserves_payloads_types_priority_and_disabled_records(tmp_path):
+def test_selected_dependencies_preserve_priority_types_and_reuse_bank_after_reinstall(tmp_path):
     base, high, low = (tmp_path / name for name in ('base.resources', 'high.resources', 'low.resources'))
     write_bank(base, [('model', 'native', b'native bytes', (1, 2))])
     write_bank(high, [('model', 'demon', b'chosen bytes', (4, 7)),
-                      ('model', 'disabled', b'not loaded', ())])
+                      ('model', 'disabled', b'not loaded', ()),
+                      ('rs_streamfile', 'generated/decls/entitydef/ai/demon.decl',
+                       b'{ model = "demon"; anim = "demon/attack"; }', ()),
+                      ('staticShadowGeom', 'unrelated map', b'geometry' * 10000, ())])
     write_bank(low, [('model', 'demon', b'lower priority', (4, 7)),
                      ('model', 'native', b'must not replace destination', (1, 2)),
                      ('anim', 'demon/attack', b'animation bytes', (11,))])
-    enabled = {str(base): b'\1', str(high): b'\1', str(low): b'\7'}
-    target, receipt = consolidate_bank(base, [high, low], set(), tmp_path / 'cache', enabled)
+    indices = {i: ResourceIndex(path) for i, path in enumerate((base, low, high))}
+    enabled = {base: b'\1', high: b'\x0d', low: b'\7'}
+    local = resource_records(indices, {0}, enabled)
+    available = resource_records(indices, {0, 1, 2}, enabled)
+    selected, streamed = select_resources(available, local, ['ai/demon', 'native', 'disabled'])
+    assert not streamed
+    target, receipt = write_resource_bank(selected, tmp_path / 'cache')
     records = payloads(target)
     assert [(key[:2], payload) for key, payload in records] == [
-        (('model', 'native'), b'native bytes'), (('model', 'demon'), b'chosen bytes'),
-        (('anim', 'demon/attack'), b'animation bytes')]
+        (('anim', 'demon/attack'), b'animation bytes'), (('model', 'demon'), b'chosen bytes'),
+        (('rs_streamfile', 'generated/decls/entitydef/ai/demon.decl'),
+         b'{ model = "demon"; anim = "demon/attack"; }')]
     index = ResourceIndex(target)
     def metadata(number):
         row = index.records[number][1][1]
         start, count = _u64(row, 24), struct.unpack_from('<I', row, 132)[0]
         return [index.metadata[value][:2] for value in index.types[start:start + count]]
     assert metadata(1) == [('dependency_kind', 'value/4'), ('dependency_kind', 'value/7')]
-    assert metadata(2) == [('dependency_kind', 'value/11')]
-    assert receipt['base_mask'] == '01' and receipt['appended'] == 2
-    assert consolidate_bank(base, [high, low], set(), tmp_path / 'cache', enabled) == (target, receipt)
-    enabled[str(high)] = b'\3'
-    changed, _ = consolidate_bank(base, [high, low], set(), tmp_path / 'cache', enabled)
-    assert changed != target
-    assert any(key[1] == 'disabled' for key, payload in payloads(changed))
+    assert metadata(0) == [('dependency_kind', 'value/11')]
+    assert receipt['base_count'] == 0 and receipt['records'] == 3
+    import os
+    os.utime(high, ns=(1_000_000_000, 1_000_000_000))
+    assert write_resource_bank(selected, tmp_path / 'cache') == (target, receipt)
+    assert len(list((tmp_path / 'cache').glob('*.resources'))) == 1
+
+
+def test_cleanup_preserves_active_foreign_and_registered_files(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    from doom_eap.launcher import resource_bank as domain
+    from doom_eap.launcher.build_manifest import _KEYS
+    from doom_eap.runtime.save_decrypt import _aes_gcm_encrypt
+    directory = tmp_path / 'ap_enemy_resources'
+    directory.mkdir()
+    stale, active, foreign = [directory / (letter * 64 + '.resources') for letter in 'abc']
+    for path in (stale, active, foreign):
+        write_bank(path, [('anim', 'demon', b'animation', ())])
+        stat = path.stat()
+        path.with_suffix('.json').write_text(json.dumps(dict(identity=path.stem, size=stat.st_size,
+            mtime_ns=stat.st_mtime_ns, records=1, base_count=0, appended=1)))
+    foreign.with_suffix('.json').write_text('{}')
+    names = [path.relative_to(tmp_path).as_posix() for path in (stale, active, foreign)]
+    spec = {'files': [{'name': names[1]}]}
+    (tmp_path / 'packagemapspec.json').write_text(json.dumps(spec))
+    obsolete = domain.obsolete_banks(tmp_path, spec)
+    assert set(obsolete) == {names[0]}
+    def manifest(files):
+        nonce = bytes(12)
+        (tmp_path / 'build-manifest.bin').write_bytes(nonce + _aes_gcm_encrypt(_KEYS[0], nonce,
+            json.dumps({'files': files}).encode(), b'build-manifest') + bytes(64))
+    manifest({names[0]: {}})
+    monkeypatch.setattr(domain, 'read_masks', lambda _: {})
+    assert domain.cleanup_banks(tmp_path, obsolete)['removed'] == []
+    manifest({})
+    monkeypatch.setattr(domain, 'read_masks', lambda _: {names[0]: b'\1'})
+    assert domain.cleanup_banks(tmp_path, obsolete)['removed'] == []
+    monkeypatch.setattr(domain, 'read_masks', lambda _: {})
+    report = domain.cleanup_banks(tmp_path, obsolete)
+    assert report['removed'] == [names[0]] and report['bytes_freed'] == obsolete[names[0]]['size']
+    assert not stale.exists() and not stale.with_suffix('.json').exists()
+    assert active.is_file() and foreign.is_file()

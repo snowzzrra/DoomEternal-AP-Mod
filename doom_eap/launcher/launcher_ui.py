@@ -878,6 +878,26 @@ class LauncherUI(QMainWindow):
         self.killsanity_counter_visible = QCheckBox("Show Killsanity counter")
         self.killsanity_counter_visible.setChecked(self.controller.config.get("killsanity_counter_visible", True) is True)
         self.killsanity_counter_visible.toggled.connect(self._save_killsanity_counter_visible)
+        self.death_link_grace = QSpinBox()
+        self.death_link_grace.setRange(0, 2147483647)
+        self.death_link_grace.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.death_link_grace.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        grace_control = QWidget()
+        grace_control.setMaximumWidth(200)
+        grace_layout = QHBoxLayout(grace_control)
+        grace_layout.setContentsMargins(0, 0, 0, 0)
+        decrease, increase = QPushButton("−"), QPushButton("+")
+        for button, action, label in ((decrease, self.death_link_grace.stepDown, "Decrease DeathLink Grace"),
+                                      (increase, self.death_link_grace.stepUp, "Increase DeathLink Grace")):
+            button.setFixedWidth(34)
+            button.setAccessibleName(label)
+            button.clicked.connect(action)
+        grace_layout.addWidget(decrease)
+        grace_layout.addWidget(self.death_link_grace, 1)
+        grace_layout.addWidget(increase)
+        self.death_link_grace.setValue(int(self.controller.config.get("death_link_grace", 0)))
+        self.death_link_grace.setToolTip("Send one DeathLink every X local deaths. 0 disables Grace. Received DeathLinks apply normally.")
+        self.death_link_grace.valueChanged.connect(self._save_death_link_grace)
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
         self.detected_paths = self._label("Checking for DOOM Eternal…", "muted")
@@ -907,13 +927,14 @@ class LauncherUI(QMainWindow):
         self._entry_row(layout, row + 3, "AMMO REFILL KEY", self.ammo_refill_keybind)
         self._entry_row(layout, row + 4, "SPECIAL TOGGLE KEY", self.special_toggle_keybind)
         layout.addWidget(self.killsanity_counter_visible, row + 5, 1, 1, 2)
+        self._entry_row(layout, row + 6, "DEATHLINK GRACE", grace_control)
         self.join_button = _ScanlineButton("CONNECT")
         self.join_button.setObjectName("primary")
         self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, row + 6, 1, 1, 2)
+        layout.addWidget(self.join_button, row + 7, 1, 1, 2)
         self.join_error = self._label("", "warning")
         self.join_error.hide()
-        layout.addWidget(self.join_error, row + 7, 0, 1, 3)
+        layout.addWidget(self.join_error, row + 8, 0, 1, 3)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
         return card
 
@@ -1662,6 +1683,15 @@ class LauncherUI(QMainWindow):
             if QMessageBox.question(self, "Confirm recovery", message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
         self.controller.request_repair(action)
+
+    def _save_death_link_grace(self, deaths: int) -> None:
+        try:
+            self.controller.set_death_link_grace(deaths)
+        except (OSError, ValueError) as error:
+            self._append_log(f"DeathLink Grace setting failed: {error}")
+            self.death_link_grace.blockSignals(True)
+            self.death_link_grace.setValue(int(self.controller.config.get("death_link_grace", 0)))
+            self.death_link_grace.blockSignals(False)
 
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
         value = captured.strip()
