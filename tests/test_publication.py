@@ -144,3 +144,23 @@ def test_concurrent_publication_keeps_one_complete_payload(io_boundary, monkeypa
     assert path.read_bytes() in (b"AP_EXECUTION_CLASS_V1 PLAYER_RUNTIME\ngive ammo\n",
                                  b"AP_EXECUTION_CLASS_V1 PLAYER_RUNTIME\ngive health\n")
     assert list(path.parent.iterdir()) == [path]
+def test_doctor_summary_reflects_degraded_game_link(tmp_path, monkeypatch):
+    from doom_eap.launcher import launcher_doctor as doctor
+    from doom_eap.launcher.launcher_platform import PrerequisiteCheck, PrerequisiteStatus
+
+    game = tmp_path / "game"
+    (game / "base").mkdir(parents=True)
+    (game / "DOOMEternalx64vk.exe").write_bytes(b"exe")
+    monkeypatch.setattr(doctor, "probe_meathook", lambda _root: PrerequisiteCheck("meathook", PrerequisiteStatus.OK, "verified", {}))
+    monkeypatch.setattr(doctor, "detect_doom_processes", lambda: [{"name": "doometernalx64vk.exe", "pid": "1"}])
+    report = doctor.LauncherDoctor(
+        config={"game_root": str(game)},
+        live_support={
+            "supervisor": {"status": "running"},
+            "native_rpc": {"source": "direct", "health": {"state": "not_ready"}},
+        },
+    ).run().document()
+    assert report["status"] == "degraded"
+    assert report["summary_status"] == "degraded"
+    assert report["summary_message"] == "native_rpc_not_ready"
+    assert report["ok"] is False

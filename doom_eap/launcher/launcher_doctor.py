@@ -91,7 +91,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
+        return self.summary_status == "ready" and all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {
@@ -1981,11 +1981,22 @@ class LauncherDoctor:
         else:
             domain = ""
             recovery_action = ""
-            summary_status = "ready" if all(
+            overall = support_diagnostics.get("game_link", {}).get("overall", {})
+            overall_status = str(overall.get("status", "ready")) if isinstance(overall, Mapping) else "ready"
+            overall_reason = str(overall.get("reason", "")) if isinstance(overall, Mapping) else ""
+            checks_ok = all(
                 item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"}
                 for item in checks
-            ) else "needs_attention"
-            summary_message = ""
+            )
+            if not checks_ok or overall_status == "attention":
+                summary_status = "needs_attention"
+                summary_message = overall_reason if checks_ok else ""
+            elif overall_status == "degraded":
+                summary_status = "degraded"
+                summary_message = overall_reason
+            else:
+                summary_status = "ready"
+                summary_message = ""
         return DoctorReport(
             self.VERSION,
             tuple(checks),
