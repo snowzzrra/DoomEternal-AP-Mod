@@ -14,7 +14,7 @@
     "sha256": "05aa6a244f727c89525f49f358818ea6ec98af122e8d6c58c1965b137c1c17ae",
     "size": 18712077
   },
-  "room_resource_input_fingerprint": "f7cc46a5d6bae520caa11090e12471af435bd99c738e8a8fadc61aa5c4cdc717",
+  "room_resource_input_fingerprint": "2c1e5494526b7edcd26eb42326963c4bf2c99607c461d10624366655ad6fca5f",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -428,7 +428,7 @@
     "tools/maps/map_semantic_baseline.py": "5d772f2d1afd37362c878ab668234ed1dafab9ca463f3f0b62394b08c0501b79",
     "tools/maps/mission_complete_map_patcher.py": "10c70ebc62be7826783654c66a1d1b2c743bf04804d4645129f8e4441b638b88",
     "tools/maps/native_enemy_inventory.py": "f4bf951fd42b74ad08415c56dc89fa3577534454c7995bf8a63bb2fee1a39ff4",
-    "tools/maps/native_recipe_materializer.py": "7b3674b82ac183345d5cae6ab08bd3f51540c7973641b3ff170d3c9c451888f1",
+    "tools/maps/native_recipe_materializer.py": "d49c7e0e3a68149c814277a925b2dacf687e1ec8f4f1e5cad845091c4c955615",
     "tools/maps/notification_formatting.py": "10b48794fb330d1fd2bb5044d9c5507be65b915e2cef4fe1337632219e226f70",
     "tools/maps/resource_priority.py": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
     "tools/maps/shell_menu_visual.py": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",
@@ -13310,7 +13310,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "4d54c31bbb35fdfdd1c0d062b1149f4b33d7d756",
+      "base_commit_sha": "9895369a6e832038664d0532447921e58a7f3421",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14343,8 +14343,8 @@
             "size": 11108
           },
           "doom_eap/launcher/launcher_doctor.py": {
-            "sha256": "889d0a814d356bfc4c7122c9a91f255047eafae73d4d1112a4f92d8655562482",
-            "size": 92055
+            "sha256": "662cc42a79ccb7549ea16f3abcdf8c1973c5ced94f52e61ccd23434e8d7d5f7b",
+            "size": 92741
           },
           "doom_eap/launcher/launcher_integration.py": {
             "sha256": "ab2e804322dc6708f3faf8a6bc458ba10caa17e144a558464f115b82332fc44e",
@@ -15499,8 +15499,8 @@
             "size": 22443
           },
           "tools/maps/native_recipe_materializer.py": {
-            "sha256": "7d3fbebf26b1912a23d748d5b8c253ddd1ec1efc0f4f3a2248244d74012d4c2a",
-            "size": 20428
+            "sha256": "5e6b2be813c7095a3834a1a5df8da365f8fb73a4394981b5c6cd1848c3196c05",
+            "size": 21328
           },
           "tools/maps/notification_formatting.py": {
             "sha256": "252d60e862d7b45c75d470afecfaa6cc4958585734f02fab4a6e19c3cc2b978c",
@@ -15671,7 +15671,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "59cd513966d4db44636ea001587e7d5edbb02434bfe93c4b45f5491a7f570026",
+        "fingerprint": "554881744ef687c24527aab3a57e2f21295f3b8e5ec86a140668439fbda1254c",
         "kind": "working_tree_snapshot"
       }
     }

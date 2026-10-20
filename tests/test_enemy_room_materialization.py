@@ -79,7 +79,14 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
     for name in names:
         start, end = find_entity_block_bounds(text, name)
         records[name] = next(entity_records(text[start:end]))
-    assert records["ap_v070_recipe_plan"]["edit"]["spawnEditableShared"]["groupName"].startswith("EAP4|")
+    header = records["ap_v070_recipe_plan"]["edit"]["spawnEditableShared"]["groupName"]
+    count = int(header.split("|")[1], 16)
+    chunks = []
+    for index in range(count):
+        start, end = find_entity_block_bounds(text, f"ap_v070_recipe_plan_{index}")
+        chunks.append(next(entity_records(text[start:end]))["edit"]["spawnEditableShared"]["groupName"])
+    from doom_eap.content.native_enemy_plan import native_recipe_metadata
+    assert "".join(chunks) == native_recipe_metadata(plan, "e1m1_intro")
     recipe = next(row for row in plan["maps"]["e1m1_intro"]["recipes"]
                   if native_event_identity(row) == "subway_encounter_manager_subway_hall/0/0")
     events = records[recipe["binding"]["entity"]]["edit"]["encounterComponent"]["entityEvents"]["item[0]"]["events"]

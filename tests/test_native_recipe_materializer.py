@@ -5,7 +5,7 @@ from textwrap import dedent
 import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes
+from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata
 from tools.maps.encounter_catalog import entity_records, list_items
 from tools.maps.native_recipe_materializer import materialize_native_recipe_definitions, materialize_native_recipe_calls
 
@@ -133,6 +133,27 @@ def test_native_library_loads_frozen_bodies_as_templates_and_preserves_original_
     body_library = records["ap_v070_bodies_r" + recipe["origin"]]
     assert list_items(body_library["edit"]["entityDefs"]) == list_items(library["edit"]["entityDefs"])
     assert library["edit"]["spawnEditableShared"]["groupName"].startswith("EAP4|" + plan["fingerprint"] + "|map\n")
+
+
+def test_large_native_library_survives_engine_property_limit_without_changing_plan():
+    plan = frozen_plan(bindings=[{"mode": "event", "reference": "point", "owner": f"arena_{i}"}
+                                 for i in range(414)])
+    before = deepcopy(plan)
+    generated = materialize_native_recipe_definitions(SOURCE, "map", plan, {"map": SOURCE})
+    records = {row["name"]: row for row in entity_records(generated)
+               if row["name"].startswith("ap_v070_recipe_plan")}
+    header = records["ap_v070_recipe_plan"]["edit"]["spawnEditableShared"]["groupName"]
+    version, count, size, checksum = header.split("|")
+    chunks = [records[f"ap_v070_recipe_plan_{i}"]["edit"]["spawnEditableShared"]["groupName"]
+              for i in range(int(count, 16))]
+    text = "".join(chunk.encode("ascii")[:2046].decode("ascii") for chunk in chunks)
+    assert version == "EAPC1" and len(chunks) > 1 and all(0 < len(chunk.encode("ascii")) <= 1800 for chunk in chunks)
+    assert len(text) == int(size, 16) and text == native_recipe_metadata(plan, "map")
+    hash_value = 14695981039346656037
+    for byte in text.encode("ascii"):
+        hash_value = ((hash_value ^ byte) * 1099511628211) & ((1 << 64) - 1)
+    assert checksum == f"{hash_value:016x}"
+    assert plan == before
 
 
 def test_native_library_refuses_changed_donor_or_body_tracking():

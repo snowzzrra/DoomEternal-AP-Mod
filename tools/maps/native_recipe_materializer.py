@@ -227,10 +227,23 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
     library = "ap_v070_recipe_plan"
     if library in names:
         raise ValueError("Duplicate native recipe library")
+    metadata = native_recipe_metadata(plan, map_key)
+    # native parser limits shit to 2046 bytes, so we gotta limit the metadata so it doesnt cut off
+    if len(metadata.encode("ascii")) > 1800:
+        chunks = [metadata[offset:offset + 1800] for offset in range(0, len(metadata), 1800)]
+        for index, chunk in enumerate(chunks):
+            name = f"ap_v070_recipe_plan_{index}"
+            if name in names or len(_render(chunk, 0).encode("ascii")) > 2046:
+                raise ValueError("Invalid native recipe metadata chunk")
+            names.add(name)
+            generated.append('entity {\n\tentityDef ' + name + ' {\n\t\tinherit = "target/spawn";\n'
+                '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
+                _render({"spawnEditableShared": {"groupName": chunk}}, 2) + '\n\t}\n}')
+        metadata = f"EAPC1|{len(chunks):08x}|{len(metadata):08x}|{_functional_token(metadata)}"
     values = {"num": len(definitions), **{f"item[{i}]": value for i, value in enumerate(definitions)}}
     generated.append('entity {\n\tentityDef ' + library + ' {\n\t\tinherit = "target/spawn";\n'
         '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' + _render({"entityDefs": values, "initialEntityDefs": values,
-            "spawnEditableShared": {"groupName": native_recipe_metadata(plan, map_key)}}, 2)
+            "spawnEditableShared": {"groupName": metadata}}, 2)
         + '\n\t}\n}')
     return source + "\n\n" + "\n\n".join(generated) + "\n"
 
