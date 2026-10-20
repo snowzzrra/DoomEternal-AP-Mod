@@ -8,7 +8,7 @@ from doom_eap.content.native_enemy_plan import native_body_name, native_recipe_m
 from tools.maps.ap_map_generator import find_entity_block_bounds
 from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_records, list_items, walk_values
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
-from tools.maps.enemy_attributes import _MISSING, _get, _render, materialize_enemy_attributes
+from tools.maps.enemy_attributes import _MISSING, _attribute_source, _get, _render, materialize_enemy_attributes
 
 
 def _functional_token(name):
@@ -40,6 +40,16 @@ def _functional_properties(edit):
     if death:
         result.setdefault("aiEditable", {})["death"] = death
     return result
+
+
+def _functional_definition(body, name, properties):
+    # spawned variants need their own prepared model and physics fields.
+    header, _, _, prepared = _attribute_source(body)
+    properties = {**{key: prepared[key] for key in ("renderModelInfo", "clipModelInfo", "afProperties", "aiHealth")
+                     if key in prepared}, **properties}
+    return ('entity {\n\tlayers { "spawn_target_layer" }\n\tentityDef ' + name +
+        ' {\n\t\tinherit = ' + _render(header.group(1), 0) + ';\n\t\tclass = "idAI2";\n\t\tedit = ' +
+        _render(properties, 2) + '\n\t}\n}')
 
 
 def _independent_definitions(recipe, original, names):
@@ -199,9 +209,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
                 if variant in names:
                     raise ValueError("Duplicate native functional body definition")
                 names.add(variant)
-                generated.append('entity {\n\tlayers { "spawn_target_layer" }\n\tentityDef ' + variant +
-                    ' {\n\t\tinherit = ' + _render(name, 0) + ';\n\t\tclass = "idAI2";\n\t\tedit = ' +
-                    _render(functional[source_name], 2) + '\n\t}\n}')
+                generated.append(_functional_definition(clone, variant, functional[source_name]))
                 functional_libraries.setdefault(source_name, []).append({"name": variant})
             definitions.append({"name": name})
             recipe_definitions.append({"name": name})

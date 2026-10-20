@@ -181,22 +181,28 @@ def test_physical_bodies_inherit_source_references_without_copying_source_health
     source += '''entity { entityDef door { inherit = "logic/relay"; class = "idLogicRelay"; edit = {} } }
         entity { entityDef destination { inherit = "info/traversal"; class = "idInfoTraversal"; edit = {} } }'''
     plan = frozen_plan(source)
-    donor = next(entity_records(SOURCE, include_names={"original"}))
+    donor_source = SOURCE.replace('edit = { aiHealth', 'edit = { renderModelInfo = { model = "donor_model"; } '
+        'afProperties = { articulatedFigure = "donor_physics"; } aiHealth')
+    donor = next(entity_records(donor_source, include_names={"original"}))
     for body in plan["maps"]["map"]["recipes"][0]["bodies"]:
         body["ai"] = {"map_key": "donor", "entity": "original", "sha256": donor["sha256"]}
     plan["fingerprint"] = native_recipe_fingerprint(plan)
-    compiled = materialize_native_recipe_definitions(source, "map", plan, {"map": source, "donor": SOURCE})
+    compiled = materialize_native_recipe_definitions(source, "map", plan, {"map": source, "donor": donor_source})
     records = {row["name"]: row for row in entity_records(compiled)}
     bodies = {body["definition"] for body in plan["maps"]["map"]["recipes"][0]["bodies"]}
-    variants = [row for row in records.values() if row["inherit"] in bodies]
+    variants = [row for row in records.values() if row["class"] == "idAI2" and row["name"].startswith("ap_v070_functional_")]
     assert len(variants) == len(bodies)
     for row in variants:
         assert row["layers"] == ["spawn_target_layer"]
-        assert row["edit"] == {"factionName": "encounter_team", "targets": {"num": 1, "item[0]": "door"},
+        assert row["inherit"] in bodies
+        assert row["edit"]["renderModelInfo"]["model"] == "donor_model"
+        assert row["edit"]["afProperties"]["articulatedFigure"] == "donor_physics"
+        assert row["edit"]["aiHealth"]["components"]["components[0]"]["max"] == 400
+        assert {k: row["edit"][k] for k in ("factionName", "targets", "aiEditable")} == {
+            "factionName": "encounter_team", "targets": {"num": 1, "item[0]": "door"},
             "aiEditable": {"tempMemoryData": {"num": 1, "item[0]": {"key": "encounter_role", "value": 1}},
                 "death": {"trigger": "door"}, "spawnSettings": {"initialTarget": "destination",
                 "initialState": "AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL"}}}
-        assert records[row["inherit"]]["edit"]["aiHealth"]["components"]["components[0]"]["max"] == 400
     libraries = [row for row in records.values() if row["class"] == "idTarget_Spawn" and
                  row["name"].startswith("ap_v070_functional_") and row["name"] != "ap_v070_functional_sources"]
     assert len(libraries) == 1

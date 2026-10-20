@@ -14,7 +14,7 @@
     "sha256": "05aa6a244f727c89525f49f358818ea6ec98af122e8d6c58c1965b137c1c17ae",
     "size": 18712077
   },
-  "room_resource_input_fingerprint": "2c1e5494526b7edcd26eb42326963c4bf2c99607c461d10624366655ad6fca5f",
+  "room_resource_input_fingerprint": "4d1d60536c6ea557a4f3d308a6b1f2ba3976b189c3830a22099aebf3fd2a6d9c",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -428,7 +428,7 @@
     "tools/maps/map_semantic_baseline.py": "5d772f2d1afd37362c878ab668234ed1dafab9ca463f3f0b62394b08c0501b79",
     "tools/maps/mission_complete_map_patcher.py": "10c70ebc62be7826783654c66a1d1b2c743bf04804d4645129f8e4441b638b88",
     "tools/maps/native_enemy_inventory.py": "f4bf951fd42b74ad08415c56dc89fa3577534454c7995bf8a63bb2fee1a39ff4",
-    "tools/maps/native_recipe_materializer.py": "d49c7e0e3a68149c814277a925b2dacf687e1ec8f4f1e5cad845091c4c955615",
+    "tools/maps/native_recipe_materializer.py": "790f6f09992edcbc933fa7bb210ff59514eaefe56e9ca3e8f3c0f748020f127c",
     "tools/maps/notification_formatting.py": "10b48794fb330d1fd2bb5044d9c5507be65b915e2cef4fe1337632219e226f70",
     "tools/maps/resource_priority.py": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
     "tools/maps/shell_menu_visual.py": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",
@@ -13310,7 +13310,7 @@
       }
     },
     "mod": {
-      "base_commit_sha": "9895369a6e832038664d0532447921e58a7f3421",
+      "base_commit_sha": "2ac2dd048dc38cae8f87932529e39b2a50269b64",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -15499,8 +15499,8 @@
             "size": 22443
           },
           "tools/maps/native_recipe_materializer.py": {
-            "sha256": "5e6b2be813c7095a3834a1a5df8da365f8fb73a4394981b5c6cd1848c3196c05",
-            "size": 21328
+            "sha256": "df007b29cd33c56e9e8163d60b540bcf8484457b9dc4b5f44b2d4ba5fca89f76",
+            "size": 21755
           },
           "tools/maps/notification_formatting.py": {
             "sha256": "252d60e862d7b45c75d470afecfaa6cc4958585734f02fab4a6e19c3cc2b978c",
@@ -15671,7 +15671,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "554881744ef687c24527aab3a57e2f21295f3b8e5ec86a140668439fbda1254c",
+        "fingerprint": "f0588e8f2be3f377e31194fabff7ae817f7e63f409a6707a821c6f3553917a31",
         "kind": "working_tree_snapshot"
       }
     }
