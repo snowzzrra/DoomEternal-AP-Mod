@@ -247,6 +247,7 @@ def test_native_calls_bind_the_original_request_without_rebuilding_its_flow_or_l
     assert events == expected
     assert after[alias]["class"] == "idTargetSpawnGroup"
     assert list_items(after[alias]["edit"]["spawners"]) == []
+    assert after[alias]['edit']['clipModelInfo']['type'] == 'CLIPMODEL_NONE'
     assert after["point"]["edit"] == before["point"]["edit"]
     if not external_target:
         assert after["group"]["edit"] == before["group"]["edit"]

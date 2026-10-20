@@ -53,17 +53,6 @@
   },
   "target_policies": {
     "temple_interior_interact_automap_1_e3m3": {
-      "native_entity_contract": {
-        "original_targets": [],
-        "required_snippets": [
-          "inherit = \"interact/automap\";",
-          "class = \"idInteractable_Automap\";",
-          "activateTargetsOnEndInteraction = true;",
-          "useStat = \"STAT_AUTOMAP\";",
-          "saveType = \"SGS_GAME_DATA\";",
-          "triggerDef = \"trigger/interact/use_panel\";"
-        ]
-      },
       "permanent_resource_budget": false
     }
   },

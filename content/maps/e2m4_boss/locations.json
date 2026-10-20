@@ -18,7 +18,11 @@
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3_E2M4": 7770302,
     "AP_CHECK_GAME_OBJECTS_INTERACT_AUTOMAP_POD_AUTOMAP_POD_1_E2M4": 7770501
   },
-  "location_feedback": {},
+  "location_feedback": {
+    "AP_CHECK_GAME_OBJECTS_INTERACT_AUTOMAP_POD_AUTOMAP_POD_1_E2M4": {
+      "policy": "ap_only"
+    }
+  },
   "target_policies": {
     "game_progress_codex_1_e2m4": {
       "independent_ap_trigger": true,
@@ -106,17 +110,6 @@
       }
     },
     "game_objects_interact_automap_pod_automap_pod_1_e2m4": {
-      "native_entity_contract": {
-        "original_targets": [],
-        "required_snippets": [
-          "inherit = \"interact/automap\";",
-          "class = \"idInteractable_Automap\";",
-          "activateTargetsOnEndInteraction = true;",
-          "useStat = \"STAT_AUTOMAP\";",
-          "saveType = \"SGS_GAME_DATA\";",
-          "triggerDef = \"trigger/interact/use_panel\";"
-        ]
-      },
       "permanent_resource_budget": false
     }
   },

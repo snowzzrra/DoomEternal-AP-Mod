@@ -8,6 +8,13 @@ from pathlib import PurePosixPath
 
 
 _MARKER = "doomEAPEnemyResourceBanks"
+_HUB_TEXT_DONORS = {
+    'game/dlc2/e5m1_spear/e5m1_spear.resources',
+    'game/dlc2/e5m1_spear/e5m1_spear_patch1.resources',
+    'game/dlc2/e5m1_spear/e5m1_spear_patch2.resources',
+    'game/horde/e6m3_mcity_horde/e6m3_mcity_horde.resources',
+    'game/horde/e6m3_mcity_horde/e6m3_mcity_horde_patch1.resources',
+}
 
 
 def native_resource_maps(plan):
@@ -31,8 +38,11 @@ def native_resource_maps(plan):
     return result
 
 
-def prepare_native_resource_banks(base, plan, roots=None):
+def prepare_native_resource_banks(base, plan, roots=None, *, hub_world_text=False):
     requested = native_resource_maps(plan)
+    if hub_world_text:
+        requested['game/hub/hub'] = {'game/dlc2/e5m1_spear/e5m1_spear', 'game/horde/e6m3_mcity_horde/e6m3_mcity_horde'}
+        roots = {**(roots or {}), 'game/hub/hub': ['gui/text', 'swf/guientity/generic_text.swf']}
     path = base / "packagemapspec.json"
     if not path.is_file() and not requested:
         return {}, {"maps": {}}
@@ -70,13 +80,26 @@ def prepare_native_resource_banks(base, plan, roots=None):
         if not isinstance(value, dict) or not isinstance(value.get("name"), str) or value["name"] in maps:
             raise ValueError("Invalid or duplicate native package map")
         maps[value["name"]] = index
+    hub = maps.get('game/hub/hub')
+    imports = [ref for ref in spec['mapFileRefs'] if ref['map'] == hub
+               and spec['files'][ref['file']]['name'] in _HUB_TEXT_DONORS]
+    if hub_world_text and imports:
+        backup = base / 'packagemapspec.json.backup'
+        if not backup.is_file():
+            raise ValueError('Fortress resource compaction requires the native package map backup')
+        native = json.loads(backup.read_text(encoding='utf-8-sig'))
+        native_hub = next(i for i, row in enumerate(native['maps']) if row['name'] == 'game/hub/hub')
+        native_files = {native['files'][ref['file']]['name'] for ref in native['mapFileRefs'] if ref['map'] == native_hub}
+        spec['mapFileRefs'] = [ref for ref in spec['mapFileRefs'] if ref not in imports
+                              or spec['files'][ref['file']]['name'] in native_files]
     by_map = {}
     for ref in spec["mapFileRefs"]:
         by_map.setdefault(ref["map"], set()).add(ref["file"])
     donor_files, targets, consolidated = set(), {}, {}
     source_hashes = {path.name: hashlib.sha256(original).hexdigest()}
     if requested:
-        expected = {stage['runtime_map'] for stage in plan['maps'].values() if stage['recipes']}
+        expected = {stage['runtime_map'] for stage in (plan or {}).get('maps', {}).values() if stage['recipes']}
+        if hub_world_text: expected.add('game/hub/hub')
         if (not isinstance(roots, dict) or set(roots) != expected
                 or any(not isinstance(values, list) or any(not isinstance(v, str) for v in values)
                        for values in roots.values())):

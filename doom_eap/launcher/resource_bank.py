@@ -99,9 +99,12 @@ def resource_records(indices, selected, masks):
 def select_resources(available, local, roots):
     from collections import defaultdict
     aliases = defaultdict(set)
+    images = defaultdict(set)
     for key in available:
         name = key[1]
         aliases[name].add(key)
+        if key[0] == 'image':
+            images[name.split('$', 1)[0].casefold()].add(key)
         if name.startswith('generated/decls/') and name.endswith('.decl'):
             aliases[name.split('/', 3)[3][:-5]].add(key)
     selected, streams, visited = {}, False, set()
@@ -110,12 +113,16 @@ def select_resources(available, local, roots):
         readers = {}
         while pending:
             token = pending.pop()
-            for key in aliases.get(token, ()):
-                if key in local or key in visited:
+            for key in set(aliases.get(token, ())) | images.get(token.casefold(), set()):
+                if key in visited:
+                    continue
+                # shared materials can reference images stored only in the donor map.
+                if key in local and not (key[0] == 'rs_streamfile' and key[1].startswith('generated/decls/material2/')):
                     continue
                 visited.add(key)
                 index, row, position = available[key]
-                selected[key] = available[key]
+                if key not in local:
+                    selected[key] = available[key]
                 for value in index.types[_u64(row, 24):_u64(row, 24) + _u32(row, 132)]:
                     kind, name, _ = index.metadata[value]
                     pending.add(name)
@@ -130,8 +137,12 @@ def select_resources(available, local, roots):
                     payload = source.read(_u64(row, 64))
                     if len(payload) != _u64(row, 64):
                         raise ValueError('Truncated native declaration')
-                    pending.update(json.loads(match[0]) for match in re.finditer(
-                        r'"(?:[^"\\]|\\.)*"', payload.decode('utf-8-sig')))
+                    # native shader strings and legacy comment bytes are not JSON.
+                    for match in re.finditer(r'"(?:[^"\\]|\\.)*"', payload.decode('utf-8-sig', errors='replace')):
+                        try:
+                            pending.add(json.loads(match[0]))
+                        except json.JSONDecodeError:
+                            continue
     return selected, streams
 
 

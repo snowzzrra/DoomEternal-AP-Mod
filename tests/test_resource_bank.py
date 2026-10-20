@@ -103,6 +103,32 @@ def test_selected_dependencies_preserve_priority_types_and_reuse_bank_after_rein
     assert len(list((tmp_path / 'cache').glob('*.resources'))) == 1
 
 
+def test_native_declaration_comments_and_shader_strings_preserve_asset_dependencies(tmp_path):
+    path = tmp_path / 'native.resources'
+    declaration = b'// legacy \xcd\n{ shader = "\\q"; model = "demon"; anim = "demon/attack"; }'
+    write_bank(path, [('rs_streamfile', 'generated/decls/entitydef/ai/demon.decl', declaration, ()),
+                      ('model', 'demon', b'model', ()), ('anim', 'demon/attack', b'anim', ())])
+    index = ResourceIndex(path)
+    available = resource_records({0: index}, {0}, {path: b'\7'})
+    selected, _ = select_resources(available, {}, ['ai/demon'])
+    assert {key[:2] for key in selected} == {key[:2] for key, _ in index.records}
+
+
+def test_local_material_resolves_native_image_variants_without_copying_unrelated_assets(tmp_path):
+    path = tmp_path / 'native.resources'
+    write_bank(path, [('rs_streamfile', 'generated/decls/material2/weapon.decl',
+                       b'{ image = "Art/Objects/Reaper/reaper.tga"; }', ()),
+                      ('image', 'art/objects/reaper/reaper.tga$streamed$mtlkind=albedo', b'albedo', ()),
+                      ('image', 'art/objects/reaper/reaper.tga$bc7$streamed', b'variant', ()),
+                      ('image', 'art/objects/other.tga$streamed', b'unrelated', ())])
+    index = ResourceIndex(path)
+    available = resource_records({0: index}, {0}, {path: b'\x0f'})
+    local = {key: value for key, value in available.items() if key[0] == 'rs_streamfile'}
+    selected, _ = select_resources(available, local, ['weapon'])
+    assert {(key[0], payload) for key, payload in payloads(write_resource_bank(selected, tmp_path / 'cache')[0])} == {
+        ('image', b'albedo'), ('image', b'variant')}
+
+
 def test_cleanup_preserves_active_foreign_and_registered_files(tmp_path, monkeypatch):
     import hashlib
     import json

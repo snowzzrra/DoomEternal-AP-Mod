@@ -149,17 +149,6 @@
       "no_auto_visual": true
     },
     "pickups_interact_automap_1_e1m2": {
-      "native_entity_contract": {
-        "original_targets": [],
-        "required_snippets": [
-          "inherit = \"interact/automap\";",
-          "class = \"idInteractable_Automap\";",
-          "activateTargetsOnEndInteraction = true;",
-          "useStat = \"STAT_AUTOMAP\";",
-          "saveType = \"SGS_GAME_DATA\";",
-          "triggerDef = \"trigger/interact/use_panel\";"
-        ]
-      },
       "permanent_resource_budget": false
     },
     "pickups_pickup_armor_large_2": {

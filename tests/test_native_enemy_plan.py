@@ -24,6 +24,44 @@ def settings(**options):
         **options})
 
 
+def test_auto_preserves_variety_after_the_original_budget_would_be_exhausted():
+    source = catalog()
+    origin = source['maps']['base']['origins'][0]
+    origin.update(logical_count=100, maximum_emissions=100, combat_cost='100')
+    options = settings(enemy_variety=100)
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
+    bodies = plan['maps']['base']['recipes'][0]['bodies']
+    assert len(bodies) == 100
+    assert 15 < sum(body['species'] == 'stone_imp' for body in bodies) < 85
+    assert validate_native_recipes(plan, options, catalog=source) == plan
+
+
+def test_frozen_composition_survives_rmo_ranking_and_revision_two_validation():
+    source = catalog()
+    source['maps']['other'] = deepcopy(source['maps']['base'])
+    options = settings()
+    campaign = {'sequence': ['base', 'other'], 'composition_bands': {'base': 1, 'other': 0}}
+    plan = build_native_recipes(options, campaign, seed=7, catalog=source)
+    reordered = build_native_recipes(options, {**campaign, 'sequence': ['other', 'base']}, seed=7, catalog=source)
+    assert plan['maps'] == reordered['maps'] and plan['combat_costs'] == reordered['combat_costs']
+    legacy = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=2)
+    assert validate_native_recipes(legacy, options, catalog=source) == legacy
+
+
+def test_campaign_rating_excludes_master_level_and_runtime_only_origins():
+    source = catalog()
+    origin = source['maps']['base']['origins'][0]
+    origin['layers'] = ['Campaign']
+    source['maps']['base']['origins'] += [
+        {**origin, 'id': 'master', 'logical_count': 100, 'layers': ['Master_Level']},
+        {**origin, 'id': 'runtime', 'logical_count': 100, 'runtime_only': True}]
+    options = settings(enemy_weights={name: int(name == 'imp') for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
+    profile = plan['combat_costs']['base']['campaign']
+    assert profile['bodies'] == 2 and profile['species'] == ['imp']
+    assert profile['actual'] < plan['combat_costs']['base']['actual']
+
+
 def test_cached_validation_rechecks_plan_options_and_catalog_mutations():
     source, options = catalog(), settings()
     campaign = {'sequence': ['base']}
@@ -64,7 +102,7 @@ def test_frozen_native_maintenance_recipe_keeps_logical_identity_and_scales_emis
         validate_native_recipes(changed, options, {"sequence": ["base"]}, catalog=source)
 
 
-def test_auto_and_attributes_share_the_existing_combat_budget():
+def test_auto_preserves_source_quantity_when_attributes_make_enemies_more_expensive():
     source = catalog()
     source["maps"]["base"]["origins"][0]["combat_cost"] = "20"
     options = settings(enemy_weights={name: int(name == "imp") for name in SPECIES_IDS})
@@ -72,8 +110,9 @@ def test_auto_and_attributes_share_the_existing_combat_budget():
     double = {**options, "attributes": deepcopy(options["attributes"])}
     double["attributes"]["health"]["global"] = {"early": [200, 200], "late": [200, 200]}
     heavier = build_native_recipes(double, {"sequence": ["base"]}, seed=12, catalog=source)
-    assert plan["maps"]["base"]["recipes"][0]["physical_count"] == 20
-    assert heavier["maps"]["base"]["recipes"][0]["physical_count"] == 10
+    assert plan["maps"]["base"]["recipes"][0]["physical_count"] == 2
+    assert heavier["maps"]["base"]["recipes"][0]["physical_count"] == 2
+    assert heavier['combat_costs']['base']['actual'] > plan['combat_costs']['base']['actual']
 
 
 def test_native_plan_round_trips_seed_types_and_rejects_invalid_campaign_progression():
@@ -111,7 +150,7 @@ def test_reduction_rounds_native_phase_once_without_forcing_zero_weight_supplier
     assert all(body["species"] == "stone_imp" for row in recipes for body in row["bodies"])
 
 
-def test_auto_budget_and_zero_variety_apply_to_the_whole_native_phase():
+def test_auto_keeps_every_request_and_zero_variety_even_when_only_expensive_species_are_allowed():
     source = catalog()
     first = source["maps"]["base"]["origins"][0]
     first.update(logical_count=1, maximum_emissions=1, combat_cost="1", phase="arena")
@@ -119,8 +158,27 @@ def test_auto_budget_and_zero_variety_apply_to_the_whole_native_phase():
     options = settings(enemy_variety=0, enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
     plan = build_native_recipes(options, {"sequence": ["base"]}, seed=7, catalog=source)
     recipes = plan["maps"]["base"]["recipes"]
-    assert sum(row["physical_count"] for row in recipes) == 1
+    assert [row["physical_count"] for row in recipes] == [1, 1]
     assert {body["species"] for row in recipes for body in row["bodies"]} == {"stone_imp"}
+
+
+def test_auto_density_adds_to_each_gated_request_and_revision_one_remains_reproducible():
+    source = catalog()
+    first = source['maps']['base']['origins'][0]
+    first.update(logical_count=3, maximum_emissions=6, phase='arena')
+    source['maps']['base']['origins'].append({**first, 'id': 'base/later', 'logical_count': 1, 'maximum_emissions': 1})
+    options = settings(enemy_density=150, enemy_weights={name: int(name == 'stone_imp') for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
+    recipes = plan['maps']['base']['recipes']
+    assert [r['physical_count'] for r in recipes] == [5, 2]
+    assert [r['maximum_emissions'] for r in recipes] == [10, 2]
+    legacy = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=1)
+    assert validate_native_recipes(legacy, options, catalog=source) == legacy
+    assert legacy['fingerprint'] != plan['fingerprint']
+    invalid = deepcopy(plan)
+    invalid['revision'] = 999
+    with pytest.raises(ValueError, match='revision'):
+        validate_native_recipes(invalid, options, catalog=source)
 
 
 def test_finite_maintenance_last_body_has_only_the_remaining_logical_credit():

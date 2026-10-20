@@ -346,7 +346,8 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps):
             inherit, kind = "encounter/spawn_group/zone", "idTargetSpawnGroup"
         else:
             inherit, kind = "target/spawn", "idTarget_Spawn"
-        settings = ({"spawners": {"num": 0}, "includeTouchingSpawners": False, "includeInGlobalOverrideGroup": False}
+        settings = ({"spawners": {"num": 0}, "includeTouchingSpawners": False, "includeInGlobalOverrideGroup": False,
+                     "clipModelInfo": {"type": "CLIPMODEL_NONE"}}
                     if kind == "idTargetSpawnGroup" else
                     {"entityDefs": {"num": 0}, "initialEntityDefs": {"num": 0}, "targets": {"num": 0}})
         aliases.append('entity { entityDef ' + alias + ' { inherit = ' + _render(inherit, 0) +

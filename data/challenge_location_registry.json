@@ -242,6 +242,12 @@
         "path": "unlockable/mission_challenge/e1m3/challenge_3.decl",
         "sha256": "fae5e067cbc5d3534fa3624cc538c47aa70aac1e7e71cf951c3d0f11c5b3e38e"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "arachnotron"
+        ]
+      },
       "location_id": 7770140,
       "mission_key": "e1m3",
       "name": "Cultist Base - Mission Challenge - Master of Turrets",
@@ -423,6 +429,12 @@
         "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_3",
         "path": "unlockable/mission_challenge/e2m1/challenge_3.decl",
         "sha256": "9fb09b0c87245f748b7c87ebf625e16ecc58f5a5942c00d9a95b05c01e4bbb0d"
+      },
+      "enemy_targets": {
+        "minimum": 3,
+        "species": [
+          "pinky"
+        ]
       },
       "location_id": 7770208,
       "mission_key": "e2m1",
@@ -711,6 +723,12 @@
         "path": "unlockable/mission_challenge/e3m1/challenge_3.decl",
         "sha256": "95a907b1a4389c8c0248a4686f614efacb4f1e9e1304a90394e07b164ee3929a"
       },
+      "enemy_targets": {
+        "minimum": 3,
+        "species": [
+          "pain_elemental"
+        ]
+      },
       "location_id": 7770335,
       "mission_key": "e3m1_slayer",
       "name": "Taras Nabad - Mission Challenge - Painkiller",
@@ -801,6 +819,12 @@
         "path": "unlockable/mission_challenge/e3m2/challenge_3.decl",
         "sha256": "14b2af1fcfa3e8badec8e2ededec8af27d496a662c5bcc6ff34054856669e243"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "doom_hunter"
+        ]
+      },
       "location_id": 7770360,
       "mission_key": "e3m2_hell",
       "name": "Nekravol - Mission Challenge - Doom Hunt",
@@ -861,6 +885,12 @@
         "path": "unlockable/mission_challenge/e3m2_b/challenge_2.decl",
         "sha256": "aba9bcf6a7cc34059c43282b4f653f2a6a61baf37ace3413b5834cfd57b3a910"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "tyrant"
+        ]
+      },
       "location_id": 7770384,
       "mission_key": "e3m2_hell_b",
       "name": "Nekravol Part II - Mission Challenge - Cut Down to Size",
@@ -890,6 +920,12 @@
         "completion_stat": "STAT_COMPLETED_E3M2_B_CHALLENGE_3",
         "path": "unlockable/mission_challenge/e3m2_b/challenge_3.decl",
         "sha256": "6bb60491c0ca048f8f5e13e48705c3c26ee15f13ef0d8951f7c5cd20b6a3b03b"
+      },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "archvile"
+        ]
       },
       "location_id": 7770385,
       "mission_key": "e3m2_hell_b",
@@ -990,6 +1026,12 @@
         "sha256": "fd33753de57fca3538eec565954c3a298a2e1d02c0885aa0f5b135385c7c20be"
       },
       "description": "Kill 5 Maykr Drones with Precision Bolt headshots",
+      "enemy_targets": {
+        "minimum": 5,
+        "species": [
+          "zombie_maykr"
+        ]
+      },
       "location_id": 7770409,
       "mission_key": "e3m3_maykr",
       "name": "Urdak - Mission Challenge - Angel of Death",
@@ -1286,6 +1328,12 @@
           "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "arachnotron"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/shotgun/pop_rocket_more_bombs",
       "item_id": 7770070,
       "location_id": 7770125,
@@ -1321,6 +1369,13 @@
           "path": "unlockable/weapon_mastery/shotgun/full_auto.decl",
           "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"
         }
+      },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "pinky",
+          "spectre"
+        ]
       },
       "gameplay_perk": "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
       "item_id": 7770069,
@@ -1502,6 +1557,12 @@
           "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "prowler"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/rocket_launcher/lockon_mastery",
       "item_id": 7770074,
       "location_id": 7770131,
@@ -1609,6 +1670,12 @@
           "path": "unlockable/weapon_mastery/ballista/arbalest.decl",
           "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"
         }
+      },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "cacodemon"
+        ]
       },
       "gameplay_perk": "perk/player/weapons/gauss_cannon/ballista_mastery",
       "item_id": 7770076,

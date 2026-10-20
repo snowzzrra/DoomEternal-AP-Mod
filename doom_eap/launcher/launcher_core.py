@@ -1275,15 +1275,24 @@ class RoomCompiler:
             raise ValueError("Enemy generation source references are malformed") from error
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
         from tools.maps.ap_map_generator import find_entity_block_bounds
+        precache = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes())["bodies"]
+        map_assets = {}
         resource_roots = {}
-        for row in changed_maps.values():
-            references = {tuple(body["ai"][key] for key in ("map_key", "entity"))
+        for key, row in changed_maps.items():
+            references = {tuple(body["ai"][field] for field in ("map_key", "entity", "sha256"))
                           for recipe in row["recipes"] for body in recipe["bodies"]}
-            roots = set()
-            for map_key, entity in references:
+            roots, assets = set(), {}
+            for map_key, entity, sha in sorted(references):
+                profile = precache.get(sha)
+                if profile is None or profile["source"] != {"map_key": map_key, "entity": entity, "sha256": sha}:
+                    raise ValueError(f"Native enemy resource catalog lacks frozen body: {map_key}/{entity}")
+                for entry in profile["assets"]:
+                    assets.setdefault((entry["mapResourceType"], entry["name"]), None)
                 source = sources[map_key]
                 start, end = find_entity_block_bounds(source, entity)
                 roots.update(json.loads(match[0]) for match in re.finditer(r'"(?:[^"\\]|\\.)*"', source[start:end]))
+            roots.update(name for _, name in assets)
+            map_assets[key] = assets
             resource_roots[row["runtime_map"]] = sorted(roots - {""})
         compiler = ModCompiler(ROOT)
         neutral_manifest = replace(manifest, static_precompile=True)
@@ -1307,6 +1316,14 @@ class RoomCompiler:
                 if audit["unrelated_generated_entity_diff_count"]:
                     raise ValueError(f"Enemy map publisher patch changed unrelated entities: {map_key}")
                 assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
+                assets_path = member.split("/", 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
+                assets = json.loads(assembled.get(assets_path, b"{}"))
+                entries = assets.setdefault("assets", [])
+                existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
+                # binary dependencies need their own native cache entries before model preparation.
+                entries.extend({"name": name, "mapResourceType": kind}
+                               for kind, name in map_assets[map_key] if (kind, name) not in existing)
+                assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
         return resource_roots
 
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:

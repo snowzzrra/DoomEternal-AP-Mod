@@ -1483,7 +1483,7 @@
     },
     {
       "default": "auto",
-      "description": "Choose between crowds of weaker enemies and smaller groups of stronger enemies when Enemy Count is Auto.\n\n100%: Use a balanced group size. Higher values favor crowds; lower values favor fewer, tougher enemies.\nAuto: Use the selected enemy preset.",
+      "description": "Choose how many enemies enter each original spawn request when Enemy Count is Auto.\n\n100%: Keep at least the original count. Higher values add enemies. Lower values favor tougher enemies while retaining the original count.\nAuto: Use the selected enemy preset.",
       "display_name": "Density",
       "group": "Game Options",
       "key": "enemy_density",
@@ -1545,7 +1545,7 @@
         }
       ],
       "default": "preset",
-      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Use Intensity and Density to choose between more weak enemies and fewer strong enemies.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nEnemies enter through the fight's normal spawn events.",
+      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Keep at least the original count in every spawn request. Density can add enemies; Intensity guides their composition.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nEnemies enter through the fight's normal spawn events.",
       "display_name": "Enemy Count",
       "group": "Game Options",
       "key": "enemy_count_mode",
@@ -8049,5 +8049,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "754b773891fe207d553d5a846abed6a92a99dc3331193a1522cc686673f0bd25"
+  "source_sha256": "3b648cfb6c30cb22317c3e781e0b7f9558692ecceb3b4318d671c4f1729b90aa"
 }

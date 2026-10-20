@@ -68,11 +68,29 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
 
     compiler, manifest = cold_case(tmp_path, monkeypatch)
     enemies = normalize_enemy_options({"enemy_count_mode": "multiplier", "enemy_count_multiplier": 100,
-        "enemy_weights": {name: int(name == "stone_imp") for name in SPECIES_IDS}})
+        "enemy_weights": {name: int(name == "demonic_trooper") for name in SPECIES_IDS}})
     plan = build_native_recipes(enemies, {"sequence": ["e1m1_intro"]}, seed=73822)
     manifest = replace(manifest, options={**manifest.options, "enemy_plan": plan, "enemies": enemies})
     assembled = base_files(compiler)
-    compiler._apply_enemy_plan(assembled, manifest)
+    assets_path = "e1m1_intro_patch3/EternalMod/assetsinfo/e1m1_intro.json"
+    model = "md6def/characters/monsters/demonic_troops/base/demonic_troops.md6"
+    retained = {"layers": [{"name": "retained_layer"}],
+                "assets": [{"name": model, "mapResourceType": "md6Def"}]}
+    assembled[assets_path] = json.dumps(retained).encode()
+    roots = compiler._apply_enemy_plan(assembled, manifest)
+    assets = json.loads(assembled[assets_path])
+    assert assets["layers"] == retained["layers"]
+    pairs = [(entry["mapResourceType"], entry["name"]) for entry in assets["assets"]]
+    assert len(pairs) == len(set(pairs))
+    assert ("md6Def", model) in pairs
+    assert ("binarymd6def", model) in pairs
+    assert any(kind == "baseModel" and "demonic_troops" in name for kind, name in pairs)
+    assert any(kind == "skeleton" and "demonic_troops" in name for kind, name in pairs)
+    assert any(kind == "anim" and "demonic_troops" in name for kind, name in pairs)
+    assert any(kind == "image" and "demonic_troops" in name for kind, name in pairs)
+    assert ("damage", "damage/ai/demonic_trooper/melee") in pairs
+    assert all(name in roots["game/sp/e1m1_intro/e1m1_intro"] for _, name in pairs)
+    assert not any("/imp_stone/" in name for _, name in pairs)
     text = assembled[TARGET].decode()
     names = ["ap_v070_recipe_plan", "subway_encounter_manager_subway_hall"]
     records = {}
@@ -95,6 +113,7 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
     assert call["args"]["item[1]"]["entity"] == "ap_v070_request_r" + recipe["origin"]
     assert not any(name.startswith("gameresources_patch3/generated/decls/actorpopulation/ap_v070/") for name in assembled)
     replay = base_files(compiler)
+    replay[assets_path] = json.dumps(retained).encode()
     compiler._apply_enemy_plan(replay, manifest)
     assert replay == assembled
 

@@ -54,6 +54,28 @@ def test_progression_interpolates_frozen_ranges_and_can_be_disabled():
     assert sample(enemies, count=1)["health_percent"] == 60
 
 
+def test_shared_instance_draws_preserve_species_overrides_and_seed_results(monkeypatch):
+    from doom_eap.content import enemy_plan
+    enemies = normalize_enemy_options({
+        'enemy_health': {'minimum': 75, 'maximum': 135, 'imp.minimum': 100, 'imp.maximum': 160},
+        'enemy_damage': {'minimum': 80, 'maximum': 120},
+        'enemy_size_variation_chance': 25})
+    original = enemy_plan._random_for
+    calls = []
+    def counted(*args):
+        calls.append(args)
+        return original(*args)
+    monkeypatch.setattr(enemy_plan, '_random_for', counted)
+    for instance in range(8):
+        expected = {species: sample_instance_attributes(enemies, species, seed=17, instance_key=instance,
+            stage_index=1, stage_count=3) for species in SPECIES_IDS}
+        uncached_calls = len(calls); calls.clear(); draws = {}
+        actual = {species: sample_instance_attributes(enemies, species, seed=17, instance_key=instance,
+            stage_index=1, stage_count=3, random_draws=draws) for species in SPECIES_IDS}
+        assert actual == expected and len(calls) < uncached_calls // 4
+        calls.clear()
+
+
 
 def test_speed_requires_positive_qualification_and_preserves_other_attributes(monkeypatch):
     enemies = normalize_enemy_options({

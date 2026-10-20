@@ -106,10 +106,17 @@ def sample_species(enemies, eligible_species, *, seed, instance_key):
 
 
 
-def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_index, stage_count):
+def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_index, stage_count, random_draws=None):
     if type(stage_count) is not int or type(stage_index) is not int or not 0 <= stage_index < stage_count:
         raise ValueError("Enemy progression requires an included stage index")
     denominator = max(1, stage_count - 1)
+    def draw(field, lower, upper):
+        key = (field, lower, upper)
+        if random_draws is None:
+            return _random_for(seed, instance_key, field).randint(lower, upper)
+        if key not in random_draws:
+            random_draws[key] = _random_for(seed, instance_key, field).randint(lower, upper)
+        return random_draws[key]
     attributes = {}
     for attribute in ("health", "damage", "speed", "size"):
         ranges = enemies["attributes"][attribute]
@@ -119,15 +126,15 @@ def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_in
              + bounds["late"][edge] * stage_index + denominator // 2) // denominator
             for edge in (0, 1)
         )
-        attributes[f"{attribute}_percent"] = lower if lower == upper else _random_for(seed, instance_key, attribute).randint(lower, upper)
+        attributes[f"{attribute}_percent"] = lower if lower == upper else draw(attribute, lower, upper)
 
     if enemy_species.enemy_speed_capabilities().get(species) != "qualified":
         attributes["speed_percent"] = 100
 
     if species not in enemies["size_variation_exclusions"]:
         chance = enemies["size_variation_chance"]
-        draw = _random_for(seed, instance_key, "size_variation").randrange(200) if chance else 0
-        attributes["size_percent"] = 50 if draw < chance else 200 if draw < 2 * chance else 100
+        variation = draw("size_variation", 0, 199) if chance else 0
+        attributes["size_percent"] = 50 if variation < chance else 200 if variation < 2 * chance else 100
     return attributes
 
 

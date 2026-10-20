@@ -10,6 +10,10 @@ Choose options under **CREATE PLAYER** before generation. During a session,
 sequence. **Mission Access as Items** lets you enter a mission after finding its
 Access item. Completed missions can be replayed from the Fortress of Doom.
 
+With the Enemy Randomizer enabled, Random Mission Order ranks the generated fights
+by their enemy composition, attributes and wave pressure. Equipment preparation
+and mandatory boss requirements contribute to difficulty; the configured goal stays last.
+
 **Use DLC Content** controls DLC gear and enemy types separately from the mission
 selection. Choose your **Goal** and any **Additional Victory Requirements** before
 generation. The launcher shows the tasks you still need during play.
@@ -24,9 +28,10 @@ offers a balanced campaign; Hell's Vanguard favors harder fights. Adjust weights
 attributes or special enemy limits to customize a preset.
 
 **Enemy Count: Multiplier** scales the original count: 200% requests twice as many
-enemies. **Auto** uses **Intensity** to set fight strength and **Density** to favor
-crowds of weaker enemies or fewer stronger enemies. **Progressive Difficulty**
-changes early settings toward late settings as you advance.
+enemies. **Auto** preserves at least the original count of each request and wave.
+**Density** can add bodies; **Intensity** changes the preference for stronger enemies.
+Species weights still apply throughout the fight. **Progressive Difficulty**
+varies the generated composition between early and late bands before mission ranking.
 
 Health, damage, speed and size ranges use percentages: 100% is the usual value.
 Equal minimum and maximum values fix an attribute. An individual enemy's setting
@@ -45,6 +50,7 @@ turn green after the server confirms completion.
 targets at 100, 200, 300 and so on. The counter includes observed deaths from traps,
 respawns and mission replays. It records physical deaths rather than multiplying
 a kill by the number of enemies it replaced.
+The HUD displays the current total and next target below **Items Found**.
 
 **Kill Rewards: Auto** estimates campaign kills, adds 10%, divides by Kills per Check
 and rounds down, up to 50 rewards. A fixed reward count can require mission replays.
