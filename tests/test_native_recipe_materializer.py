@@ -48,6 +48,42 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
     return build_native_recipes(options, {"sequence": ["map"]}, seed=8, catalog=catalog)
 
 
+@pytest.mark.parametrize('authored_initial', [False, True])
+def test_shared_empty_point_prepares_direct_recipe_for_inherited_group_definitions(authored_initial):
+    source = SOURCE.replace('edit = { aiHealth', 'edit = { factionName = "source_faction"; aiHealth')
+    source = source.replace('edit = { entityDefs = { num = 1; item[0] = { name = "original"; } } }',
+        'edit = { entityDefs = { num = 0; } initialEntityDefs = { ' +
+        ('num = 1; item[0] = { name = "original"; }' if authored_initial else 'num = 0;') + ' } }')
+    source += '''entity {
+    entityDef alternative { inherit = "ai/fodder/imp"; class = "idAI2";
+        edit = { factionName = "parent_faction"; aiEditable = { death = { triggerOnDeath = "door_relay"; } } } }
+}
+entity {
+    entityDef parent { inherit = "target/spawn_parent"; class = "idTarget_Spawn_Parent";
+        edit = { entityDefs = { num = 2; item[0] = { name = "original"; } item[1] = { name = "alternative"; } } } }
+}
+entity {
+    entityDef group { inherit = "encounter/spawn_group/zone"; class = "idTargetSpawnGroup";
+        edit = { targetSpawnParent = "parent"; spawners = { num = 3; item[0] = "point"; item[2] = "point"; } } }
+}
+'''
+    plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1,
+        bindings=[{'mode':'event', 'reference':point, 'owner':'arena'} for point in ('group', 'point')])
+    frozen = deepcopy(plan)
+    compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map':source})
+    records = {row['name']:row for row in entity_records(compiled)}
+    direct, = [r for r in plan['maps']['map']['recipes'] if r['binding']['reference'] == 'point']
+    variants = [r for r in records.values() if r['name'].startswith('ap_v070_functional_') and
+                r['class'] == 'idAI2' and r['inherit'] == direct['bodies'][0]['definition']]
+    assert {r['edit']['factionName'] for r in variants} == (
+        {'source_faction'} if authored_initial else {'source_faction', 'parent_faction'})
+    if not authored_initial:
+        inherited, = [r for r in variants if r['edit']['factionName'] == 'parent_faction']
+        assert inherited['edit']['aiEditable']['death']['triggerOnDeath'] == 'door_relay'
+    assert records['point']['edit'] == next(entity_records(source, include_names={'point'}))['edit']
+    assert plan == frozen
+
+
 def test_entrance_uses_ground_from_its_encounter_without_moving_native_points():
     source = SOURCE.replace('edit = { entityDefs', '''edit = {
         spawnPosition = { x = 0; y = 0; z = -5; }
@@ -66,8 +102,45 @@ def test_entrance_uses_ground_from_its_encounter_without_moving_native_points():
     plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1, bindings=bindings)
     compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map':source})
     helpers = [r for r in entity_records(compiled) if r['name'].startswith('ap_v070_landing_')]
-    assert len(helpers) == 1 and helpers[0]['edit']['spawnEditableShared']['groupName'] == 'floor'
+    assert len(helpers) == 1 and helpers[0]['edit']['spawnEditableShared']['groupName'] == helpers[0]['name']
+    assert helpers[0]['edit']['spawnPosition'] == {'x': 5, 'y': 0, 'z': 0}
     assert next(entity_records(source, include_names={'point'})) == next(entity_records(compiled, include_names={'point'}))
+
+
+@pytest.mark.parametrize('marker_kind', ['navigation', 'spawn_parent', 'player_destination', 'pickup'])
+def test_animation_only_encounter_uses_ground_marker_without_changing_frozen_recipe(marker_kind):
+    source = SOURCE.replace('edit = { entityDefs', '''edit = {
+        spawnPosition = { z = -10; }
+        spawnEditable = { aiStateOverride = "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION"; spawnAnim = "jump_up"; }
+        entityDefs''')
+    for name, x, snap in [('unsafe', 0, False), ('floor', 3, True), ('foreign', 60, True)]:
+        source += f'''entity {{
+    entityDef {name} {{ inherit = "info/traversal/imp"; class = "idInfoTraversal";
+        edit = {{ snapToGround = {str(snap).lower()}; spawnPosition = {{ x = {x}; y = 0; z = 0; }} }}
+    }}
+}}
+'''
+    if marker_kind == 'spawn_parent':
+        source = source.replace('entityDef floor { inherit = "info/traversal/imp"; class = "idInfoTraversal";',
+            'entityDef floor { inherit = "target/spawn"; class = "idTarget_Spawn";')
+        source = source.replace('snapToGround = true; spawnPosition = { x = 3;',
+            'targetSpawnParent = "pool"; entityDefs = { num = 1; item[0] = { name = "original"; } } spawnPosition = { x = 3;')
+    elif marker_kind == 'player_destination':
+        source = source.replace('entityDef floor { inherit = "info/traversal/imp"; class = "idInfoTraversal";',
+            'entityDef floor { inherit = "info/teleport_destination"; class = "idInfo_TeleportDestination";')
+    elif marker_kind == 'pickup':
+        source = source.replace('entityDef floor { inherit = "info/traversal/imp"; class = "idInfoTraversal";',
+            'entityDef floor { inherit = "pickup/armor/medium"; class = "idProp2";')
+        source = source.replace('snapToGround = true; spawnPosition = { x = 60;',
+            'snapToGround = false; spawnPosition = { x = 60;')
+    plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1)
+    before = deepcopy(plan)
+    compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map': source})
+    helper, = [r for r in entity_records(compiled) if r['name'].startswith('ap_v070_landing_')]
+    assert helper['edit']['spawnPosition'] == {'x': 3, 'y': 0, 'z': 0}
+    assert helper['edit']['spawnEditableShared']['groupName'] == helper['name']
+    assert next(entity_records(source, include_names={'point'})) == next(entity_records(compiled, include_names={'point'}))
+    assert plan == before
 
 
 def test_direct_activations_of_a_shared_point_have_distinct_native_clones():

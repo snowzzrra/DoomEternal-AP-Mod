@@ -105,10 +105,25 @@ def _independent_definitions(recipe, original, names):
 
 
 def _functional_sources(source):
-    selected = {name for name, _, kind in ENTITY_HEADER.findall(source) if kind in SPAWN_CLASSES | {"idAI2"}}
+    selected = {name for name, inherit, kind in ENTITY_HEADER.findall(source)
+                if kind in SPAWN_CLASSES | {"idAI2", "idInfoTraversal", "idInfoCoverExposed", "idPlayerStart", "idInfo_TeleportDestination"}
+                or (kind == 'idProp2' and inherit.startswith(('pickup/ammo/', 'pickup/armor/', 'pickup/health/')))}
     records = {row["name"]: row for row in entity_records(source, include_names=selected)}
     properties = {name: _functional_properties(row["edit"]) for name, row in records.items() if row["class"] == "idAI2"}
     properties = {name: value for name, value in properties.items() if value}
+    inherited = {}
+    for row in records.values():
+        if row['class'] != 'idTargetSpawnGroup':
+            continue
+        parent = row['edit'].get('targetSpawnParent')
+        if parent not in records:
+            continue
+        spawners = row['edit'].get('spawners', {})
+        for index in range(spawners.get('num', 0)):
+            name = spawners.get(f'item[{index}]')
+            point = records.get(name)
+            if point and point['class'] in {'idTarget_Spawn', 'idTarget_Spawn_Parent'} and not point['edit'].get('initialEntityDefs', {}).get('num', 0):
+                inherited.setdefault(name, set()).add(parent)
     sources = {}
     def reachable(name, visited=None):
         if visited is None:
@@ -124,6 +139,9 @@ def _functional_sources(source):
             return set()
         visited.add(name)
         result = set()
+        # groups populate child definitions from their parent when initialEntityDefs is empty.
+        for parent in inherited.get(name, ()):
+            result.update(reachable(parent, visited))
         for _, value in walk_values(row["edit"]):
             if isinstance(value, str) and value in records:
                 result.update(reachable(value, visited))
@@ -133,6 +151,8 @@ def _functional_sources(source):
 
 def _entrance_landings(recipes, records):
     points = {}
+    positions = {name: {axis: row['edit']['spawnPosition'].get(axis, 0) for axis in ('x','y','z')}
+                 for name,row in records.items() if 'spawnPosition' in row['edit']}
     def resolve(name, visited=None):
         if name in points:
             return points[name]
@@ -150,23 +170,51 @@ def _entrance_landings(recipes, records):
         return binding.get('owner', ''), binding.get('path', '').split('.events.item[')[0]
     def ground(name):
         edit = records[name]['edit']; spawn = edit.get('spawnEditable', {})
-        templates = [records.get(value.get('name'), {}).get('edit', {}) for field,value in edit.get('entityDefs', {}).items()
+        templates = [records.get(value.get('name'), {}) for field,value in edit.get('entityDefs', {}).items()
                      if re.fullmatch(r'item\[\d+\]', field) and isinstance(value, dict)]
         return (not spawn.get('spawnAnim') and spawn.get('aiStateOverride', 'AIOVERRIDE_DEFAULT') in
                 {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'}
-                and all(template.get('aiEditable', {}).get('spawnSettings', {}).get('initialState', 'AIOVERRIDE_DEFAULT') in
-                        {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'} for template in templates)
-                and not spawn.get('spawnAt') and not edit.get('targetSpawnParent')
-                and not edit.get('bindInfo') and all(math.isfinite(edit.get('spawnPosition', {}).get(axis, math.nan)) for axis in ('x','y','z')))
+                and all(template.get('edit', {}).get('aiEditable', {}).get('spawnSettings', {}).get('initialState', 'AIOVERRIDE_DEFAULT') in
+                        {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE',
+                         'AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER'} for template in templates)
+                and (not templates or any(not any(kind in template.get('inherit', '') for kind in
+                     ('/ambient/', 'cacodemon', 'painelemental', 'lostsoul', 'spirit', 'bloodangel')) for template in templates))
+                and not spawn.get('spawnAt')
+                and not edit.get('bindInfo') and name in positions and all(map(math.isfinite, positions[name].values())))
     airborne = {'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_LOST_SOUL',
                 'ENCOUNTER_SPAWN_SPIRIT', 'ENCOUNTER_SPAWN_BLOOD_ANGEL', 'ENCOUNTER_SPAWN_TENTACLE',
                 'ENCOUNTER_SPAWN_SUPER_TENTACLE', 'ENCOUNTER_SPAWN_BUFF_POD', 'ENCOUNTER_SPAWN_TURRET'}
-    owners = {}
+    owners, footprints, flying_points = {}, {}, set()
     for recipe in recipes:
         reference = recipe['binding'].get('reference', '')
         points.setdefault(reference, resolve(reference))
+        footprints.setdefault(scope(recipe), set()).update(points[reference])
         if recipe['selected_spawn_type'] not in airborne:
             owners.setdefault(scope(recipe), set()).update(name for name in points[reference] if ground(name))
+        else:
+            flying_points.update(points[reference])
+    ground_points = set().union(*owners.values())
+    anchors = {name for name, row in records.items()
+               if (row['class'] in {'idInfoCoverExposed', 'idPlayerStart', 'idInfo_TeleportDestination'} or
+                   (row['class'] == 'idTarget_Spawn' and ground(name) and
+                    (name in ground_points or (name not in flying_points and row['edit'].get('entityDefs', {}).get('num', 0) > 0))) or
+                   (row['class'] == 'idInfoTraversal' and row['edit'].get('snapToGround') is True))
+               and not row['edit'].get('bindInfo')
+               and name in positions and all(map(math.isfinite, positions[name].values()))}
+    pickups = {name for name,row in records.items() if row['class'] == 'idProp2' and not row['edit'].get('bindInfo')
+               and name in positions and all(map(math.isfinite, positions[name].values()))}
+    fallback_owners = set()
+    for owner, names in footprints.items():
+        if owners.get(owner) or not names:
+            continue
+        footprint = [positions.get(name, {}) for name in names]
+        if not all(all(math.isfinite(pos.get(axis, math.nan)) for axis in ('x','y','z')) for pos in footprint):
+            continue
+        # navigation and cover markers provide ground even when every entrance starts outside the arena.
+        bounds = {axis: (min(pos[axis] for pos in footprint)-50, max(pos[axis] for pos in footprint)+50) for axis in ('x','y')}
+        owners[owner] = {name for name in anchors if all(
+            bounds[axis][0] <= positions[name][axis] <= bounds[axis][1] for axis in ('x','y'))}
+        fallback_owners.add(owner)
     choices = {}
     for recipe in recipes:
         for name in points[recipe['binding'].get('reference', '')]:
@@ -176,11 +224,24 @@ def _entrance_landings(recipes, records):
                     'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES'}:
                 continue
             candidates = owners.get(scope(recipe), set())
-            position = edit.get('spawnPosition', {})
-            if not candidates or not all(math.isfinite(position.get(axis, math.nan)) for axis in ('x','y','z')):
+            position = positions.get(name, {})
+            if not all(math.isfinite(position.get(axis, math.nan)) for axis in ('x','y','z')):
                 continue
             def distance(other):
-                return sum((position[axis]-records[other]['edit']['spawnPosition'][axis])**2 for axis in ('x','y','z')), other
+                return sum((position[axis]-positions[other][axis])**2 for axis in ('x','y','z')), other
+            if scope(recipe) in fallback_owners:
+                candidates = {other for other in candidates if distance(other)[0] <= 50**2}
+                if not candidates:
+                    candidates = {other for other in pickups if distance(other)[0] <= 50**2}
+                animation = edit.get('spawnEditable', {}).get('spawnAnim', '')
+                direction = 1 if '_up_' in animation or '/riseup_' in animation else -1 if '_down_' in animation else 0
+                directed = {other for other in candidates if direction and
+                            direction*(positions[other]['z']-position['z']) >= .5 and
+                            sum((position[axis]-positions[other][axis])**2 for axis in ('x','y','z')) <= 50**2}
+                if directed:
+                    candidates = directed
+            if not candidates:
+                continue
             target = min(candidates, key=distance)
             if distance(target)[0] <= 50**2:
                 choices.setdefault(name, []).append((distance(target), target))
@@ -223,9 +284,12 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
         if helper in names:
             raise ValueError('Duplicate native entrance landing')
         names.add(helper)
+        anchor = records[landing]
+        edit = {key: anchor['edit'][key] for key in ('spawnPosition', 'spawnOrientation') if key in anchor['edit']}
+        edit['spawnEditableShared'] = {'groupName': helper}
         generated.append('entity {\n\tentityDef ' + helper + ' {\n\t\tinherit = "target/spawn";\n'
             '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
-            _render({'spawnEditableShared': {'groupName': landing}}, 2) + '\n\t}\n}')
+            _render(edit, 2) + '\n\t}\n}')
     functional_libraries = {}
     for recipe in stage["recipes"]:
         recipe_definitions = []
