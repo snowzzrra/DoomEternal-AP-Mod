@@ -166,11 +166,43 @@ def test_progressive_composition_bounds_each_body_without_erasing_requests():
     plan = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source)
     early, late = (plan['maps'][key]['recipes'][0]['bodies'] for key in ('base', 'late'))
     assert len(early) == len(late) == 100
-    assert {body['species'] for body in early} == {'imp'}
-    assert any(body['species'] == 'stone_imp' for body in late)
+    assert {'imp', 'stone_imp'} <= {body['species'] for body in early}
+    assert sum(body['species'] == 'stone_imp' for body in late) > sum(body['species'] == 'stone_imp' for body in early)
     legacy = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source, revision=3)
     assert any(body['species'] == 'stone_imp' for body in legacy['maps']['base']['recipes'][0]['bodies'])
     assert validate_native_recipes(legacy, options, catalog=source) == legacy
+
+
+def test_blocking_waves_progress_independently_in_parallel_encounters():
+    source = catalog()
+    origin = source['maps']['base']['origins'][0]
+    source['maps']['base']['origins'] = [
+        {**origin, 'id': f'{owner}/{wave}', 'wave': f'{owner}/0/{wave}'}
+        for owner in ('arena', 'parallel') for wave in (0, 4)]
+    health = dict(early_minimum=100, early_maximum=100, late_minimum=200, late_maximum=200)
+    options = settings(enemy_health=health)
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
+    for recipe in plan['maps']['base']['recipes']:
+        expected = 100 if recipe['id'].endswith('/0') else 200
+        assert {body['attributes']['health_percent'] for body in recipe['bodies']} == {expected}
+    flat = build_native_recipes(settings(progressive_difficulty=False, enemy_health=health),
+        {'sequence': ['base']}, seed=7, catalog=source)
+    assert len({body['attributes']['health_percent'] for recipe in flat['maps']['base']['recipes']
+                for body in recipe['bodies']}) == 1
+
+
+def test_workload_does_not_sum_alternative_scripts_or_unbounded_refills():
+    source = catalog()
+    origin = source['maps']['base']['origins'][0]
+    source['maps']['base']['origins'] = [
+        {**origin, 'id': f'arena/{script}/{event}', 'wave': f'arena/{script}/0',
+         'maximum_emissions': maximum, 'binding': {'mode': 'event', 'entity': 'arena',
+             'path': f'encounterComponent.entityEvents.item[{script}].events.item[{event}].eventCall'}}
+        for script in (0, 1) for event, maximum in ((0, 9999), (1, 0))]
+    plan = build_native_recipes(settings(), {'sequence': ['base']}, seed=7, catalog=source)
+    profile = plan['combat_costs']['base']['campaign']
+    assert profile['finite_spawns'] == 9999
+    assert profile['estimated_kills'] == 8
 
 
 @pytest.mark.parametrize('original', ['shotgun_soldier', 'chaingun_soldier', 'stone_imp', 'zombie_maykr'])
@@ -265,7 +297,7 @@ def test_extracted_campaign_origins_allow_cross_campaign_species_with_no_supply_
     plan = build_native_recipes(options, campaign, seed=73819, catalog=sources, revision=3)
     for map_key, source in sources["maps"].items():
         expected = {row["id"] for row in source["origins"]
-                    if not row.get("protected_reason") and not row.get("inactive_reason")}
+                    if not row.get("protected_reason") and not row.get("inactive_reason") and not row.get('legacy_protected_reason')}
         recipes = plan["maps"][map_key]["recipes"]
         assert {row["id"] for row in recipes if not row["runtime_only"]} == expected
         assert {row["id"] for row in recipes if row["runtime_only"]} == {row["id"] for row in source["runtime_origins"]}

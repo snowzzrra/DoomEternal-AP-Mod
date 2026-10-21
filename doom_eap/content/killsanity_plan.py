@@ -56,6 +56,7 @@ def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
     result, estimated_kills = [], 0
     for key in campaign["stage_ids"]:
         original = catalog["maps"][key]
+        stage_estimate_before = estimated_kills
         sources = _finite_sources(original["sources"], allow_empty=True)
         alternatives = deepcopy(original.get("source_alternatives", []))
         if not isinstance(alternatives, list):
@@ -112,6 +113,11 @@ def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
         collapsed = collapse_source_alternatives({row['source_id']: row for row in sources
                                                  if row['source_id'] not in groups}, alternatives)
         estimated_kills += sum(collapsed[identity]['count'] for identity in groups) - original_alternatives
+        if (enemy_plan or {}).get('revision', 0) >= 5:
+            estimate = enemy_plan.get('combat_costs', {}).get(key, {}).get('campaign', {}).get('estimated_kills')
+            if type(estimate) is not int or not 0 <= estimate <= 0xffffffffffffffff:
+                raise ValueError(f'Native campaign kill estimate is invalid: {key}')
+            estimated_kills = stage_estimate_before + max(estimated_kills - stage_estimate_before, estimate)
         sources = list(collapsed.values())
         result.extend(source for source in sources if source["count"] and source['source_id'] in progression
                       and source['source_id'].split('/')[0] not in conditional)

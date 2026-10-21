@@ -81,7 +81,7 @@ def extract_native_inventory(source, map_key, *, profiles=None):
                             "entity": record["name"], "owner": record["name"], "path": path, "reference": target,
                             "source_class": kind, "layers": record["layers"], "protected_reason": reason}
                         (direct if field == "targets" and kind in DIRECT_TARGET_EMITTERS else dependencies).append(row)
-        phases = {}
+        phases, waves = {}, {}
         if kind in SPAWN_CLASSES:
             points.append({"entity": record["name"], "class": kind, "sha256": record["sha256"],
                            "layers": record["layers"], "references": sorted({
@@ -105,6 +105,8 @@ def extract_native_inventory(source, map_key, *, profiles=None):
             call = _at(edit, call_path)
             script_path = call_path.split(".events.", 1)[0]
             arguments = list_items(call.get("args"))
+            if event in {"waitAIRemaining", "waitKillCount", "waitAIHealthLevel"}:
+                waves[script_path] = waves.get(script_path, 0) + 1
             if event == "waitAIRemaining" and len(arguments) >= 3 and arguments[:3] == [
                     {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, {"int": 0}, {"string": ""}]:
                 phases[script_path] = phases.get(script_path, 0) + 1
@@ -126,9 +128,13 @@ def extract_native_inventory(source, map_key, *, profiles=None):
                       "owner": owner, "layers": record["layers"], "path": call_path, "script_index": script, "event_index": index,
                       "event_def": event, "family": EMITTERS.get(event, "unknown"),
                       "phase": f"{record['name']}/{script_path}/{phases.get(script_path, 0)}",
+                      "wave": f"{record['name']}/{script_path}/{waves.get(script_path, 0)}",
                       "tutorial_hint": any("tutorial" in value.lower() for value in [record["name"], *record["layers"]]),
                       "protected_reason": reason, "arguments": arguments}
             emitters.append(origin)
+            legacy = profiles.get(record['name'], {}).get('legacy_protection')
+            if legacy:
+                origin['legacy_protected_reason'] = _protection(record, {'protection': legacy}, script, index)
     for record in records.values():
         if record["class"] != "idAI2":
             continue
@@ -255,6 +261,8 @@ def native_recipe_catalog(inventory, registry):
                     binding["spawn_type"] = original_type
             origins.append({**identity,
                 "phase": origin.get("phase", origin["id"]),
+                **({"wave": origin['wave']} if 'wave' in origin else {}),
+                **({"legacy_protected_reason": origin['legacy_protected_reason']} if origin.get('legacy_protected_reason') else {}),
                 "spawn_type": original_type, "logical_types": logical_types,
                 "logical_count": count, "maximum_emissions": maximum,
                 "binding": binding,

@@ -12,12 +12,16 @@
   "maps": {
     "e5m2_earth": {
       "ai_encounter_manager_dlc1_opening": {
-        "category": "tutorial_targets",
-        "protection": {
-          "spawn_events": [{"script": 0, "event": 5}],
+        "category": "combat",
+        "legacy_protection": {
+          "spawn_events": [
+            {
+              "script": 0,
+              "event": 5
+            }
+          ],
           "reason": "This Cursed Prowler introduces the curse mechanic."
-        },
-        "evidence": "script0 event6 activates tutorial_target_relay_cursedprowler_tutorial; event9 waits for the opening Cursed Prowler."
+        }
       }
     },
     "e1m4_boss": {
@@ -84,8 +88,8 @@
     },
     "e5m1_spear": {
       "ai_combat_encounter_manager_dlc1_4": {
-        "category": "tutorial_targets",
-        "protection": {
+        "category": "combat",
+        "legacy_protection": {
           "manager_sha256": "188b20f5373a41992f0580499e884d7b683894f2896272b7cb074fd229f6ad6d",
           "spawn_events": [
             {
@@ -106,17 +110,15 @@
             }
           ],
           "reason": "These Screechers demonstrate the mechanic introduced by the tutorial."
-        },
-        "evidence": "script0 event4 activates screecher_tutorial; events9-12 spawn its demonstration targets and event25 applies their scripted damage."
+        }
       },
       "ai_combat_encounter_manager_dlc2_13": {
-        "category": "exclusive_tutorial",
-        "protection": {
+        "category": "combat",
+        "legacy_protection": {
           "entire_encounter": true,
           "manager_sha256": "af539da989e826b24b5fcb0f475eafc3a17b4f8502c46ae958e5ce66fa3008cb",
           "reason": "This fight teaches Stone Imps and keeps respawning them until eight Stone Imp kills."
-        },
-        "evidence": "script0 event0 activates ai_stone_imp_tutorial; event13 maintains stone_imp_intro; event14 waits for eight Stone Imp kills."
+        }
       }
     },
     "e1m2_war": {

@@ -215,6 +215,26 @@ def test_host_and_spirit_share_the_original_event_quantity():
     assert result == {'estimated_kills': 3, 'finite_sources': [{**entry, 'count': 3}]}
 
 
+def test_native_workload_adds_optional_milestones_without_guaranteeing_refill_kills():
+    entry = sources(200)[0]
+    catalog = {'schema_version': 2, 'maps': {'e1m1_intro': {
+        'estimated_kills': 200, 'source_sha256': 'a' * 64, 'sources': [entry]}}}
+    plan = {'kind': 'native_recipes', 'revision': 5, 'maps': {}, 'combat_costs': {
+        'e1m1_intro': {'campaign': {'estimated_kills': 1500}}}}
+    budget = build_campaign_kill_budget({'stage_ids': ['e1m1_intro']}, plan, catalog=catalog)
+    assert budget == {'estimated_kills': 1500, 'finite_sources': [entry]}
+    rewards = build_killsanity_plan({'enabled': True, 'interval': 100},
+        budget['finite_sources'], estimated_kills=budget['estimated_kills'])
+    assert len(rewards['milestones']) > 10
+    assert sum(row['finite_supported'] for row in rewards['milestones']) == 2
+    plan['revision'] = 4
+    assert build_campaign_kill_budget({'stage_ids': ['e1m1_intro']}, plan, catalog=catalog)['estimated_kills'] == 200
+    plan['revision'] = 5
+    plan['combat_costs']['e1m1_intro']['campaign']['estimated_kills'] = True
+    with pytest.raises(ValueError, match='estimate is invalid'):
+        build_campaign_kill_budget({'stage_ids': ['e1m1_intro']}, plan, catalog=catalog)
+
+
 @pytest.mark.parametrize('estimate, interval, expected', [
     (90, 100, 0), (91, 100, 1), (181, 100, 1), (182, 100, 2),
     (1000, 50, 22), (4545, 100, 49), (4546, 100, 50), (100000, 100, 50),

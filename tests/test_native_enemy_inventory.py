@@ -39,6 +39,17 @@ def test_external_timeline_and_unknown_emitter_are_retained():
     assert row["owner"] == "arena"
 
 
+def test_health_and_species_gates_separate_composition_waves():
+    calls = ['spawnAI', 'waitAIRemaining', 'spawnAI', 'waitAIHealthLevel', 'spawnAI', 'waitKillCount', 'spawnAI']
+    events = ' '.join(f'item[{index}] = {{ eventCall = {{ eventDef = "{name}"; args = {{ num = 0; }} }} }}'
+                      for index, name in enumerate(calls))
+    source = entity('arena', 'idEncounterManager',
+        f'encounterComponent = {{ entityEvents = {{ num = 1; item[0] = {{ events = {{ num = {len(calls)}; {events} }} }} }} }}')
+    rows = extract_native_inventory(source, 'map')['emitters']
+    assert len({row['wave'] for row in rows}) == 4
+    assert [int(row['wave'].rsplit('/', 1)[1]) for row in rows] == [0, 1, 2, 3]
+
+
 def test_direct_inventory_separates_activation_edges_from_groups_and_removal():
     source = entity("point", "idTarget_Spawn", 'entityDefs = { num = 0; }')
     source += entity("group", "idTargetSpawnGroup", 'spawners = { num = 1; item[0] = "point"; } targets = { num = 1; item[0] = "point"; }')
