@@ -48,6 +48,28 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
     return build_native_recipes(options, {"sequence": ["map"]}, seed=8, catalog=catalog)
 
 
+def test_entrance_uses_ground_from_its_encounter_without_moving_native_points():
+    source = SOURCE.replace('edit = { entityDefs', '''edit = {
+        spawnPosition = { x = 0; y = 0; z = -5; }
+        spawnEditable = { aiStateOverride = "AIOVERRIDE_PLAY_ENTRANCE_ANIMATION"; spawnAnim = "jump_up"; }
+        entityDefs''')
+    for name,x in [('floor', 5), ('foreign', 1), ('unused', 0)]:
+        source += f'''entity {{
+    entityDef {name} {{ inherit = "target/spawn"; class = "idTarget_Spawn";
+        edit = {{ spawnPosition = {{ x = {x}; y = 0; z = 0; }}
+            entityDefs = {{ num = 1; item[0] = {{ name = "original"; }} }} }}
+    }}
+}}
+'''
+    bindings = [{'mode':'event','reference':point,'owner':owner} for point,owner in
+                [('point','arena'),('floor','arena'),('foreign','another')]]
+    plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1, bindings=bindings)
+    compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map':source})
+    helpers = [r for r in entity_records(compiled) if r['name'].startswith('ap_v070_landing_')]
+    assert len(helpers) == 1 and helpers[0]['edit']['spawnEditableShared']['groupName'] == 'floor'
+    assert next(entity_records(source, include_names={'point'})) == next(entity_records(compiled, include_names={'point'}))
+
+
 def test_direct_activations_of_a_shared_point_have_distinct_native_clones():
     source = SOURCE + '''entity { entityDef trigger { inherit = "target/count"; class = "idTarget_Count";
         edit = { targets = { num = 3; item[0] = "point"; item[1] = "point"; item[2] = "wall_relay"; } } } }

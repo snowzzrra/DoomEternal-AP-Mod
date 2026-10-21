@@ -1,6 +1,7 @@
 """Prepare frozen native body definitions without editing encounter commands."""
 
 import hashlib
+import math
 import re
 
 from doom_eap.content.enemy_species import validate_enemy_speed_percent
@@ -127,7 +128,63 @@ def _functional_sources(source):
             if isinstance(value, str) and value in records:
                 result.update(reachable(value, visited))
         return result
-    return properties, reachable
+    return properties, reachable, records
+
+
+def _entrance_landings(recipes, records):
+    points = {}
+    def resolve(name, visited=None):
+        if name in points:
+            return points[name]
+        visited = set() if visited is None else visited
+        if name in visited or name not in records:
+            return set()
+        visited.add(name)
+        row = records[name]
+        if row['class'] == 'idTarget_Spawn':
+            return {name}
+        return set().union(*(resolve(child, visited) for field,child in row['edit'].get('spawners', {}).items()
+                             if re.fullmatch(r'item\[\d+\]', field) and isinstance(child, str)))
+    def scope(recipe):
+        binding = recipe['binding']
+        return binding.get('owner', ''), binding.get('path', '').split('.events.item[')[0]
+    def ground(name):
+        edit = records[name]['edit']; spawn = edit.get('spawnEditable', {})
+        templates = [records.get(value.get('name'), {}).get('edit', {}) for field,value in edit.get('entityDefs', {}).items()
+                     if re.fullmatch(r'item\[\d+\]', field) and isinstance(value, dict)]
+        return (not spawn.get('spawnAnim') and spawn.get('aiStateOverride', 'AIOVERRIDE_DEFAULT') in
+                {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'}
+                and all(template.get('aiEditable', {}).get('spawnSettings', {}).get('initialState', 'AIOVERRIDE_DEFAULT') in
+                        {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'} for template in templates)
+                and not spawn.get('spawnAt') and not edit.get('targetSpawnParent')
+                and not edit.get('bindInfo') and all(math.isfinite(edit.get('spawnPosition', {}).get(axis, math.nan)) for axis in ('x','y','z')))
+    airborne = {'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_LOST_SOUL',
+                'ENCOUNTER_SPAWN_SPIRIT', 'ENCOUNTER_SPAWN_BLOOD_ANGEL', 'ENCOUNTER_SPAWN_TENTACLE',
+                'ENCOUNTER_SPAWN_SUPER_TENTACLE', 'ENCOUNTER_SPAWN_BUFF_POD', 'ENCOUNTER_SPAWN_TURRET'}
+    owners = {}
+    for recipe in recipes:
+        reference = recipe['binding'].get('reference', '')
+        points.setdefault(reference, resolve(reference))
+        if recipe['selected_spawn_type'] not in airborne:
+            owners.setdefault(scope(recipe), set()).update(name for name in points[reference] if ground(name))
+    choices = {}
+    for recipe in recipes:
+        for name in points[recipe['binding'].get('reference', '')]:
+            edit = records[name]['edit']
+            if edit.get('spawnEditable', {}).get('aiStateOverride') not in {
+                    'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION',
+                    'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES'}:
+                continue
+            candidates = owners.get(scope(recipe), set())
+            position = edit.get('spawnPosition', {})
+            if not candidates or not all(math.isfinite(position.get(axis, math.nan)) for axis in ('x','y','z')):
+                continue
+            def distance(other):
+                return sum((position[axis]-records[other]['edit']['spawnPosition'][axis])**2 for axis in ('x','y','z')), other
+            target = min(candidates, key=distance)
+            if distance(target)[0] <= 50**2:
+                choices.setdefault(name, []).append((distance(target), target))
+    return {name:min(options)[1] for name,options in choices.items()}
 
 
 def _body_definitions(recipe, settings):
@@ -160,7 +217,15 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
         raise ValueError("Invalid native recipe fingerprint")
     names = {name for name, _, _ in ENTITY_HEADER.findall(source)}
     definitions, donors, generated = [], {}, []
-    functional, reachable = _functional_sources(source)
+    functional, reachable, records = _functional_sources(source)
+    for point, landing in sorted(_entrance_landings(stage['recipes'], records).items()):
+        helper = 'ap_v070_landing_' + _functional_token(point)
+        if helper in names:
+            raise ValueError('Duplicate native entrance landing')
+        names.add(helper)
+        generated.append('entity {\n\tentityDef ' + helper + ' {\n\t\tinherit = "target/spawn";\n'
+            '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
+            _render({'spawnEditableShared': {'groupName': landing}}, 2) + '\n\t}\n}')
     functional_libraries = {}
     for recipe in stage["recipes"]:
         recipe_definitions = []

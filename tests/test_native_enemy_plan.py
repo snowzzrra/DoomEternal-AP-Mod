@@ -28,7 +28,7 @@ def test_auto_preserves_variety_after_the_original_budget_would_be_exhausted():
     source = catalog()
     origin = source['maps']['base']['origins'][0]
     origin.update(logical_count=100, maximum_emissions=100, combat_cost='100')
-    options = settings(enemy_variety=100)
+    options = settings(enemy_variety=100, progressive_difficulty=False)
     plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
     bodies = plan['maps']['base']['recipes'][0]['bodies']
     assert len(bodies) == 100
@@ -137,6 +137,54 @@ def test_unbounded_maintenance_and_unresolved_sources_are_distinct():
         build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
 
 
+def test_ammunition_supply_and_its_initial_wave_keep_chainsaw_targets():
+    source = catalog()
+    source['species']['prowler'] = {**source['species']['stone_imp'], 'spawn_type': 'ENCOUNTER_SPAWN_PROWLER'}
+    refill = source['maps']['base']['origins'][0]
+    refill.update(maximum_emissions=0, logical_types=['ENCOUNTER_SPAWN_IMP', 'ENCOUNTER_SPAWN_PROWLER'],
+        binding={'owner': 'arena', 'arguments': [{'string': 'refill'}]})
+    initial = {**deepcopy(refill), 'id': 'initial', 'family': 'staggered', 'maximum_emissions': 2}
+    source['maps']['base']['origins'].append(initial)
+    for mode in ('auto', 'multiplier'):
+        plan = build_native_recipes(settings(enemy_count_mode=mode, enemy_count_multiplier=1),
+            {'sequence': ['base']}, seed=8, catalog=source)
+        recipes = plan['maps']['base']['recipes']
+        assert all(len(recipe['bodies']) >= 2 for recipe in recipes)
+        assert {body['species'] for recipe in recipes for body in recipe['bodies']} == {'imp'}
+        assert recipes[0]['maximum_emissions'] == 0 and recipes[1]['maximum_emissions'] == 2
+    excluded = settings(enemy_weights={name: int(name == 'stone_imp') for name in SPECIES_IDS})
+    with pytest.raises(ValueError, match='Ammunition source'):
+        build_native_recipes(excluded, {'sequence': ['base']}, seed=8, catalog=source)
+
+
+def test_progressive_composition_bounds_each_body_without_erasing_requests():
+    source = catalog()
+    source['maps']['late'] = deepcopy(source['maps']['base'])
+    source['maps']['base']['origins'][0].update(logical_count=100, maximum_emissions=100)
+    source['maps']['late']['origins'][0].update(logical_count=100, maximum_emissions=100)
+    options = settings(enemy_variety=100)
+    plan = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source)
+    early, late = (plan['maps'][key]['recipes'][0]['bodies'] for key in ('base', 'late'))
+    assert len(early) == len(late) == 100
+    assert {body['species'] for body in early} == {'imp'}
+    assert any(body['species'] == 'stone_imp' for body in late)
+    legacy = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source, revision=3)
+    assert any(body['species'] == 'stone_imp' for body in legacy['maps']['base']['recipes'][0]['bodies'])
+    assert validate_native_recipes(legacy, options, catalog=source) == legacy
+
+
+@pytest.mark.parametrize('original', ['shotgun_soldier', 'chaingun_soldier', 'stone_imp', 'zombie_maykr'])
+def test_special_fodder_ammunition_sources_keep_ordinary_chainsaw_targets(original):
+    source = catalog()
+    spawn_type = 'ENCOUNTER_SPAWN_' + original.upper()
+    source['species'][original] = {**source['species']['stone_imp'], 'spawn_type': spawn_type}
+    refill = source['maps']['base']['origins'][0]
+    refill.update(maximum_emissions=0, logical_types=[spawn_type], spawn_type=spawn_type)
+    options = settings(enemy_weights={name: int(name in {'imp', original}) for name in SPECIES_IDS})
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
+    assert {body['species'] for recipe in plan['maps']['base']['recipes'] for body in recipe['bodies']} == {'imp'}
+
+
 def test_reduction_rounds_native_phase_once_without_forcing_zero_weight_suppliers():
     source = catalog()
     first = source["maps"]["base"]["origins"][0]
@@ -214,7 +262,7 @@ def test_extracted_campaign_origins_allow_cross_campaign_species_with_no_supply_
     options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=100,
         enemy_weights={name: int(name == "stone_imp") for name in SPECIES_IDS})
     campaign = {"sequence": sorted(sources["maps"])}
-    plan = build_native_recipes(options, campaign, seed=73819, catalog=sources)
+    plan = build_native_recipes(options, campaign, seed=73819, catalog=sources, revision=3)
     for map_key, source in sources["maps"].items():
         expected = {row["id"] for row in source["origins"]
                     if not row.get("protected_reason") and not row.get("inactive_reason")}

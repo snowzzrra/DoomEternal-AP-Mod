@@ -108,10 +108,11 @@ def test_kill_rewards_are_independent_of_enemy_totals_but_validate_enemy_sources
 @pytest.mark.parametrize("species, qualified", [("arachnotron", True), ("gargoyle", False)])
 def test_room_accepts_speed_only_for_qualified_species(validate, species, qualified):
     slot = slot_data()
+    slot['progressive_difficulty'] = False
     slot["enemy_randomizer"] = True
     slot["enemies"] = normalize_enemy_options(slot)
     slot["enemy_plan"] = frozen_plan(slot["enemies"])
-    slot["enemy_weights"] = {name: int(name == species) for name in slot["enemies"]["weights"]}
+    slot["enemy_weights"] = {name: int(name in {species, 'imp'}) for name in slot["enemies"]["weights"]}
     slot["enemy_speed"] = {"minimum": 150, "maximum": 150}
     slot["enemies"] = normalize_enemy_options(slot)
     slot["enemy_plan"] = frozen_plan(slot["enemies"])

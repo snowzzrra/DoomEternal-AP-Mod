@@ -68,7 +68,7 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
 
     compiler, manifest = cold_case(tmp_path, monkeypatch)
     enemies = normalize_enemy_options({"enemy_count_mode": "multiplier", "enemy_count_multiplier": 100,
-        "enemy_weights": {name: int(name == "demonic_trooper") for name in SPECIES_IDS}})
+        "enemy_weights": {name: int(name in {"demonic_trooper", "imp"}) for name in SPECIES_IDS}})
     plan = build_native_recipes(enemies, {"sequence": ["e1m1_intro"]}, seed=73822)
     manifest = replace(manifest, options={**manifest.options, "enemy_plan": plan, "enemies": enemies})
     assembled = base_files(compiler)
