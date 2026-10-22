@@ -14,7 +14,7 @@
     "sha256": "e63a2d3be5071841556cac3a5d4e210c8a3e49f3247530790d5d6e2c3d0b8a3a",
     "size": 18712731
   },
-  "room_resource_input_fingerprint": "77ca93644c4e2d15320dac5422900b5229ada32017059a2bcd8c85e33531fe76",
+  "room_resource_input_fingerprint": "1d815d2a95f226cbab68583649e70adea0d6aaa0ef5263b5d9f691b8080d1d83",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -172,9 +172,9 @@
     "data/automap_native_decl_sources/e1m1_intro/generated/decls/propitem/propitem/collectible/toys/default.decl": "e571e82a3059d05d734a78bf5320b4f0ac0360b22ad921d57282536b88743fe5",
     "data/automap_native_decl_sources/e1m1_intro/generated/decls/propitem/propitem/collectible/toys/doom_slayer.decl": "1c221458498ddde1df81ab8cf50a24d5c4d3671fd1227a819bd696cd5881230b",
     "data/campaign_goal_contract.json": "143a3c0fb44252b3c46edc41b94e5e4f7fc0b6b5ad46e063dad15c2e484f81c0",
-    "data/campaign_sources/blood_punch_ai_charge_rate.decl": "fec46a02e3d0fac2d22ca297045150fb8aaa384fcec0d2d7b9293daf715099d7",
-    "data/campaign_sources/blood_punch_area_of_effect.decl": "1f0d2a9e676b99e317a803bb04b9e097a7bd28f081572c464b0578579118772d",
-    "data/campaign_sources/blood_punch_max_charges.decl": "60c2bf1d93d659162d41bc1e170b5b9a188307dae2b1d9efaa86ad586fc5d0d4",
+    "data/campaign_sources/blood_punch_ai_charge_rate.decl": "af4d4439dba8d55bee27a51cf9c967729bd296a7aacf2541b3d054ab927fceeb",
+    "data/campaign_sources/blood_punch_area_of_effect.decl": "9903dd723f785f44bb794a9a8d4b88de6cf08368fbe850d9ddd600e9b61331cf",
+    "data/campaign_sources/blood_punch_max_charges.decl": "dd40730279ab161d7133a0c21899205dbb8ceba0b60af1ca32ef4244d4b50e6b",
     "data/campaign_sources/dlc1.decl": "7f691e46bd8c23918e57f67825b77af09c90100f111dfff53008afb1ec19ae17",
     "data/campaign_sources/dlc2.decl": "8bc7ee0cb564c40a50b3306a301f085943c9c4a8eb3f71d6108d1e859840c5a4",
     "data/campaign_sources/hub.decl": "a3dab6fa9d77e8ccf4c5a6113ce576f4eb6d959d93ace8bc4dabf245cfa9c3e1",
@@ -183,7 +183,7 @@
     "data/campaign_sources/missionlist.decl": "9198d7da74d8e273579c9776391f8f00773d834d61467898c32a424a281510ec",
     "data/campaign_sources/missionlist_dlc1.decl": "2ce79ed9c11e655a025f40d0dc0d97f03fc33e5666dfa39f3e806ff7cfa289a6",
     "data/campaign_sources/missionlist_dlc2.decl": "0d3c3f6e4b79c5f4f674a65cbe42a2461aa9f5b2ffaffe77ab1725734a2ad9a1",
-    "data/campaign_sources/unmaykr_progress.decl": "40583490d9aae5ba6c1cb11803c436824d911cf70af511ce9b777e35bcfb3bf1",
+    "data/campaign_sources/unmaykr_progress.decl": "45f16256aa32ebea9534612320bd90c5c1fc8f398596cdc44307b361424cf7e2",
     "data/campaign_stages.json": "19a18381059532b035b6cb7949baa83765c13c294ea9cad6948f6e6bd9a61403",
     "data/challenge_location_registry.json": "5447bbc2d86d11946378ab558643b7ea4a2b2c00de54bc66c1d9e53cd691bbd3",
     "data/checked_location_visuals.json": "e2d5bd6c617d3e0019e97133afea3842ccf35bb42af3948952852d1e3f98a739",
@@ -447,7 +447,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "b430d764178d829fb8a19c3e0311b30f1dff850f",
+      "base_commit_sha": "1f9418a2879c34c40b7c4eef267ebad19daadf6f",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -4372,8 +4372,8 @@
             "size": 126
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "73cfdd44a9aa0b51326d933b74f0996714ee95a1b3f364d8bc5e04781c04cb7e",
-            "size": 38110
+            "sha256": "b44ade8d2a4d1aaef1b7a0e2e093cb14cb59930f87faebb0cead393f57c36ec9",
+            "size": 38188
           },
           "archipelago/worlds/doometernal/campaign_kill_sources.json": {
             "sha256": "ec1bfbe85ae49ced2193964b67a27e4b1fb0160ac7b2e542c3823f30152f2744",
@@ -13316,12 +13316,12 @@
             "size": 136
           }
         },
-        "fingerprint": "a38f9cb8e369c6db3bb37f3f2b03e42caad5f566faf9b6641b8d994471b8e6e5",
+        "fingerprint": "1fff51ae196addd37aacf1d5a9ae3fa1512da82415808b0d220c0a2b7e30d967",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "9b508d0eb6186a6e76ab2393ed180582c7092913",
+      "base_commit_sha": "b836898ad5db43510d26e9f6c093d7c7eecbaf87",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13986,16 +13986,16 @@
             "size": 478
           },
           "data/campaign_sources/blood_punch_ai_charge_rate.decl": {
-            "sha256": "fec46a02e3d0fac2d22ca297045150fb8aaa384fcec0d2d7b9293daf715099d7",
-            "size": 440
+            "sha256": "af4d4439dba8d55bee27a51cf9c967729bd296a7aacf2541b3d054ab927fceeb",
+            "size": 451
           },
           "data/campaign_sources/blood_punch_area_of_effect.decl": {
-            "sha256": "1f0d2a9e676b99e317a803bb04b9e097a7bd28f081572c464b0578579118772d",
-            "size": 426
+            "sha256": "9903dd723f785f44bb794a9a8d4b88de6cf08368fbe850d9ddd600e9b61331cf",
+            "size": 437
           },
           "data/campaign_sources/blood_punch_max_charges.decl": {
-            "sha256": "60c2bf1d93d659162d41bc1e170b5b9a188307dae2b1d9efaa86ad586fc5d0d4",
-            "size": 429
+            "sha256": "dd40730279ab161d7133a0c21899205dbb8ceba0b60af1ca32ef4244d4b50e6b",
+            "size": 440
           },
           "data/campaign_sources/dlc1.decl": {
             "sha256": "7f691e46bd8c23918e57f67825b77af09c90100f111dfff53008afb1ec19ae17",
@@ -14030,8 +14030,8 @@
             "size": 493
           },
           "data/campaign_sources/unmaykr_progress.decl": {
-            "sha256": "40583490d9aae5ba6c1cb11803c436824d911cf70af511ce9b777e35bcfb3bf1",
-            "size": 67439
+            "sha256": "45f16256aa32ebea9534612320bd90c5c1fc8f398596cdc44307b361424cf7e2",
+            "size": 69899
           },
           "data/campaign_stages.json": {
             "sha256": "b1c02fc85c0cf774a7e972c105a646b9a204c20061034a31cc369a3d913bff1b",
@@ -15718,7 +15718,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "b04769943378c32532ac1c1da4c89f7063112c8a945559c7a297940277963b56",
+        "fingerprint": "eed60213094bb0e8a8afe37e7660d5f2e6037d903b24155499c6d07f3545bbad",
         "kind": "working_tree_snapshot"
       }
     }
