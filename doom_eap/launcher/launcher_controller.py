@@ -837,6 +837,7 @@ class LauncherController:
                 return False
             last_failure = deepcopy(self.last_setup_failure)
             last_issue = deepcopy(self.last_room_package_issue)
+            repair_event = self.setup.current_event if self.connected_room else None
 
         def operation(job):
             try:
@@ -871,15 +872,22 @@ class LauncherController:
                         self._stop_native_client()
                         message = workflow.ensure_game_link(root, force_repair=True).message
                     else:
-                        event = self.setup.current_event
-                        if not event:
+                        if not repair_event:
                             raise RuntimeError("Connect to the same room before repairing its session")
                         workflow.ensure_game_link(root)
-                        config.update(workflow._config())
-                        status = workflow.session_owner.prepare(RoomSnapshot.from_event(event), config, recover_prelaunch=True)
-                        self.last_setup_failure = None
-                        self.emit("ap_session_status", **status)
                         message = "Session prepared in the same room; saves and receipts preserved."
+                    if action_key != "rollback_core" and repair_event:
+                        job.check()
+                        config.update(workflow._config())
+                        status = workflow.session_owner.prepare(RoomSnapshot.from_event(repair_event), config, recover_prelaunch=True)
+                        job.check()
+                        if os.name == "nt" and not self._ensure_native_client(generation=job.generation):
+                            job.check()
+                            raise RuntimeError("The game integration helper could not start")
+                        with self._lifecycle_lock:
+                            job.check()
+                            self.last_setup_failure = None
+                        emit("ap_session_status", **status)
                 elif integration_only:
                     result = install_game_link(config, workflow, emit, force_repair=True)
                     message = result.message

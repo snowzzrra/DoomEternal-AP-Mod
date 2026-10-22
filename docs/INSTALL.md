@@ -1,8 +1,8 @@
-# Install DOOM Eternal Archipelago 0.6.5
+# Install DOOM Eternal Archipelago 0.6.6
 
 [Requirements](#requirements) · [APWorld](#install-apworld) · [Launcher](#launcher-flow) · [Windows](#windows) · [Linux](#linux--steam--proton) · [Troubleshooting](#troubleshooting)
 
-DOOM Eternal Archipelago **0.6.5** uses a legally obtained, player-supplied
+DOOM Eternal Archipelago **0.6.6** uses a legally obtained, player-supplied
 DOOM Eternal installation. Launcher acquires supported external modding tools
 from pinned providers after player consent and verifies each SHA-256.
 
@@ -207,7 +207,7 @@ supervised bridge. Do not run two bridge clients for one profile.
 
 ## Player configuration
 
-Launcher and APWorld versions are **0.6.5**. Compatible 0.6.x rooms retain their seed, placements and AP save. Update with DOOM closed and reconnect to the same room. Rebuild the room package when the launcher requests a content update.
+Launcher version is **0.6.6**; the compatible APWorld version is **0.6.5**. Compatible 0.6.x rooms retain their seed, placements and AP save. Update with DOOM closed and reconnect to the same room. Rebuild the room package when the launcher requests a content update.
 
 For new Vanilla Order generations, enabled missions follow chronological order
 with the selected goal mission last. Updating the launcher does not reorder a

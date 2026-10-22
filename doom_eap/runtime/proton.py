@@ -53,15 +53,16 @@ def runtime(configuration):
         raise RuntimeError("Select DOOM Eternal's Steam userdata directory")
     environment = dict(os.environ, STEAM_COMPAT_DATA_PATH=str(prefix),
                        STEAM_COMPAT_CLIENT_INSTALL_PATH=str(remote.parents[3]), WINEPREFIX=str(prefix / "pfx"))
-    return [str(proton), "run"], environment
+    return [str(proton), "runinprefix"], environment
 
 
 def windows_processes(configuration, helper):
     """Return qualified guest identities, an empty tuple, or UNKNOWN (None)."""
     try:
         command, environment = runtime(configuration)
+        # the windowed supervisor requires stdin even for process queries
         response = subprocess.run([*command, windows_path(helper), "--process-identity"],
-                                  env=environment, capture_output=True, timeout=8, check=False)
+                                  env=environment, input=b"", capture_output=True, timeout=8, check=False)
         rows = json.loads(response.stdout).get("processes")
         if response.returncode or not isinstance(rows, list):
             return None
