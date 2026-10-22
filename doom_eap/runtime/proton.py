@@ -62,7 +62,7 @@ def windows_processes(configuration, helper):
         command, environment = runtime(configuration)
         # the windowed supervisor requires stdin even for process queries
         response = subprocess.run([*command, windows_path(helper), "--process-identity"],
-                                  env=environment, input=b"", capture_output=True, timeout=8, check=False)
+                                  env=environment, input=b"", capture_output=True, timeout=30, check=False)
         rows = json.loads(response.stdout).get("processes")
         if response.returncode or not isinstance(rows, list):
             return None

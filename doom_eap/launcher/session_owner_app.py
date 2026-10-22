@@ -1,4 +1,5 @@
 """Windows process-session owner shared by the native and Proton launchers."""
+import errno
 import json
 import os
 from pathlib import Path
@@ -12,7 +13,14 @@ from doom_eap.runtime.observer_lifecycle import windows_game_processes
 
 
 def respond(document):
-    print(json.dumps(document, ensure_ascii=True), flush=True)
+    try:
+        print(json.dumps(document, ensure_ascii=True), flush=True)
+    except OSError as error:
+        # windows can report a closed pipe as EINVAL
+        if error.errno != errno.EPIPE and not (sys.platform == "win32" and error.errno == errno.EINVAL):
+            raise
+        sys.stdout = None
+        raise SystemExit(1) from None
 
 
 def main():
