@@ -31,12 +31,16 @@ BASE_COMBAT_COST = {
 }
 
 
-def enemy_combat_cost(species, attributes):
+def enemy_combat_cost(species, attributes, *, buff_totems=False, screechers=False):
     if set(attributes) != {f"{name}_percent" for name in ("health", "damage", "speed", "size")} or any(
             type(value) is not int or not 1 <= value <= 10000 for value in attributes.values()):
         raise ValueError("Enemy combat attributes require integer percentages in 1..10000")
     health, damage, speed, size = (attributes[f"{name}_percent"] for name in ("health", "damage", "speed", "size"))
     cost = BASE_COMBAT_COST[species]
+    if buff_totems and species == 'buff_pod':
+        cost *= 12
+    if screechers and species == 'zombie_t1_screecher':
+        cost *= 12
     size_numerator, size_denominator = (300 + size, 400) if size >= 100 else (3 * size + 100, 4 * size)
     # One kill still takes a targeting action when health is below a normal shot.
     return Fraction(cost.numerator * max(health, 25) * (100 + damage) * (300 + speed) * size_numerator,
@@ -67,7 +71,12 @@ def _density_weights(enemies, candidates, *, seed, phase, stage_index, stage_cou
 def _limit_suffix(enemies, species):
     limits = enemies["special_limits"]
     values = "".join(f"{limits[name]:08x}" for name in ("marauder", "archvile", "spirit", "combined_special"))
-    kind = {"marauder": "m", "archvile": "a", "spirit": "s"}.get(species, "n")
+    kinds = {"marauder": "m", "archvile": "a", "spirit": "s"}
+    if enemies.get('revision', 2) >= 3:
+        kinds['buff_pod'] = 'b'
+    if enemies.get('revision', 2) >= 4:
+        kinds['zombie_t1_screecher'] = 'c'
+    kind = kinds.get(species, "n")
     return f"_l{values}_k{kind}"
 
 

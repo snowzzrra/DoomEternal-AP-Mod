@@ -1,5 +1,6 @@
 {
   "map_key": "hub",
+  "neutralize_pickups": ["collectibles_weapons_unmaykr_1"],
   "region": "Fortress of Doom - Second Visit",
   "region_overrides": {
     "7770073": "Fortress of Doom - First Visit",

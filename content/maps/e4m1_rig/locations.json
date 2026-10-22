@@ -58,6 +58,9 @@
     }
   },
   "target_policies": {
+    "pickups_pickup_extra_life_extra_life_2up_1_b": {
+      "legacy_alias_of": 7770428
+    },
     "pickups_pickup_keycard_slayer_key_1": {
       "independent_ap_trigger": true,
       "remove_original": true,

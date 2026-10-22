@@ -1,4 +1,7 @@
 {
+  "7770910": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/berserk"},
+  "7770911": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/onslaught"},
+  "7770912": {"type": "physical_pickup_spawn", "entity_def": "pickup/powerup/overdrive"},
   "7770000": "give weapon/player/heavy_cannon",
   "7770001": "give weapon/player/plasma_rifle",
   "7770002": "give weapon/player/rocket_launcher",

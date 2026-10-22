@@ -17,12 +17,13 @@ DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "g
 
 
 def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
-    physical = [item for item in catalog.physical_locations if selected_map in (None, item.map_key)]
+    physical = [item for item in catalog.physical_locations
+                if not item.policy.get('legacy_alias_of') and selected_map in (None, item.map_key)]
     if selected_map is not None and selected_map not in catalog.maps:
         raise ValueError(f"unknown map key: {selected_map}")
     # --map narrows catalog discovery while output remains a complete APWorld table.
     if selected_map is not None:
-        physical = list(catalog.physical_locations)
+        physical = [item for item in catalog.physical_locations if not item.policy.get('legacy_alias_of')]
     rows: list[tuple[str, int | None, str]] = [
         (item.name, item.location_id, item.region) for item in physical
     ]
@@ -266,6 +267,8 @@ def _compile_catalog(
                          (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_plan.py"),
                          (catalog.root / "doom_eap/content/native_enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_safety.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_safety.py").read_bytes())
     from tools.maps.native_enemy_inventory import build_native_recipe_catalog
 
     native = build_native_recipe_catalog(catalog.root)
@@ -332,7 +335,8 @@ def _compile_catalog(
             "schema": 1,
             "maps": {
                 spec.runtime_map: sorted(item.location_id for item in catalog.physical_locations
-                                         if item.map_key == spec.key and item.strategy != "secret_encounter")
+                                         if item.map_key == spec.key and item.strategy != "secret_encounter"
+                                         and not item.policy.get('legacy_alias_of'))
                 for spec in catalog.maps.values() if spec.enabled
             },
         },

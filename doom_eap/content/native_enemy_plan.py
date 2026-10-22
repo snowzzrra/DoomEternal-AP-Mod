@@ -104,7 +104,10 @@ def native_recipe_metadata(plan, map_key):
     runtime_map = plan["maps"][map_key].get("runtime_map", map_key)
     if not isinstance(runtime_map, str) or not runtime_map or len(runtime_map) > 191 or re.fullmatch(r"[A-Za-z0-9_./-]+", runtime_map) is None:
         raise ValueError("Invalid native recipe runtime map")
-    lines = [f"EAP4|{plan['fingerprint']}|{runtime_map}"]
+    identity = plan.get('source_fingerprint', plan['fingerprint'])
+    if re.fullmatch(r"[0-9a-f]{64}", identity) is None:
+        raise ValueError("Invalid native recipe source identity")
+    lines = [f"EAP4|{identity}|{runtime_map}"]
     seen = set()
     for recipe in plan["maps"][map_key]["recipes"]:
         binding = recipe.get("binding")
@@ -209,8 +212,12 @@ def _revision_one_bodies(sources, candidates, settings, intensity, *, seed, key,
     spent, ordinal = Fraction(0), 0
     while ordinal < fixed if fixed is not None else ordinal == 0 or spent < budget:
         draw_key = [key, ordinal]
+        source = roster[ordinal % len(roster)]
+        eligible = [species for species in candidates if species in source['allowed_species']] if source.get('allowed_species') else candidates
+        if not eligible:
+            raise ValueError(f"Native spawn has no enabled compatible species: {source['id']}")
         individual = _random_for(seed, draw_key, "variety").randrange(100) < settings["variety"]
-        species = sample_species(selected, candidates, seed=seed, instance_key=draw_key) if individual else shared
+        species = sample_species(selected, eligible, seed=seed, instance_key=draw_key) if individual or shared not in eligible else shared
         attributes = sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
             stage_index=stage_index, stage_count=stage_count)
         cost = enemy_combat_cost(species, attributes)
@@ -218,16 +225,16 @@ def _revision_one_bodies(sources, candidates, settings, intensity, *, seed, key,
             if ordinal:
                 break
             draws = {candidate: sample_instance_attributes(settings, candidate, seed=seed,
-                instance_key=draw_key, stage_index=stage_index, stage_count=stage_count) for candidate in candidates}
+                instance_key=draw_key, stage_index=stage_index, stage_count=stage_count) for candidate in eligible}
             costs = {candidate: enemy_combat_cost(candidate, attrs) for candidate, attrs in draws.items()}
-            fitting = [candidate for candidate in candidates if costs[candidate] <= budget]
+            fitting = [candidate for candidate in eligible if costs[candidate] <= budget]
             if not fitting:
-                fitting = [candidate for candidate in candidates if costs[candidate] == min(costs.values())]
+                fitting = [candidate for candidate in eligible if costs[candidate] == min(costs.values())]
             species = sample_species(selected, fitting, seed=seed, instance_key=draw_key)
             attributes, cost = draws[species], costs[species]
             if not individual:
                 shared = species
-        bodies[roster[ordinal % len(roster)]["id"]].append({"species": species, "attributes": attributes,
+        bodies[source["id"]].append({"species": species, "attributes": attributes,
             "spawn_type": catalog["species"][species]["spawn_type"], "ai": dict(catalog["species"][species]["ai"]),
             "hitpoints": _body_hitpoints(catalog["species"][species], attributes)})
         spent += cost
@@ -302,6 +309,8 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     if balanced and revision >= 5:
         progress = Fraction(stage_index, max(1, stage_count - 1)) if settings['progressive'] else 0
         target = Fraction(neutral, 2) * (1 + progress) * intensity
+        if revision >= 7:
+            target = Fraction(3 * neutral, 4) * (1 + progress) * intensity
     target_numerator, target_denominator = target.numerator ** 2, target.denominator ** 2
     shared = None
     for ordinal, source in enumerate(roster):
@@ -309,16 +318,20 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         random_draws = {}
         draws = {species: sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
             stage_index=stage_index, stage_count=stage_count, random_draws=random_draws) for species in candidates}
-        costs = {species: enemy_combat_cost(species, attributes) for species, attributes in draws.items()}
+        costs = {species: enemy_combat_cost(species, attributes, buff_totems=revision >= 6,
+                                           screechers=revision >= 7) for species, attributes in draws.items()}
         eligible = candidates
+        if revision >= 6 and source.get('allowed_species'):
+            eligible = [species for species in candidates if species in source['allowed_species']]
+            if not eligible:
+                raise ValueError(f"Native spawn has no enabled compatible species: {source['id']}")
         if source['id'] in supply_sources:
-            eligible = [species for species in candidates if species in AMMO_FODDER]
+            eligible = [species for species in eligible if species in AMMO_FODDER]
             if not eligible:
                 raise ValueError(f"Ammunition source requires an enabled chainsaw fodder species: {source['id']}")
-        elif balanced:
-            eligible = [species for species in candidates if costs[species] <= target * (3 if revision >= 5 else 6)]
-            if not eligible:
-                eligible = [min(candidates, key=lambda species: (costs[species], species))]
+        elif balanced and revision < 7:
+            fitted = [species for species in eligible if costs[species] <= target * (3 if revision >= 5 else 6)]
+            eligible = fitted or [min(eligible, key=lambda species: (costs[species], species))]
         selected_weights = {}
         for species in eligible:
             cost = costs[species]
@@ -332,7 +345,7 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         individual = _random_for(seed, draw_key, 'variety').randrange(100) < settings['variety']
         if shared not in eligible or individual:
             species = sample_species(selected, eligible, seed=seed, instance_key=draw_key)
-            if shared is None: shared = species
+            if shared is None or revision >= 7: shared = species
         else:
             species = shared
         attributes = draws[species]
@@ -342,8 +355,8 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     return bodies
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=5):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=7):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -389,11 +402,23 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=5):
         settings = {**enemies, "special_limits": limits}
         candidates = sorted(species for species in catalog["species"]
                             if enemies["weights"].get(species, 0) > 0 and limits.get(species, 1) > 0
-                            and (species not in {"marauder", "archvile", "spirit"}
+                            and (species not in {'buff_pod', 'zombie_t1_screecher'} or
+                                 (species == 'zombie_t1_screecher' and enemies.get('revision',2)<4) or limits['archvile'] > 0)
+                            and (species not in {"marauder", "archvile", "spirit", "buff_pod"}
+                                 and not (species == 'zombie_t1_screecher' and enemies.get('revision',2)>=4)
                                  or limits["combined_special"] > 0))
         recipes, protected, inactive = [], [], []
         phases = {}
         origins = [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])]
+        if revision >= 6:
+            from .native_enemy_safety import SCRIPTED_BOSS_ACTORS, FLYING_SPAWN_POINTS, FLYING_REPLACEMENTS
+            origins = [{**source, 'protected_reason': 'scripted boss acquisition actor'}
+                       if (source.get('binding') or {}).get('entity') in SCRIPTED_BOSS_ACTORS.get(map_key, ())
+                       else {**source, 'protected_reason': 'airborne spawn requires a flying species'}
+                       if (source.get('binding') or {}).get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) and not FLYING_REPLACEMENTS.intersection(candidates)
+                       else {**source, 'allowed_species': sorted(FLYING_REPLACEMENTS)}
+                       if (source.get('binding') or {}).get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) else source
+                       for source in origins]
         supplies = ammunition_sources(origins, catalog) if revision >= 4 else frozenset()
         for source in origins:
             if not source.get("protected_reason") and not source.get("inactive_reason"):
@@ -479,7 +504,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=5):
         if revision >= 5: maps[map_key]['wave_progression'] = phase_progression
         original_cost = sum((Fraction(source["combat_cost"]) for sources in phases.values() for source in sources
                              if not source.get("runtime_only")), Fraction(0))
-        actual_cost = sum((enemy_combat_cost(body["species"], body["attributes"])
+        actual_cost = sum((enemy_combat_cost(body["species"], body["attributes"], buff_totems=revision >= 6, screechers=revision >= 7)
                            for recipe in recipes if not recipe["runtime_only"] for body in recipe["bodies"]), Fraction(0))
         combat_costs[map_key] = {"original": float(original_cost), "target": float(original_cost * intensity),
                                "actual": float(actual_cost)}
@@ -493,7 +518,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=5):
                 source = by_id[recipe['id']]
                 phase = recipe['wave'] if revision >= 5 else source.get('phase', source['id'])
                 wave_costs[phase] = wave_costs.get(phase, Fraction(0)) + sum(
-                    (enemy_combat_cost(body['species'], body['attributes']) for body in recipe['bodies']), Fraction(0))
+                    (enemy_combat_cost(body['species'], body['attributes'], buff_totems=revision >= 6, screechers=revision >= 7) for body in recipe['bodies']), Fraction(0))
                 wave_bodies[phase] = wave_bodies.get(phase, 0) + len(recipe['bodies'])
             ordered = sorted(wave_costs.values())
             present = {body['species'] for recipe in active for body in recipe['bodies']}

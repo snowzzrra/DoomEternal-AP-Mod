@@ -969,6 +969,12 @@
           "minimum": 0
         },
         {
+          "key": "Berserk",
+          "label": "Berserk",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        {
           "key": "Bullet Ammo",
           "label": "Bullet Ammo",
           "maximum": 10000,
@@ -1019,6 +1025,18 @@
         {
           "key": "Large Health",
           "label": "Large Health",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        {
+          "key": "Onslaught",
+          "label": "Onslaught",
+          "maximum": 10000,
+          "minimum": 0
+        },
+        {
+          "key": "Overdrive",
+          "label": "Overdrive",
           "maximum": 10000,
           "minimum": 0
         },

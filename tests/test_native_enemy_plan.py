@@ -1,4 +1,5 @@
 from copy import deepcopy
+from fractions import Fraction
 
 import pytest
 
@@ -22,6 +23,19 @@ def settings(**options):
     return normalize_enemy_options({"enemy_size_variation_chance": 0,
         **{f"enemy_{name}": {"minimum": 100, "maximum": 100} for name in ("health", "damage", "speed", "size")},
         **options})
+
+
+def test_late_balanced_waves_can_include_expensive_specials_and_keep_the_body_floor():
+    from importlib.resources import files
+    import json
+    from doom_eap.content.native_enemy_plan import _phase_bodies
+    source=json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    options=settings(enemy_variety=100)
+    candidates=sorted(name for name in source['species'] if options['weights'].get(name,0)>0)
+    bodies=_phase_bodies([{'id':'wave','logical_count':400}],candidates,options,Fraction(145,100),
+        seed=7,key='late_arena',catalog=source,stage_index=5,stage_count=6,balanced=True,revision=7)['wave']
+    assert len(bodies)==400
+    assert {'archvile','marauder','doom_hunter'} <= {body['species'] for body in bodies}
 
 
 def test_auto_preserves_variety_after_the_original_budget_would_be_exhausted():

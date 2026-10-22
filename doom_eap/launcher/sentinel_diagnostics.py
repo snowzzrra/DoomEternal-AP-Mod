@@ -26,10 +26,10 @@ def collect(config, session):
                 start = max(0, size - 1024 * 1024)
                 stream.seek(start)
                 if start:
-                    stream.readline(65537)
+                    stream.readline(131073)
                 raw = stream.read(1024 * 1024)
             for line in raw.splitlines():
-                if len(line) > 65536:
+                if len(line) > 131072:
                     continue
                 record = json.loads(line)
                 if (not isinstance(record, dict) or record.get("schema") != "sentinel-startup-v1"

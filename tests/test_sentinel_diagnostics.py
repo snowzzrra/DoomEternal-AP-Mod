@@ -19,3 +19,8 @@ def test_diagnostics_correlate_only_selected_process(tmp_path, monkeypatch):
     assert len(result["records"]) == 2
     assert result["records"][0]["correlation"] == {"build_matches": True, "namespace_matches": True}
     assert result["records"][1]["correlation"]["namespace_matches"] is False
+    (root / "71-123.latest.json").write_text(json.dumps({**record, "padding": "x" * 70000}))
+    result = collect(config, session)
+    assert len(result['records']) == 3 and len(result['records'][-1]['padding']) == 70000
+    (root / "71-123.latest.json").write_text(json.dumps({**record, "padding": "x" * 140000}))
+    assert len(collect(config, session)['records']) == 2

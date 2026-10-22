@@ -11,7 +11,7 @@ def test_secret_timer_uses_source_duration_once(duration, field):
         {"entity": "secret", "duration_ms": duration},
     ]}}}
     result = apply_secret_encounter_timers(source, "game/test.entities", registry)
-    assert f"challengeDuration = {duration * 3 // 2};" in result
+    assert f"challengeDuration = {max(duration * 5 // 4, duration + 5000) * 3 // 2};" in result
     assert "otherDuration = 3;" in result
     assert apply_secret_encounter_timers(result, "game/test.entities", registry) == result
     assert apply_secret_encounter_timers(source, "game/other.entities", registry) == source
@@ -19,7 +19,7 @@ def test_secret_timer_uses_source_duration_once(duration, field):
         apply_secret_encounter_timers("", "game/test.entities", registry)
 
 
-@pytest.mark.parametrize("easier,expected", [(False, 24000), (True, 36000)])
+@pytest.mark.parametrize("easier,expected", [(False, 30000), (True, 45000)])
 def test_frozen_timer_replaces_source_duration_and_never_compounds(easier, expected):
     source = 'entity { entityDef secret { class = "idTarget_EncounterChallenge"; edit = { challengeDuration = 10000; } } }'
     registry = {"maps": {"test": {"entities_path": "test.entities", "timers": [

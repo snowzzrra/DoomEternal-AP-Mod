@@ -350,16 +350,12 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "automap station"
-    ],
+    "forbidden_ap_terms": [],
     "required_source_edge": {
       "from": "game_target_relay_28",
       "to": "game_target_level_transition_1"
     },
-    "excluded_entities": [
-      "game_interact_automap_1_e3m2"
-    ]
+    "excluded_entities": []
   },
   "checks": [
     "source hash locked and byte-identical to decompressed patch2 owner payload",

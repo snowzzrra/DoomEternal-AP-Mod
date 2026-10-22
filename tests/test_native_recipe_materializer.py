@@ -5,7 +5,7 @@ from textwrap import dedent
 import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata
+from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
 from tools.maps.encounter_catalog import entity_records, list_items
 from tools.maps.native_recipe_materializer import materialize_native_recipe_definitions, materialize_native_recipe_calls
 
@@ -46,6 +46,18 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
         **{f"enemy_{name}": {"minimum": 100, "maximum": 100} for name in ("damage", "speed", "size")},
         "enemy_health": {"minimum": 200, "maximum": 200}})
     return build_native_recipes(options, {"sequence": ["map"]}, seed=8, catalog=catalog)
+
+
+def test_checkpoint_body_library_reuses_identical_definitions():
+    plan = frozen_plan()
+    recipe = plan['maps']['map']['recipes'][0]
+    plan['maps']['map']['compatibility_recipes'] = [deepcopy(recipe)]
+    plan['fingerprint'] = native_recipe_fingerprint(plan)
+    compiled = materialize_native_recipe_definitions(SOURCE, 'map', plan, {'map': SOURCE})
+    records = list(entity_records(compiled))
+    assert sum(row['name'] == recipe['bodies'][0]['definition'] for row in records) == 1
+    compatible, = [row for row in records if row['name'] == 'ap_v070_compat_r' + recipe['origin']]
+    assert len(list_items(compatible['edit']['entityDefs'])) == recipe['physical_count']
 
 
 @pytest.mark.parametrize('authored_initial', [False, True])
@@ -107,7 +119,7 @@ def test_entrance_uses_ground_from_its_encounter_without_moving_native_points():
     assert next(entity_records(source, include_names={'point'})) == next(entity_records(compiled, include_names={'point'}))
 
 
-@pytest.mark.parametrize('marker_kind', ['navigation', 'spawn_parent', 'player_destination', 'pickup'])
+@pytest.mark.parametrize('marker_kind', ['navigation', 'spawn_parent', 'player_destination', 'pickup', 'distant_wave'])
 def test_animation_only_encounter_uses_ground_marker_without_changing_frozen_recipe(marker_kind):
     source = SOURCE.replace('edit = { entityDefs', '''edit = {
         spawnPosition = { z = -10; }
@@ -133,7 +145,17 @@ def test_animation_only_encounter_uses_ground_marker_without_changing_frozen_rec
             'entityDef floor { inherit = "pickup/armor/medium"; class = "idProp2";')
         source = source.replace('snapToGround = true; spawnPosition = { x = 60;',
             'snapToGround = false; spawnPosition = { x = 60;')
-    plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1)
+    bindings=None
+    if marker_kind == 'distant_wave':
+        source += '''entity {
+    entityDef distant { inherit = "target/spawn"; class = "idTarget_Spawn";
+        edit = { spawnPosition = { x = 200; }
+            entityDefs = { num = 1; item[0] = { name = "original"; } } }
+    }
+}
+'''
+        bindings=[{'mode':'event','reference':point,'owner':'arena'} for point in ('point','distant')]
+    plan = frozen_plan(source, family='immediate', logical_count=1, maximum=1,bindings=bindings)
     before = deepcopy(plan)
     compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map': source})
     helper, = [r for r in entity_records(compiled) if r['name'].startswith('ap_v070_landing_')]

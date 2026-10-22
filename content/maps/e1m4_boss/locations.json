@@ -46,7 +46,7 @@
       "policy": "vanilla_only"
     },
     "AP_CHECK_WING_B_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_03_1": {
-      "policy": "vanilla_only"
+      "policy": "ap_only"
     },
     "AP_CHECK_WING_B_PROGRESS_PRAETOR_TOKEN_1_E1M4": {
       "policy": "ap_only"
@@ -108,19 +108,10 @@
       }
     },
     "wing_b_pickup_collectible_albums_album_03_1": {
-      "native_entity_contract": {
-        "original_targets": [],
-        "set_properties": {
-          "model": "art/pickups/codex.lwo"
-        },
-        "required_snippets": [
-          "inherit = \"pickup/collectible/albums/album_03\";",
-          "triggerDef = \"trigger/props/progression_collectibles\";",
-          "useableComponentDecl = \"propitem/collectible/albums/album_03\";",
-          "stat = \"STAT_COLLECTIBLE_ALBUM_FOUND\";"
-        ]
-      },
-      "duplicate_policy": "native_only"
+      "independent_ap_trigger": true,
+      "remove_original": true,
+      "preserve_targets": [],
+      "drop_targets": []
     },
     "intro_interact_automap_1_e1m4": {
       "permanent_resource_budget": false

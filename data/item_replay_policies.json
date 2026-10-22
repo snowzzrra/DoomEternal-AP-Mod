@@ -1,6 +1,9 @@
 {
   "version": 2,
   "items": {
+    "7770910": {"name": "Berserk", "policy": "never_replay"},
+    "7770911": {"name": "Onslaught", "policy": "never_replay"},
+    "7770912": {"name": "Overdrive", "policy": "never_replay"},
     "7770000": {
       "name": "Heavy Cannon",
       "policy": "replay_manual_only"

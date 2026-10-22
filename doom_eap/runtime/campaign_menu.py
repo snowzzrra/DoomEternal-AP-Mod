@@ -85,6 +85,7 @@ class CampaignMenu:
             entries = [(1, entry) for entry in reward.challenges] if reward else []
             if reward and reward.aggregate:
                 entries.append((2, reward.aggregate))
+            entries.extend((4, entry) for entry in snapshot.get('encounter_rewards', {}).get(row['stage'], ()))
             if reward and (reward.namespace != link.namespace or reward.runtime_map != row["map"]):
                 raise RuntimeError("Native rewards belong to a different campaign view")
             rewards.append(_reward_wire(bool(reward and reward.known), entries))

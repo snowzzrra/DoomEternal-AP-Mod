@@ -405,15 +405,12 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "automap station"
-    ],
+    "forbidden_ap_terms": [],
     "required_source_edge": {
       "from": "temp_all_scripting_target_level_transition_1",
       "to": "maps/game/sp/e3m4_boss/e3m4_boss.map"
     },
     "excluded_entities": [
-      "temple_interior_interact_automap_1_e3m3",
       "cine_light_slayer_key1",
       "temp_all_scripting_trigger_level_transition",
       "temp_all_scripting_target_relay_65"

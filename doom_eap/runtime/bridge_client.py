@@ -4445,6 +4445,9 @@ class DoomEternalContext(CommonContext):
             }
             projection["masteries"] = self._mission_presentations.mastery_snapshot(
                 facts, placements, WEAPON_MASTERY_ENTRIES)
+            projection['encounter_rewards'] = {row['stage']: self._mission_presentations.encounter_snapshot(
+                row['map'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
+                for row in projection['rows']}
             ratings = self._connected_slot_data.get("mission_presentation_v2",
                                                     self._connected_slot_data.get("mission_presentation_v1", {}))
             projection["ratings_version"] = 2 if "mission_presentation_v2" in self._connected_slot_data else 1

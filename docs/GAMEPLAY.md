@@ -37,11 +37,14 @@ Health, damage, speed and size ranges use percentages: 100% is the usual value.
 Equal minimum and maximum values fix an attribute. An individual enemy's setting
 overrides the global range. Some scripted enemies and bosses keep their native behavior.
 
-**Special Enemy Limits** caps simultaneous randomized Marauders, Arch-viles and
-Spirits. Setting a weight to zero excludes that species from random picks.
+**Special Enemy Limits** caps simultaneous randomized Marauders, Arch-viles,
+Spirits, Buff Totems and Screechers. Totems and Screechers share the Arch-vile
+limit and the combined special limit. Setting a weight to zero excludes that
+species from random picks.
 
-Secret Encounter timers scale with their randomized enemies. **Easier Secret
-Encounters** adds 50% more time. Slayer Gate indicators show key ownership and
+Secret Encounter timers scale with their randomized enemies and include 25%
+extra time, with at least five extra seconds. **Easier Secret Encounters** adds
+another 50%. Slayer Gate indicators show key ownership and
 turn green after the server confirms completion.
 
 ## Kill rewards

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "item_mapping_revision": 9,
   "source": "Archipelago/worlds/doometernal/items.py",
-  "source_sha256": "889e7aae61ab8eec668fc6086eeb8618c978d3bf9d3b2143cdee64bcd8cec12a",
+  "source_sha256": "6a1c067679664eceb26188d58a30ac13cb89811ce03f6e2e475ec7da1c30c301",
   "items": {
     "7770000": {
       "name": "Heavy Cannon",
@@ -519,6 +519,18 @@
     "7770904": {
       "name": "Progressive Blood Punch",
       "classification": 2
+    },
+    "7770910": {
+      "name": "Berserk",
+      "classification": 0
+    },
+    "7770911": {
+      "name": "Onslaught",
+      "classification": 0
+    },
+    "7770912": {
+      "name": "Overdrive",
+      "classification": 0
     }
   }
 }

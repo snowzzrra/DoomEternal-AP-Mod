@@ -20,6 +20,7 @@ def apply_secret_encounter_timers(text: str, member: str, registry: dict,
             duration = (frozen_timers or {}).get(map_key, {}).get(timer["entity"], timer["duration_ms"])
             if type(duration) is not int or not 1 <= duration <= 0x7fffffff:
                 raise ValueError("Secret Encounter duration is outside the game's range")
+            duration = max(duration * 5 // 4, duration + 5000)
             if easier:
                 duration = duration * 3 // 2
             if duration > 0x7fffffff:

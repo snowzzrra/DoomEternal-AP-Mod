@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 2
+ENEMY_OPTIONS_REVISION = 4
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -115,6 +115,9 @@ def _attribute(raw, name, automatic, progressive):
 
 
 def normalize_enemy_options(raw):
+    revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
+    if revision not in (2, 3, ENEMY_OPTIONS_REVISION):
+        raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
         preset = "slayers_path"
@@ -139,6 +142,10 @@ def normalize_enemy_options(raw):
     eligible = [species for species in SPECIES_IDS if dlc or species not in DLC_SPECIES]
     weights = {species: (recipe.group_weights[index] if index < 4 else 0)
                for index, members in enumerate(SPECIES_GROUPS.values()) for species in members}
+    if revision >= 3:
+        weights['buff_pod'] = min(recipe.group_weights[2:])
+    if revision >= 4:
+        weights['zombie_t1_screecher'] = min(recipe.group_weights[2:])
     if preset == "oops_all_imps":
         weights.update(imp=900, stone_imp=100)
     elif preset == "pinata_party":
@@ -188,7 +195,7 @@ def normalize_enemy_options(raw):
                 endpoint[name] = min(endpoint[name], endpoint["combined_special"])
     if not progressive:
         late_limits = dict(limits)
-    return {"revision": ENEMY_OPTIONS_REVISION, "enabled": enabled, "progressive": progressive,
+    return {"revision": revision, "enabled": enabled, "progressive": progressive,
             "intensity": intensity, "density": density, "variety": variety, "count_mode": count_mode,
             "count_multiplier": multiplier, "weights": weights, "attributes": attributes,
             "size_variation_chance": chance, "size_variation_exclusions": size_exclusions,

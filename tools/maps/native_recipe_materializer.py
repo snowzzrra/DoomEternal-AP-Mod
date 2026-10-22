@@ -219,6 +219,14 @@ def _entrance_landings(recipes, records):
     for recipe in recipes:
         for name in points[recipe['binding'].get('reference', '')]:
             edit = records[name]['edit']
+            spawn = edit.get('spawnEditable', {})
+            if spawn.get('aiStateOverride') in {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}:
+                target = spawn.get('initialTargetOverride')
+                traversal = records.get(target, {})
+                if (traversal.get('class') == 'idInfoTraversal' and target in positions and
+                        'traversalEndpoint' in traversal['edit']):
+                    choices.setdefault(name, []).append(((0, target), target))
+                    continue
             if edit.get('spawnEditable', {}).get('aiStateOverride') not in {
                     'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION',
                     'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES'}:
@@ -229,8 +237,10 @@ def _entrance_landings(recipes, records):
                 continue
             def distance(other):
                 return sum((position[axis]-positions[other][axis])**2 for axis in ('x','y','z')), other
-            if scope(recipe) in fallback_owners:
-                candidates = {other for other in candidates if distance(other)[0] <= 50**2}
+            candidates = {other for other in candidates if distance(other)[0] <= 50**2}
+            if scope(recipe) in fallback_owners or not candidates:
+                if not candidates:
+                    candidates = {other for other in anchors if distance(other)[0] <= 50**2}
                 if not candidates:
                     candidates = {other for other in pickups if distance(other)[0] <= 50**2}
                 animation = edit.get('spawnEditable', {}).get('spawnAnim', '')
@@ -286,12 +296,24 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
         names.add(helper)
         anchor = records[landing]
         edit = {key: anchor['edit'][key] for key in ('spawnPosition', 'spawnOrientation') if key in anchor['edit']}
+        if ('traversalEndpoint' in anchor['edit'] and
+                records[point]['edit'].get('spawnEditable', {}).get('aiStateOverride') in
+                {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}):
+            endpoint = anchor['edit']['traversalEndpoint']
+            matrix = anchor['edit'].get('spawnOrientation', {}).get('mat', {})
+            edit['spawnPosition'] = {axis: anchor['edit']['spawnPosition'].get(axis, 0) + sum(
+                endpoint.get(local, 0) * matrix.get(f'mat[{index}]', {local: 1}).get(axis, 0)
+                for index, local in enumerate(('x', 'y', 'z'))) for axis in ('x', 'y', 'z')}
+            if not all(math.isfinite(value) for value in edit['spawnPosition'].values()):
+                raise ValueError('Native traversal landing is not finite')
         edit['spawnEditableShared'] = {'groupName': helper}
         generated.append('entity {\n\tentityDef ' + helper + ' {\n\t\tinherit = "target/spawn";\n'
             '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
             _render(edit, 2) + '\n\t}\n}')
     functional_libraries = {}
-    for recipe in stage["recipes"]:
+    emitted_bodies = {}
+    for recipe, compatible in ([(recipe, False) for recipe in stage['recipes']] +
+                               [(recipe, True) for recipe in stage.get('compatibility_recipes', [])]):
         recipe_definitions = []
         reference = recipe["binding"].get("reference", recipe["binding"].get("entity", ""))
         source_names = sorted(reachable(reference)) if recipe["family"] != "summon" else []
@@ -301,9 +323,13 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
             raise ValueError("Invalid native recipe origin")
         for body, name in _body_definitions(recipe, stage):
             reference, attributes = body["ai"], body["attributes"]
+            if compatible and emitted_bodies.get(name) == body:
+                recipe_definitions.append({"name": name})
+                continue
             if name in names:
                 raise ValueError(f"Duplicate native body definition: {name}")
             names.add(name)
+            emitted_bodies[name] = body
             validate_enemy_speed_percent(body["species"], attributes["speed_percent"])
             key = tuple(reference[field] for field in ("map_key", "entity", "sha256"))
             if key not in donors:
@@ -343,7 +369,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
             definitions.append({"name": name})
             recipe_definitions.append({"name": name})
         values = {"num": len(recipe_definitions), **{f"item[{i}]": value for i, value in enumerate(recipe_definitions)}}
-        body_library = "ap_v070_bodies_r" + recipe["origin"]
+        body_library = ("ap_v070_compat_r" if compatible else "ap_v070_bodies_r") + recipe["origin"]
         if body_library in names:
             raise ValueError("Duplicate native body library")
         names.add(body_library)
@@ -365,7 +391,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
     if library in names:
         raise ValueError("Duplicate native recipe library")
     metadata = native_recipe_metadata(plan, map_key)
-    # native parser limits shit to 2046 bytes, so we gotta limit the metadata so it doesnt cut off
+    # native entity string fields accept at most 2046 encoded bytes.
     if len(metadata.encode("ascii")) > 1800:
         chunks = [metadata[offset:offset + 1800] for offset in range(0, len(metadata), 1800)]
         for index, chunk in enumerate(chunks):
@@ -422,7 +448,11 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps):
             if original["class"] != "idAI2" or name in changes:
                 raise ValueError("Independent native binding differs from the source")
             replacement, definitions = _independent_definitions(recipe, original, names)
-            changes[name] = first, last, replacement
+            if name not in plan['maps'][map_key].get('passthrough_actors', []):
+                changes[name] = first, last, replacement
+            else:
+                marker = 'ap_v070_passthrough_r' + recipe['origin']
+                aliases.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
             aliases.extend(definitions)
             continue
         if binding["mode"] == "summon" and binding["entity"]:

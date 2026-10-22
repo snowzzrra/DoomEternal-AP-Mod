@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
-from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace, replace_targets_block
+from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace, neutralize_conditional_pickup_block, replace_targets_block
 
 VISITS = ("from_e1m1", "from_e1m2", "from_e1m4", "from_e2m1",
           "from_e2m2", "from_e2m4", "from_e3m1")
@@ -179,6 +179,23 @@ def project_fortress(text: str, config: dict) -> str:
     mission_select_enable = mission_select_action.replace("ap_fortress_mission_select", "ap_fortress_mission_select_enable", 1)
     mission_select_enable = mission_select_enable.replace('action = "IA_USE_SUCCEED";', 'action = "IA_ACTIVATE_ANY";', 1)
     text = _portal_navigation(text)
+    bounds = find_entity_block_bounds(text, "interact_hub_master_level_panel")
+    if bounds is None:
+        raise ValueError("Fortress Master Levels interaction is missing")
+    panel = text[slice(*bounds)]
+    for field in ("interaction", "touchData"):
+        match = re.search(rf"\b{field}\s*=\s*\{{", panel)
+        if match is None:
+            raise ValueError(f"Fortress Master Levels {field} is missing")
+        end = find_matching_brace(panel, panel.index("{", match.start()))
+        panel = panel[:match.start()] + panel[end:]
+    panel = neutralize_conditional_pickup_block(panel)
+    text = text[:bounds[0]] + panel + text[bounds[1]:]
+    bounds = find_entity_block_bounds(text, "guis_func_guis_gui_4")
+    if bounds is None or 'swf = "swf/worldgui/guientity/hub_masterlevels.swf";' not in text[slice(*bounds)]:
+        raise ValueError("Fortress Master Levels hologram is missing")
+    hologram = neutralize_conditional_pickup_block(text[slice(*bounds)])
+    text = text[:bounds[0]] + hologram + text[bounds[1]:]
     for alias, code in config["entities"].items():
         layer = content_layer(code)
         source = alias.removeprefix("AP_CHECK_").lower()

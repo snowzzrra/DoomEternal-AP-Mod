@@ -45,9 +45,7 @@
       "from": "game_target_relay_getcrucible",
       "to": "game_target_give_item_1"
     },
-    "excluded_entities": [
-      "interact_automap_1_e3m1"
-    ]
+    "excluded_entities": []
   },
   "challenge_notes": {
     "excluded_codex": 7770326,

@@ -121,7 +121,7 @@ def test_room_finalizer_installs_and_clears_native_banks_without_species_imports
     package = base.parent / "room.zip"
     for active in (plan, None):
         with zipfile.ZipFile(package, "w") as archive:
-            archive.writestr("seed_manifest.json", json.dumps({"options": {"enemy_plan": active}}))
+            archive.writestr("seed_manifest.json", json.dumps({"options": {"enemy_plan": active, "enemies": {}}}))
             archive.writestr("seed_receipt.json", json.dumps({'native_resource_roots': ROOTS if active else {}}))
         result = campaign_resources.enable_campaign_resources(base.parent, package)
         assert result["state"] == "enabled"

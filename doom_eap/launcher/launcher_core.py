@@ -889,6 +889,9 @@ class RoomCompiler:
         decompressor = self._verified_decompressor()
 
         placement_by_id = {record.location_id: record for record in placements}
+        from doom_eap.content.content_catalog import load_content_catalog
+        inactive_aliases = {spec.ap_check: spec.location_id for spec in load_content_catalog().physical_locations
+                            if spec.policy.get("legacy_alias_of") and spec.location_id not in placement_by_id}
         secret_timers = None
         easier_secrets = (options or {}).get("easier_secret_encounters", False)
         frozen_timers = ((options or {}).get("enemy_plan") or {}).get("secret_timers", {})
@@ -955,6 +958,15 @@ class RoomCompiler:
                 if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
                     from tools.maps.ap_map_generator import remove_blood_punch_grants
                     text = remove_blood_punch_grants(text)
+                if inactive_aliases:
+                    from tools.maps.ap_map_generator import find_entity_block_bounds, neutralize_conditional_pickup_block
+                    for check, location_id in inactive_aliases.items():
+                        bounds = find_entity_block_bounds(text, check)
+                        if bounds is not None:
+                            text = text[:bounds[0]] + neutralize_conditional_pickup_block(text[slice(*bounds)]) + text[bounds[1]:]
+                        bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                        if bounds is not None:
+                            text = text[:bounds[0]] + text[bounds[1]:]
                 if secret_timers is not None:
                     from doom_eap.content.secret_encounter_timers import apply_secret_encounter_timers
                     text = apply_secret_encounter_timers(text, member, secret_timers,
@@ -1095,7 +1107,7 @@ class RoomCompiler:
             raise ValueError("Fortress placement label specification must cover exactly 13 anchors")
 
         entities: list[str] = []
-        for location_id in sorted(expected):
+        for location_id in sorted(expected - {7770171}):
             record = placement_by_id[location_id]
             if record.trap:
                 display = "A TRAP\\nFOR SOMEONE"
@@ -1264,13 +1276,17 @@ class RoomCompiler:
         validate_frozen_enemy_plan(plan, manifest.options["enemies"])
         if plan is None:
             return {}
+        from doom_eap.content.native_enemy_safety import project_native_safety
+        plan = project_native_safety(plan, manifest.options["enemies"])
+        if plan.get('compiler_adjustments'):
+            assembled['enemy_safety_adjustments.json'] = (json.dumps(plan['compiler_adjustments'], indent=2) + '\n').encode('utf8')
         changed_maps = {key: row for key, row in plan["maps"].items() if row["recipes"]}
         if not changed_maps:
             return {}
         required_sources = set(changed_maps)
         try:
             for row in changed_maps.values():
-                required_sources.update(body["ai"]["map_key"] for recipe in row["recipes"] for body in recipe["bodies"])
+                required_sources.update(body["ai"]["map_key"] for recipe in [*row["recipes"], *row.get('compatibility_recipes', [])] for body in recipe["bodies"])
         except (KeyError, TypeError) as error:
             raise ValueError("Enemy generation source references are malformed") from error
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
@@ -1280,7 +1296,7 @@ class RoomCompiler:
         resource_roots = {}
         for key, row in changed_maps.items():
             references = {tuple(body["ai"][field] for field in ("map_key", "entity", "sha256"))
-                          for recipe in row["recipes"] for body in recipe["bodies"]}
+                          for recipe in [*row["recipes"], *row.get('compatibility_recipes', [])] for body in recipe["bodies"]}
             roots, assets = set(), {}
             for map_key, entity, sha in sorted(references):
                 profile = precache.get(sha)

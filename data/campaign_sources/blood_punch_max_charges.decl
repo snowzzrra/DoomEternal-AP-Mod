@@ -1,0 +1,12 @@
+{
+	inherit = "perk/player/blood_punch/base";
+	edit = {
+		displayName = "#str_decl_bloodpunch_upgrade_max_charges";
+		pickupName = "#str_decl_callout_encounter_khan_maykr_GHOST82854";
+		notificationSubtext = "#str_decl_callout_encounter_khan_maykr_defeated_GHOST82859";
+		description = "#str_decl_ability_bloodpunch_upgrade_maxcharges_desc_alt_2_GHOST62754";
+		upgrades = {
+			item[0] = "upgrade/blood_punch/max_charges";
+		}
+	}
+}

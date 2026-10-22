@@ -569,6 +569,7 @@ def apply_native_entity_contract(block, contract):
 
 TARGET_POLICY_CONSUMERS = {
     "permanent_resource_budget": "authorial resource budget metadata",
+    "legacy_alias_of": "compile_content_catalog shared physical pickup",
     "independent_ap_trigger": "generate_map independent-trigger branch",
     "remove_original": "generate_map original-owner branch",
     "drop_targets": "build_independent_targets",
@@ -714,6 +715,14 @@ def validate_target_policies(config_entities, target_policies, content):
                 f"Target policy has unsupported key(s) for {entity_name}: "
                 + ", ".join(unknown)
             )
+        if "legacy_alias_of" in policy:
+            primary = policy["legacy_alias_of"]
+            if (type(primary) is not int or not entity_name.endswith("_b") or
+                    set(policy) != {"legacy_alias_of"} or
+                    config_entities.get(f"AP_CHECK_{entity_name[:-2].upper()}") != primary or
+                    find_entity_block_bounds(content, entity_name[:-2]) is None):
+                raise ValueError(f"Legacy pickup alias has no matching primary check: {entity_name}")
+            continue
         if policy.get("ap_touch_only"):
             if "native_entity_contract" not in policy:
                 raise ValueError(
@@ -2198,12 +2207,15 @@ def progressive_effect_command(effect):
 
 
 def generate_physical_pickup_spawn(item_id, command_value):
-    """Emit one repeatable native spawner and one concrete Berserk pickup template."""
-    if command_value != {
-        "type": "physical_pickup_spawn",
-        "entity_def": "pickup/powerup/berserk",
+    """Emit a repeatable spawner for one native powerup pickup."""
+    effect = command_value.get("entity_def", "").removeprefix("pickup/powerup/")
+    if effect not in {"berserk", "onslaught", "overdrive"} or command_value != {
+        "type": "physical_pickup_spawn", "entity_def": f"pickup/powerup/{effect}",
     }:
         raise ValueError(f"Unsupported physical pickup definition for item {item_id}")
+    model = "berserker" if effect == "berserk" else effect
+    sound = "haste" if effect == "overdrive" else effect
+    play, stop = ("play", "stop") if effect == "berserk" else ("Play", "Stop")
     spawner_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
     pickup_name = f"{spawner_name}_pickup"
     spawner = build_primitive(
@@ -2212,8 +2224,9 @@ def generate_physical_pickup_spawn(item_id, command_value):
         {"pickup_entity": pickup_name, "spawn_at": "player1"},
     )
     pickup = f'''entity {{
+	layers {{ "spawn_target_layer" }}
 	entityDef {pickup_name} {{
-		inherit = "pickup/powerup/berserk";
+		inherit = "pickup/powerup/{effect}";
 		class = "idProp2";
 		expandInheritance = false;
 		poolCount = 0;
@@ -2235,7 +2248,7 @@ def generate_physical_pickup_spawn(item_id, command_value):
 					y = 2;
 					z = 2;
 				}}
-				model = "art/pickups/powerup/berserker_powerup.lwo";
+				model = "art/pickups/powerup/{model}_powerup.lwo";
 			}}
 			dormancy = {{
 				delay = 5;
@@ -2262,11 +2275,11 @@ def generate_physical_pickup_spawn(item_id, command_value):
 					monsterClip = false;
 				}}
 			}}
-			fxDecl = "gameplay/powerups/berserk";
-			useableComponentDecl = "propstatuseffect/berserk";
+			fxDecl = "gameplay/powerups/{effect}";
+			useableComponentDecl = "propstatuseffect/{effect}";
 			thinkComponentDecl = "bobthink";
-			sound_spawn = "play_berserk_pickup_loop";
-			sound_stop = "stop_berserk_pickup_loop";
+			sound_spawn = "{play}_{sound}_pickup_loop";
+			sound_stop = "{stop}_{sound}_pickup_loop";
 			pickup_statIncreases = {{
 				num = 2;
 				item[0] = {{
@@ -3177,29 +3190,8 @@ def generate_map(
                                 )
                             )
                         new_blocks.append(generate_check_event(secondary_location_id))
-                        secondary_policy = copy.deepcopy(target_policy)
-                        secondary_position = list(
-                            target_policy.get("independent_position") or _spawn_position_from_block(block)
-                        )
-                        secondary_position[0] += 1.5
-                        secondary_policy["independent_position"] = secondary_position
-                        if not target_policy.get("no_auto_automap_helper"):
-                            new_blocks.append(generate_automap_location_helper(
-                                block, secondary_location_id, policy=secondary_policy
-                            ))
-                        secondary_universal = build_universal_physical_policy(
-                            secondary_ap_check_id,
-                            secondary_location_id,
-                            block,
-                            default_visual_model,
-                            policy=secondary_policy,
-                        )
-                        secondary_visual = generate_inert_location_visual(block, secondary_universal)
-                        if secondary_visual:
-                            new_blocks.append(secondary_visual)
                         new_blocks.append(generate_target_relay(
                             secondary_ap_check_id, secondary_location_id, "",
-                            completion_targets=[secondary_universal["independent_visual"]["cleanup_entity"]],
                             include_notification=include_ap_feedback,
                         ))
                     new_blocks.append(generate_target_relay(
