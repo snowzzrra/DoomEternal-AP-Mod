@@ -1320,7 +1320,8 @@ class RoomCompiler:
                 member = self.payload_manifest["maps"][map_key]["target_member"]
                 if member not in assembled:
                     raise ValueError(f"Enemy generation map is not active: {map_key}")
-                materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources)
+                materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
+                    enemy_revision=manifest.options["enemies"].get("revision", 2))
                 source_path = staged / f"{map_key}.source"
                 output_path = staged / f"{map_key}.entities"
                 source_path.write_bytes(materialized.encode("utf-8"))

@@ -278,8 +278,9 @@ def _body_definitions(recipe, settings):
             raise ValueError("Unexpected native partial credit definition")
 
 
-def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
+def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2):
     stage = plan["maps"][map_key]
+    settings = {**stage, "revision": enemy_revision}
     if re.fullmatch(r"[a-z0-9_]+", map_key) is None:
         raise ValueError("Invalid native recipe map key")
     if hashlib.sha256(source.encode("utf8")).hexdigest() != stage["source_sha256"]:
@@ -321,7 +322,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
             raise ValueError("Native recipe body quantity differs")
         if re.fullmatch(r"[0-9a-f]{20}", recipe["origin"]) is None:
             raise ValueError("Invalid native recipe origin")
-        for body, name in _body_definitions(recipe, stage):
+        for body, name in _body_definitions(recipe, settings):
             reference, attributes = body["ai"], body["attributes"]
             if compatible and emitted_bodies.get(name) == body:
                 recipe_definitions.append({"name": name})
@@ -411,10 +412,10 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps):
     return source + "\n\n" + "\n\n".join(generated) + "\n"
 
 
-def materialize_native_recipe_calls(source, map_key, plan, source_maps):
+def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
     from tools.maps.enemy_attributes import _edit
 
-    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps)
+    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
     for recipe in plan["maps"][map_key]["recipes"]:

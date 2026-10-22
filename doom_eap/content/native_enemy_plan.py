@@ -298,8 +298,15 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     bodies = {source['id']: [] for source in sources}
     if not candidates:
         return bodies
-    roster = [source for source in sources
-              for _ in range((source['logical_count'] * max(100, settings['density']) + 99) // 100)]
+    if revision >= 8:
+        roster = [source for source in sources for _ in range(source['logical_count'])]
+        density_draw = _random_for(seed, key, 'density')
+        count, remainder = divmod(len(roster) * max(100, settings['density']), 100)
+        count += density_draw.randrange(100) < remainder
+        roster += density_draw.choices(roster, k=count - len(roster))
+    else:
+        roster = [source for source in sources
+                  for _ in range((source['logical_count'] * max(100, settings['density']) + 99) // 100)]
     _random_for(seed, key, 'positions').shuffle(roster)
     weights = _density_weights(settings, candidates, seed=seed, phase=key,
         stage_index=stage_index, stage_count=stage_count)
@@ -355,8 +362,8 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     return bodies
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=7):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -376,7 +383,9 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=7):
             or any(not isinstance(key, str) or key not in catalog["maps"] for key in sequence)
             or len(sequence) != len(set(sequence))):
         raise ValueError("Native recipe campaign needs distinct source maps")
-    if campaign.get("mode") == "mission_access_as_items":
+    mai = campaign.get("mode") == "mission_access_as_items" or (
+        revision >= 8 and campaign.get("mode") == "Mission Access as Items")
+    if mai:
         bands = campaign.get("enemy_progression_bands")
         if (not isinstance(bands, dict) or any(type(bands.get(key)) is not int or not 0 <= bands[key] <= 4 for key in sequence)):
             raise ValueError("Native recipe campaign progression is invalid")
@@ -385,15 +394,17 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=7):
             or any(type(value) is not int for value in composition_bands.values())
             or sorted(composition_bands.values()) != list(range(len(sequence)))):
         raise ValueError('Native recipe composition bands are invalid')
-    stage_count = 5 if campaign.get("mode") == "mission_access_as_items" else len(sequence)
+    stage_count = 5 if mai else len(sequence)
     for stage_index, map_key in enumerate(sequence):
         if map_key not in catalog["maps"]:
             raise ValueError(f"Missing native recipe map: {map_key}")
         if catalog["maps"][map_key].get("unresolved"):
             raise ValueError(f"Unresolved native origin: {catalog['maps'][map_key]['unresolved'][0]['id']}")
-        if composition_bands is not None:
+        if mai and revision >= 8:
+            stage_index = campaign["enemy_progression_bands"][map_key]
+        elif composition_bands is not None:
             stage_index = composition_bands[map_key]
-        elif campaign.get("mode") == "mission_access_as_items":
+        elif mai:
             stage_index = campaign["enemy_progression_bands"][map_key]
         denominator = max(1, stage_count - 1)
         intensity = Fraction(enemies["intensity"][0] * (denominator - stage_index)
@@ -550,7 +561,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=7):
     frozen_campaign = {"sequence": list(sequence), "mode": campaign.get("mode", "linear")}
     if composition_bands is not None:
         frozen_campaign['composition_bands'] = dict(composition_bands)
-    if campaign.get("mode") == "mission_access_as_items":
+    if mai:
         frozen_campaign["enemy_progression_bands"] = {key: campaign["enemy_progression_bands"][key] for key in sequence}
     plan = {"kind": "native_recipes", "revision": revision, "seed": str(seed), "campaign": frozen_campaign, "maps": maps,
             "secret_timers": _secret_timers(maps, catalog), "combat_costs": combat_costs}

@@ -7,6 +7,7 @@ import importlib.util
 import importlib.metadata
 import os
 import platform
+import ssl
 import subprocess
 import sys
 from pathlib import Path
@@ -66,6 +67,9 @@ def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs.extend(_source_inputs("content", REPO_ROOT / "content"))
     inputs.extend(_source_inputs("requirements-launcher.txt", REPO_ROOT / "requirements-launcher.txt"))
     inputs.extend(_source_inputs("archipelago", archipelago_source))
+    ssl_policy = Path(ssl.__file__).with_name("codex-rejected-cas.pem")
+    if ssl_policy.is_file():
+        inputs.extend(_source_inputs("python/ssl_policy", ssl_policy))
     return inputs
 
 
@@ -207,6 +211,10 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     ]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
+    ssl_policy = Path(ssl.__file__).with_name("codex-rejected-cas.pem")
+    if ssl_policy.is_file():
+        # this Python runtime loads its certificate policy beside ssl.py
+        command[-1:-1] = ["--add-data", f"{ssl_policy}{data_separator}."]
     for path in xcb_libraries.values():
         command[-1:-1] = ["--add-binary", f"{path}{data_separator}."]
     if os.name == "nt":

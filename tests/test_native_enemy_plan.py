@@ -256,7 +256,7 @@ def test_auto_keeps_every_request_and_zero_variety_even_when_only_expensive_spec
     assert {body["species"] for row in recipes for body in row["bodies"]} == {"stone_imp"}
 
 
-def test_auto_density_adds_to_each_gated_request_and_revision_one_remains_reproducible():
+def test_auto_density_preserves_requests_and_frozen_revisions():
     source = catalog()
     first = source['maps']['base']['origins'][0]
     first.update(logical_count=3, maximum_emissions=6, phase='arena')
@@ -264,8 +264,13 @@ def test_auto_density_adds_to_each_gated_request_and_revision_one_remains_reprod
     options = settings(enemy_density=150, enemy_weights={name: int(name == 'stone_imp') for name in SPECIES_IDS})
     plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
     recipes = plan['maps']['base']['recipes']
-    assert [r['physical_count'] for r in recipes] == [5, 2]
-    assert [r['maximum_emissions'] for r in recipes] == [10, 2]
+    assert all(r['physical_count'] >= r['logical_count'] for r in recipes)
+    assert sum(r['physical_count'] for r in recipes) == 6
+    assert recipes[0]['maximum_emissions'] == recipes[0]['physical_count'] * 2
+    assert recipes[1]['maximum_emissions'] == recipes[1]['physical_count']
+    frozen = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=7)
+    assert [r['physical_count'] for r in frozen['maps']['base']['recipes']] == [5, 2]
+    assert validate_native_recipes(frozen, options, catalog=source) == frozen
     legacy = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=1)
     assert validate_native_recipes(legacy, options, catalog=source) == legacy
     assert legacy['fingerprint'] != plan['fingerprint']
