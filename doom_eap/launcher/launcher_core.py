@@ -189,8 +189,6 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError(f"Connected.slot_data.{key} is required")
         if not isinstance(slot_data[key], bool):
             raise ValueError(f"Connected.slot_data.{key} must be boolean")
-    if slot_data["include_dlc_missions"] and not slot_data["use_dlc_content"]:
-        raise ValueError("Connected.slot_data.include_dlc_missions requires use_dlc_content")
     if not isinstance(slot_data.get("enemies"), dict) or json.dumps(slot_data["enemies"], sort_keys=True) != json.dumps(
         normalize_enemy_options(slot_data), sort_keys=True
     ):

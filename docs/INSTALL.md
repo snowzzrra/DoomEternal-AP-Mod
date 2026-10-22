@@ -110,6 +110,13 @@ starting the game. Use one launcher/bridge for each game profile.
 Use **AP SAVE…** to inspect or back up the room's AP campaign. Do not replace it
 with a save from another room. See [Gameplay and options](GAMEPLAY.md) for inventory recovery.
 
+**Details / Copy details** shows the room's metadata and native save paths, including
+missing or inaccessible files. **Back up local files** copies available files for
+this room with DOOM closed and verifies the archive. **Create backup** requires an
+active AP game session. **Restore compatible backup** accepts a matching backup.
+**New DOOM save in this room** requires confirmation and a verified local backup;
+server progress stays intact. A local file copy does not verify that DOOM can load it.
+
 ## Fix a problem
 
 | Problem | What to do |

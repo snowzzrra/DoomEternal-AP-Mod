@@ -356,7 +356,7 @@
         }
       ],
       "default": "random_mission_order",
-      "description": "Choose how you unlock missions.\n\nVanilla Order: Play missions in their original order.\nRandom Mission Order: Play a shuffled sequence, unlocking the next mission as you progress.\nMission Access as Items: Find an Access item to unlock each mission.\nYou can replay completed missions through the Fortress of Doom.",
+      "description": "Choose how you unlock missions.\n\nVanilla Order: Play missions in their original order, with the goal mission last.\nRandom Mission Order: Play a shuffled sequence, unlocking the next mission as you progress.\nMission Access as Items: Find an Access item to unlock each mission.\nYou can replay completed missions through the Fortress of Doom.",
       "display_name": "Mission Order",
       "group": "Game Options",
       "key": "mission_order",
@@ -8067,5 +8067,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "3b648cfb6c30cb22317c3e781e0b7f9558692ecceb3b4318d671c4f1729b90aa"
+  "source_sha256": "bd2c22ddc479ea5bf479f17b82be045c109c4b1fdf4e7e7663a69730abaca73f"
 }

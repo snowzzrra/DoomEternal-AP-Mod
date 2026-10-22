@@ -32,7 +32,7 @@ def test_unreadable_completion_waits_for_retry_and_rejects_malformed_content(tmp
                 f"from_map={trigger['from_map']}\nto_map={trigger['to_map']}\n")
     event.write_text(contents, encoding="utf-8")
     monkeypatch.setattr(bridge, "goal_event_files", lambda: [str(event)] if kind == "native_transition" and event.exists() else [])
-    ctx = SimpleNamespace(state_key="room", receipt_session=SimpleNamespace(
+    ctx = SimpleNamespace(state_key="room", check_and_update_event_session=lambda: True, receipt_session=SimpleNamespace(
         capture=lambda state_key: state_key, is_current=lambda token, state_key: token == state_key))
     executed = []
 

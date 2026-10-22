@@ -89,7 +89,7 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
         with pytest.raises(RuntimeError) as refused:
             from pathlib import Path
             slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
-            owner.prepare(SimpleNamespace(slot_data=slot_data), {})
+            owner.prepare(SimpleNamespace(seed_name="fixture", team=0, slot=1, slot_data=slot_data), {})
     assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
     assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
     diagnostic = json.loads((tmp_path / "session_prepare_failure.json").read_text())

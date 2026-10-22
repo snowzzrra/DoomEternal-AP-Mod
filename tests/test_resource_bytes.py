@@ -95,7 +95,7 @@ def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edi
 
     unused = type("UnusedOption", (), {})
     world = SimpleNamespace(game="DOOM Eternal", options_dataclass=SimpleNamespace(type_hints={"death_link": Toggle}))
-    monkeypatch.setattr(compiler, "_load_apworld", lambda _: (world, Toggle, unused, unused, unused, unused))
+    monkeypatch.setattr(compiler, "_load_apworld", lambda _: (world, Toggle, unused, unused, unused, unused, unused))
     source = tmp_path / "worlds/doometernal/options.py"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"death_link = False\n")

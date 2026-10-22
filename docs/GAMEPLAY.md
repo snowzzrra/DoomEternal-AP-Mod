@@ -30,8 +30,12 @@ attributes or special enemy limits to customize a preset.
 **Enemy Count: Multiplier** scales the original count: 200% requests twice as many
 enemies. **Auto** preserves at least the original count of each request and wave.
 **Density** can add bodies; **Intensity** changes the preference for stronger enemies.
+Density uses seeded rounding across each wave, so 110% aims for about 10% extra
+enemies without doubling every request for a single enemy. Each original request
+keeps its minimum count.
 Species weights still apply throughout the fight. **Progressive Difficulty**
 varies the generated composition between early and late bands before mission ranking.
+Mission Access as Items uses five mission bands, with a smaller rise between waves.
 
 Health, damage, speed and size ranges use percentages: 100% is the usual value.
 Equal minimum and maximum values fix an attribute. An individual enemy's setting
