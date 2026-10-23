@@ -285,7 +285,7 @@ def _revision_two_bodies(sources, candidates, settings, intensity, *, seed, key,
 
 
 def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalog, stage_index, stage_count,
-                  balanced=False, supply_sources=frozenset(), revision=4):
+                  balanced=False, supply_sources=frozenset(), revision=4, opening=False):
     if settings['count_mode'] == 'multiplier':
         bodies = _revision_one_bodies(sources, candidates, settings, intensity, seed=seed, key=key,
             catalog=catalog, stage_index=stage_index, stage_count=stage_count)
@@ -328,8 +328,13 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         costs = {species: enemy_combat_cost(species, attributes, buff_totems=revision >= 6,
                                            screechers=revision >= 7) for species, attributes in draws.items()}
         eligible = candidates
+        if opening:
+            eligible = [species for species in eligible if costs[species] <= 5 and species not in
+                        {'spirit', 'blood_angel', 'stone_imp', 'marauder', 'archvile', 'buff_pod', 'zombie_t1_screecher'}]
+            if not eligible:
+                raise ValueError('Starting encounters need an enabled enemy that the initial arsenal can handle')
         if revision >= 6 and source.get('allowed_species'):
-            eligible = [species for species in candidates if species in source['allowed_species']]
+            eligible = [species for species in eligible if species in source['allowed_species']]
             if not eligible:
                 raise ValueError(f"Native spawn has no enabled compatible species: {source['id']}")
         if source['id'] in supply_sources:
@@ -390,6 +395,11 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
         if (not isinstance(bands, dict) or any(type(bands.get(key)) is not int or not 0 <= bands[key] <= 4 for key in sequence)):
             raise ValueError("Native recipe campaign progression is invalid")
     composition_bands = campaign.get('composition_bands') if revision >= 3 else None
+    if campaign.get('opening_stage') is not None:
+        from .native_enemy_safety import OPENING_REGIONS
+        if (revision != 8 or campaign['opening_stage'] not in OPENING_REGIONS
+                or campaign['opening_stage'] not in sequence or enemies['count_mode'] != 'auto'):
+            raise ValueError('Native recipe opening needs a supported mission and Auto enemy count')
     if composition_bands is not None and (not isinstance(composition_bands, dict) or set(composition_bands) != set(sequence)
             or any(type(value) is not int for value in composition_bands.values())
             or sorted(composition_bands.values()) != list(range(len(sequence)))):
@@ -445,6 +455,10 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
                 if number.isdigit(): wave_order.setdefault(owner, set()).add(int(number))
         phase_bodies = {}
         phase_progression = {}
+        from .native_enemy_safety import opening_source
+        opening_phases = {phase for phase, sources in phases.items()
+                          if campaign.get('opening_stage') == map_key
+                          and any(opening_source(map_key, source) for source in sources)}
         for phase, sources in phases.items():
             phase_index, phase_count, phase_intensity = stage_index, stage_count, intensity
             if revision >= 5 and enemies['progressive']:
@@ -461,7 +475,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
             generate_bodies = _revision_one_bodies if revision == 1 else _revision_two_bodies if revision == 2 else _phase_bodies
             phase_bodies.update(generate_bodies(sources, candidates, settings, phase_intensity, seed=seed,
                 key=[map_key, phase], catalog=catalog, stage_index=phase_index, stage_count=phase_count,
-                **({'balanced': True, 'supply_sources': supplies, 'revision': revision} if revision >= 4 else {})))
+                **({'balanced': True, 'supply_sources': supplies, 'revision': revision,
+                    'opening': phase in opening_phases} if revision >= 4 else {})))
         for source in origins:
             if source.get("protected_reason"):
                 protected.append({"id": source["id"], "reason": source["protected_reason"]})
@@ -543,6 +558,10 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
                 waves = [{'id': phase, 'cost': float(cost),
                           'bodies': wave_bodies[phase],
                           'progression': phase_progression[phase]} for phase, cost in sorted(wave_costs.items())]
+                if opening_phases:
+                    combat_costs[map_key]['campaign']['opening_waves'] = [wave for wave in waves if wave['id'] in opening_phases]
+                    combat_costs[map_key]['campaign']['opening_species'] = sorted({body['species']
+                        for recipe in active if recipe['wave'] in opening_phases for body in recipe['bodies']})
                 cohorts = {}
                 for recipe in active:
                     identity = native_event_identity(recipe)
@@ -559,6 +578,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
                 combat_costs[map_key]['campaign'].update(waves=waves, finite_spawns=finite,
                     estimated_kills=estimated, effort=estimated + len(waves) * 4)
     frozen_campaign = {"sequence": list(sequence), "mode": campaign.get("mode", "linear")}
+    if campaign.get('opening_stage'):
+        frozen_campaign['opening_stage'] = campaign['opening_stage']
     if composition_bands is not None:
         frozen_campaign['composition_bands'] = dict(composition_bands)
     if mai:

@@ -14,7 +14,7 @@
     "sha256": "e63a2d3be5071841556cac3a5d4e210c8a3e49f3247530790d5d6e2c3d0b8a3a",
     "size": 18712731
   },
-  "room_resource_input_fingerprint": "1d815d2a95f226cbab68583649e70adea0d6aaa0ef5263b5d9f691b8080d1d83",
+  "room_resource_input_fingerprint": "31d8feed38adf407f31c4d78996b4ba9b46c114c01174f2ca17400554a114851",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -234,8 +234,8 @@
     "doom_eap/content/map_registry.py": "08f6dfc337469d779aa944406dd6417f7ebb1d3ff5493ebdb287b184dae042a3",
     "doom_eap/content/mastery_requirements.py": "4a9fb9ef1cf8fe5dbca1c4a3335ca55ee99c38ae8127d6bf16ef6ca3ab2841f2",
     "doom_eap/content/native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
-    "doom_eap/content/native_enemy_plan.py": "cba15862795e3e1c467b5f778e348161f149aad00d3f55e8e3984a4e01c1fccb",
-    "doom_eap/content/native_enemy_safety.py": "9e1f056c0ba6615bde9e85f787ee914d5dadf19f6e746a4a2976425369d9785d",
+    "doom_eap/content/native_enemy_plan.py": "8584512e4594ab8e6f454aeb985674e8ccaac3c324320444570ab9473c4672e7",
+    "doom_eap/content/native_enemy_safety.py": "2c06c4312f05d374f8a3b011c6ef7aa4964350beb6b5b21ba3aeadf9f9a54276",
     "doom_eap/content/options_foundation.py": "3c70dd0e22b76d5ff81a0416f6ff904cdf9c3e7b77020ac0f0852509d13f23fa",
     "doom_eap/content/physical_options.py": "d42368b639db8c2a91cabfc7212f334c6c49bc37aeb104b301f81ea05ca1b354",
     "doom_eap/content/publisher_loader.py": "3294603980928f10a72eb7944a3367a78dc5b6838f8b65f0082da67a420ea59c",
@@ -4364,16 +4364,16 @@
             "size": 35
           },
           "archipelago/worlds/doometernal/__init__.py": {
-            "sha256": "7e8db9a30c9782ef081290f52374dc6901ada358629e8b5ed084ab229b855416",
-            "size": 43945
+            "sha256": "8aa5ca5ede84e4856e56d4c5d7ea966ca9c1bd8db8e85174492999d7defd71a7",
+            "size": 46486
           },
           "archipelago/worlds/doometernal/archipelago.json": {
             "sha256": "246ce3288eaf57f4d301b1caca3850d63fd382f6abc850b7aaff966f483738f9",
             "size": 126
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "b44ade8d2a4d1aaef1b7a0e2e093cb14cb59930f87faebb0cead393f57c36ec9",
-            "size": 38188
+            "sha256": "b118508fd166aee4b8f97200a57062a1612eb005725b91d82f9b10400241fe8c",
+            "size": 37255
           },
           "archipelago/worlds/doometernal/campaign_kill_sources.json": {
             "sha256": "ec1bfbe85ae49ced2193964b67a27e4b1fb0160ac7b2e542c3823f30152f2744",
@@ -4388,12 +4388,12 @@
             "size": 25679
           },
           "archipelago/worlds/doometernal/combat_readiness.py": {
-            "sha256": "91f756f7bc4a7e59b2f3f307fc0ffc016f5f4d57daca8c1404c0be57453a8602",
-            "size": 17567
+            "sha256": "aff0669c193cea4b96e43f58465fcf1c8f54e7bca3a6edc7da96c522aa73a4e7",
+            "size": 18121
           },
           "archipelago/worlds/doometernal/docs/en_DOOM Eternal.md": {
-            "sha256": "aa8a5b31622e3603a184b4663c76ebde27376c91a8f816b01bc6f47fa84e783f",
-            "size": 1976
+            "sha256": "cc6c92e4177a2d7f294847f0818042c634533c9fcd9047197c8ede476801dd3d",
+            "size": 2454
           },
           "archipelago/worlds/doometernal/docs/setup_en.md": {
             "sha256": "e5def760ac655a3763740eb6750b3e3ca16b447a4b4426bf4f4400693aacab06",
@@ -4452,12 +4452,12 @@
             "size": 6544283
           },
           "archipelago/worlds/doometernal/native_enemy_plan.py": {
-            "sha256": "197358c316ddcc3123643523a4db63f7f2ece1801d08de6442617f30d276f693",
-            "size": 39497
+            "sha256": "85964dacb8f593a24fe12d9f5a2f7a2aa3aa4a6282c18dcc3536ebee0739c495",
+            "size": 41123
           },
           "archipelago/worlds/doometernal/native_enemy_safety.py": {
-            "sha256": "8f920721cf3ceca678aa04f68a697b5d71076e6cc9cd6d6b3b1f2680013499b2",
-            "size": 3565
+            "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
+            "size": 4254
           },
           "archipelago/worlds/doometernal/options.py": {
             "sha256": "a9f134835cc2b1755c7fea1c2580bfd45b45746f72f78ec3d0a328286d30cd9c",
@@ -13316,12 +13316,12 @@
             "size": 136
           }
         },
-        "fingerprint": "1fff51ae196addd37aacf1d5a9ae3fa1512da82415808b0d220c0a2b7e30d967",
+        "fingerprint": "b5918847f00ae298bfff149a820de4780d4b291db5b888260b282255c4e0dc07",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "b836898ad5db43510d26e9f6c093d7c7eecbaf87",
+      "base_commit_sha": "6abd6a1ca50412f713bfba84656dd35aaac8e13a",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14238,12 +14238,12 @@
             "size": 6544283
           },
           "doom_eap/content/native_enemy_plan.py": {
-            "sha256": "197358c316ddcc3123643523a4db63f7f2ece1801d08de6442617f30d276f693",
-            "size": 39497
+            "sha256": "85964dacb8f593a24fe12d9f5a2f7a2aa3aa4a6282c18dcc3536ebee0739c495",
+            "size": 41123
           },
           "doom_eap/content/native_enemy_safety.py": {
-            "sha256": "8f920721cf3ceca678aa04f68a697b5d71076e6cc9cd6d6b3b1f2680013499b2",
-            "size": 3565
+            "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
+            "size": 4254
           },
           "doom_eap/content/options_foundation.py": {
             "sha256": "1a37dd4b014b2c6e3b51a6f7e1a9d28b7c98b99552a0fbf652d92c29b31afb86",
@@ -15718,7 +15718,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "eed60213094bb0e8a8afe37e7660d5f2e6037d903b24155499c6d07f3545bbad",
+        "fingerprint": "4ec67607c128f8a52010df3e7e3a0b5f3d61f5ec23501c51ce273b78559505b5",
         "kind": "working_tree_snapshot"
       }
     }

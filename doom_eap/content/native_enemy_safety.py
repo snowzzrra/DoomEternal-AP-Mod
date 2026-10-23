@@ -58,3 +58,18 @@ def project_native_safety(plan, enemies):
     result['compiler_adjustments'] = changes
     result['fingerprint'] = native_recipe_fingerprint(result)
     return result
+OPENING_REGIONS = {
+    'e1m1_intro': ('Hell on Earth - Barge - Hell Priest Barge', 'Hell on Earth - City - Midtown'),
+    'e1m2_war': ('Exultia - Exultia - Mourning Spire', 'Exultia - Exultia - Central Rotunda',
+                 "Exultia - Exultia - Belphegor's Gate", 'Exultia - Exultia - Dour Slough'),
+}
+OPENING_PREFIXES = {
+    'e1m1_intro': ('barge_', 'mech_', 'corner_street_', 'crack_building_'),
+    'e1m2_war': ('capitol_', 'tutorial_', 'extraction_'),
+}
+
+
+def opening_source(stage, source):
+    binding = source.get('binding') or {}
+    return any(binding.get(field, '').startswith(OPENING_PREFIXES.get(stage, ()))
+               for field in ('owner', 'entity'))

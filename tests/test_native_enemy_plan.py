@@ -25,6 +25,22 @@ def settings(**options):
         **options})
 
 
+def test_opening_keeps_requests_and_counters_out_of_early_fights():
+    source = catalog()
+    stage = source['maps'].pop('base')
+    origin = stage['origins'][0]
+    origin['binding'] = {'owner': 'barge_encounter_manager_barge_arena'}
+    source['maps']['e1m1_intro'] = stage
+    options = settings(enemy_weights={'imp': 1, 'stone_imp': 1000})
+    campaign = {'sequence': ['e1m1_intro'], 'opening_stage': 'e1m1_intro'}
+    plan = build_native_recipes(options, campaign, seed=7, catalog=source)
+    bodies = plan['maps']['e1m1_intro']['recipes'][0]['bodies']
+    assert len(bodies) >= origin['logical_count']
+    assert {body['species'] for body in bodies} == {'imp'}
+    assert plan['combat_costs']['e1m1_intro']['campaign']['opening_waves']
+    assert validate_native_recipes(plan, options, catalog=source) == plan
+
+
 def test_late_balanced_waves_can_include_expensive_specials_and_keep_the_body_floor():
     from importlib.resources import files
     import json
