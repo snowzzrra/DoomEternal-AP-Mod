@@ -9,6 +9,7 @@ import time
 
 from doom_eap.launcher.launcher_session import APSessionOwner
 from doom_eap.launcher.launcher_core import RoomSnapshot
+from doom_eap.launcher.launcher_platform import restore_standard_streams
 from doom_eap.runtime.observer_lifecycle import windows_game_processes
 
 
@@ -24,21 +25,7 @@ def respond(document):
 
 
 def main():
-    if sys.platform == "win32" and sys.stdin is None:
-        import ctypes
-        import msvcrt
-        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel.GetStdHandle.argtypes = [ctypes.c_ulong]
-        kernel.GetStdHandle.restype = ctypes.c_void_p
-        # windowed builds keep the inherited pipes, but Python leaves these streams unset.
-        for name, number, mode, flags in (("stdin", -10, "r", os.O_RDONLY),
-                                          ("stdout", -11, "w", os.O_WRONLY),
-                                          ("stderr", -12, "w", os.O_WRONLY)):
-            handle = kernel.GetStdHandle(number & 0xffffffff)
-            if not handle or handle == ctypes.c_void_p(-1).value:
-                raise RuntimeError(f"The session supervisor requires an inherited {name} pipe")
-            descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
-            setattr(sys, name, os.fdopen(descriptor, mode, buffering=1, encoding="utf-8"))
+    restore_standard_streams(require_pipes=True)
     if "--process-identity" in sys.argv:
         respond({"processes": windows_game_processes()})
         return 0

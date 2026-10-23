@@ -36,6 +36,31 @@ REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
+def restore_standard_streams(*, require_pipes=False):
+    if sys.platform != 'win32':
+        return
+    import ctypes
+    import msvcrt
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.GetStdHandle.argtypes = [ctypes.c_ulong]
+    kernel.GetStdHandle.restype = ctypes.c_void_p
+    # windowed builds keep inherited pipes but leave Python's streams unset
+    for name, number, mode, flags in (('stdin', -10, 'r', os.O_RDONLY),
+                                     ('stdout', -11, 'w', os.O_WRONLY),
+                                     ('stderr', -12, 'w', os.O_WRONLY)):
+        if getattr(sys, name) is not None:
+            continue
+        handle = kernel.GetStdHandle(number & 0xffffffff)
+        if not handle or handle == ctypes.c_void_p(-1).value:
+            if require_pipes:
+                raise RuntimeError(f'The session supervisor requires an inherited {name} pipe')
+            stream = open(os.devnull, mode, encoding='utf-8')
+        else:
+            descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
+            stream = os.fdopen(descriptor, mode, buffering=1, encoding='utf-8')
+        setattr(sys, name, stream)
+
+
 @lru_cache(maxsize=32)
 def _sha256_file_identity(path: str, size: int, modified_ns: int, created_ns: int) -> str:
     """Hash immutable file identity once; metadata changes invalidate the entry."""

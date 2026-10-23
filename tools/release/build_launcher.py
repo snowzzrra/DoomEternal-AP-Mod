@@ -139,7 +139,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
             "pyinstaller": _dependency_version("pyinstaller"),
             "pyside6": _dependency_version("PySide6"),
             "command": [
-                "onefile", "console", "standalone_runtime", "data", "manifests", "content",
+                "onefile", "windowed" if os.name == 'nt' else "console", "standalone_runtime", "data", "manifests", "content",
                 *PYINSTALLER_EXCLUDES,
             ],
         },
@@ -174,7 +174,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--noconfirm",
         "--clean",
         "--onefile",
-        "--console",
+        "--windowed" if os.name == 'nt' else "--console",
         "--name",
         name,
         "--distpath",
@@ -218,7 +218,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     for path in xcb_libraries.values():
         command[-1:-1] = ["--add-binary", f"{path}{data_separator}."]
     if os.name == "nt":
-        command[-1:-1] = ["--hide-console", "hide-early", "--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
+        command[-1:-1] = ["--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
     build_environment = os.environ.copy()
     if os.name == "nt":
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))

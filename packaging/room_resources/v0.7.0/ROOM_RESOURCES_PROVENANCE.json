@@ -14,7 +14,7 @@
     "sha256": "e63a2d3be5071841556cac3a5d4e210c8a3e49f3247530790d5d6e2c3d0b8a3a",
     "size": 18712731
   },
-  "room_resource_input_fingerprint": "31d8feed38adf407f31c4d78996b4ba9b46c114c01174f2ca17400554a114851",
+  "room_resource_input_fingerprint": "f35725497259d38846d89cbd2ab3cf407acceccad44fad999d0851a267d66f31",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -234,7 +234,7 @@
     "doom_eap/content/map_registry.py": "08f6dfc337469d779aa944406dd6417f7ebb1d3ff5493ebdb287b184dae042a3",
     "doom_eap/content/mastery_requirements.py": "4a9fb9ef1cf8fe5dbca1c4a3335ca55ee99c38ae8127d6bf16ef6ca3ab2841f2",
     "doom_eap/content/native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
-    "doom_eap/content/native_enemy_plan.py": "8584512e4594ab8e6f454aeb985674e8ccaac3c324320444570ab9473c4672e7",
+    "doom_eap/content/native_enemy_plan.py": "c9d9ec3e30c5181bd268e95fb278d9b7485a9cd0bb5ba08dc3fe2316bde968cd",
     "doom_eap/content/native_enemy_safety.py": "2c06c4312f05d374f8a3b011c6ef7aa4964350beb6b5b21ba3aeadf9f9a54276",
     "doom_eap/content/options_foundation.py": "3c70dd0e22b76d5ff81a0416f6ff904cdf9c3e7b77020ac0f0852509d13f23fa",
     "doom_eap/content/physical_options.py": "d42368b639db8c2a91cabfc7212f334c6c49bc37aeb104b301f81ea05ca1b354",
@@ -447,7 +447,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "1f9418a2879c34c40b7c4eef267ebad19daadf6f",
+      "base_commit_sha": "468b0f57cee277ee8db99dbedfe38061cfa88d10",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -668,8 +668,8 @@
             "size": 6687
           },
           "archipelago/CommonClient.py": {
-            "sha256": "9606e3b3b4131d658f90c9dd6dd85ae2632739c9023c52d79d2e9c8d8b3d8507",
-            "size": 56438
+            "sha256": "be6a47e3263d7184a9ea869e045956c4d66da2a4b8aee46926dc7ea4fd7be5ce",
+            "size": 56549
           },
           "archipelago/Dockerfile": {
             "sha256": "43e39efe3f49c0be88b93dd0474bf26bd6a8b1e9ff9f12cf0e179cfa1694a8b1",
@@ -1748,8 +1748,8 @@
             "size": 234
           },
           "archipelago/_persistent_storage.yaml": {
-            "sha256": "5576f92f19a44b7ca94019ab277d1f684f4ef31f193a370689847963de9c7f06",
-            "size": 29220
+            "sha256": "2943434d4374ec50e20a9a88022c28a9e26dafa6f23f28a6f83b20141689fb98",
+            "size": 29312
           },
           "archipelago/_speedups.pyx": {
             "sha256": "64df2298c9ec62ada0f9b5d760136fac1fb0bd866314638fd301f1702b687388",
@@ -2331,245 +2331,13 @@
             "sha256": "ccda4e830630343f314eb1a9397dfd25897dce06297db9212c61636856044250",
             "size": 58570
           },
-          "archipelago/logs/DoomEternalClient_2026_10_01_19_12_33.txt": {
-            "sha256": "c414d154eb0ee01b4fb7759df45da490852659502a6dfae5e971eae101db86eb",
-            "size": 1167
+          "archipelago/logs/DoomEternalClient_2026_10_23_10_52_26.txt": {
+            "sha256": "e062c0c3e5f9e58d8f9191089af0350fb32f7ce607b58fc266a1726634d16c26",
+            "size": 1703
           },
-          "archipelago/logs/DoomEternalClient_2026_10_01_19_14_55.txt": {
-            "sha256": "ffbe10441b6e3220fb4603feffd81cf0ee78981ad7f1e9c31408b958ebd6afd2",
-            "size": 1007
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_19_16_14.txt": {
-            "sha256": "88dc155abb8bc8dd06a27cc152c18d0feaa0368373e7b404d4ece7e674e9e2b2",
-            "size": 1057
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_19_18_10.txt": {
-            "sha256": "43a509f1473ca02134d0cf5e13943dcf25caf70ac11adf68dc207778903c8388",
-            "size": 1057
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_08_14.txt": {
-            "sha256": "a05e739d7da7fbbff41bc64a35797bef8d3bd98122914e6d7901f8476f86dc64",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_08_16.txt": {
-            "sha256": "b754154ec6b358319e1885386977054cf1c20f77e0f833cfe28bfb2849eca51d",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_10_43.txt": {
-            "sha256": "8e07ef5b0352bdc958bb7f8de74def67a23a957dd1b91eed203bf8a5b95ce239",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_10_44.txt": {
-            "sha256": "9ec8e20e64e69400c64bdaa683dd2d5d1953160ec12f389a6422f3c61c1b9da6",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_12_09.txt": {
-            "sha256": "3f29edf97c60fd64413a3b3843f5711d6b5df8e9eea629a1b0596abbaa4ff3da",
-            "size": 1063
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_12_10.txt": {
-            "sha256": "4f91aa8e1507f4c4c15383d83318e044165b584c748bbea41ceb8fba169859b5",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_32.txt": {
-            "sha256": "619e198bfc59be924273c685527426ccb9d8607f33f475da36c3807621c53fda",
-            "size": 1062
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_33.txt": {
-            "sha256": "39c588eb80a8a10a69454809b5e76132203cb4cb53c014f45532a8b5b1f44692",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_34.txt": {
-            "sha256": "c7041777c236b17a51342a7d2e0fc4030284ecba37815402dd73e1b20ec637a5",
-            "size": 1114
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_13_35.txt": {
-            "sha256": "1e27f8e8ffcd301fd2950e63de61c1161faf9391d4a7ec158b112b208eb29b28",
-            "size": 1113
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_13.txt": {
-            "sha256": "a1894f93c0ac7aba15d5b2194507d13fa15a8d1ee113b4031351097db5f04854",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_14.txt": {
-            "sha256": "0882840eb6c161620bbca94967c10d8ce8c0a99175a4cea269ea6c87cbed7e54",
-            "size": 1064
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_15.txt": {
-            "sha256": "e7c5fe49f712f5ad9ea2159ecd4ffe8334b9e55b2baa4a653a5fbc1d436d0454",
-            "size": 1114
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_21_34_16.txt": {
-            "sha256": "9039fc3c8f340451598d14f94d41ef59a21e8e3f69274a28ec132c50795cafb3",
-            "size": 1114
-          },
-          "archipelago/logs/DoomEternalClient_2026_10_01_23_58_26.txt": {
-            "sha256": "36da6f720a7698df0d150547d75539a32cbd18bbe6605fad807475de8e159495",
-            "size": 1113
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_42_21.txt": {
-            "sha256": "e6d9b2749a7289674b6326da643341d0571beb87d47a9051ceb2ea3423bd4447",
-            "size": 1738
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_45_12.txt": {
-            "sha256": "226131dd1bdd1d5454defff75bf33bd5a5fbec6717de393724321f8078f339ad",
-            "size": 1739
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_45_13.txt": {
-            "sha256": "b8f1f7a86badc7c1bfdb186aab17a2d08ac922a777ad1ef0ba51631eddc6937b",
-            "size": 1746
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_50_29.txt": {
-            "sha256": "302a68c7671be970ae6a6084588da636e508dad608e07f5bb029b08c71d6eed4",
-            "size": 1738
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_50_31.txt": {
-            "sha256": "dc16adb822d2d9a7468920ae537a8730573240aa605a7ab10914c4a2f07f3ddc",
-            "size": 1746
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_56_56.txt": {
-            "sha256": "ccbf97a709a8008311aae3ae48e5f9d323ac3160bcd0348ffe606244d292f241",
-            "size": 1737
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_11_56_58.txt": {
-            "sha256": "f14aad64a12a5dd3a532e9fea88fe5c9a51f6415bd39fb3d8095646f294b353d",
-            "size": 1746
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_12_20_46.txt": {
-            "sha256": "4ad8d153dde545ad21896864b9d1a4d8e4ca2791f9dce28e9ea697d904d49bf5",
-            "size": 1739
-          },
-          "archipelago/logs/Generate_410050_2026_10_05_12_20_49.txt": {
-            "sha256": "d65250bb1b436e7240b1079e92bbaaffd1e73b362cc346e37547d426cfece695",
-            "size": 1747
-          },
-          "archipelago/logs/Generate_410051_2026_10_05_11_45_15.txt": {
-            "sha256": "eb9c4779a82df04f8a871a37787082f5f8f219e411051e18b999deb8f87052e7",
-            "size": 2002
-          },
-          "archipelago/logs/Generate_410051_2026_10_05_11_50_32.txt": {
-            "sha256": "73750690f8192a9fe1fd0dd65dbf3bd75390b05e2212774550f628bfc53c8f28",
-            "size": 2003
-          },
-          "archipelago/logs/Generate_410051_2026_10_05_11_56_59.txt": {
-            "sha256": "e64208cf88106e73950a72f0b66d03ecb07156b53e26367ad727ca082b8b9951",
-            "size": 2003
-          },
-          "archipelago/logs/Generate_410051_2026_10_05_12_20_51.txt": {
-            "sha256": "1ee1533c33ef2ba1c09451170c14b2f6ebc1b8e79a5031369d87e227d7cf8e9f",
-            "size": 2002
-          },
-          "archipelago/logs/Generate_410052_2026_10_05_11_45_35.txt": {
-            "sha256": "5d8f242ddf24f930252edebddc393e64db146a54f6d2b82200bf36191d5b19ae",
-            "size": 6100
-          },
-          "archipelago/logs/Generate_410052_2026_10_05_11_50_53.txt": {
-            "sha256": "3ac234aedf6abd1eafd82f6071bd21d86b86c605b6dd4a8a4a2e8edc80d11dff",
-            "size": 2010
-          },
-          "archipelago/logs/Generate_410052_2026_10_05_11_57_24.txt": {
-            "sha256": "2b720607a62472cbfe89188f20022c573ecf90f8ec35d72f4ae20cddec6aa42e",
-            "size": 2008
-          },
-          "archipelago/logs/Generate_410052_2026_10_05_12_21_11.txt": {
-            "sha256": "32a90206c8bd98d946e0a4ece457dcad1053e947f4e044c1494f4e83a0fccd51",
-            "size": 2009
-          },
-          "archipelago/logs/Generate_410053_2026_10_05_11_51_19.txt": {
-            "sha256": "4b9a94630c3f85910fa0939ef2ea03bb592ed319a117a69449d7bcb7c67b172a",
-            "size": 1735
-          },
-          "archipelago/logs/Generate_410053_2026_10_05_11_57_55.txt": {
-            "sha256": "d7d0e001e99ebe39d8a3cc87b2384eff2e853e66f3ae5066f76fccd1fb6c91c6",
-            "size": 1735
-          },
-          "archipelago/logs/Generate_410053_2026_10_05_12_21_29.txt": {
-            "sha256": "b71e86c2731ad054f4cc754799c173835b62cfda820ddb2a597688e5ba4f7d1c",
-            "size": 1734
-          },
-          "archipelago/logs/Generate_54357886157619157907_2026_10_02_23_51_32.txt": {
-            "sha256": "eac769a2c98bbb3f5389497a012658570c6c09e33fca515d56d7db99e58d5b9a",
-            "size": 21675
-          },
-          "archipelago/logs/Generate_626104_2026_10_06_20_57_34.txt": {
-            "sha256": "d8d07a4c649a414c2d45b0e7a689306dff337d90055bad65f52302cac1d59752",
-            "size": 3106
-          },
-          "archipelago/logs/Generate_626104_2026_10_06_20_59_07.txt": {
-            "sha256": "57d82eec7abea72751414e249ce6527aaec6f0388a64ade837e43592326c7b15",
-            "size": 4984
-          },
-          "archipelago/logs/Generate_626104_2026_10_06_21_00_59.txt": {
-            "sha256": "6d4c916c522e970c4031f759656349d199f87417191eab9db4ca5d8c12e8294c",
-            "size": 2329
-          },
-          "archipelago/logs/Generate_626104_2026_10_06_21_06_34.txt": {
-            "sha256": "5da19758c1a214b046a6fffa74b7b6cfa38d906afc52784c86c5db005ceec7d7",
-            "size": 2330
-          },
-          "archipelago/logs/Generate_626104_2026_10_06_21_16_28.txt": {
-            "sha256": "b119b186c640bc3e9b04a03780e15a29ee612ad2f6c7f40b6c697aced6cb02a8",
-            "size": 2330
-          },
-          "archipelago/logs/Generate_90911006_2026_10_01_15_11_13.txt": {
-            "sha256": "a7d343d7b9b6f2550041e6c5526acce96af1871d33b5914b05d7424cc093c64f",
-            "size": 527
-          },
-          "archipelago/logs/Generate_90911006_2026_10_01_15_14_09.txt": {
-            "sha256": "3f7bae8c0a14787ae3068ad6173636504cc23c5c256c7602a5368e359b8ceac6",
-            "size": 7867
-          },
-          "archipelago/logs/Generate_90911006_2026_10_01_19_00_45.txt": {
-            "sha256": "a242d02194ba94b17632b86a5339652ab1ef0a24f1d726d9088580ca1b5d2186",
-            "size": 1733
-          },
-          "archipelago/logs/Generate_90911020_2026_10_01_16_41_12.txt": {
-            "sha256": "896db3e6e24ebcbbc618e428cacb20c37327b6c3fb935fd403e6505f0aa9cd95",
-            "size": 1739
-          },
-          "archipelago/logs/Server_2026_09_30_00_54_52.txt": {
-            "sha256": "6ede606fc49e6c1f6a32a827bf480bee22aacd0497748350393fa352acef6243",
-            "size": 1392
-          },
-          "archipelago/logs/Server_2026_09_30_01_04_50.txt": {
-            "sha256": "4c57a522518dd0bd03f7c49bddee8bca36f166c7159596ea5ceb95f839540046",
-            "size": 3036
-          },
-          "archipelago/logs/Server_2026_09_30_09_20_19.txt": {
-            "sha256": "2ae24b0d978ada40a7e4566e2b01a7e66646e4ef56b3f08c40f676f85dd56568",
-            "size": 2111
-          },
-          "archipelago/logs/Server_2026_09_30_10_46_02.txt": {
-            "sha256": "28c6a26985da94bccfbaaeebc1d92ff47ddbf94e0c9fdebf815326a03a6537ae",
-            "size": 1406
-          },
-          "archipelago/logs/Server_2026_09_30_16_08_29.txt": {
-            "sha256": "7440647fd9fcedeb78f7f1d9fff88e119a875d1b1791783083a94ea2b113c637",
-            "size": 1873
-          },
-          "archipelago/logs/Server_2026_09_30_17_10_12.txt": {
-            "sha256": "13f08024e13bdf89a34ee67a3c71162cb871df8280eecb416dad9218b37eb20f",
-            "size": 2512
-          },
-          "archipelago/logs/Server_2026_09_30_17_48_08.txt": {
-            "sha256": "e93e6e87b84d886094958dc2eef66e9560079472cbfb350ac56c0aac2d0cdcbd",
-            "size": 1406
-          },
-          "archipelago/logs/Server_2026_09_30_17_58_54.txt": {
-            "sha256": "0e75bdd2c257526334b655f790a8fd11622ac9d9a86fb64a99891e5b54fa6c1a",
-            "size": 1406
-          },
-          "archipelago/logs/Server_2026_09_30_18_16_08.txt": {
-            "sha256": "dd3c806c18568c5d85793465c8e67ad77daab60a2dbff720199f319911068f61",
-            "size": 1575
-          },
-          "archipelago/logs/Server_2026_09_30_18_32_46.txt": {
-            "sha256": "ffc2c2ca7e78a9c5af7d7216bc2061b5262e33f146fff1fd490530d5803fe202",
-            "size": 1405
-          },
-          "archipelago/logs/Server_2026_09_30_18_49_10.txt": {
-            "sha256": "8883fb44455b2347ae98e9aaaa486311fc1cf3f28f38c5cc568be60bedefaf30",
-            "size": 1406
+          "archipelago/logs/DoomEternalClient_2026_10_23_10_53_32.txt": {
+            "sha256": "7eef0fa046a50e2cccf1022e2b48b002de7921c952f04fc4d9f86eb50fb44efa",
+            "size": 759
           },
           "archipelago/meta.yaml": {
             "sha256": "b18729f4ae2c3b0513395837955dc1a39f7cec8006b87a8ae57dd4c6eff7cc64",
@@ -4452,8 +4220,8 @@
             "size": 6544283
           },
           "archipelago/worlds/doometernal/native_enemy_plan.py": {
-            "sha256": "85964dacb8f593a24fe12d9f5a2f7a2aa3aa4a6282c18dcc3536ebee0739c495",
-            "size": 41123
+            "sha256": "bc3dc88252bc2f8d68e5ab49d5c50e35a7ae958ef50a53b0ed7bb1462097a2d0",
+            "size": 44359
           },
           "archipelago/worlds/doometernal/native_enemy_safety.py": {
             "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
@@ -13316,12 +13084,12 @@
             "size": 136
           }
         },
-        "fingerprint": "b5918847f00ae298bfff149a820de4780d4b291db5b888260b282255c4e0dc07",
+        "fingerprint": "7ee6f420be7cfdd666cdf7f59f7d61a84d8248c2ccac1a17a1dde3aef7e9afe6",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "6abd6a1ca50412f713bfba84656dd35aaac8e13a",
+      "base_commit_sha": "fd9f0093fec698cead197e32a41b5bc4e3195e40",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -14238,8 +14006,8 @@
             "size": 6544283
           },
           "doom_eap/content/native_enemy_plan.py": {
-            "sha256": "85964dacb8f593a24fe12d9f5a2f7a2aa3aa4a6282c18dcc3536ebee0739c495",
-            "size": 41123
+            "sha256": "bc3dc88252bc2f8d68e5ab49d5c50e35a7ae958ef50a53b0ed7bb1462097a2d0",
+            "size": 44359
           },
           "doom_eap/content/native_enemy_safety.py": {
             "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
@@ -14358,8 +14126,8 @@
             "size": 7535
           },
           "doom_eap/launcher/launcher_app.py": {
-            "sha256": "3fac34287974b4326ee6296824dcdb2089d35c4b2362de3c4d6dd1c111d44c6a",
-            "size": 18075
+            "sha256": "7876e34ae6bc93df1d5fb99a58ea180fa377c5c7f495c62688cf6ddf84336879",
+            "size": 18791
           },
           "doom_eap/launcher/launcher_controller.py": {
             "sha256": "b7024510be3ca72dc48bca89a27797f89fc9da48e959e2150d475c4f3ffc6263",
@@ -14394,8 +14162,8 @@
             "size": 6953
           },
           "doom_eap/launcher/launcher_platform.py": {
-            "sha256": "6dc29c19f2251c2d923f81bf89bdf17e075bdc4614fd7472a55a39bcb082a8ae",
-            "size": 143879
+            "sha256": "7fb8d92026c334a6a1c2a2e64768149205487b610a6bb4f328b19423d0083aae",
+            "size": 145075
           },
           "doom_eap/launcher/launcher_repairs.py": {
             "sha256": "6cb8105bdde3fcb51c00ad7b39982f5e34b9b63e7c8de0e9126b5a835c5e0867",
@@ -14410,8 +14178,8 @@
             "size": 53358
           },
           "doom_eap/launcher/launcher_supervisor.py": {
-            "sha256": "5152a101cda5c3708fa2109e9a0f982dbce55ae51b4813002a21ed696b0afc7b",
-            "size": 11605
+            "sha256": "c18d5c6794eb1fa78bcd0e0359213f0627e6d9290d6bbac1082f67e34ab79dd7",
+            "size": 11691
           },
           "doom_eap/launcher/launcher_ui.py": {
             "sha256": "c0986b0239276a8ed917a0ca2751fef38a72c1c0b36662bcbb7c57a25d4cf083",
@@ -14434,8 +14202,8 @@
             "size": 2383
           },
           "doom_eap/launcher/session_owner_app.py": {
-            "sha256": "2cd3fbf5395cdd8bf2322e84bedc50c97093728f7fa668cdf1d63a4b45259181",
-            "size": 4722
+            "sha256": "63683ece0bf48b149ee3681c1c7990c48be57669b4fef5a7c630a4a7949844d3",
+            "size": 3846
           },
           "doom_eap/presentation.py": {
             "sha256": "6a49e09d092ffecf106940941e79dade8bc67142037c974a945435b2ada1e388",
@@ -14462,8 +14230,8 @@
             "size": 7301
           },
           "doom_eap/runtime/bridge_client.py": {
-            "sha256": "43dadc8674f1a5fea101818fb5ee9842c268ba5e2c58e309a1d75c99b989dd24",
-            "size": 318401
+            "sha256": "4e61f29f27fc42488f4c0de1c4a0f70f73c852cc3524d3d56f8cda2090cb0f11",
+            "size": 319355
           },
           "doom_eap/runtime/campaign_menu.py": {
             "sha256": "66e440c0b2719d8bc27fd2062e711bc28c8bb9fee33a749caecbc5f9f80a2f03",
@@ -15582,8 +15350,8 @@
             "size": 10717
           },
           "tools/release/build_launcher.py": {
-            "sha256": "7582662a918f37d869b57708fef6448db692a61ba824da0d1e2a3e10c33a4bac",
-            "size": 10454
+            "sha256": "dc7869bf1d5feaf246ab060ec2664b2b165dd2b20a02f79288e46405cbd65218",
+            "size": 10494
           },
           "tools/release/build_playtest_presets.py": {
             "sha256": "9a119ae1ff3a27c1f35d98c4eeb2b851a6c55f902c42b116a5b60e5386e43548",
@@ -15718,7 +15486,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "4ec67607c128f8a52010df3e7e3a0b5f3d61f5ec23501c51ce273b78559505b5",
+        "fingerprint": "b882b8bc20b6e972bb68b6e262dd6fa3b6aacc4bf58ac60a12f48575b00829a0",
         "kind": "working_tree_snapshot"
       }
     }

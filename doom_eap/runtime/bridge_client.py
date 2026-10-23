@@ -3305,6 +3305,24 @@ class DoomEternalContext(CommonContext):
     def _consume_ammo_refill_request_file(self):
         return self.ammo_requests.consume(ammo_refill_request_files())
 
+    def _reject_slot_contract(self, error):
+        message = f"Unsupported DOOM Eternal slot contract: {error}"
+        logger.error("[Contract] Connected slot rejected: %s", error)
+        self._report_launcher_connection_failure(message, code="room_incompatible", technical_message=message)
+
+    async def on_package_async(self, cmd: str, args: dict):
+        if cmd == 'Connected':
+            self.item_state_ready = False
+            slot_data = args.get('slot_data', {})
+            started = time.perf_counter()
+            try:
+                await asyncio.to_thread(validate_slot_contract, slot_data if isinstance(slot_data, dict) else {})
+            except ValueError as error:
+                self._reject_slot_contract(error)
+                return
+            logger.info('ROOM_SLOT_VALIDATION elapsed_ms=%d', round((time.perf_counter() - started) * 1000))
+        self.on_package(cmd, args)
+
     def on_package(self, cmd: str, args: dict):
         if cmd == "RoomInfo":
             self.reset_transient_effects("room_info")
@@ -3324,13 +3342,7 @@ class DoomEternalContext(CommonContext):
             try:
                 slot_data = validate_slot_contract(slot_data)
             except ValueError as error:
-                message = f"Unsupported DOOM Eternal slot contract: {error}"
-                logger.error("[Contract] Connected slot rejected: %s", error)
-                self._report_launcher_connection_failure(
-                    message,
-                    code="room_incompatible",
-                    technical_message=message,
-                )
+                self._reject_slot_contract(error)
                 return
             self._connected_slot_data = slot_data
             previous_state_key = self.state_key
@@ -6613,6 +6625,9 @@ class DoomEternalContext(CommonContext):
 
     async def death_monitor_loop(self):
         while not self.exit_event.is_set():
+            if not self.item_state_ready:
+                await asyncio.sleep(0.25)
+                continue
             self.check_rpc_autopause()
             self.queue_received_deathlink()
             game_running = bool(doom_process_identity())
@@ -6726,6 +6741,9 @@ class DoomEternalContext(CommonContext):
 
         while not self.exit_event.is_set():
             self.last_heartbeat_timestamp = time.time()
+            if not self.item_state_ready:
+                await asyncio.sleep(0.25)
+                continue
             if not doom_process_identity():
                 self.invalidate_map_identity("game_not_running")
                 await asyncio.sleep(4.0)

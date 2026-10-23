@@ -25,6 +25,37 @@ def settings(**options):
         **options})
 
 
+def test_validation_cache_preserves_input_and_compiler_checks(tmp_path, monkeypatch):
+    from copy import deepcopy
+    from collections import OrderedDict
+    from doom_eap.content import native_enemy_plan as native
+    monkeypatch.setattr(native, '_VALIDATED_PLANS', OrderedDict())
+    monkeypatch.setattr(native, '_VALIDATION_CACHE', None)
+    options, source = settings(), catalog()
+    plan = build_native_recipes(options, {'sequence': ['base']}, seed=1, catalog=source)
+    native.configure_native_validation_cache(tmp_path, 'a' * 64)
+    native.validate_native_recipes(plan, options, catalog=source)
+    native._VALIDATED_PLANS.clear()
+    calls = []
+    original = native.build_native_recipes
+    def rebuild(*args, **kwargs):
+        calls.append(True)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(native, 'build_native_recipes', rebuild)
+    assert native.validate_native_recipes(deepcopy(plan), options, catalog=source) == plan
+    assert not calls
+    changed = deepcopy(plan)
+    changed['maps']['base']['recipes'][0]['bodies'][0]['attributes']['health_percent'] += 1
+    with pytest.raises(ValueError, match='Native recipes differ'):
+        native.validate_native_recipes(changed, options, catalog=source)
+    assert calls
+    calls.clear()
+    native._VALIDATED_PLANS.clear()
+    native.configure_native_validation_cache(tmp_path, 'b' * 64)
+    native.validate_native_recipes(plan, options, catalog=source)
+    assert calls
+
+
 def test_opening_keeps_requests_and_counters_out_of_early_fights():
     source = catalog()
     stage = source['maps'].pop('base')

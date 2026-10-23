@@ -5,6 +5,9 @@ import json
 import math
 import re
 import struct
+import os
+import tempfile
+from pathlib import Path
 from fractions import Fraction
 from importlib.resources import files
 from collections import OrderedDict
@@ -12,7 +15,7 @@ from threading import Lock
 
 from .enemy_plan import (BASE_COMBAT_COST, _density_weights, _limit_suffix, _random_for, enemy_combat_cost,
                          effective_special_limits, sample_instance_attributes, sample_species)
-from .enemy_species import enemy_spawn_mask, enemy_tracking_suffix, selected_spawn_type
+from .enemy_species import enemy_spawn_mask, enemy_tracking_suffix, selected_spawn_type, enemy_speed_capabilities
 
 NATIVE_FAMILIES = {"immediate": "i", "group": "g", "staggered": "t", "maintenance": "m", "archvile": "a",
                    "spirit": "s", "possessed": "p", "buff_pod": "b", "independent_actor": "d", "summon": "u", "direct_point": "f"}
@@ -319,17 +322,35 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         if revision >= 7:
             target = Fraction(3 * neutral, 4) * (1 + progress) * intensity
     target_numerator, target_denominator = target.numerator ** 2, target.denominator ** 2
+    attribute_groups = {}
+    representatives = {}
+    for species in candidates:
+        profile = tuple(tuple(tuple(bounds[stage]) for stage in ('early', 'late'))
+                        for ranges in (settings['attributes'][name] for name in ('health', 'damage', 'speed', 'size'))
+                        for bounds in [ranges['species'].get(species, ranges['global'])])
+        profile += (enemy_speed_capabilities().get(species) == 'qualified',
+                    species in settings['size_variation_exclusions'])
+        representatives[species] = attribute_groups.setdefault(profile, species)
+    base_costs = {species: BASE_COMBAT_COST[species] * (
+        12 if revision >= 6 and species == 'buff_pod' or revision >= 7 and species == 'zombie_t1_screecher' else 1)
+        for species in candidates}
+    cost_scales = {species: base_costs[species] / base_costs[representatives[species]] for species in candidates}
     shared = None
     for ordinal, source in enumerate(roster):
         draw_key = [key, ordinal]
         random_draws = {}
-        draws = {species: sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
-            stage_index=stage_index, stage_count=stage_count, random_draws=random_draws) for species in candidates}
-        costs = {species: enemy_combat_cost(species, attributes, buff_totems=revision >= 6,
-                                           screechers=revision >= 7) for species, attributes in draws.items()}
+        samples = {species: sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
+            stage_index=stage_index, stage_count=stage_count, random_draws=random_draws)
+            for species in attribute_groups.values()}
+        draws = {species: samples[representatives[species]] for species in candidates}
+        profile_costs = {species: enemy_combat_cost(species, attributes, buff_totems=revision >= 6,
+                                                  screechers=revision >= 7) for species, attributes in samples.items()}
+        costs = {species: (profile_costs[representatives[species]].numerator * cost_scales[species].numerator,
+                           profile_costs[representatives[species]].denominator * cost_scales[species].denominator)
+                 for species in candidates}
         eligible = candidates
         if opening:
-            eligible = [species for species in eligible if costs[species] <= 5 and species not in
+            eligible = [species for species in eligible if costs[species][0] <= 5 * costs[species][1] and species not in
                         {'spirit', 'blood_angel', 'stone_imp', 'marauder', 'archvile', 'buff_pod', 'zombie_t1_screecher'}]
             if not eligible:
                 raise ValueError('Starting encounters need an enabled enemy that the initial arsenal can handle')
@@ -342,15 +363,20 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
             if not eligible:
                 raise ValueError(f"Ammunition source requires an enabled chainsaw fodder species: {source['id']}")
         elif balanced and revision < 7:
-            fitted = [species for species in eligible if costs[species] <= target * (3 if revision >= 5 else 6)]
-            eligible = fitted or [min(eligible, key=lambda species: (costs[species], species))]
+            fitted = [species for species in eligible if costs[species][0] * target.denominator
+                      <= target.numerator * costs[species][1] * (3 if revision >= 5 else 6)]
+            eligible = fitted or [min(eligible, key=lambda species: (Fraction(*costs[species]), species))]
         selected_weights = {}
         for species in eligible:
-            cost = costs[species]
-            target_units = target_numerator * cost.denominator ** 2
-            penalty_units = cost.numerator ** 2 * target_denominator
+            cost_numerator, cost_denominator = costs[species]
+            target_units = target_numerator * cost_denominator ** 2
+            penalty_units = cost_numerator ** 2 * target_denominator
             if balanced and revision >= 5:
-                selected_weights[species] = max(1, int(weights[species] * min(cost, target) * 1000000 / max(cost, target)))
+                numerator = cost_numerator * target.denominator
+                denominator = target.numerator * cost_denominator
+                if numerator > denominator:
+                    numerator, denominator = denominator, numerator
+                selected_weights[species] = max(1, weights[species] * numerator * 1000000 // denominator)
             else:
                 selected_weights[species] = max(1, weights[species] * target_units * 1000000 // (target_units + penalty_units))
         selected = {**settings, 'weights': selected_weights}
@@ -592,6 +618,14 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
 
 _VALIDATED_PLANS = OrderedDict()
 _VALIDATION_LOCK = Lock()
+_VALIDATION_CACHE = None
+
+
+def configure_native_validation_cache(directory, compiler_fingerprint):
+    global _VALIDATION_CACHE
+    if re.fullmatch(r'[0-9a-f]{64}', compiler_fingerprint) is None:
+        raise ValueError('Native validation cache needs a compiler fingerprint')
+    _VALIDATION_CACHE = Path(directory) / compiler_fingerprint
 
 
 def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
@@ -610,9 +644,31 @@ def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
                                    separators=(",", ":"), allow_nan=False).encode("utf-8")).digest()
     with _VALIDATION_LOCK:
         if key not in _VALIDATED_PLANS:
-            expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog, revision=plan.get('revision'))
-            if plan != expected:
-                raise ValueError("Native recipes differ from the seed, options or source catalog")
+            cached = _VALIDATION_CACHE / key.hex() if _VALIDATION_CACHE is not None else None
+            try:
+                verified = cached is not None and cached.stat().st_size == len(key) and cached.read_bytes() == key
+            except OSError:
+                verified = False
+            if not verified:
+                expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog, revision=plan.get('revision'))
+                if plan != expected:
+                    raise ValueError("Native recipes differ from the seed, options or source catalog")
+                if cached is not None:
+                    pending = None
+                    try:
+                        cached.parent.mkdir(parents=True, exist_ok=True)
+                        with tempfile.NamedTemporaryFile(dir=cached.parent, delete=False) as output:
+                            pending = Path(output.name)
+                            output.write(key)
+                        os.replace(pending, cached)
+                    except OSError:
+                        pass
+                    finally:
+                        if pending is not None:
+                            try:
+                                pending.unlink(missing_ok=True)
+                            except OSError:
+                                pass
             _VALIDATED_PLANS[key] = None
             if len(_VALIDATED_PLANS) > 8:
                 _VALIDATED_PLANS.popitem(last=False)
