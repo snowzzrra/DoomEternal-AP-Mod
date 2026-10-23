@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 4
+ENEMY_OPTIONS_REVISION = 5
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -116,7 +116,7 @@ def _attribute(raw, name, automatic, progressive):
 
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, ENEMY_OPTIONS_REVISION):
+    if revision not in (2, 3, 4, ENEMY_OPTIONS_REVISION):
         raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
@@ -168,8 +168,13 @@ def normalize_enemy_options(raw):
     attributes = {}
     size_groups = set()
     for name in ("health", "damage", "speed", "size"):
-        attributes[name], groups = _attribute(raw, name, (100, 100, 100, 100) if name == "size"
-                                               else getattr(recipe, name), progressive)
+        automatic = (100, 100, 100, 100) if name == "size" else getattr(recipe, name)
+        if revision >= 5 and progressive and name != "size":
+            ceiling = 120 if name == "health" else 100
+            automatic = (min(automatic[0], ceiling), min(automatic[1], ceiling), *automatic[2:])
+            if name == 'damage':
+                automatic = (*automatic[:2], min(automatic[2], 125), min(automatic[3], 125))
+        attributes[name], groups = _attribute(raw, name, automatic, progressive)
         if name == "size":
             size_groups = groups
     chance = _recipe_number(raw, "enemy_size_variation_chance", 3, 0, 100)

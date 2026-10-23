@@ -67,6 +67,17 @@ def test_fixed_attributes_replace_curves_and_size_variation_is_separate():
     assert normalize_enemy_options(raw) == normalize_enemy_options({"enemy_randomizer": False})
 
 
+def test_progressive_attributes_keep_early_damage_at_vanilla_and_respect_manual_ranges():
+    raw = {'enemy_preset': 'hells_vanguard'}
+    current = normalize_enemy_options(raw)
+    legacy = normalize_enemy_options({**raw, 'enemies': {'revision': 4}})
+    assert current['attributes']['damage']['global']['early'] == [90, 100]
+    assert current['attributes']['damage']['global']['late'] == [105, 125]
+    assert legacy['attributes']['damage']['global']['early'] == [90, 135]
+    manual = normalize_enemy_options({**raw, 'enemy_damage': {'minimum': 150, 'maximum': 180}})
+    assert manual['attributes']['damage']['global'] == {'early': [150, 180], 'late': [150, 180]}
+
+
 @pytest.mark.parametrize("overrides", [{}, {"marauder": 0}, {"marauder": 3},
     {"combined_special": 1}, {"archvile": 0, "spirit": 0},
     {"marauder": 2, "archvile": 3, "spirit": 1, "combined_special": 4}])

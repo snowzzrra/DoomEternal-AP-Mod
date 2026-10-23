@@ -13,7 +13,7 @@ def catalog():
                 "ai": {"map_key": "base", "entity": "imp", "sha256": "b" * 64}},
         "stone_imp": {"spawn_type": "ENCOUNTER_SPAWN_STONE_IMP", "hitpoints": {"max": 200, "starting": 200},
                       "ai": {"map_key": "dlc", "entity": "stone_imp", "sha256": "c" * 64}}}, "maps": {"base": {
-        "source_sha256": "a" * 64, "origins": [{"id": "base/source/0", "family": "maintenance",
+        "source_sha256": "a" * 64, "origins": [{"id": "base/source/0", "family": "group",
             "spawn_type": "ENCOUNTER_SPAWN_IMP", "logical_types": ["ENCOUNTER_SPAWN_IMP"],
             "logical_count": 2, "maximum_emissions": 8, "combat_cost": "2"},
             {"id": "base/protected", "protected_reason": "tutorial"}]}}}
@@ -190,6 +190,7 @@ def test_native_plan_round_trips_seed_types_and_rejects_invalid_campaign_progres
 
 def test_unbounded_maintenance_and_unresolved_sources_are_distinct():
     source = catalog()
+    source["maps"]["base"]["origins"][0]["family"] = "maintenance"
     source["maps"]["base"]["origins"][0]["maximum_emissions"] = 0
     plan = build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
     assert plan["maps"]["base"]["recipes"][0]["maximum_emissions"] == 0
@@ -198,24 +199,48 @@ def test_unbounded_maintenance_and_unresolved_sources_are_distinct():
         build_native_recipes(settings(), {"sequence": ["base"]}, seed=8, catalog=source)
 
 
-def test_ammunition_supply_and_its_initial_wave_keep_chainsaw_targets():
+@pytest.mark.parametrize('maximum', [0, 6, 99])
+def test_ammunition_supply_and_its_initial_wave_keep_chainsaw_targets(maximum):
     source = catalog()
     source['species']['prowler'] = {**source['species']['stone_imp'], 'spawn_type': 'ENCOUNTER_SPAWN_PROWLER'}
     refill = source['maps']['base']['origins'][0]
-    refill.update(maximum_emissions=0, logical_types=['ENCOUNTER_SPAWN_IMP', 'ENCOUNTER_SPAWN_PROWLER'],
+    refill.update(family='maintenance', maximum_emissions=maximum, logical_types=['ENCOUNTER_SPAWN_IMP', 'ENCOUNTER_SPAWN_PROWLER'],
         binding={'owner': 'arena', 'arguments': [{'string': 'refill'}]})
     initial = {**deepcopy(refill), 'id': 'initial', 'family': 'staggered', 'maximum_emissions': 2}
     source['maps']['base']['origins'].append(initial)
     for mode in ('auto', 'multiplier'):
-        plan = build_native_recipes(settings(enemy_count_mode=mode, enemy_count_multiplier=1),
+        plan = build_native_recipes(settings(enemy_count_mode=mode, enemy_count_multiplier=1, enemy_density=150),
             {'sequence': ['base']}, seed=8, catalog=source)
         recipes = plan['maps']['base']['recipes']
-        assert all(len(recipe['bodies']) >= 2 for recipe in recipes)
+        assert all(len(recipe['bodies']) == 2 for recipe in recipes)
         assert {body['species'] for recipe in recipes for body in recipe['bodies']} == {'imp'}
-        assert recipes[0]['maximum_emissions'] == 0 and recipes[1]['maximum_emissions'] == 2
+        assert recipes[0]['maximum_emissions'] == maximum and recipes[1]['maximum_emissions'] == 2
     excluded = settings(enemy_weights={name: int(name == 'stone_imp') for name in SPECIES_IDS})
     with pytest.raises(ValueError, match='Ammunition source'):
         build_native_recipes(excluded, {'sequence': ['base']}, seed=8, catalog=source)
+
+
+def test_campaign_curve_keeps_ammunition_and_defers_superheavies_until_later():
+    from importlib.resources import files
+    import json
+    from doom_eap.content.native_enemy_plan import _phase_bodies, AMMO_FODDER
+    from doom_eap.content.enemy_plan import enemy_combat_cost
+    source = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    options = normalize_enemy_options({'enemy_preset': 'hells_vanguard', 'enemy_variety': 100})
+    candidates = sorted(s for s in source['species'] if options['weights'].get(s, 0) > 0)
+    waves, costs = [], []
+    for index in range(5):
+        bodies = _phase_bodies([{'id': 'arena', 'logical_count': 200}], candidates, options,
+            Fraction(125 + 15 * index, 100), seed=7, key='arena', catalog=source,
+            stage_index=index, stage_count=5, balanced=True, revision=9)['arena']
+        assert len(bodies) == 220
+        assert sum(body['species'] in AMMO_FODDER for body in bodies) >= 55
+        waves.append({body['species'] for body in bodies})
+        costs.append(sum(enemy_combat_cost(body['species'], body['attributes'], buff_totems=True, screechers=True)
+                         for body in bodies))
+    assert all(first < second for first, second in zip(costs, costs[1:]))
+    assert not {'tyrant', 'marauder', 'archvile', 'spirit', 'cursed_prowler', 'stone_imp', 'blood_angel'} & waves[0]
+    assert {'archvile', 'marauder', 'tyrant', 'doom_hunter'} <= waves[-1]
 
 
 def test_progressive_composition_bounds_each_body_without_erasing_requests():
@@ -227,7 +252,7 @@ def test_progressive_composition_bounds_each_body_without_erasing_requests():
     plan = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source)
     early, late = (plan['maps'][key]['recipes'][0]['bodies'] for key in ('base', 'late'))
     assert len(early) == len(late) == 100
-    assert {'imp', 'stone_imp'} <= {body['species'] for body in early}
+    assert {body['species'] for body in early} == {'imp'}
     assert sum(body['species'] == 'stone_imp' for body in late) > sum(body['species'] == 'stone_imp' for body in early)
     legacy = build_native_recipes(options, {'sequence': ['base', 'late']}, seed=7, catalog=source, revision=3)
     assert any(body['species'] == 'stone_imp' for body in legacy['maps']['base']['recipes'][0]['bodies'])
@@ -256,7 +281,7 @@ def test_workload_does_not_sum_alternative_scripts_or_unbounded_refills():
     source = catalog()
     origin = source['maps']['base']['origins'][0]
     source['maps']['base']['origins'] = [
-        {**origin, 'id': f'arena/{script}/{event}', 'wave': f'arena/{script}/0',
+        {**origin, 'family': 'maintenance', 'id': f'arena/{script}/{event}', 'wave': f'arena/{script}/0',
          'maximum_emissions': maximum, 'binding': {'mode': 'event', 'entity': 'arena',
              'path': f'encounterComponent.entityEvents.item[{script}].events.item[{event}].eventCall'}}
         for script in (0, 1) for event, maximum in ((0, 9999), (1, 0))]
@@ -272,7 +297,7 @@ def test_special_fodder_ammunition_sources_keep_ordinary_chainsaw_targets(origin
     spawn_type = 'ENCOUNTER_SPAWN_' + original.upper()
     source['species'][original] = {**source['species']['stone_imp'], 'spawn_type': spawn_type}
     refill = source['maps']['base']['origins'][0]
-    refill.update(maximum_emissions=0, logical_types=[spawn_type], spawn_type=spawn_type)
+    refill.update(family='maintenance', maximum_emissions=0, logical_types=[spawn_type], spawn_type=spawn_type)
     options = settings(enemy_weights={name: int(name in {'imp', original}) for name in SPECIES_IDS})
     plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
     assert {body['species'] for recipe in plan['maps']['base']['recipes'] for body in recipe['bodies']} == {'imp'}
@@ -329,7 +354,8 @@ def test_auto_density_preserves_requests_and_frozen_revisions():
 
 def test_finite_maintenance_last_body_has_only_the_remaining_logical_credit():
     source = catalog()
-    source["maps"]["base"]["origins"][0]["maximum_emissions"] = 3
+    source["maps"]["base"]["origins"][0].update(family='maintenance', maximum_emissions=3,
+        spawn_type='ENCOUNTER_SPAWN_CACODEMON', logical_types=['ENCOUNTER_SPAWN_CACODEMON'])
     options = settings(enemy_count_mode="multiplier", enemy_count_multiplier=150,
         enemy_weights={name: int(name == "imp") for name in SPECIES_IDS})
     plan = build_native_recipes(options, {"sequence": ["base"]}, seed=7, catalog=source)

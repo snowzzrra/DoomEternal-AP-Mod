@@ -22,7 +22,7 @@ NATIVE_FAMILIES = {"immediate": "i", "group": "g", "staggered": "t", "maintenanc
 AMMO_FODDER = frozenset({"zombie_tier_1", "zombie_tier_3", "imp", "gargoyle", "hell_soldier"})
 
 
-def ammunition_sources(origins, catalog):
+def ammunition_sources(origins, catalog, *, finite=False):
     original_suppliers = AMMO_FODDER | {'shotgun_soldier', 'chaingun_soldier', 'stone_imp', 'zombie_maykr'}
     spawn_types = {catalog['species'][species]['spawn_type'] for species in original_suppliers if species in catalog['species']}
     fodder = AMMO_FODDER | {'prowler', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper',
@@ -35,7 +35,9 @@ def ammunition_sources(origins, catalog):
         binding = source.get('binding') or {}
         label = next((argument['string'] for argument in binding.get('arguments', []) if 'string' in argument), '')
         return binding.get('owner', binding.get('entity', source['id'])), label
-    groups = {group(source) for source in origins if source.get('family') == 'maintenance' and source.get('maximum_emissions') == 0
+    groups = {group(source) for source in origins if source.get('family') == 'maintenance'
+              and (source.get('maximum_emissions') == 0 or finite
+                   and source.get('maximum_emissions', 0) > source.get('logical_count', 0))
               and ammunition_pool(source)
               and not source.get('protected_reason') and not source.get('inactive_reason')}
     return {source['id'] for source in origins if group(source) in groups and ammunition_pool(source)}
@@ -304,9 +306,10 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     if revision >= 8:
         roster = [source for source in sources for _ in range(source['logical_count'])]
         density_draw = _random_for(seed, key, 'density')
-        count, remainder = divmod(len(roster) * max(100, settings['density']), 100)
+        expandable = [source for source in roster if source['id'] not in supply_sources] if revision >= 9 else roster
+        count, remainder = divmod(len(expandable) * max(100, settings['density']), 100)
         count += density_draw.randrange(100) < remainder
-        roster += density_draw.choices(roster, k=count - len(roster))
+        roster += density_draw.choices(expandable, k=count - len(expandable))
     else:
         roster = [source for source in sources
                   for _ in range((source['logical_count'] * max(100, settings['density']) + 99) // 100)]
@@ -321,6 +324,9 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         target = Fraction(neutral, 2) * (1 + progress) * intensity
         if revision >= 7:
             target = Fraction(3 * neutral, 4) * (1 + progress) * intensity
+        if revision >= 9 and settings['progressive']:
+            target = neutral * (Fraction(settings['intensity'][0], 400) * (1 - progress)
+                                + Fraction(3 * settings['intensity'][1], 100) * progress)
     target_numerator, target_denominator = target.numerator ** 2, target.denominator ** 2
     attribute_groups = {}
     representatives = {}
@@ -335,6 +341,18 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         12 if revision >= 6 and species == 'buff_pod' or revision >= 7 and species == 'zombie_t1_screecher' else 1)
         for species in candidates}
     cost_scales = {species: base_costs[species] / base_costs[representatives[species]] for species in candidates}
+    fodder_slots = set()
+    if revision >= 9:
+        slots = [index for index, source in enumerate(roster)
+                 if any(species in AMMO_FODDER and (not source.get('allowed_species')
+                        or species in source['allowed_species']) for species in candidates)]
+        if len(roster) >= 4 or any(source['id'] in supply_sources or any(
+                catalog['species'][species]['spawn_type'] in source.get('logical_types', [])
+                for species in AMMO_FODDER if species in catalog['species']) for source in sources):
+            _random_for(seed, key, 'ammunition').shuffle(slots)
+            fodder_slots.update(slots[:(len(roster) + 3) // 4])
+    remaining = target * len(roster)
+    drawn = {}
     shared = None
     for ordinal, source in enumerate(roster):
         draw_key = [key, ordinal]
@@ -358,13 +376,14 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
             eligible = [species for species in eligible if species in source['allowed_species']]
             if not eligible:
                 raise ValueError(f"Native spawn has no enabled compatible species: {source['id']}")
-        if source['id'] in supply_sources:
+        if source['id'] in supply_sources or ordinal in fodder_slots:
             eligible = [species for species in eligible if species in AMMO_FODDER]
             if not eligible:
                 raise ValueError(f"Ammunition source requires an enabled chainsaw fodder species: {source['id']}")
-        elif balanced and revision < 7:
-            fitted = [species for species in eligible if costs[species][0] * target.denominator
-                      <= target.numerator * costs[species][1] * (3 if revision >= 5 else 6)]
+        elif balanced and (revision < 7 or revision >= 9):
+            allowance = min(target * 3, remaining * 2 / (len(roster) - ordinal)) if revision >= 9 else target * (3 if revision >= 5 else 6)
+            fitted = [species for species in eligible if costs[species][0] * allowance.denominator
+                      <= allowance.numerator * costs[species][1]]
             eligible = fitted or [min(eligible, key=lambda species: (Fraction(*costs[species]), species))]
         selected_weights = {}
         for species in eligible:
@@ -376,6 +395,9 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
                 denominator = target.numerator * cost_denominator
                 if numerator > denominator:
                     numerator, denominator = denominator, numerator
+                if revision >= 9:
+                    numerator, denominator = numerator ** 2, denominator ** 2
+                    denominator *= 1 + drawn.get(species, 0)
                 selected_weights[species] = max(1, weights[species] * numerator * 1000000 // denominator)
             else:
                 selected_weights[species] = max(1, weights[species] * target_units * 1000000 // (target_units + penalty_units))
@@ -387,14 +409,17 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
         else:
             species = shared
         attributes = draws[species]
+        if revision >= 9:
+            remaining -= Fraction(*costs[species])
+            drawn[species] = drawn.get(species, 0) + 1
         bodies[source['id']].append({'species': species, 'attributes': attributes,
             'spawn_type': catalog['species'][species]['spawn_type'], 'ai': dict(catalog['species'][species]['ai']),
             'hitpoints': _body_hitpoints(catalog['species'][species], attributes)})
     return bodies
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=9):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -418,19 +443,20 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
         revision >= 8 and campaign.get("mode") == "Mission Access as Items")
     if mai:
         bands = campaign.get("enemy_progression_bands")
-        if (not isinstance(bands, dict) or any(type(bands.get(key)) is not int or not 0 <= bands[key] <= 4 for key in sequence)):
+        maximum = len(sequence) - 1 if revision >= 9 else 4
+        if (not isinstance(bands, dict) or any(type(bands.get(key)) is not int or not 0 <= bands[key] <= maximum for key in sequence)):
             raise ValueError("Native recipe campaign progression is invalid")
     composition_bands = campaign.get('composition_bands') if revision >= 3 else None
     if campaign.get('opening_stage') is not None:
         from .native_enemy_safety import OPENING_REGIONS
-        if (revision != 8 or campaign['opening_stage'] not in OPENING_REGIONS
+        if (revision < 8 or campaign['opening_stage'] not in OPENING_REGIONS
                 or campaign['opening_stage'] not in sequence or enemies['count_mode'] != 'auto'):
             raise ValueError('Native recipe opening needs a supported mission and Auto enemy count')
     if composition_bands is not None and (not isinstance(composition_bands, dict) or set(composition_bands) != set(sequence)
             or any(type(value) is not int for value in composition_bands.values())
             or sorted(composition_bands.values()) != list(range(len(sequence)))):
         raise ValueError('Native recipe composition bands are invalid')
-    stage_count = 5 if mai else len(sequence)
+    stage_count = (max(bands.values()) + 1 if revision >= 9 else 5) if mai else len(sequence)
     for stage_index, map_key in enumerate(sequence):
         if map_key not in catalog["maps"]:
             raise ValueError(f"Missing native recipe map: {map_key}")
@@ -466,7 +492,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=8):
                        else {**source, 'allowed_species': sorted(FLYING_REPLACEMENTS)}
                        if (source.get('binding') or {}).get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) else source
                        for source in origins]
-        supplies = ammunition_sources(origins, catalog) if revision >= 4 else frozenset()
+        supplies = ammunition_sources(origins, catalog, finite=revision >= 9) if revision >= 4 else frozenset()
         for source in origins:
             if not source.get("protected_reason") and not source.get("inactive_reason"):
                 count = source["logical_count"]

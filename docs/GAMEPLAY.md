@@ -33,13 +33,15 @@ enemies. **Auto** preserves at least the original count of each request and wave
 Density uses seeded rounding across each wave, so 110% aims for about 10% extra
 enemies without doubling every request for a single enemy. Each original request
 keeps its minimum count.
-Species weights still apply throughout the fight. **Progressive Difficulty**
-varies the generated composition between early and late bands before mission ranking.
-Mission Access as Items uses five mission bands, with a smaller rise between waves.
+**Progressive Difficulty** raises the enemy mix gradually across whole missions,
+with a smaller rise between waves. Mission Access as Items starts with easier
+missions and gives each remaining mission its own step in the difficulty curve.
 
 Health, damage, speed and size ranges use percentages: 100% is the usual value.
 Equal minimum and maximum values fix an attribute. An individual enemy's setting
 overrides the global range. Some scripted enemies and bosses keep their native behavior.
+Automatic progressive damage ranges reach at most 100% at the start and 125% at
+the end. Manually entered ranges take precedence.
 
 **Special Enemy Limits** caps simultaneous randomized Marauders, Arch-viles,
 Spirits, Buff Totems and Screechers. Totems and Screechers share the Arch-vile
