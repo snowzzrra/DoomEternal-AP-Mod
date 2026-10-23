@@ -148,6 +148,7 @@ def unpack_game_duration(path, *, steam_id, runtime_directory, probe_path, oodle
         text=True,
         timeout=10,
         check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if result.returncode in {0, 20}:
         return runtime_unpacked.read_bytes(), result.returncode, result.stdout

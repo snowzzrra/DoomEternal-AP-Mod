@@ -1,6 +1,8 @@
 name: Marine
 game: DOOM Eternal
 DOOM Eternal:
+  local_items: []
+  non_local_items: []
   randomize_chainsaw: false
   randomize_dash: false
   randomize_first_battery: false

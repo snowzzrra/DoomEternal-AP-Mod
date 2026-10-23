@@ -303,6 +303,9 @@ def validate_option_values(
                 )
         result[key] = value
     result[START_INVENTORY_KEY] = validate_start_inventory(values[START_INVENTORY_KEY])
+    overlap = set(result.get("local_items", ())) & set(result.get("non_local_items", ()))
+    if overlap:
+        raise ValueError("Items cannot be both local and non-local: " + ", ".join(sorted(overlap)))
     if "enemy_randomizer" in result:
         normalize_enemy_options(result)
     return result

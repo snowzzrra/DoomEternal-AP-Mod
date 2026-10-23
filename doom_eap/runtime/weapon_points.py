@@ -90,7 +90,8 @@ class SentinelWeaponPoints:
                 from doom_eap.runtime.proton import windows_path
                 executable = windows_path(self.probe)
             process = subprocess.run([*self.command_prefix, executable, *args], input=payload,
-                                     capture_output=True, timeout=4, check=False, env=self.environment)
+                                     capture_output=True, timeout=4, check=False, env=self.environment,
+                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             evidence.update(returncode=process.returncode,
                             stdout=process.stdout.decode("utf-8", errors="replace"),
                             stderr=process.stderr.decode("utf-8", errors="replace"))

@@ -56,11 +56,13 @@ def _load_apworld(ap_root: Path):
         options_module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = options_module
         spec.loader.exec_module(options_module)
+        from worlds.doometernal.items import item_name_to_id
         world = SimpleNamespace(
             game=json.loads(
                 (ap_root / "worlds/doometernal/archipelago.json").read_text(encoding="utf-8")
             )["game"],
             options_dataclass=options_module.DoomEternalOptions,
+            item_name_to_id=item_name_to_id,
         )
     finally:
         try:
@@ -91,6 +93,10 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
             "group": "Game Options",
             "source_class": option_type.__name__,
         }
+        if key in {"local_items", "non_local_items"}:
+            options.append({**base, "group": "Item & Location Options", "ui_type": "option_set", "default": [],
+                            "choices": [{"key": name, "label": name} for name in sorted(world.item_name_to_id)]})
+            continue
         if issubclass(option_type, toggle_type):
             options.append({**base, "ui_type": "toggle", "default": bool(option_type.default)})
             continue

@@ -1,16 +1,6 @@
 {
   "excluded_options": [
     {
-      "key": "local_items",
-      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
-      "source_class": "LocalItems"
-    },
-    {
-      "key": "non_local_items",
-      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
-      "source_class": "NonLocalItems"
-    },
-    {
       "key": "start_inventory",
       "reason": "complex_common_option_not_exposed_in_scalar_foundation",
       "source_class": "StartInventory"
@@ -96,6 +86,1244 @@
       "key": "accessibility",
       "source_class": "Accessibility",
       "ui_type": "choice"
+    },
+    {
+      "choices": [
+        {
+          "key": "ARC Complex Access",
+          "label": "ARC Complex Access"
+        },
+        {
+          "key": "Air Control",
+          "label": "Air Control"
+        },
+        {
+          "key": "Ammo Cache",
+          "label": "Ammo Cache"
+        },
+        {
+          "key": "Ammo Drain Trap",
+          "label": "Ammo Drain Trap"
+        },
+        {
+          "key": "Ammo Refill",
+          "label": "Ammo Refill"
+        },
+        {
+          "key": "Ammo from Barrels",
+          "label": "Ammo from Barrels"
+        },
+        {
+          "key": "Arachnotron Trap",
+          "label": "Arachnotron Trap"
+        },
+        {
+          "key": "Arbalest",
+          "label": "Arbalest"
+        },
+        {
+          "key": "Arbalest Mastery",
+          "label": "Arbalest Mastery"
+        },
+        {
+          "key": "Archvile Trap",
+          "label": "Archvile Trap"
+        },
+        {
+          "key": "Armor Shard",
+          "label": "Armor Shard"
+        },
+        {
+          "key": "BFG Ammo",
+          "label": "BFG Ammo"
+        },
+        {
+          "key": "BFG Drain Trap",
+          "label": "BFG Drain Trap"
+        },
+        {
+          "key": "BFG-9000",
+          "label": "BFG-9000"
+        },
+        {
+          "key": "Ballista",
+          "label": "Ballista"
+        },
+        {
+          "key": "Baron Trap",
+          "label": "Baron Trap"
+        },
+        {
+          "key": "Berserk",
+          "label": "Berserk"
+        },
+        {
+          "key": "Blood Fueled",
+          "label": "Blood Fueled"
+        },
+        {
+          "key": "Blood Punch",
+          "label": "Blood Punch"
+        },
+        {
+          "key": "Break Blast",
+          "label": "Break Blast"
+        },
+        {
+          "key": "Bullet Ammo",
+          "label": "Bullet Ammo"
+        },
+        {
+          "key": "Carcass Trap",
+          "label": "Carcass Trap"
+        },
+        {
+          "key": "Cell Ammo",
+          "label": "Cell Ammo"
+        },
+        {
+          "key": "Chaingun",
+          "label": "Chaingun"
+        },
+        {
+          "key": "Chainsaw",
+          "label": "Chainsaw"
+        },
+        {
+          "key": "Chainsaw Fuel",
+          "label": "Chainsaw Fuel"
+        },
+        {
+          "key": "Chrono Strike",
+          "label": "Chrono Strike"
+        },
+        {
+          "key": "Combat Shotgun",
+          "label": "Combat Shotgun"
+        },
+        {
+          "key": "Cueball Trap",
+          "label": "Cueball Trap"
+        },
+        {
+          "key": "Cultist Base Access",
+          "label": "Cultist Base Access"
+        },
+        {
+          "key": "Dash",
+          "label": "Dash"
+        },
+        {
+          "key": "Dash Refill on Glory Kill",
+          "label": "Dash Refill on Glory Kill"
+        },
+        {
+          "key": "Dazed and Confused",
+          "label": "Dazed and Confused"
+        },
+        {
+          "key": "Desperate Punch",
+          "label": "Desperate Punch"
+        },
+        {
+          "key": "Destroyer Blade",
+          "label": "Destroyer Blade"
+        },
+        {
+          "key": "Destroyer Blade Mastery",
+          "label": "Destroyer Blade Mastery"
+        },
+        {
+          "key": "Doom Hunter Base Access",
+          "label": "Doom Hunter Base Access"
+        },
+        {
+          "key": "Dread Knight Trap",
+          "label": "Dread Knight Trap"
+        },
+        {
+          "key": "Energy Shield",
+          "label": "Energy Shield"
+        },
+        {
+          "key": "Energy Shield Mastery",
+          "label": "Energy Shield Mastery"
+        },
+        {
+          "key": "Equipment Fiend",
+          "label": "Equipment Fiend"
+        },
+        {
+          "key": "Extended Ice Bomb Duration",
+          "label": "Extended Ice Bomb Duration"
+        },
+        {
+          "key": "Extra Life",
+          "label": "Extra Life"
+        },
+        {
+          "key": "Extra Life Pack",
+          "label": "Extra Life Pack"
+        },
+        {
+          "key": "Exultia Access",
+          "label": "Exultia Access"
+        },
+        {
+          "key": "Faster Dash Recharge",
+          "label": "Faster Dash Recharge"
+        },
+        {
+          "key": "Faster Ledge Grab",
+          "label": "Faster Ledge Grab"
+        },
+        {
+          "key": "Faster Weapon Swap",
+          "label": "Faster Weapon Swap"
+        },
+        {
+          "key": "Final Sin Access",
+          "label": "Final Sin Access"
+        },
+        {
+          "key": "Flame Belch",
+          "label": "Flame Belch"
+        },
+        {
+          "key": "Frag Grenade",
+          "label": "Frag Grenade"
+        },
+        {
+          "key": "Frag Grenade Cluster Bombs",
+          "label": "Frag Grenade Cluster Bombs"
+        },
+        {
+          "key": "Frag Grenade Concussive Blast",
+          "label": "Frag Grenade Concussive Blast"
+        },
+        {
+          "key": "Frag Grenade Cooldown",
+          "label": "Frag Grenade Cooldown"
+        },
+        {
+          "key": "Frozen Melee Shatter",
+          "label": "Frozen Melee Shatter"
+        },
+        {
+          "key": "Fuel",
+          "label": "Fuel"
+        },
+        {
+          "key": "Fuel Drain Trap",
+          "label": "Fuel Drain Trap"
+        },
+        {
+          "key": "Full Armor",
+          "label": "Full Armor"
+        },
+        {
+          "key": "Full Auto",
+          "label": "Full Auto"
+        },
+        {
+          "key": "Full Auto Mastery",
+          "label": "Full Auto Mastery"
+        },
+        {
+          "key": "Full Heal",
+          "label": "Full Heal"
+        },
+        {
+          "key": "Health from Frozen Demons",
+          "label": "Health from Frozen Demons"
+        },
+        {
+          "key": "Heat Blast",
+          "label": "Heat Blast"
+        },
+        {
+          "key": "Heat Blast Mastery",
+          "label": "Heat Blast Mastery"
+        },
+        {
+          "key": "Heavy Cannon",
+          "label": "Heavy Cannon"
+        },
+        {
+          "key": "Hell Knight Trap",
+          "label": "Hell Knight Trap"
+        },
+        {
+          "key": "Hell on Earth Access",
+          "label": "Hell on Earth Access"
+        },
+        {
+          "key": "Ice Bomb",
+          "label": "Ice Bomb"
+        },
+        {
+          "key": "Ice Bomb Cooldown",
+          "label": "Ice Bomb Cooldown"
+        },
+        {
+          "key": "Immora Access",
+          "label": "Immora Access"
+        },
+        {
+          "key": "Imp Trap",
+          "label": "Imp Trap"
+        },
+        {
+          "key": "Large Armor",
+          "label": "Large Armor"
+        },
+        {
+          "key": "Large Health",
+          "label": "Large Health"
+        },
+        {
+          "key": "Larger Automap Reveal",
+          "label": "Larger Automap Reveal"
+        },
+        {
+          "key": "Lock-on Burst",
+          "label": "Lock-on Burst"
+        },
+        {
+          "key": "Lock-on Burst Mastery",
+          "label": "Lock-on Burst Mastery"
+        },
+        {
+          "key": "Marauder Trap",
+          "label": "Marauder Trap"
+        },
+        {
+          "key": "Mars Core Access",
+          "label": "Mars Core Access"
+        },
+        {
+          "key": "Meat Hook",
+          "label": "Meat Hook"
+        },
+        {
+          "key": "Meat Hook Mastery",
+          "label": "Meat Hook Mastery"
+        },
+        {
+          "key": "Micro Missiles",
+          "label": "Micro Missiles"
+        },
+        {
+          "key": "Micro Missiles Mastery",
+          "label": "Micro Missiles Mastery"
+        },
+        {
+          "key": "Microwave Beam",
+          "label": "Microwave Beam"
+        },
+        {
+          "key": "Microwave Beam Mastery",
+          "label": "Microwave Beam Mastery"
+        },
+        {
+          "key": "Mobile Turret",
+          "label": "Mobile Turret"
+        },
+        {
+          "key": "Mobile Turret Mastery",
+          "label": "Mobile Turret Mastery"
+        },
+        {
+          "key": "Nekravol Access",
+          "label": "Nekravol Access"
+        },
+        {
+          "key": "Nekravol Part II Access",
+          "label": "Nekravol Part II Access"
+        },
+        {
+          "key": "One Extra Life",
+          "label": "One Extra Life"
+        },
+        {
+          "key": "Onslaught",
+          "label": "Onslaught"
+        },
+        {
+          "key": "Overdrive",
+          "label": "Overdrive"
+        },
+        {
+          "key": "Plasma Rifle",
+          "label": "Plasma Rifle"
+        },
+        {
+          "key": "Powerup Extender",
+          "label": "Powerup Extender"
+        },
+        {
+          "key": "Precision Bolt",
+          "label": "Precision Bolt"
+        },
+        {
+          "key": "Precision Bolt Mastery",
+          "label": "Precision Bolt Mastery"
+        },
+        {
+          "key": "Progressive Ammo Upgrade",
+          "label": "Progressive Ammo Upgrade"
+        },
+        {
+          "key": "Progressive Armor Upgrade",
+          "label": "Progressive Armor Upgrade"
+        },
+        {
+          "key": "Progressive Blood Punch",
+          "label": "Progressive Blood Punch"
+        },
+        {
+          "key": "Progressive Health Upgrade",
+          "label": "Progressive Health Upgrade"
+        },
+        {
+          "key": "Progressive Sentinel Hammer",
+          "label": "Progressive Sentinel Hammer"
+        },
+        {
+          "key": "Progressive Special Weapon",
+          "label": "Progressive Special Weapon"
+        },
+        {
+          "key": "Punch and Reave",
+          "label": "Punch and Reave"
+        },
+        {
+          "key": "Reclaimed Earth Access",
+          "label": "Reclaimed Earth Access"
+        },
+        {
+          "key": "Reduced Hazard Damage",
+          "label": "Reduced Hazard Damage"
+        },
+        {
+          "key": "Reduced Self Damage",
+          "label": "Reduced Self Damage"
+        },
+        {
+          "key": "Remote Detonate",
+          "label": "Remote Detonate"
+        },
+        {
+          "key": "Remote Detonate Mastery",
+          "label": "Remote Detonate Mastery"
+        },
+        {
+          "key": "Respawning Barrels",
+          "label": "Respawning Barrels"
+        },
+        {
+          "key": "Reveal Automap Progression Items",
+          "label": "Reveal Automap Progression Items"
+        },
+        {
+          "key": "Reveal Automap Stations",
+          "label": "Reveal Automap Stations"
+        },
+        {
+          "key": "Reveal Dossier Progression Items",
+          "label": "Reveal Dossier Progression Items"
+        },
+        {
+          "key": "Revenant Trap",
+          "label": "Revenant Trap"
+        },
+        {
+          "key": "Rocket Ammo",
+          "label": "Rocket Ammo"
+        },
+        {
+          "key": "Rocket Launcher",
+          "label": "Rocket Launcher"
+        },
+        {
+          "key": "Savagery",
+          "label": "Savagery"
+        },
+        {
+          "key": "Saving Throw",
+          "label": "Saving Throw"
+        },
+        {
+          "key": "Second Frag Grenade",
+          "label": "Second Frag Grenade"
+        },
+        {
+          "key": "Seek and Destroy",
+          "label": "Seek and Destroy"
+        },
+        {
+          "key": "Sentinel Battery",
+          "label": "Sentinel Battery"
+        },
+        {
+          "key": "Sentinel Battery Bundle",
+          "label": "Sentinel Battery Bundle"
+        },
+        {
+          "key": "Sentinel Hammer",
+          "label": "Sentinel Hammer"
+        },
+        {
+          "key": "Sentinel Prime Access",
+          "label": "Sentinel Prime Access"
+        },
+        {
+          "key": "Shotgun Ammo",
+          "label": "Shotgun Ammo"
+        },
+        {
+          "key": "Slayer Gate Key ARC Complex",
+          "label": "Slayer Gate Key ARC Complex"
+        },
+        {
+          "key": "Slayer Gate Key Cultist Base",
+          "label": "Slayer Gate Key Cultist Base"
+        },
+        {
+          "key": "Slayer Gate Key Exultia",
+          "label": "Slayer Gate Key Exultia"
+        },
+        {
+          "key": "Slayer Gate Key Mars Core",
+          "label": "Slayer Gate Key Mars Core"
+        },
+        {
+          "key": "Slayer Gate Key Super Gore Nest",
+          "label": "Slayer Gate Key Super Gore Nest"
+        },
+        {
+          "key": "Slayer Gate Key Taras Nabad",
+          "label": "Slayer Gate Key Taras Nabad"
+        },
+        {
+          "key": "Slayer Gate Key The Holt",
+          "label": "Slayer Gate Key The Holt"
+        },
+        {
+          "key": "Slayer Gate Key UAC Atlantica Facility",
+          "label": "Slayer Gate Key UAC Atlantica Facility"
+        },
+        {
+          "key": "Small Armor",
+          "label": "Small Armor"
+        },
+        {
+          "key": "Small Health",
+          "label": "Small Health"
+        },
+        {
+          "key": "Soulsphere",
+          "label": "Soulsphere"
+        },
+        {
+          "key": "Sticky Bombs",
+          "label": "Sticky Bombs"
+        },
+        {
+          "key": "Sticky Bombs Mastery",
+          "label": "Sticky Bombs Mastery"
+        },
+        {
+          "key": "Suit Point",
+          "label": "Suit Point"
+        },
+        {
+          "key": "Super Gore Nest Access",
+          "label": "Super Gore Nest Access"
+        },
+        {
+          "key": "Super Shotgun",
+          "label": "Super Shotgun"
+        },
+        {
+          "key": "Take Back",
+          "label": "Take Back"
+        },
+        {
+          "key": "Taras Nabad Access",
+          "label": "Taras Nabad Access"
+        },
+        {
+          "key": "The Blood Swamps Access",
+          "label": "The Blood Swamps Access"
+        },
+        {
+          "key": "The Crucible",
+          "label": "The Crucible"
+        },
+        {
+          "key": "The Dark Lord Access",
+          "label": "The Dark Lord Access"
+        },
+        {
+          "key": "The Holt Access",
+          "label": "The Holt Access"
+        },
+        {
+          "key": "The Unmaykr",
+          "label": "The Unmaykr"
+        },
+        {
+          "key": "The World Spear Access",
+          "label": "The World Spear Access"
+        },
+        {
+          "key": "Tyrant Trap",
+          "label": "Tyrant Trap"
+        },
+        {
+          "key": "UAC Atlantica Facility Access",
+          "label": "UAC Atlantica Facility Access"
+        },
+        {
+          "key": "Urdak Access",
+          "label": "Urdak Access"
+        },
+        {
+          "key": "Victory",
+          "label": "Victory"
+        },
+        {
+          "key": "Weapon Upgrade Points (3)",
+          "label": "Weapon Upgrade Points (3)"
+        }
+      ],
+      "default": [],
+      "description": "Forces these items to be in their native world.",
+      "display_name": "Local Items",
+      "group": "Item & Location Options",
+      "key": "local_items",
+      "source_class": "LocalItems",
+      "ui_type": "option_set"
+    },
+    {
+      "choices": [
+        {
+          "key": "ARC Complex Access",
+          "label": "ARC Complex Access"
+        },
+        {
+          "key": "Air Control",
+          "label": "Air Control"
+        },
+        {
+          "key": "Ammo Cache",
+          "label": "Ammo Cache"
+        },
+        {
+          "key": "Ammo Drain Trap",
+          "label": "Ammo Drain Trap"
+        },
+        {
+          "key": "Ammo Refill",
+          "label": "Ammo Refill"
+        },
+        {
+          "key": "Ammo from Barrels",
+          "label": "Ammo from Barrels"
+        },
+        {
+          "key": "Arachnotron Trap",
+          "label": "Arachnotron Trap"
+        },
+        {
+          "key": "Arbalest",
+          "label": "Arbalest"
+        },
+        {
+          "key": "Arbalest Mastery",
+          "label": "Arbalest Mastery"
+        },
+        {
+          "key": "Archvile Trap",
+          "label": "Archvile Trap"
+        },
+        {
+          "key": "Armor Shard",
+          "label": "Armor Shard"
+        },
+        {
+          "key": "BFG Ammo",
+          "label": "BFG Ammo"
+        },
+        {
+          "key": "BFG Drain Trap",
+          "label": "BFG Drain Trap"
+        },
+        {
+          "key": "BFG-9000",
+          "label": "BFG-9000"
+        },
+        {
+          "key": "Ballista",
+          "label": "Ballista"
+        },
+        {
+          "key": "Baron Trap",
+          "label": "Baron Trap"
+        },
+        {
+          "key": "Berserk",
+          "label": "Berserk"
+        },
+        {
+          "key": "Blood Fueled",
+          "label": "Blood Fueled"
+        },
+        {
+          "key": "Blood Punch",
+          "label": "Blood Punch"
+        },
+        {
+          "key": "Break Blast",
+          "label": "Break Blast"
+        },
+        {
+          "key": "Bullet Ammo",
+          "label": "Bullet Ammo"
+        },
+        {
+          "key": "Carcass Trap",
+          "label": "Carcass Trap"
+        },
+        {
+          "key": "Cell Ammo",
+          "label": "Cell Ammo"
+        },
+        {
+          "key": "Chaingun",
+          "label": "Chaingun"
+        },
+        {
+          "key": "Chainsaw",
+          "label": "Chainsaw"
+        },
+        {
+          "key": "Chainsaw Fuel",
+          "label": "Chainsaw Fuel"
+        },
+        {
+          "key": "Chrono Strike",
+          "label": "Chrono Strike"
+        },
+        {
+          "key": "Combat Shotgun",
+          "label": "Combat Shotgun"
+        },
+        {
+          "key": "Cueball Trap",
+          "label": "Cueball Trap"
+        },
+        {
+          "key": "Cultist Base Access",
+          "label": "Cultist Base Access"
+        },
+        {
+          "key": "Dash",
+          "label": "Dash"
+        },
+        {
+          "key": "Dash Refill on Glory Kill",
+          "label": "Dash Refill on Glory Kill"
+        },
+        {
+          "key": "Dazed and Confused",
+          "label": "Dazed and Confused"
+        },
+        {
+          "key": "Desperate Punch",
+          "label": "Desperate Punch"
+        },
+        {
+          "key": "Destroyer Blade",
+          "label": "Destroyer Blade"
+        },
+        {
+          "key": "Destroyer Blade Mastery",
+          "label": "Destroyer Blade Mastery"
+        },
+        {
+          "key": "Doom Hunter Base Access",
+          "label": "Doom Hunter Base Access"
+        },
+        {
+          "key": "Dread Knight Trap",
+          "label": "Dread Knight Trap"
+        },
+        {
+          "key": "Energy Shield",
+          "label": "Energy Shield"
+        },
+        {
+          "key": "Energy Shield Mastery",
+          "label": "Energy Shield Mastery"
+        },
+        {
+          "key": "Equipment Fiend",
+          "label": "Equipment Fiend"
+        },
+        {
+          "key": "Extended Ice Bomb Duration",
+          "label": "Extended Ice Bomb Duration"
+        },
+        {
+          "key": "Extra Life",
+          "label": "Extra Life"
+        },
+        {
+          "key": "Extra Life Pack",
+          "label": "Extra Life Pack"
+        },
+        {
+          "key": "Exultia Access",
+          "label": "Exultia Access"
+        },
+        {
+          "key": "Faster Dash Recharge",
+          "label": "Faster Dash Recharge"
+        },
+        {
+          "key": "Faster Ledge Grab",
+          "label": "Faster Ledge Grab"
+        },
+        {
+          "key": "Faster Weapon Swap",
+          "label": "Faster Weapon Swap"
+        },
+        {
+          "key": "Final Sin Access",
+          "label": "Final Sin Access"
+        },
+        {
+          "key": "Flame Belch",
+          "label": "Flame Belch"
+        },
+        {
+          "key": "Frag Grenade",
+          "label": "Frag Grenade"
+        },
+        {
+          "key": "Frag Grenade Cluster Bombs",
+          "label": "Frag Grenade Cluster Bombs"
+        },
+        {
+          "key": "Frag Grenade Concussive Blast",
+          "label": "Frag Grenade Concussive Blast"
+        },
+        {
+          "key": "Frag Grenade Cooldown",
+          "label": "Frag Grenade Cooldown"
+        },
+        {
+          "key": "Frozen Melee Shatter",
+          "label": "Frozen Melee Shatter"
+        },
+        {
+          "key": "Fuel",
+          "label": "Fuel"
+        },
+        {
+          "key": "Fuel Drain Trap",
+          "label": "Fuel Drain Trap"
+        },
+        {
+          "key": "Full Armor",
+          "label": "Full Armor"
+        },
+        {
+          "key": "Full Auto",
+          "label": "Full Auto"
+        },
+        {
+          "key": "Full Auto Mastery",
+          "label": "Full Auto Mastery"
+        },
+        {
+          "key": "Full Heal",
+          "label": "Full Heal"
+        },
+        {
+          "key": "Health from Frozen Demons",
+          "label": "Health from Frozen Demons"
+        },
+        {
+          "key": "Heat Blast",
+          "label": "Heat Blast"
+        },
+        {
+          "key": "Heat Blast Mastery",
+          "label": "Heat Blast Mastery"
+        },
+        {
+          "key": "Heavy Cannon",
+          "label": "Heavy Cannon"
+        },
+        {
+          "key": "Hell Knight Trap",
+          "label": "Hell Knight Trap"
+        },
+        {
+          "key": "Hell on Earth Access",
+          "label": "Hell on Earth Access"
+        },
+        {
+          "key": "Ice Bomb",
+          "label": "Ice Bomb"
+        },
+        {
+          "key": "Ice Bomb Cooldown",
+          "label": "Ice Bomb Cooldown"
+        },
+        {
+          "key": "Immora Access",
+          "label": "Immora Access"
+        },
+        {
+          "key": "Imp Trap",
+          "label": "Imp Trap"
+        },
+        {
+          "key": "Large Armor",
+          "label": "Large Armor"
+        },
+        {
+          "key": "Large Health",
+          "label": "Large Health"
+        },
+        {
+          "key": "Larger Automap Reveal",
+          "label": "Larger Automap Reveal"
+        },
+        {
+          "key": "Lock-on Burst",
+          "label": "Lock-on Burst"
+        },
+        {
+          "key": "Lock-on Burst Mastery",
+          "label": "Lock-on Burst Mastery"
+        },
+        {
+          "key": "Marauder Trap",
+          "label": "Marauder Trap"
+        },
+        {
+          "key": "Mars Core Access",
+          "label": "Mars Core Access"
+        },
+        {
+          "key": "Meat Hook",
+          "label": "Meat Hook"
+        },
+        {
+          "key": "Meat Hook Mastery",
+          "label": "Meat Hook Mastery"
+        },
+        {
+          "key": "Micro Missiles",
+          "label": "Micro Missiles"
+        },
+        {
+          "key": "Micro Missiles Mastery",
+          "label": "Micro Missiles Mastery"
+        },
+        {
+          "key": "Microwave Beam",
+          "label": "Microwave Beam"
+        },
+        {
+          "key": "Microwave Beam Mastery",
+          "label": "Microwave Beam Mastery"
+        },
+        {
+          "key": "Mobile Turret",
+          "label": "Mobile Turret"
+        },
+        {
+          "key": "Mobile Turret Mastery",
+          "label": "Mobile Turret Mastery"
+        },
+        {
+          "key": "Nekravol Access",
+          "label": "Nekravol Access"
+        },
+        {
+          "key": "Nekravol Part II Access",
+          "label": "Nekravol Part II Access"
+        },
+        {
+          "key": "One Extra Life",
+          "label": "One Extra Life"
+        },
+        {
+          "key": "Onslaught",
+          "label": "Onslaught"
+        },
+        {
+          "key": "Overdrive",
+          "label": "Overdrive"
+        },
+        {
+          "key": "Plasma Rifle",
+          "label": "Plasma Rifle"
+        },
+        {
+          "key": "Powerup Extender",
+          "label": "Powerup Extender"
+        },
+        {
+          "key": "Precision Bolt",
+          "label": "Precision Bolt"
+        },
+        {
+          "key": "Precision Bolt Mastery",
+          "label": "Precision Bolt Mastery"
+        },
+        {
+          "key": "Progressive Ammo Upgrade",
+          "label": "Progressive Ammo Upgrade"
+        },
+        {
+          "key": "Progressive Armor Upgrade",
+          "label": "Progressive Armor Upgrade"
+        },
+        {
+          "key": "Progressive Blood Punch",
+          "label": "Progressive Blood Punch"
+        },
+        {
+          "key": "Progressive Health Upgrade",
+          "label": "Progressive Health Upgrade"
+        },
+        {
+          "key": "Progressive Sentinel Hammer",
+          "label": "Progressive Sentinel Hammer"
+        },
+        {
+          "key": "Progressive Special Weapon",
+          "label": "Progressive Special Weapon"
+        },
+        {
+          "key": "Punch and Reave",
+          "label": "Punch and Reave"
+        },
+        {
+          "key": "Reclaimed Earth Access",
+          "label": "Reclaimed Earth Access"
+        },
+        {
+          "key": "Reduced Hazard Damage",
+          "label": "Reduced Hazard Damage"
+        },
+        {
+          "key": "Reduced Self Damage",
+          "label": "Reduced Self Damage"
+        },
+        {
+          "key": "Remote Detonate",
+          "label": "Remote Detonate"
+        },
+        {
+          "key": "Remote Detonate Mastery",
+          "label": "Remote Detonate Mastery"
+        },
+        {
+          "key": "Respawning Barrels",
+          "label": "Respawning Barrels"
+        },
+        {
+          "key": "Reveal Automap Progression Items",
+          "label": "Reveal Automap Progression Items"
+        },
+        {
+          "key": "Reveal Automap Stations",
+          "label": "Reveal Automap Stations"
+        },
+        {
+          "key": "Reveal Dossier Progression Items",
+          "label": "Reveal Dossier Progression Items"
+        },
+        {
+          "key": "Revenant Trap",
+          "label": "Revenant Trap"
+        },
+        {
+          "key": "Rocket Ammo",
+          "label": "Rocket Ammo"
+        },
+        {
+          "key": "Rocket Launcher",
+          "label": "Rocket Launcher"
+        },
+        {
+          "key": "Savagery",
+          "label": "Savagery"
+        },
+        {
+          "key": "Saving Throw",
+          "label": "Saving Throw"
+        },
+        {
+          "key": "Second Frag Grenade",
+          "label": "Second Frag Grenade"
+        },
+        {
+          "key": "Seek and Destroy",
+          "label": "Seek and Destroy"
+        },
+        {
+          "key": "Sentinel Battery",
+          "label": "Sentinel Battery"
+        },
+        {
+          "key": "Sentinel Battery Bundle",
+          "label": "Sentinel Battery Bundle"
+        },
+        {
+          "key": "Sentinel Hammer",
+          "label": "Sentinel Hammer"
+        },
+        {
+          "key": "Sentinel Prime Access",
+          "label": "Sentinel Prime Access"
+        },
+        {
+          "key": "Shotgun Ammo",
+          "label": "Shotgun Ammo"
+        },
+        {
+          "key": "Slayer Gate Key ARC Complex",
+          "label": "Slayer Gate Key ARC Complex"
+        },
+        {
+          "key": "Slayer Gate Key Cultist Base",
+          "label": "Slayer Gate Key Cultist Base"
+        },
+        {
+          "key": "Slayer Gate Key Exultia",
+          "label": "Slayer Gate Key Exultia"
+        },
+        {
+          "key": "Slayer Gate Key Mars Core",
+          "label": "Slayer Gate Key Mars Core"
+        },
+        {
+          "key": "Slayer Gate Key Super Gore Nest",
+          "label": "Slayer Gate Key Super Gore Nest"
+        },
+        {
+          "key": "Slayer Gate Key Taras Nabad",
+          "label": "Slayer Gate Key Taras Nabad"
+        },
+        {
+          "key": "Slayer Gate Key The Holt",
+          "label": "Slayer Gate Key The Holt"
+        },
+        {
+          "key": "Slayer Gate Key UAC Atlantica Facility",
+          "label": "Slayer Gate Key UAC Atlantica Facility"
+        },
+        {
+          "key": "Small Armor",
+          "label": "Small Armor"
+        },
+        {
+          "key": "Small Health",
+          "label": "Small Health"
+        },
+        {
+          "key": "Soulsphere",
+          "label": "Soulsphere"
+        },
+        {
+          "key": "Sticky Bombs",
+          "label": "Sticky Bombs"
+        },
+        {
+          "key": "Sticky Bombs Mastery",
+          "label": "Sticky Bombs Mastery"
+        },
+        {
+          "key": "Suit Point",
+          "label": "Suit Point"
+        },
+        {
+          "key": "Super Gore Nest Access",
+          "label": "Super Gore Nest Access"
+        },
+        {
+          "key": "Super Shotgun",
+          "label": "Super Shotgun"
+        },
+        {
+          "key": "Take Back",
+          "label": "Take Back"
+        },
+        {
+          "key": "Taras Nabad Access",
+          "label": "Taras Nabad Access"
+        },
+        {
+          "key": "The Blood Swamps Access",
+          "label": "The Blood Swamps Access"
+        },
+        {
+          "key": "The Crucible",
+          "label": "The Crucible"
+        },
+        {
+          "key": "The Dark Lord Access",
+          "label": "The Dark Lord Access"
+        },
+        {
+          "key": "The Holt Access",
+          "label": "The Holt Access"
+        },
+        {
+          "key": "The Unmaykr",
+          "label": "The Unmaykr"
+        },
+        {
+          "key": "The World Spear Access",
+          "label": "The World Spear Access"
+        },
+        {
+          "key": "Tyrant Trap",
+          "label": "Tyrant Trap"
+        },
+        {
+          "key": "UAC Atlantica Facility Access",
+          "label": "UAC Atlantica Facility Access"
+        },
+        {
+          "key": "Urdak Access",
+          "label": "Urdak Access"
+        },
+        {
+          "key": "Victory",
+          "label": "Victory"
+        },
+        {
+          "key": "Weapon Upgrade Points (3)",
+          "label": "Weapon Upgrade Points (3)"
+        }
+      ],
+      "default": [],
+      "description": "Forces these items to be outside their native world.",
+      "display_name": "Non-local Items",
+      "group": "Item & Location Options",
+      "key": "non_local_items",
+      "source_class": "NonLocalItems",
+      "ui_type": "option_set"
     },
     {
       "default": false,

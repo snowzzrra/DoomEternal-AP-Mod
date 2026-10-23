@@ -1,5 +1,9 @@
 import struct
+import os
+import sys
 from pathlib import Path
+
+import pytest
 
 from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
 from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
@@ -13,6 +17,14 @@ SCOPE = {
     "lifecycle_generation": 7,
     "build_id": "build",
 }
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows console visibility")
+def test_probe_transport_does_not_create_a_console():
+    link = SentinelWeaponPoints(Path(sys.executable), 42, "a" * 64)
+    result = link._run(["-c", "import ctypes,json; print(json.dumps({'result':'ok',"
+        "'console':ctypes.windll.kernel32.GetConsoleWindow()}))"])
+    assert result["console"] == 0
 
 
 def link_with(result_factory):

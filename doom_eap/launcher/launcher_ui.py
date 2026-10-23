@@ -489,7 +489,21 @@ class OptionSetControl(QWidget):
             check.setChecked(key in selected)
             self.grid.addWidget(check, index, 0)
             self.checks.append((key, check))
-        layout.addLayout(self.grid)
+        if option.get("key") in {"local_items", "non_local_items"}:
+            search = QLineEdit()
+            search.setPlaceholderText("Find an item...")
+            search.textChanged.connect(lambda text: [
+                check.setVisible(text.casefold() in check.text().casefold()) for _, check in self.checks])
+            layout.addWidget(search)
+            contents = QWidget()
+            contents.setLayout(self.grid)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setWidget(contents)
+            scroll.setFixedHeight(240)
+            layout.addWidget(scroll)
+        else:
+            layout.addLayout(self.grid)
         self._refresh_lock_state()
 
     def resizeEvent(self, event) -> None:
@@ -1229,7 +1243,7 @@ class LauncherUI(QMainWindow):
             ("ENEMIES", ("enemy_randomizer", "enemy_preset", "enemy_intensity_early", "enemy_intensity_late", "enemy_density", "enemy_variety", "progressive_difficulty", "easier_secret_encounters")),
             ("KILLSANITY", ("killsanity", "kills_per_check", "killsanity_maximum_milestones")),
             ("COMBAT & QoL", ("campaign_difficulty", "logic_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
-            ("MULTIWORLD", ("progression_balancing", "accessibility", "death_link", "death_link_mode")),
+            ("MULTIWORLD", ("progression_balancing", "accessibility", "local_items", "non_local_items", "death_link", "death_link_mode")),
         )
         self.option_categories = []
         displayed = set()

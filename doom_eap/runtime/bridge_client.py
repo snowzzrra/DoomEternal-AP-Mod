@@ -2682,6 +2682,8 @@ class DoomEternalContext(CommonContext):
         self.last_tracker_error = None
         self.last_heartbeat_timestamp = None
         self.item_state_ready = False
+        self._slot_validation_task = None
+        self._pending_slot_packages = []
         self.reconnect_resync_attempted = False
         self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
         self.state_key = ""
@@ -2772,6 +2774,11 @@ class DoomEternalContext(CommonContext):
 
 
     def reset_queue_session_authority(self, reason):
+        task = getattr(self, "_slot_validation_task", None)
+        if task is not None:
+            task.cancel()
+        self._slot_validation_task = None
+        self._pending_slot_packages = []
         self._ammo_projection_active = False
         self._publish_native_ammo_refill(reason)
         self.runtime_lifecycle.invalidate_work()
@@ -3310,20 +3317,43 @@ class DoomEternalContext(CommonContext):
         logger.error("[Contract] Connected slot rejected: %s", error)
         self._report_launcher_connection_failure(message, code="room_incompatible", technical_message=message)
 
-    async def on_package_async(self, cmd: str, args: dict):
-        if cmd == 'Connected':
-            self.item_state_ready = False
-            slot_data = args.get('slot_data', {})
-            started = time.perf_counter()
-            try:
-                await asyncio.to_thread(validate_slot_contract, slot_data if isinstance(slot_data, dict) else {})
-            except ValueError as error:
-                self._reject_slot_contract(error)
-                return
-            logger.info('ROOM_SLOT_VALIDATION elapsed_ms=%d', round((time.perf_counter() - started) * 1000))
-        self.on_package(cmd, args)
+    async def _validate_connected_package(self, args):
+        slot_data = args.get("slot_data", {})
+        started = time.perf_counter()
+        try:
+            await asyncio.to_thread(validate_slot_contract, slot_data if isinstance(slot_data, dict) else {})
+        except ValueError as error:
+            self._slot_validation_task = None
+            self._pending_slot_packages = []
+            self._reject_slot_contract(error)
+            return
+        logger.info("ROOM_SLOT_VALIDATION elapsed_ms=%d", round((time.perf_counter() - started) * 1000))
+        pending, self._pending_slot_packages = self._pending_slot_packages, []
+        self._slot_validation_task = None
+        self._handle_package("Connected", args)
+        if self.item_state_ready:
+            for cmd, packet, received_count in pending:
+                self._handle_package(cmd, packet, received_count=received_count)
 
     def on_package(self, cmd: str, args: dict):
+        if cmd == "Connected":
+            task = self._slot_validation_task
+            if task is not None:
+                task.cancel()
+            self._pending_slot_packages = []
+            self.item_state_ready = False
+            self._slot_validation_task = asyncio.create_task(self._validate_connected_package(args))
+        elif self._slot_validation_task is not None and cmd not in {"RoomInfo", "ConnectionRefused"}:
+            if len(self._pending_slot_packages) >= 256:
+                self.reset_queue_session_authority("pending_packets_limit")
+                self._reject_slot_contract(ValueError("Too many packets received before room validation completed"))
+            else:
+                received_count = len(self.items_received) if cmd == "ReceivedItems" else None
+                self._pending_slot_packages.append((cmd, args, received_count))
+        else:
+            self._handle_package(cmd, args)
+
+    def _handle_package(self, cmd: str, args: dict, *, received_count=None):
         if cmd == "RoomInfo":
             self.reset_transient_effects("room_info")
             # Durable item state cannot authorize queue work until matching
@@ -3331,7 +3361,7 @@ class DoomEternalContext(CommonContext):
             self.reset_queue_session_authority("room_info")
             self.room_seed_name = args.get("seed_name")
         elif cmd == "ReceivedItems":
-            self._on_received_items_packet(args)
+            self._on_received_items_packet(args, authoritative_count=received_count)
         elif cmd == "Connected":
             self._item_history_received = False
             self._room_session_established = True
@@ -3509,7 +3539,7 @@ class DoomEternalContext(CommonContext):
             ammo_refills_authoritative=balance["authoritative"],
         )
 
-    def _on_received_items_packet(self, args):
+    def _on_received_items_packet(self, args, *, authoritative_count=None):
         """Record packet metadata and wake delivery without doing delivery work."""
         packet_received_ns = time.monotonic_ns()
         packet_items = args.get("items", ()) if isinstance(args, dict) else ()
@@ -3517,7 +3547,8 @@ class DoomEternalContext(CommonContext):
             packet_item_count = len(packet_items)
         except TypeError:
             packet_item_count = 0
-        authoritative_count = len(self.items_received)
+        if authoritative_count is None:
+            authoritative_count = len(self.items_received)
         packet_start_index, packet_accepted = self.receipt_session.observe_packet(
             args.get("index") if isinstance(args, dict) else None,
             packet_item_count, authoritative_count, packet_received_ns,

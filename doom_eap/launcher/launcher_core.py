@@ -923,6 +923,7 @@ class RoomCompiler:
                         check=True,
                         capture_output=True,
                         text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                 except subprocess.CalledProcessError as error:
                     detail = (error.stderr or error.stdout or "").strip()[:500]
@@ -996,6 +997,7 @@ class RoomCompiler:
                         check=True,
                         capture_output=True,
                         text=True,
+                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                     )
                 except subprocess.CalledProcessError as error:
                     detail = (error.stderr or error.stdout or "").strip()[:500]
@@ -1225,6 +1227,7 @@ class RoomCompiler:
                     check=True,
                     capture_output=True,
                     text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except subprocess.CalledProcessError as error:
                 detail = (error.stderr or error.stdout or "").strip()[:500]
@@ -1255,6 +1258,7 @@ class RoomCompiler:
                     check=True,
                     capture_output=True,
                     text=True,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
                 )
             except subprocess.CalledProcessError as error:
                 detail = (error.stderr or error.stdout or "").strip()[:500]

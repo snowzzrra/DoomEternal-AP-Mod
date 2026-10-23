@@ -2490,6 +2490,7 @@ class LinuxModManagerAdapter:
                 capture_output=True,
                 timeout=self.TIMEOUT_SECONDS,
                 check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except subprocess.TimeoutExpired as error:
             return AdapterResult(
@@ -2913,6 +2914,7 @@ def detect_doom_processes(
                 completed = subprocess.run(
                     ["tasklist", "/fo", "csv", "/nh"],
                     capture_output=True, text=True, timeout=3, check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
             except (OSError, subprocess.SubprocessError):

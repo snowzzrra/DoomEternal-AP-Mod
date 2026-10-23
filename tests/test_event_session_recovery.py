@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,6 +24,74 @@ def bridge(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "INV_DUMP_DIR", str(tmp_path))
     monkeypatch.setattr(module, "doom_process_identity", lambda: "fixture-process")
     return module
+
+
+def test_room_validation_preserves_packet_order_and_discards_disconnected_work(bridge, monkeypatch):
+    async def run():
+        context = bridge.DoomEternalContext(None, None)
+        packets, failures = [], []
+        started, release = threading.Event(), threading.Event()
+
+        def validate(_):
+            started.set()
+            assert release.wait(5)
+
+        def handle(cmd, args, *, received_count=None):
+            packets.append((cmd, args))
+            if cmd == "Connected":
+                context.item_state_ready = True
+            elif cmd == "ReceivedItems":
+                context._on_received_items_packet(args, authoritative_count=received_count)
+            elif cmd == "RoomInfo":
+                context.reset_queue_session_authority("room_info")
+
+        monkeypatch.setattr(bridge, "validate_slot_contract", validate)
+        monkeypatch.setattr(context, "_handle_package", handle)
+        monkeypatch.setattr(context, "_reject_slot_contract", failures.append)
+        monkeypatch.setattr(context, "_schedule_item_delivery", lambda _: None)
+        monkeypatch.setattr(context, "_schedule_ammo_refill_overflow_normalization", lambda _: None)
+        for disconnected in (False, True):
+            started.clear()
+            release.clear()
+            packets.clear()
+            context._item_history_received = False
+            context.on_package("Connected", {"slot_data": {}})
+            task = context._slot_validation_task
+            try:
+                for _ in range(100):
+                    if started.is_set():
+                        break
+                    await asyncio.sleep(0.01)
+                assert started.is_set()
+                context.items_received = [1, 2]
+                context.on_package("ReceivedItems", {"index": 0, "items": [1, 2]})
+                context.items_received.append(3)
+                context.on_package("ReceivedItems", {"index": 2, "items": [3]})
+                context.on_package("RoomUpdate", {"checked_locations": [1]})
+                assert not packets and not context.item_state_ready
+                if disconnected:
+                    context.on_package("RoomInfo", {"seed_name": "another-room"})
+                release.set()
+                await asyncio.gather(task, return_exceptions=disconnected)
+                assert [cmd for cmd, _ in packets] == (
+                    ["RoomInfo"] if disconnected else ["Connected", "ReceivedItems", "ReceivedItems", "RoomUpdate"])
+                assert context._item_history_received is not disconnected
+                assert context._pending_slot_packages == []
+            finally:
+                release.set()
+
+        def reject(_):
+            raise ValueError("invalid room")
+
+        monkeypatch.setattr(bridge, "validate_slot_contract", reject)
+        packets.clear()
+        context.on_package("Connected", {"slot_data": {}})
+        context.on_package("ReceivedItems", {"index": 0})
+        await context._slot_validation_task
+        assert not packets and len(failures) == 1 and not context.item_state_ready
+        await context.session_tasks.close()
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("old_key", [None, "room-A", "room-B"])
