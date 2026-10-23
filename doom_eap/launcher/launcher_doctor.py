@@ -1550,7 +1550,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.6.6"
+    VERSION = "0.6.7"
 
     def __init__(
         self,

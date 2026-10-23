@@ -2961,6 +2961,8 @@ class DoomEternalContext(CommonContext):
 
     def _active_materialization_lease(self, context=None):
         marker = self.cached_map_identity or {}
+        if marker.get("native_scope") and not self.runtime_effects_ready():
+            return None
         marker_context = classify_runtime_context(marker.get("runtime_map", ""))
         return self.runtime_lifecycle.materialization_lease(
             getattr(marker_context, "campaign", None), getattr(context, "campaign", None),
@@ -2982,6 +2984,57 @@ class DoomEternalContext(CommonContext):
             queue_authoritative=self._queue_session_authoritative,
         )
 
+    def _native_materialization_scope(self, evidence, admitted=None, link=None):
+        from doom_eap.contracts.save_observation import admitted_evidence_matches
+        try:
+            link = link or self.native_game_link()
+            admitted = admitted or self.admitted_campaign_save()
+            admission = getattr(link, "save_admission", {})
+            if (not getattr(evidence, "native_safe", False)
+                    or not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, admission)):
+                return None
+            scope = link._run(["--pid", str(link.pid), "--native", "--json"])
+            identity = (str(admission.get("process_created")), admission.get("instance_id"), admission.get("build_id"))
+            if (scope.get("target_pid") != link.pid or scope.get("server_pid") != link.pid
+                    or (str(scope.get("process_created")), scope.get("instance_id"), scope.get("build_id")) != identity
+                    or scope.get("availability") != "enabled" or scope.get("lifecycle") != "active"
+                    or scope.get("context_reason") != "none"):
+                return None
+            generation = int(scope["lifecycle_generation"])
+            if generation <= 0 or int(scope["context_generation"]) != generation:
+                return None
+            runtime_map = canonical_map_name(scope.get("current_map"))
+            if len([key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map]) != 1:
+                return None
+            return (link.namespace, admission["native_root"], link.pid, *identity, generation, runtime_map)
+        except (RuntimeError, OSError, ValueError, KeyError, TypeError):
+            return None
+
+    def _recover_native_materialization(self, evidence):
+        scope = self._native_materialization_scope(evidence)
+        marker = self.cached_map_identity or {}
+        if scope is None:
+            if marker.get("native_scope") and self.published_materialization_lease is not None:
+                publish_materialization_lease(None)
+                self.runtime_lifecycle.record_lease_publication(None, False)
+            return False
+        if marker.get("native_scope") == scope:
+            if self.published_materialization_lease != marker["gameplay_epoch"]:
+                self.accept_map_identity(marker, evidence.epoch)
+            return True
+        # process creation and Core load generation keep the epoch stable across polls
+        epoch = build_materialization_epoch(scope[-2], int(scope[3]))
+        if epoch is None:
+            return False
+        marker = {**self.runtime_lifecycle.new_map_proposal(
+            _catalog_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
+            "native_scope": scope}
+        self.invalidate_active_save_proof()
+        self.accept_map_identity(marker, evidence.epoch)
+        self.snapshot_fast_travel_eligibility(marker_data=marker)
+        logger.info("[MAP] Native Core context recovered map=%s epoch=%s", scope[-1], epoch)
+        return True
+
     def runtime_effects_ready(self, evidence=None):
         """Canonical admission predicate for map-scoped runtime effects."""
         evidence = evidence or read_gameplay_save_evidence()
@@ -2994,6 +3047,8 @@ class DoomEternalContext(CommonContext):
                                         getattr(link, "save_admission", {})):
             return False
         marker = getattr(self, "cached_map_identity", None)
+        if marker and marker.get("native_scope"):
+            return marker["native_scope"] == self._native_materialization_scope(evidence, admitted, link)
         context = classify_runtime_context(
             marker.get("runtime_map", "") if isinstance(marker, Mapping) else ""
         )
@@ -4173,6 +4228,12 @@ class DoomEternalContext(CommonContext):
     def advance_known_map_materialization(self, evidence):
         """Advance epoch from a fresh native load edge or transition."""
         cached = getattr(self, "cached_map_identity", None)
+        if cached is None or cached.get("native_scope") or cached.get("materialization_suspended"):
+            evidence = evidence or read_gameplay_save_evidence()
+            if self._recover_native_materialization(evidence):
+                return True
+            if cached and cached.get("native_scope"):
+                return False
         decision = self.runtime_lifecycle.classify_native_load(evidence, KNOWN_CATALOG_MAPS)
         if decision is None:
             return False
@@ -4356,6 +4417,8 @@ class DoomEternalContext(CommonContext):
             return None
         if cached.get("materialization_suspended"):
             return None
+        if cached.get("native_scope"):
+            return cached if self.runtime_effects_ready(evidence) else None
         marker_mtime = cached.get("mtime_ns", 0)
         if lease is not None and lease.started_ns and marker_mtime < lease.started_ns:
             return self.invalidate_map_identity("stale_marker")

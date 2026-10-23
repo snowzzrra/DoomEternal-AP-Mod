@@ -1,11 +1,17 @@
 #!/bin/bash
 NEW_CMD=()
+GAME_CMD=()
 SKIP_NEXT=0
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 AP_CLIENT_DELAY="${AP_CLIENT_DELAY:-12}"
 
 for arg in "$@"; do
+    # the prepared AP session keeps wineserver alive before the game starts
+    if [[ "$arg" == "waitforexitandrun" || "$arg" == "--verb=waitforexitandrun" ]]; then
+        arg="${arg/waitforexitandrun/run}"
+    fi
+    GAME_CMD+=("$arg")
     if [[ $SKIP_NEXT -eq 1 ]]; then
         SKIP_NEXT=0
         continue
@@ -14,9 +20,6 @@ for arg in "$@"; do
     # Steam executes the launcher first, not x64vk.exe directly
     if [[ "$arg" == *"launcher/idTechLauncher.exe"* || "$arg" == *"DOOMEternalx64vk.exe"* ]]; then
         NEW_CMD+=("$DIR/ap_client.exe" "$PWD")
-    elif [[ "$arg" == *"waitforexitandrun"* ]]; then
-        # Use 'run' to prevent Steam from blocking on the background client
-        NEW_CMD+=("${arg/waitforexitandrun/run}")
     elif [[ "$arg" == "+com_skipSignInManager" || "$arg" == "+com_skipBethesdaMessage" ]]; then
         SKIP_NEXT=1
         continue
@@ -37,4 +40,4 @@ pkill -f '[/\\]ap_client\.exe' 2>/dev/null || true
 ) &
 
 # Start the game immediately.
-exec "$@"
+exec "${GAME_CMD[@]}"
