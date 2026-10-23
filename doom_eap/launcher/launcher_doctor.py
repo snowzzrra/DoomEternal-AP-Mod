@@ -130,6 +130,8 @@ def _sanitize_support_text(text: str) -> str:
 
 def sanitize_support_value(value: object, *, key: str = "") -> object:
     lowered = key.casefold().replace("-", "_")
+    if lowered == "gameplay_authorization" and value == "unvalidated":
+        return value
     if lowered in _CREDENTIAL_FIELDS or any(lowered.endswith("_" + field) for field in _CREDENTIAL_FIELDS):
         return "[REDACTED]"
     if isinstance(value, Mapping):
@@ -951,14 +953,18 @@ def _expected_room_compiler_digest(application_dir: Path | None = None) -> str |
     return None
 
 
-def _preparation_failure_summary(state_dir):
+def _preparation_failure_summary(state_dir, *, filename="session_prepare_failure.json", source="last_preparation_failure"):
     if not state_dir:
         return {"status": "unavailable"}
     try:
-        document = json.loads((state_dir / "session_prepare_failure.json").read_text(encoding="utf-8"))
+        with (state_dir / filename).open("rb") as stream:
+            raw = stream.read(SUPPORT_DIAGNOSTIC_MAX_BYTES + 1)
+        if len(raw) > SUPPORT_DIAGNOSTIC_MAX_BYTES:
+            return {"status": "unavailable", "reason": "diagnostic_exceeds_support_limit"}
+        document = json.loads(raw)
     except (OSError, UnicodeError, ValueError):
         return {"status": "unavailable"}
-    return {"status": "retained", "source": "last_preparation_failure", "evidence": sanitize_support_value(document)}
+    return {"status": "retained", "source": source, "evidence": sanitize_support_value(document)}
 
 
 def _room_install_receipt_summary(
@@ -1328,6 +1334,8 @@ def build_support_diagnostics(
         "item_state": _item_state_summary(config, config_path),
         "room_install_receipt": _room_install_receipt_summary(state_dir, app_dir),
         "session_preparation_failure": _preparation_failure_summary(state_dir),
+        "session_admission_failure": _preparation_failure_summary(
+            state_dir, filename="session_admission_failure.json", source="last_admission_failure"),
         "game_link": _support_game_link_diagnostics(
             config, config_path, paths, processes, runtime, meathook, live=live
         ),
@@ -1478,7 +1486,9 @@ def write_support_bundle(
         payload["support_condump"] = sanitize_support_value(condump_metadata)
     if support_diagnostics is not None:
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
-    native_startup = _native_startup_diagnostics(config, payload.get("support_diagnostics", {}).get("ap_session", {}))
+    support = payload.get("support_diagnostics", {})
+    session = support.get("ap_session") or support.get("campaign_inspection", {}).get("session", {})
+    native_startup = _native_startup_diagnostics(config, session)
     payload["native_startup"] = sanitize_support_value(native_startup)
     safe_logs = _bound_support_text(
         "\n".join(_sanitize_support_text(str(line)) for line in logs)
@@ -1509,6 +1519,9 @@ def write_support_bundle(
     with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("doctor.json", json.dumps(payload, indent=2, sort_keys=True) + "\n")
         archive.writestr("native_startup.json", json.dumps(payload["native_startup"], indent=2, sort_keys=True) + "\n")
+        archive.writestr("session_admission_failure.json", json.dumps(
+            payload.get("support_diagnostics", {}).get("session_admission_failure", {"status": "unavailable"}),
+            indent=2, sort_keys=True) + "\n")
         if "launcher.log" not in tails:
             archive.writestr("launcher.log", safe_logs + ("\n" if safe_logs else ""))
         elif safe_logs:
@@ -1817,6 +1830,15 @@ class LauncherDoctor:
             },
             live=self.live_support,
         )
+        health = support_diagnostics["game_link"]["native_rpc"].get("health")
+        admission = health.get("session") if isinstance(health, Mapping) else None
+        game_pids = {str(process.get("pid")) for process in processes
+                     if str(process.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}}
+        if (isinstance(admission, Mapping) and admission.get("state") == "admission_refused"
+                and str(admission.get("pid")) in game_pids):
+            checks.append(Diagnostic("ap_session", "attention",
+                "Core has not admitted the AP save session. Inspect the admission diagnostic before loading a save.",
+                dict(admission)))
 
         state_dir = self._state_dir()
         receipt_path = (state_dir / "launcher_setup.json") if state_dir else None

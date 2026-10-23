@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ctypes
+import datetime
 from dataclasses import asdict
 from ctypes import wintypes
 import hashlib
@@ -298,6 +299,64 @@ class APSessionOwner:
             refused.storage_outcome = outcome
             raise refused
         return value
+
+    def _capture_admission_failure(self, process, admission=None, error=None):
+        runtime = getattr(self, "_runtime", None)
+        if runtime is None:
+            return
+        admission = admission or {}
+        key = (process["pid"], str(process["created"]), self.namespace,
+               *(admission.get(field) for field in ("state", "fault", "prepared_routes", "instance_id")))
+        now = time.monotonic()
+        if key != getattr(self, "_admission_capture_key", None):
+            self._admission_capture_key, self._admission_capture_attempts = key, 0
+            self._next_admission_capture = 0
+        if self._admission_capture_attempts >= 4 or now < self._next_admission_capture:
+            return
+        self._admission_capture_attempts += 1
+        self._next_admission_capture = now + 5
+        document = {"at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "pid": process["pid"], "process_created": str(process["created"]),
+                    "namespace_id": self.namespace, "build_id": self._build,
+                    "probe": str(runtime / "sentinel_probe.exe"), "attempt": self._admission_capture_attempts,
+                    "admission": admission, "admission_error": str(error) if error else None, "queries": {}}
+        for flag in ("--native", "--engine", "--save-installation"):
+            query = {}
+            document["queries"][flag] = query
+            try:
+                result = subprocess.run([document["probe"], "--pid", str(process["pid"]), flag,
+                                         "--timeout-ms", "250", "--json"], capture_output=True,
+                                        timeout=1, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                query.update(returncode=result.returncode, stderr=result.stderr[:4096].decode("utf-8", errors="replace"))
+                raw = result.stdout[:65536].decode("utf-8", errors="replace")
+                query["truncated"] = len(result.stdout) > 65536
+                try:
+                    response = json.loads(raw)
+                    if not isinstance(response, dict):
+                        raise ValueError("Core diagnostic returned an invalid object")
+                    query["response"] = response
+                    query["identity_matches"] = (response.get("target_pid") == process["pid"]
+                        and response.get("server_pid") == process["pid"]
+                        and str(response.get("process_created")) == str(process["created"]))
+                except ValueError as invalid:
+                    query.update(error=str(invalid), stdout=raw)
+            except (OSError, subprocess.SubprocessError) as failed:
+                query.update(error_type=type(failed).__name__, error=str(failed))
+                for stream in ("stdout", "stderr"):
+                    value = getattr(failed, stream, None)
+                    if value:
+                        query[stream] = value[:4096].decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)[:4096]
+        native = document["queries"]["--native"]
+        if (native.get("identity_matches") and native.get("response", {}).get("availability") in {"enabled", "disabled", "retained"}
+                and all(query.get("identity_matches") and query.get("returncode") == 0 for query in document["queries"].values())):
+            self._admission_capture_attempts = 4
+        try:
+            from .launcher_platform import _atomic_write_bytes
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            _atomic_write_bytes(self.state_dir / "session_admission_failure.json",
+                                (json.dumps(document, indent=2, ensure_ascii=True) + "\n").encode("utf-8"))
+        except OSError:
+            logging.getLogger(__name__).exception("AP_ADMISSION_DIAGNOSTIC_WRITE_FAILED diagnostic=%s", document)
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
         try:
@@ -801,8 +860,9 @@ class APSessionOwner:
             self.status.update(pid=process["pid"], process_created=process["created"])
             try:
                 admission = self._probe("--pid", str(process["pid"]), "--save-admission", "--json")
-            except (RuntimeError, OSError, subprocess.SubprocessError):
+            except (RuntimeError, OSError, subprocess.SubprocessError) as error:
                 self.status.update(state="awaiting_admission", ready=False)
+                self._capture_admission_failure(process, error=error)
                 return dict(self.status)
             matches = (admission.get("state") == "admitted" and admission.get("accepting_requests") is True
                        and admission.get("namespace_id") == self.namespace and admission.get("build_id") == self._build
@@ -814,6 +874,8 @@ class APSessionOwner:
                 self._instance = instance
             self.status.update(state="admitted" if matches else "admission_refused", ready=matches,
                                pid=process["pid"], process_created=process["created"], admission=admission)
+            if not matches:
+                self._capture_admission_failure(process, admission)
             return dict(self.status)
 
     def can_close(self) -> bool:
