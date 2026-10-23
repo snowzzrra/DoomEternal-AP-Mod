@@ -44,8 +44,13 @@ def bank_order(spec, map_index):
         (row for row in spec["mapFileRefs"] if row["map"] == map_index), key=lambda row: row["file"], reverse=True)]
 
 
-def test_native_donor_closure_keeps_destination_priority_and_restores_between_rooms(bank_room):
+@pytest.mark.parametrize('family', ['recipes', 'compatibility_recipes', 'counter_recipes'])
+def test_native_donor_closure_keeps_destination_priority_and_restores_between_rooms(bank_room, family):
     base, original, plan = bank_room
+    if family != 'recipes':
+        stage = plan['maps']['e1m1_intro']
+        stage[family] = stage['recipes']
+        stage['recipes'] = [{'bodies': [{'species': 'zombie', 'ai': {'map_key': 'e1m1_intro'}}]}]
     updates, report = prepare_native_resource_banks(base, plan, ROOTS)
     projected = json.loads(updates["packagemapspec.json"])
     bank, = report['consolidated']

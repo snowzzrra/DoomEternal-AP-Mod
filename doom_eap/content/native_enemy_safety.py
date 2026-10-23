@@ -8,14 +8,32 @@ FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
 
 
+def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_capabilities):
+    from .native_enemy_plan import _body_hitpoints, native_body_name
+
+    donor = catalog['species'][species]
+    if speed_capabilities[species] != 'qualified':
+        body['attributes']['speed_percent'] = 100
+    body.update(species=species, spawn_type=donor['spawn_type'], ai=dict(donor['ai']),
+                hitpoints=_body_hitpoints(donor, body['attributes']))
+    body['definition'] = native_body_name(recipe['origin'], ordinal, recipe['logical_count'],
+        recipe['physical_count'], recipe['selected_spawn_type'], body, enemies)
+    if 'tail_definition' in body:
+        body['tail_definition'] = native_body_name(recipe['origin'], ordinal, recipe['logical_count'],
+            recipe['physical_count'], recipe['selected_spawn_type'], body, enemies,
+            credit_units=recipe['final_credit_units'])
+
+
 def project_native_safety(plan, enemies):
     from .enemy_plan import sample_species
     from .enemy_species import enemy_speed_capabilities
-    from .native_enemy_plan import _body_hitpoints, native_body_name, native_recipe_fingerprint
+    from .native_enemy_plan import native_recipe_fingerprint
 
     if plan is None:
         return None
     affected = (set(SCRIPTED_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS)) & set(plan['maps'])
+    affected.update(key for key, stage in plan['maps'].items()
+                    if any(body['species'] == 'cursed_prowler' for recipe in stage['recipes'] for body in recipe['bodies']))
     if not affected:
         return plan
     result = deepcopy(plan)
@@ -26,6 +44,7 @@ def project_native_safety(plan, enemies):
         stage = result['maps'][map_key]
         protected = SCRIPTED_BOSS_ACTORS.get(map_key, ())
         points = FLYING_SPAWN_POINTS.get(map_key, ())
+        settings = {**enemies, 'special_limits': stage['special_limits']}
         for recipe in stage['recipes']:
             binding = recipe['binding']
             if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
@@ -39,19 +58,17 @@ def project_native_safety(plan, enemies):
                     continue
                 species = sample_species(enemies, FLYING_REPLACEMENTS, seed=plan['seed'],
                                          instance_key=[recipe['id'], ordinal, 'flying_spawn'])
-                donor = catalog['species'][species]
                 before = body['species']
-                if speed_capabilities[species] != 'qualified':
-                    body['attributes']['speed_percent'] = 100
-                body.update(species=species, spawn_type=donor['spawn_type'], ai=dict(donor['ai']),
-                            hitpoints=_body_hitpoints(donor, body['attributes']))
-                body['definition'] = native_body_name(recipe['origin'], ordinal, recipe['logical_count'],
-                    recipe['physical_count'], recipe['selected_spawn_type'], body, {**enemies, 'special_limits': stage['special_limits']})
-                if 'tail_definition' in body:
-                    body['tail_definition'] = native_body_name(recipe['origin'], ordinal, recipe['logical_count'],
-                        recipe['physical_count'], recipe['selected_spawn_type'], body,
-                        {**enemies, 'special_limits': stage['special_limits']}, credit_units=recipe['final_credit_units'])
+                _replace_species(body, species, recipe, ordinal, settings, catalog, speed_capabilities)
                 changes.append({'origin': recipe['id'], 'action': 'flying_spawn', 'before': before, 'after': species})
+        for recipe in stage['recipes']:
+            if any(body['species'] == 'cursed_prowler' for body in recipe['bodies']):
+                alternate = deepcopy(recipe)
+                for ordinal, body in enumerate(alternate['bodies']):
+                    if body['species'] == 'cursed_prowler':
+                        _replace_species(body, 'prowler', alternate, ordinal, settings, catalog, speed_capabilities)
+                stage.setdefault('counter_recipes', []).append(alternate)
+                changes.append({'origin': recipe['id'], 'action': 'blood_punch_fallback', 'after': 'prowler'})
     if not changes:
         return plan
     result['source_fingerprint'] = plan['fingerprint']

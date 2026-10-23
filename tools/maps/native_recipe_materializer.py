@@ -313,8 +313,9 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             _render(edit, 2) + '\n\t}\n}')
     functional_libraries = {}
     emitted_bodies = {}
-    for recipe, compatible in ([(recipe, False) for recipe in stage['recipes']] +
-                               [(recipe, True) for recipe in stage.get('compatibility_recipes', [])]):
+    for recipe, compatible, prefix in ([(recipe, False, 'ap_v070_bodies_r') for recipe in stage['recipes']] +
+            [(recipe, True, 'ap_v070_compat_r') for recipe in stage.get('compatibility_recipes', [])] +
+            [(recipe, True, 'ap_v070_counter_r') for recipe in stage.get('counter_recipes', [])]):
         recipe_definitions = []
         reference = recipe["binding"].get("reference", recipe["binding"].get("entity", ""))
         source_names = sorted(reachable(reference)) if recipe["family"] != "summon" else []
@@ -370,7 +371,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             definitions.append({"name": name})
             recipe_definitions.append({"name": name})
         values = {"num": len(recipe_definitions), **{f"item[{i}]": value for i, value in enumerate(recipe_definitions)}}
-        body_library = ("ap_v070_compat_r" if compatible else "ap_v070_bodies_r") + recipe["origin"]
+        body_library = prefix + recipe["origin"]
         if body_library in names:
             raise ValueError("Duplicate native body library")
         names.add(body_library)

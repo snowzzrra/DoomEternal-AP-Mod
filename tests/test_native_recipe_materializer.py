@@ -52,12 +52,15 @@ def test_checkpoint_body_library_reuses_identical_definitions():
     plan = frozen_plan()
     recipe = plan['maps']['map']['recipes'][0]
     plan['maps']['map']['compatibility_recipes'] = [deepcopy(recipe)]
+    plan['maps']['map']['counter_recipes'] = [deepcopy(recipe)]
     plan['fingerprint'] = native_recipe_fingerprint(plan)
     compiled = materialize_native_recipe_definitions(SOURCE, 'map', plan, {'map': SOURCE})
     records = list(entity_records(compiled))
     assert sum(row['name'] == recipe['bodies'][0]['definition'] for row in records) == 1
     compatible, = [row for row in records if row['name'] == 'ap_v070_compat_r' + recipe['origin']]
     assert len(list_items(compatible['edit']['entityDefs'])) == recipe['physical_count']
+    alternate, = [row for row in records if row['name'] == 'ap_v070_counter_r' + recipe['origin']]
+    assert len(list_items(alternate['edit']['entityDefs'])) == recipe['physical_count']
 
 
 @pytest.mark.parametrize('authored_initial', [False, True])

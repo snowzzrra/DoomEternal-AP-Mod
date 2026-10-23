@@ -26,7 +26,7 @@ def native_resource_maps(plan):
         if key not in catalog or stage["runtime_map"] != catalog[key]["runtime_map"]:
             raise ValueError("Native enemy resource destination differs from the catalog")
         donors = set()
-        for recipe in [*stage["recipes"], *stage.get('compatibility_recipes', [])]:
+        for recipe in [*stage["recipes"], *stage.get('compatibility_recipes', []), *stage.get('counter_recipes', [])]:
             for body in recipe["bodies"]:
                 donor = body["ai"]["map_key"]
                 if donor not in catalog:

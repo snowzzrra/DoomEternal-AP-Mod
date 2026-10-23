@@ -14,7 +14,7 @@
     "sha256": "e63a2d3be5071841556cac3a5d4e210c8a3e49f3247530790d5d6e2c3d0b8a3a",
     "size": 18712731
   },
-  "room_resource_input_fingerprint": "aa0396f25c08e89eedb0b4bf27cf647416885b15099e46c575f3e3e2a76f2d9e",
+  "room_resource_input_fingerprint": "2f3b2e623b17d85f1585462bec3b4442d466cfcd860492021f129b8b98f8183f",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -235,7 +235,7 @@
     "doom_eap/content/mastery_requirements.py": "4a9fb9ef1cf8fe5dbca1c4a3335ca55ee99c38ae8127d6bf16ef6ca3ab2841f2",
     "doom_eap/content/native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
     "doom_eap/content/native_enemy_plan.py": "c9d9ec3e30c5181bd268e95fb278d9b7485a9cd0bb5ba08dc3fe2316bde968cd",
-    "doom_eap/content/native_enemy_safety.py": "2c06c4312f05d374f8a3b011c6ef7aa4964350beb6b5b21ba3aeadf9f9a54276",
+    "doom_eap/content/native_enemy_safety.py": "b003ff5c9e6a75538822f6557524db974305181399efd81c17b8f92ef2bf8dd8",
     "doom_eap/content/options_foundation.py": "0093ff7f21daa5818b99a9ddf3da36b7bb4f7b613919eff588452e7fb13e5b6e",
     "doom_eap/content/physical_options.py": "d42368b639db8c2a91cabfc7212f334c6c49bc37aeb104b301f81ea05ca1b354",
     "doom_eap/content/publisher_loader.py": "3294603980928f10a72eb7944a3367a78dc5b6838f8b65f0082da67a420ea59c",
@@ -259,7 +259,7 @@
     "doom_eap/contracts/save_observation.py": "672f27a9a86d32fe58b890b978d4b199031f478720417ba571f5200f90a453c8",
     "doom_eap/contracts/source_bytes.py": "9a9c41e4d61d7c84e4cf16167bcb36c3f6403f44334d52c6dfdc0ccda356bcba",
     "doom_eap/contracts/tag_prerequisites.py": "76f605b03424824de269aaa4fed88425e950f0d687a09095dcdd5d8e73cad907",
-    "doom_eap/launcher/launcher_core.py": "1342b2bc3ba461007af41845ca86d25f503db06597aab923aea64765be3b8c92",
+    "doom_eap/launcher/launcher_core.py": "81ae93b28488759cf673b77e9032097c0a12a34a7b2719ad656c20620d2fb10e",
     "doom_eap/runtime/context_registry.py": "21b44d74240f7b9d63fc40878e79d72e7cbb18daf651094ab8f6f095eee74e52",
     "doom_eap/runtime/save_records.py": "96065b79896e964c47e5855c4035b1eb3ea13b56c0bcb7025b0593c25955a106",
     "manifests/e1m1_intro.json": "5dde4f9f0e0c7b67000e134ee0225a43b3cb2f7a72efb075536036d382ab717f",
@@ -435,7 +435,7 @@
     "tools/maps/map_semantic_baseline.py": "5d772f2d1afd37362c878ab668234ed1dafab9ca463f3f0b62394b08c0501b79",
     "tools/maps/mission_complete_map_patcher.py": "10c70ebc62be7826783654c66a1d1b2c743bf04804d4645129f8e4441b638b88",
     "tools/maps/native_enemy_inventory.py": "2c6a09b335cdc26edf08d4163302ac8408be97eb7adeef1b98b41be5f0fbf8d9",
-    "tools/maps/native_recipe_materializer.py": "e0a1f2ff86a36c7ae7a4b0be399fbf5a18e18e06832f5192239fdc2ddde4f35a",
+    "tools/maps/native_recipe_materializer.py": "f1df7bae7af89433d5a50a828194ad7cb6f39591dfe56b3073d57eefe5f7e01f",
     "tools/maps/notification_formatting.py": "10b48794fb330d1fd2bb5044d9c5507be65b915e2cef4fe1337632219e226f70",
     "tools/maps/resource_priority.py": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
     "tools/maps/shell_menu_visual.py": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",
@@ -447,7 +447,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "468b0f57cee277ee8db99dbedfe38061cfa88d10",
+      "base_commit_sha": "c9e131edd613928f6f59e80d804d67a836f4b101",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -4164,8 +4164,8 @@
             "size": 2454
           },
           "archipelago/worlds/doometernal/docs/setup_en.md": {
-            "sha256": "72c50096fcbbcd9cb0a0ffe712ae3cef02cf65161b7b8b190d54dd96cb32fd0a",
-            "size": 8671
+            "sha256": "6610bd65c5264b1ed6ba5bfc411a1a53ef39234cc8ed90f8375832a7c3436238",
+            "size": 8225
           },
           "archipelago/worlds/doometernal/doom_logo.png": {
             "sha256": "fb6fd971c27abe314fa4c22f62df80ac007a918f474037f262b4486f156e240b",
@@ -4224,8 +4224,8 @@
             "size": 44359
           },
           "archipelago/worlds/doometernal/native_enemy_safety.py": {
-            "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
-            "size": 4254
+            "sha256": "3317517a14ae867c74bfc071c0ec1c46169eba42e5fa54366cd14b837dd71a97",
+            "size": 5143
           },
           "archipelago/worlds/doometernal/options.py": {
             "sha256": "a9f134835cc2b1755c7fea1c2580bfd45b45746f72f78ec3d0a328286d30cd9c",
@@ -13084,12 +13084,12 @@
             "size": 136
           }
         },
-        "fingerprint": "68de869823d412e21744dae095c1a1852c8f715a86a7120552b51c8fc424e5f8",
+        "fingerprint": "0873c5c073443b65bd8482a3c555f8f0c410e5254d9c010e2ee4ff807860c24b",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "7e2f79d35d66200a3035723c3d2b5a3be5aa5e40",
+      "base_commit_sha": "5ca26d957bf0a806c6480e19a5a2b24b70981367",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13098,8 +13098,8 @@
             "size": 1305
           },
           ".github/workflows/cross-platform-build.yml": {
-            "sha256": "71f558594d934ea969d3f8ac6d0736aa2336b7b4edf64bbd260754a1977deac8",
-            "size": 25366
+            "sha256": "ab2793cd468de88d4af6076455cdebaa6ee6c0ae0481996ef69c5511e74bb3b7",
+            "size": 25983
           },
           ".github/workflows/integration-audit.yml": {
             "sha256": "4de070bc84d3aeac92f97377c75459c2773ae1a477488ebc7910ee1def2bd492",
@@ -13198,8 +13198,8 @@
             "size": 99508
           },
           "content/catalog/fast_travel_anchors.json": {
-            "sha256": "e79c4b44074593174a765101960ab3e3df6b927ecbc9e7e73387416ab37e3314",
-            "size": 23312
+            "sha256": "4d89483ea02830ac116c399242ebd5fec9490e25102d759e9e4fe823ed799a37",
+            "size": 24061
           },
           "content/catalog/fortress.json": {
             "sha256": "72f8024c309f07753eced47fd2a6490cd1d3ef1952677c28542e67da160ce7b4",
@@ -13226,8 +13226,8 @@
             "size": 18203
           },
           "content/maps/e1m1_intro/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e1m1_intro/descriptor.json": {
             "sha256": "501439bdd025429553d3990f7bff0d47a52c9123f334412e9a248898c85a1290",
@@ -13242,16 +13242,16 @@
             "size": 1398
           },
           "content/maps/e1m1_intro/publishers.json": {
-            "sha256": "7bf4d7a334cdb3db2281148ca76e9bae544f08991d129d30e1b66893ead9e478",
-            "size": 564
+            "sha256": "96177e5d4054a75ba61cfad008cab00d8c232ad6bbbeacab78f74ca5b2e0b4d7",
+            "size": 589
           },
           "content/maps/e1m1_intro/runtime.json": {
             "sha256": "18058a0e828f1515807115be6fdc856ae39dd5135999d8730fc73e7df0dea537",
             "size": 427
           },
           "content/maps/e1m2_war/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e1m2_war/descriptor.json": {
             "sha256": "942986b8a4a69720289a6375dea8dc8a937c2696a0b2bcb0846c0b42d145ff08",
@@ -13266,16 +13266,16 @@
             "size": 3582
           },
           "content/maps/e1m2_war/publishers.json": {
-            "sha256": "a1535ff1759a956e14dbbea5d6282348edd93e3014a77c1424a21460eb7c07cd",
-            "size": 599
+            "sha256": "7a0440f25ac7013f3750f20afe125f582f93aa91919eae62884789f99bbe56ec",
+            "size": 624
           },
           "content/maps/e1m2_war/runtime.json": {
             "sha256": "b396a84d5ada353af02aa67c4b3b60f147b8205e3e23d8a578bd0df873de227f",
             "size": 464
           },
           "content/maps/e1m3_cult/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e1m3_cult/descriptor.json": {
             "sha256": "02088651dd3a322588a6d33927ca0d04e2e2f506d00b0d07269a032f276df46f",
@@ -13298,8 +13298,8 @@
             "size": 4608
           },
           "content/maps/e1m4_boss/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e1m4_boss/descriptor.json": {
             "sha256": "60e65ef95944f8c51e4dd10636f44431eaf883748ad9b91d4a4393c7e02b958e",
@@ -13322,8 +13322,8 @@
             "size": 4534
           },
           "content/maps/e2m1_nest/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e2m1_nest/descriptor.json": {
             "sha256": "d0315c03dd1cf1fea86d0fbe27a5143643f13dc7287216e07bb635e5a324769b",
@@ -13346,8 +13346,8 @@
             "size": 4599
           },
           "content/maps/e2m2_base/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e2m2_base/descriptor.json": {
             "sha256": "63562d8e70a57a198b2c1a63cf68d040df66824cacaec40a20bd81ecd48ec621",
@@ -13370,8 +13370,8 @@
             "size": 4542
           },
           "content/maps/e2m3_core/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e2m3_core/descriptor.json": {
             "sha256": "d455ae1a8462ee155d9ada36ec99f64a78495298b30cd02c2d3370552ed92389",
@@ -13394,8 +13394,8 @@
             "size": 4821
           },
           "content/maps/e2m4_boss/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e2m4_boss/descriptor.json": {
             "sha256": "4212102b37fa720965c9a60165e0e72b19e12922865a28e4ad84727cedcb1132",
@@ -13414,12 +13414,12 @@
             "size": 1597
           },
           "content/maps/e2m4_boss/runtime.json": {
-            "sha256": "336fced6c18c533a31e7bdc2583d9e0ba637891924e548726fb5eec47b70c9c2",
-            "size": 423
+            "sha256": "99f901b2b4e5c146ddf0898ff9238649e258f14bf12870d6de2d0a57bd886a99",
+            "size": 441
           },
           "content/maps/e3m1_slayer/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e3m1_slayer/descriptor.json": {
             "sha256": "1cec4ea88246da50bc990bc60aa1a19a74cd510630d85da0b750d63d57df83d1",
@@ -13434,16 +13434,16 @@
             "size": 2936
           },
           "content/maps/e3m1_slayer/publishers.json": {
-            "sha256": "56bd12a1623844e7a2959d81d9c52127556e0ef6667a40efe3f05a04c14ddad5",
-            "size": 1683
+            "sha256": "f026e0bf2affd15ff86e10d9bb8192e8ec913d709620813588059cea59bfca3e",
+            "size": 1688
           },
           "content/maps/e3m1_slayer/runtime.json": {
             "sha256": "21ed9fd2dd352ce05f4f7f61c2b145bd351b1a7726a54817083b5d20d4f03632",
             "size": 4867
           },
           "content/maps/e3m2_hell/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e3m2_hell/descriptor.json": {
             "sha256": "13a73ba8d6ad9c7bffeb815727d7f7b243b59d67312db85976590ceca8b1deae",
@@ -13466,8 +13466,8 @@
             "size": 4621
           },
           "content/maps/e3m2_hell_b/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e3m2_hell_b/descriptor.json": {
             "sha256": "5f84526b6937b917fdd362c1aa17327eb350c800f68b2b0e6b3b32cf54ebc0cb",
@@ -13490,8 +13490,8 @@
             "size": 4814
           },
           "content/maps/e3m3_maykr/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e3m3_maykr/descriptor.json": {
             "sha256": "e76f038dac126d4e40dd9a2eea27cbc384703a4089fe87321befbb99827c5444",
@@ -13514,8 +13514,8 @@
             "size": 4967
           },
           "content/maps/e3m4_boss/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e3m4_boss/descriptor.json": {
             "sha256": "9fbbf01c211b817ac0e6f7519a7afd77b1b7a71b0fc5035dda4de2c41350979b",
@@ -13538,8 +13538,8 @@
             "size": 463
           },
           "content/maps/e4m1_rig/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e4m1_rig/descriptor.json": {
             "sha256": "e3741ea90247a4716709f9fc8486f6aa91fd964e02dc849d3f43142d5bb806f4",
@@ -13562,8 +13562,8 @@
             "size": 467
           },
           "content/maps/e4m2_swamp/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e4m2_swamp/descriptor.json": {
             "sha256": "87873214fb7a32e01a7f89e2b95309785f62161df3be2ea1911bbf6bf8c4c0a2",
@@ -13586,8 +13586,8 @@
             "size": 458
           },
           "content/maps/e4m3_mcity/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e4m3_mcity/descriptor.json": {
             "sha256": "7bfec17553cc45c7381d5a4bf7806358257306d508bb1a8bf7ad163636c55cfc",
@@ -13610,8 +13610,8 @@
             "size": 447
           },
           "content/maps/e5m1_spear/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e5m1_spear/descriptor.json": {
             "sha256": "91463af87b48a1ce5ef0a9850a725a0f54ad624a4a5eae87c5df8e862d19f217",
@@ -13634,8 +13634,8 @@
             "size": 455
           },
           "content/maps/e5m2_earth/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e5m2_earth/descriptor.json": {
             "sha256": "f9933d5e8dc81e92a9c9b75d29e0890eef5cf250643d0b52421acab03b103d52",
@@ -13658,8 +13658,8 @@
             "size": 459
           },
           "content/maps/e5m3_hell/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/e5m3_hell/descriptor.json": {
             "sha256": "adfe3928751e70969668bd077b258c35808c175b2e487ce538c1bbadc7834286",
@@ -13682,56 +13682,56 @@
             "size": 442
           },
           "content/maps/e5m4_boss/assets.json": {
-            "sha256": "5ac9b6e199eec84b85fe630eb9be16d5473f7cf84e4e8f4a8f36254fbf91ec28",
-            "size": 42
+            "sha256": "3c34317be5789733b2c42f32ef9847065b37d501a34170f984e5740d73d6a0e1",
+            "size": 46
           },
           "content/maps/e5m4_boss/descriptor.json": {
             "sha256": "f9a7c3683c24cba81945debadff5aa5e22b02772ec0edb5de368ee0290517554",
             "size": 1065
           },
           "content/maps/e5m4_boss/locations.json": {
-            "sha256": "b8443d94175b1b0d2ea813bdacf8d1d5f1844020e075cfe7cc73e05c20db1cd2",
-            "size": 85
+            "sha256": "5fd477289c0d4f81e1f8cd6ed6fd73a62a329fad18263265b01b37aaafe531bb",
+            "size": 91
           },
           "content/maps/e5m4_boss/onboarding.json": {
-            "sha256": "9d9e6c5d0e26f636e8f0f5d6ea1dc12f1c5b403cb4abbdf15c013884d32c83d8",
-            "size": 2305
+            "sha256": "2f15061e4f64bf03373109bb76ed7c87bc564e51a6e4a09064e060d49600c661",
+            "size": 2369
           },
           "content/maps/e5m4_boss/publishers.json": {
-            "sha256": "26720583a58d26d104ab7d5474d1c2183e3e8c0fae9e08ca6542f82a83bb7ac7",
-            "size": 724
+            "sha256": "4f20dae0372e9ed1d5a24d5e0530425ebf895b3612509aabc6ec07d72bc2500c",
+            "size": 753
           },
           "content/maps/e5m4_boss/runtime.json": {
-            "sha256": "9524a589f695e09b0a1c49a99cce734172baf15823419835d2ce8d270d2505f2",
-            "size": 451
+            "sha256": "9a5ef6651ebe70b272906a8833077c4b468b1faa5f4c74c1c812255d68933f24",
+            "size": 470
           },
           "content/maps/hub/assets.json": {
-            "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
-            "size": 96
+            "sha256": "2d69739e7e035830ae93643eda55c16f38fd3598725955a38593f3058113f1df",
+            "size": 101
           },
           "content/maps/hub/descriptor.json": {
-            "sha256": "288eaed20ed5ddd9b056b00e70159f83b46fe2c7d57ab6b9f7fd59db66262cfa",
-            "size": 2637
+            "sha256": "4004f914116444117bbb2940bae1bc674d1a79d6f9ccfb19ac91591732fdfe57",
+            "size": 2741
           },
           "content/maps/hub/locations.json": {
             "sha256": "79ad840a9b4ae4f322c04a5caaddb90a03dd81e0482b266da048b6fc76addfb0",
             "size": 14198
           },
           "content/maps/hub/onboarding.json": {
-            "sha256": "91f4bd9b887c261815eace51b0708754a746ca6f7ca5715c8717db9a96fffbf1",
-            "size": 18827
+            "sha256": "32db0164d277a5b1b9955cb3479862fb7cce24381c0e8f1ff8ca8b033a07def6",
+            "size": 19325
           },
           "content/maps/hub/publishers.json": {
-            "sha256": "35ec40023a1226863ca04a76bbfee9f984e380a23762a305b3dc21c834df186c",
-            "size": 46
+            "sha256": "1df29987c6f0b233bfe02605ffc08225f058974047e49b29c0ce979b61fd4d1f",
+            "size": 50
           },
           "content/maps/hub/runtime.json": {
-            "sha256": "ef78aeae874848684c706ec7ae20b6a246f4be530bcca817511fcf459119564e",
-            "size": 45
+            "sha256": "89b8b00b3f7ce3a901b5e017fd8267d107fbe07f3836495716d063383be2f0ef",
+            "size": 49
           },
           "data/ap_visual_bundle.json": {
-            "sha256": "90e9bc8edf9c2cf8aba17e61fd8e13f67333b31d983ddd5f59bf72b7475dc63a",
-            "size": 2733
+            "sha256": "0e7345b68dd1960096400a37a23d883ffb7eabb744258012781dbfcf3d1f6bce",
+            "size": 2805
           },
           "data/automap_family_registry.json": {
             "sha256": "32dc5dd8da8bb4d920bd77030fa6d2fd4ff7a52c7e9cd492a7e841b4eda7733a",
@@ -13846,28 +13846,28 @@
             "size": 214
           },
           "data/devinv_sources/tag_dev_inv_chain.json": {
-            "sha256": "04dbc7bf3b3d77ed22655ef629dcd5d675bb2a4b8e72dd5d15f9158eec802158",
-            "size": 3183
+            "sha256": "357461038729cd08228cee183e2720b18c978767e716c079b3fd0aceab48d7a0",
+            "size": 3221
           },
           "data/devinv_start_mapping.json": {
-            "sha256": "39df7595b687c3ee5e656d67431fd529a608080172ffff9478638ba7c245c109",
-            "size": 26439
+            "sha256": "f1bfa9c825214faf060e32e851d85ae412b9e2728680c852b2ca6969039d7087",
+            "size": 27600
           },
           "data/fast_travel.json": {
-            "sha256": "d7d4b58f7c8e651a838605cea34506b3781e88a02cfa9d543416c4e4dd7450e4",
-            "size": 1287
+            "sha256": "31315b66ab92144ffc7aeac4a4477a9f81860069cb51c6f99dbfb9ba1cc04aa7",
+            "size": 1313
           },
           "data/fortress_battery_labels.json": {
-            "sha256": "fe9ab0fc491b4d1801d2061981a01efa22962eaec68c3c2b48a46b75e3d23ff7",
-            "size": 3163
+            "sha256": "a7626abc5027d55e9cb8f398adcb1e54438fd126b46afc9be2e2d414bf181d68",
+            "size": 3188
           },
           "data/foundation_contracts.json": {
             "sha256": "ddf0e348060b0c22883c632cb8511c6f4243958a0a0ffc908a849a7717f3abd2",
             "size": 2499
           },
           "data/item_classifications.json": {
-            "sha256": "46ce237381dd794d3035b04d9802fd2d51574c4bde5182ffb9db3bfb2ce4bb14",
-            "size": 11291
+            "sha256": "26a54099bacc0da96a2a88bf21d50ffc9e8df096e8071754ac859c8162bc94ff",
+            "size": 11827
           },
           "data/item_replay_policies.json": {
             "sha256": "bfb7af3350d9a087a01813ed136d6c0d9d791553e50cfc346ced8eddf4e0c856",
@@ -13882,72 +13882,72 @@
             "size": 11954
           },
           "data/location_feedback_policies.json": {
-            "sha256": "ebdddb4d8744c7cd391a245bbb6537f8353566eb60e6149e567fec11a31233d3",
-            "size": 8611
+            "sha256": "be044828652b1b78f512d3c1f4246c2904d309798cf6445761151bdc1f5fb792",
+            "size": 8787
           },
           "data/location_names.json": {
             "sha256": "aa474a4c0673736b9db64d63de7ac6dfb7f40350b6069a25d5b81e432f2f6be8",
             "size": 30722
           },
           "data/map_sources.json": {
-            "sha256": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
-            "size": 19513
+            "sha256": "b754ea9db32d969cc901f38d83ac0c52ee44f42f5f15115cc1032e63ea619e5f",
+            "size": 19931
           },
           "data/mission_complete_map_contracts.json": {
             "sha256": "9ea6cef16e1376a1f69521527464df31af790a5c2bfb9a45f8b6ef8dbbd681b2",
             "size": 4003
           },
           "data/observer_contracts.json": {
-            "sha256": "3e604750ef57c6164eeb30edd785e1efc286062b981c51efddd040bfe74a4b98",
-            "size": 1082
+            "sha256": "dfb8beab3062e589234d84df25a39c6245ba248c4525b57712fcc997d822344d",
+            "size": 1120
           },
           "data/options_schema.json": {
-            "sha256": "9b642f942d2d88c1b153a0448028058e1e152d4ba10dd24c1d1303c4f83517f1",
-            "size": 258141
+            "sha256": "147ab135e270ea4d18437b1cb3630ca668c5bcab0eef7513ed07495e66a8f105",
+            "size": 267440
           },
           "data/perk_candidates.json": {
-            "sha256": "0d989a009c6907a3930f874312caeaf377b14e6069f50a478961b2e316a7ba71",
-            "size": 3173
+            "sha256": "28dea75cc0904dd344519728cece95b3602f9c1c96636e56e7c8706d06b04baa",
+            "size": 3223
           },
           "data/physical_pickups.json": {
             "sha256": "335ca6ed0fa93279e1d5c7b698d33a19dfdbcaf853d5783a86c4b52bfb1a4e55",
             "size": 6939
           },
           "data/publisher_contracts.json": {
-            "sha256": "b23ed958defb522ef193d0554293fc9eba4d947e833c953d81eebfc5a6bdbd70",
-            "size": 15107
+            "sha256": "e24aca9d0a6952f345493313942f97510c8fdb139f9b95dd43e9bfd15b9e483b",
+            "size": 15637
           },
           "data/report_endpoint.json": {
             "sha256": "b4127f11fa6228a1fb269fab909effdd2845a50235b66e300f9f8e8b238a9735",
             "size": 50
           },
           "data/runtime_contexts.json": {
-            "sha256": "154593d920ef448b74b9c8dc5ea21af421ba82025114495038494d266960b440",
-            "size": 5235
+            "sha256": "0d0bf4f74eae06e504191bca592c975cfec9fa51141767351f6fc0153a6f840d",
+            "size": 5262
           },
           "data/runtime_locations.json": {
             "sha256": "ff2a3cfc1edb48c91ff5e3750e7a4fe0369dafcb22e7a2a84b79701aca1761d9",
             "size": 3975
           },
           "data/scripted_location_contracts.json": {
-            "sha256": "1d1801f76c4378809f1cc9415a0555d32947142634c7e4a99831a8beda6f1636",
-            "size": 5477
+            "sha256": "a8a92e32335628cbe1f8421b28e0ff752656752612a0b6f8ea890feaa294fd51",
+            "size": 5595
           },
           "data/snapshots/ice_logic_decl_patch.json": {
-            "sha256": "930096474b7e67c4011575c4e04d47ee8607adb09c8f7dc99113b4df69db5fb8",
-            "size": 700
+            "sha256": "c1759350da2e033b11a96b573e06bd24eaeacfbe83298cce306216edfa6744c7",
+            "size": 723
           },
           "data/start_inventory_catalog.json": {
-            "sha256": "3feb6d6c4706c34d4309f0fcaf6edcac53d691cebed65ec3338aab64287049bb",
-            "size": 7351
+            "sha256": "606395270af0beff875451e520ff3cf27de9e82e2cdb0dc8fedf60ba8a2278dd",
+            "size": 7701
           },
           "doom_eap/__init__.py": {
-            "sha256": "5de1a47a282323220c5b410b48279d7ee15ed92fa174e2751ff81866c3d91be3",
-            "size": 71
+            "sha256": "6273df6ad119905172229bd014c75c82afc24317907968aa4e5711877ac52fac",
+            "size": 73
           },
           "doom_eap/content/__init__.py": {
-            "sha256": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
-            "size": 43
+            "sha256": "9d46648b16252e8a3d4e73762a1c8773779abcb26dc4ad7af31f730aaf8f21b2",
+            "size": 44
           },
           "doom_eap/content/automap_visual_registry.py": {
             "sha256": "2e29716528020556b35bee4a136943037100ab9368e7f6d293edfdecb4c7fab5",
@@ -13962,8 +13962,8 @@
             "size": 1868
           },
           "doom_eap/content/compiler_identity.py": {
-            "sha256": "646281c1932f7aebe8740112ea6088f01c646af44676a43c8ef4a7c2bd043391",
-            "size": 2209
+            "sha256": "9d3f05374bbf14bd0f05481ffa376d53aa24ad51d154f96460bc87683c9f28b1",
+            "size": 2225
           },
           "doom_eap/content/content_catalog.py": {
             "sha256": "58f969f96ff0acb6e824c0992c7374c5b0b969111727e1e16a406bcbe15db8a5",
@@ -13986,8 +13986,8 @@
             "size": 6999
           },
           "doom_eap/content/item_classification.py": {
-            "sha256": "3979d509c8111e600f66a78bacdbc7550b053f2dfe25f1cf2aadeb16b7caec1f",
-            "size": 4541
+            "sha256": "cc63fd5401b90d8744848ef8f02de1738682e36a563faf46fa9ca64594161240",
+            "size": 4654
           },
           "doom_eap/content/killsanity_plan.py": {
             "sha256": "31d878aa2e7f2c7aa247ec2ee1889b439a039284893169dffee732913e3f09ef",
@@ -14010,16 +14010,16 @@
             "size": 44359
           },
           "doom_eap/content/native_enemy_safety.py": {
-            "sha256": "655168ea0e920e20059d20a8cb31b3b030b4779f633c450bd0f4f954dfedf18c",
-            "size": 4254
+            "sha256": "3317517a14ae867c74bfc071c0ec1c46169eba42e5fa54366cd14b837dd71a97",
+            "size": 5143
           },
           "doom_eap/content/options_foundation.py": {
             "sha256": "2dc58ff4963e46d05e8d8805b0e4a675c697bd21025974a449158fb6183f7b53",
             "size": 22048
           },
           "doom_eap/content/physical_options.py": {
-            "sha256": "d42368b639db8c2a91cabfc7212f334c6c49bc37aeb104b301f81ea05ca1b354",
-            "size": 3587
+            "sha256": "fe263663059cf633f92022d0b67c10fcd809df2cfe5ce6fbea97735fa57bb7e6",
+            "size": 3694
           },
           "doom_eap/content/publisher_loader.py": {
             "sha256": "22b7e6f820f26c20b3adc698a0c004c1551428e2153a5b4ec545cc9362d8fcdc",
@@ -14034,16 +14034,16 @@
             "size": 2183
           },
           "doom_eap/contracts/__init__.py": {
-            "sha256": "3f2ecdaed1b27d99205251aaab21d06eae0ce583f8cd7aecccb82e28cfe21256",
-            "size": 40
+            "sha256": "7e58f5c4109f1498f8399c57bd43148f0ad6a77f2308249ba3daf65817c3ac2f",
+            "size": 41
           },
           "doom_eap/contracts/ap_visual_contract.py": {
-            "sha256": "2fd82a5b16111e556c13e770ad94d71a82065ef2591b6e8caf59367bbfc0f1ac",
-            "size": 1581
+            "sha256": "eed70462f43442e06585fd8ed4649b7e6eee0a6eab6ef08c20c51ec12e7afd2b",
+            "size": 1617
           },
           "doom_eap/contracts/campaign_goal_contract.py": {
-            "sha256": "6a6ed1b6302e96f2a962686198ac37b0e67a30c1e92504a1d38ece0413afc7b8",
-            "size": 1753
+            "sha256": "5685f0fc2d60e3bc9e3563c2d69f60185c8005a3c15b27ba3076f8388c2eafbc",
+            "size": 1800
           },
           "doom_eap/contracts/challenge_registry.py": {
             "sha256": "b2d1fb8a4182662e62bf073afb85cb5e30d0c3484ef38e33e02e9dfb4db467c4",
@@ -14074,8 +14074,8 @@
             "size": 7296
           },
           "doom_eap/contracts/item_contracts.py": {
-            "sha256": "c75f091dcf77c7641632623a1f2f0263e450f4d63bc82a30d69521e1c2eb843a",
-            "size": 4238
+            "sha256": "9a03442cfce51694ca3428312a3bf40dc907015cc06f3855e6cf1fa247bbea51",
+            "size": 4328
           },
           "doom_eap/contracts/materialization.py": {
             "sha256": "0d4ef964533974cc6f5ae69b97813110e74f52ccda5b6c1857c641295f184497",
@@ -14098,8 +14098,8 @@
             "size": 2489
           },
           "doom_eap/contracts/save_observation.py": {
-            "sha256": "ac47786e9d28afc8af9b1eaf6fb1530d289eac01165e6837ef4a27881667bb1b",
-            "size": 3602
+            "sha256": "5b5bbc6577be4a7000e30e42fb6046f6efc329ecc0bf6e2983fce20de3ea37df",
+            "size": 3619
           },
           "doom_eap/contracts/source_bytes.py": {
             "sha256": "affdf5189f87c6ce953f5fd2e02a12f4dcff2a6f04f8916188bfa20183ab6aa8",
@@ -14110,8 +14110,8 @@
             "size": 2915
           },
           "doom_eap/launcher/__init__.py": {
-            "sha256": "d65ea730744769665c138f661196266536d7f1aab6b536b5b048a0d71c74772f",
-            "size": 50
+            "sha256": "02453c201d7f11d49256d4e5c83fd74a6365fedc3d79c10e058f15b94be7f290",
+            "size": 51
           },
           "doom_eap/launcher/build_manifest.py": {
             "sha256": "38e45ca121cc6391f434fe0490b3f5a4a9840f1f8d452ad6acd1354dcb88653d",
@@ -14134,16 +14134,16 @@
             "size": 95517
           },
           "doom_eap/launcher/launcher_core.py": {
-            "sha256": "0c1392ec0a6f84a5b47814fb7a8c6a9da3888ae707c3a14c5db09b7c7cce2bb7",
-            "size": 82260
+            "sha256": "b606f96431781cf565f8b53759c74d3726af3cb3d87fd81cf3ba173d70f93580",
+            "size": 82395
           },
           "doom_eap/launcher/launcher_core_install.py": {
-            "sha256": "b5f550782e1e935d3629da52ddc7926b0acaf0b8477805ae21dc9a9f770259b5",
-            "size": 6392
+            "sha256": "256a21f701dfc91d0dfaaa3b03bc4d0b0d20db14528ca66f2488ca7fb1273d2f",
+            "size": 6531
           },
           "doom_eap/launcher/launcher_core_runtime.py": {
-            "sha256": "c58f164b9c047646070a407359058ecdccda0e8ab2be4523cae1f52e61382127",
-            "size": 11108
+            "sha256": "cccc2477bfba4eb088c463dfee8a22166af9a0752ece830233095541f05399cd",
+            "size": 11312
           },
           "doom_eap/launcher/launcher_doctor.py": {
             "sha256": "662cc42a79ccb7549ea16f3abcdf8c1973c5ced94f52e61ccd23434e8d7d5f7b",
@@ -14158,8 +14158,8 @@
             "size": 3582
           },
           "doom_eap/launcher/launcher_native_health.py": {
-            "sha256": "3b8f53fc5f17b43b5bcaf313e961893378a4b062c560ea95b2543f5fa0c33b4a",
-            "size": 6953
+            "sha256": "2d799f912c0a7ca6cf05a96fe231a7b1679456e25822b6b26f8c1faba2b2cc98",
+            "size": 7165
           },
           "doom_eap/launcher/launcher_platform.py": {
             "sha256": "b4f4b1f018ceb6e03fb789ba3b7f0c99225214ce1faf852fd00694df4e8ad915",
@@ -14190,8 +14190,8 @@
             "size": 4628
           },
           "doom_eap/launcher/native_enemy_resources.py": {
-            "sha256": "e06625e65e77210bc2c6782840d8b24e76b1f8782447275ee6acd9fb10028664",
-            "size": 10800
+            "sha256": "d5579ea52bee188f69336c29abfce5a65897955d65ace6cbe16f4a41e4d6d9ac",
+            "size": 10835
           },
           "doom_eap/launcher/resource_bank.py": {
             "sha256": "9f8885630cb5b88e226d51fdb09691e40342f70e610c2751034ae4ddb8fb60c1",
@@ -14206,12 +14206,12 @@
             "size": 3846
           },
           "doom_eap/presentation.py": {
-            "sha256": "6a49e09d092ffecf106940941e79dade8bc67142037c974a945435b2ada1e388",
-            "size": 1138
+            "sha256": "5042cd7094369a289d3075642b4c7a2bc9e0a8e05b09d863252ea1aec43264ba",
+            "size": 1175
           },
           "doom_eap/runtime/__init__.py": {
-            "sha256": "d19dff38bea52f5ac3ade154540e32e66fe909671b5cb95bdafc28d3387be5d7",
-            "size": 31
+            "sha256": "20c11eb22bdce73edee7772a809dd8945e75fe791e252fb5c93970baefbb4bfa",
+            "size": 32
           },
           "doom_eap/runtime/ammo_adapters.py": {
             "sha256": "f9daad4eb7137062405e71061ca6408d8999f254f400a3694261bbf1a3c61e07",
@@ -14254,8 +14254,8 @@
             "size": 11109
           },
           "doom_eap/runtime/context_registry.py": {
-            "sha256": "21b44d74240f7b9d63fc40878e79d72e7cbb18daf651094ab8f6f095eee74e52",
-            "size": 8028
+            "sha256": "1cdf6fc32eec2322bf5b39581f1602933a3cdd1a413e6724c11ca9f9edebd409",
+            "size": 8218
           },
           "doom_eap/runtime/death_observation.py": {
             "sha256": "aee34619254739f4b8cd324120a4bcc6221b6a944d998bd1564c19fa33b6becd",
@@ -14270,8 +14270,8 @@
             "size": 11801
           },
           "doom_eap/runtime/deathlink_session.py": {
-            "sha256": "6b29d02b737b4f01e09d7222432c965b6cc5200e004a28d60bb18845f0ffe058",
-            "size": 7434
+            "sha256": "71dbef23a791452af8884f893ad2413e32ba1b45e1f9720b4db5e3f41a434cf6",
+            "size": 7634
           },
           "doom_eap/runtime/fast_travel.py": {
             "sha256": "7f239832f8a50883c428b4d335643369f4674b8944de5cfd716924ba02bc66ff",
@@ -14286,8 +14286,8 @@
             "size": 4477
           },
           "doom_eap/runtime/item_reconciliation.py": {
-            "sha256": "dab6f5de519779966f3a4c2dd414b651ff6e12a88cd42521e6226280b9a57d92",
-            "size": 43394
+            "sha256": "da270207e90068e5ef3c2072845c77e31abf6d598c2579d9bd28966a440a5db2",
+            "size": 43402
           },
           "doom_eap/runtime/killsanity.py": {
             "sha256": "8a70865cf4a897494d942d6ac65fa39e11df928613d337be5590945cb71b5926",
@@ -14382,12 +14382,12 @@
             "size": 8343
           },
           "doom_eap/runtime/save_files.py": {
-            "sha256": "05e6c2748623acc7ab9950b2d35b8418e1728b472376ec67ce02b4f2f034f7fc",
-            "size": 7210
+            "sha256": "cb7bddcdc6def45fcf9ac2c0f66de8e808bcd187f79d8f6740ec22320d7e2551",
+            "size": 7216
           },
           "doom_eap/runtime/save_observer.py": {
-            "sha256": "1ea8c7b46052341dc54b00be07b57fa874a12fe1ed77f419d141f9adb25687f6",
-            "size": 13411
+            "sha256": "68f68c6b9118f6c39166a7c2a97fead2e72647e680e5dd5b6549269afac9631e",
+            "size": 13414
           },
           "doom_eap/runtime/save_records.py": {
             "sha256": "53e77c559088b94471c40ec78d3a066d42820c901ed59f6f0875d46afbdf4aff",
@@ -14490,52 +14490,52 @@
             "size": 579
           },
           "manifests/e5m4_boss.json": {
-            "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
-            "size": 3
+            "sha256": "e3566b3a06430868d71e9287dfd6c6c520a3da027aabea01951d407ee131dc2f",
+            "size": 4
           },
           "manifests/hub.json": {
-            "sha256": "95dace3e3470c27ea6110fcd5622f61e951d75bc6da9c7b0d89c754e52990904",
-            "size": 1222
+            "sha256": "f51d006026b106ccab8ac1d34c085606c81a3b62d93041857eff51726c5789b9",
+            "size": 1244
           },
           "native/client/ammo_hotkey.cpp": {
             "sha256": "e9c253d0158f81482b324e659bca551793a1c78b52aa5da175b435c49db43a54",
             "size": 8513
           },
           "native/client/ammo_hotkey.h": {
-            "sha256": "971c5c860678a8fed91c9a62d37e5b7fe39839ad1010b13a6df4e10bcb020500",
-            "size": 1335
+            "sha256": "492f7532bfacf0de5bf8ac14e8199f3583d7c22549a796b27c7b273fb764849e",
+            "size": 1382
           },
           "native/client/ap_client.rc": {
             "sha256": "0ffc6d3677b1a35640edfda3315f7324526b1d919acd0258e326ca1833b66b5d",
             "size": 891
           },
           "native/client/ap_client_exe.cpp": {
-            "sha256": "5f084abace97c9b46c601a1e54e255a025f1d36b24cef0579ed4887718ea1e51",
-            "size": 53049
+            "sha256": "db97098a662e4ae7a71f95edfcc85b9c184ed3c8404b011508bd4f458ba54baf",
+            "size": 54572
           },
           "native/client/ap_client_path_utils.cpp": {
-            "sha256": "47e0c1b37be9d39cf7c3da972f3170731ece24366971215bdd7affb8dba14710",
-            "size": 4706
+            "sha256": "92c32af7bf4f7e19f72f647b9ecd5573c1b8acd898bb028d5fcaa93f902b234c",
+            "size": 4842
           },
           "native/client/ap_client_path_utils.h": {
-            "sha256": "c7e93e962a46c00c2a61c71f5315bc3717979b59d912d27a8fb232da0b02707b",
-            "size": 1292
+            "sha256": "90e9898a103ed2dca8b76cb3e4b8b7782ef1bfb78c03ae4fdfb1231821b76d76",
+            "size": 1341
           },
           "native/client/ap_rpc_health_state.cpp": {
-            "sha256": "b32811cf5a8c3bc7563b80d827388c5c0af9a29f756acae0eac1085c9d48ffac",
-            "size": 5224
+            "sha256": "487774741de342d7174586e06011c7c9d74de0d9383338a8993a93952063d58e",
+            "size": 5387
           },
           "native/client/ap_rpc_health_state.h": {
-            "sha256": "fb86e68874099d0c4dadf25d427d95338391d22267189e6b0b593f6e46f35292",
-            "size": 1096
+            "sha256": "610ae909cae8d9beb7e40f1eae70a91fd2212d474b591a7170f7dd9f6e728b2a",
+            "size": 1128
           },
           "native/client/command_queue.cpp": {
-            "sha256": "b1e8a047eed940918afb655fca782e497a3773bfcc2a835c1768a1fe27fdaeed",
-            "size": 63137
+            "sha256": "f4dc146b4eb77af0b13466d400c94839a82993f29151db3644408b94fa23410e",
+            "size": 63173
           },
           "native/client/command_queue.h": {
-            "sha256": "e8fcc54ab4b39a7ac91b2de3420f4c8476c942435e7ad137b19f15268df3d4f0",
-            "size": 6189
+            "sha256": "f3747a82100ee17b80055d8fd136b5d8e77dd95d3d9430b7fbb62628990828ff",
+            "size": 6191
           },
           "native/client/command_queue_contracts.h": {
             "sha256": "d97d935ccb2e45890271a362f80920e6c19295c6e8aa9571ea5b4de5cfe96ff6",
@@ -14546,36 +14546,36 @@
             "size": 611
           },
           "native/client/game_state_probe.cpp": {
-            "sha256": "8806183e596705c62e068dac097b3bc5759cf3ac3f410faa981e89ec318c5bea",
-            "size": 17222
+            "sha256": "87b9a40f62d013414de94afddddb376a8ea16aebb22f200b87e621f949f842c5",
+            "size": 17781
           },
           "native/client/game_state_probe.h": {
-            "sha256": "0868c7fdaf7304f9c448deb027005ba1c0a38a596d890a1b0d0784a71857d57d",
-            "size": 2316
+            "sha256": "fc1eba42b375426c00bb93df4228f8726d0eaf2c473079795d2a7c5ac14d5549",
+            "size": 2398
           },
           "native/client/sentinel_command_client.cpp": {
-            "sha256": "cc5b3ad6bbce3b9a02755b5ee900d04e939a1abf1d17c1f61619687ed9dba489",
-            "size": 4641
+            "sha256": "cca471b0dcd337028ae26daca00caa8a258605805ab362767914b5fde0777033",
+            "size": 4642
           },
           "native/client/sentinel_command_client.h": {
-            "sha256": "ef09b2f80f04f787730e5a822552443e8e4b1071caa670eac690d99ae99ac101",
-            "size": 1248
+            "sha256": "a48ad5ab85621bdaf34d32495b7b626d9fe326bf151ff140a0c62d4216611ee9",
+            "size": 1250
           },
           "native/probes/ap_logger.cpp": {
-            "sha256": "68275b9f77a0c66060a62af08aaefb2cf0f974620ba6900ed57a5743e7f0e087",
-            "size": 3350
+            "sha256": "ea8a999294990f72040cf4b1c0e2dd27c36a4b724c154586dfe1e1ec5e3de18d",
+            "size": 3434
           },
           "native/probes/save_death_probe.cpp": {
-            "sha256": "1411eb34eb8a6391365d3f4b176f0e62eb52a7ea8408750d0c944815b806f377",
-            "size": 4893
+            "sha256": "b3a2e50c3a6e48c577980fc23b52b3a0c604bc11b0c232a962a8bc7d02c7502b",
+            "size": 5042
           },
           "native/probes/save_oodle_probe.cpp": {
-            "sha256": "d18b75844428b670cfc4e9354377aa70746f2b9307654cf50b2459419683e8b3",
-            "size": 2948
+            "sha256": "5951af40cb0e371705053bb9b2b614d414ce39cdb550daf925820b09d7f2ab10",
+            "size": 3035
           },
           "packaging/client/ap_config.example.json": {
-            "sha256": "b8ddf035e6dec40891425fe27393f5a509a9da28bf84f4e6da84ec3a7893b9ae",
-            "size": 282
+            "sha256": "fa7cd5747a8b08eccf25c4b18f0f55d1b8ef19a2095ca688339abc4e16e68cbb",
+            "size": 288
           },
           "packaging/hub_world_text_assetsinfo.json": {
             "sha256": "ab2add8bfad76b03bc0862b1d5a2370afcffc00ff29736b8ce6981426d66da5f",
@@ -15070,36 +15070,36 @@
             "size": 79606
           },
           "packaging/shell_menu_assetsinfo.json": {
-            "sha256": "c19bc85853c42e7063b66b2d0292df9d6d0e80ad78e2b935f01d1873abd3f653",
-            "size": 129
+            "sha256": "a87a16ad8c2da426828a44a98b221dbb5401c1cf7887d5695af93a974caf2eea",
+            "size": 139
           },
           "packaging/standalone_runtime/ModuleUpdate.py": {
-            "sha256": "1ccbb1a29aed3c1b16a1b43ce934e5e4b226af72f80e355f81a6170e9351663c",
-            "size": 159
+            "sha256": "2c28616d97bc6553aeb9a968deda8c4408c4f79d5ab716efb6799b4678175baf",
+            "size": 166
           },
           "packaging/standalone_runtime/MultiServer.py": {
-            "sha256": "306c99a61c8c91a18f9e20479baf46a1f9cdece338d8bbd3fa63a24a104d700e",
-            "size": 4012
+            "sha256": "d3165463ddfa74140f034ee0c4b7d3d799eef1d5263e2d115a594e2059366cb9",
+            "size": 4130
           },
           "packaging/standalone_runtime/worlds/__init__.py": {
-            "sha256": "e3692effdc153c210f0b479c709ae6171d543e0a6254ae395c37d9b809d7c4c6",
-            "size": 647
+            "sha256": "950ab8c4fafc4fc7367add5624132a485103455dc9073e1254741d760edbf151",
+            "size": 672
           },
           "player_templates/DoomSlayer.yaml": {
-            "sha256": "4b99b845e228242d432f5481acbf9c25cefd03a14184a5f628c53d526e72a088",
-            "size": 191
+            "sha256": "2703aa6b422e46c9a877e8baa33f8bb67df0cd6ec55a8ba867d7436ebaa70f47",
+            "size": 200
           },
           "player_templates/Marine.yaml": {
-            "sha256": "e4829c3a36ec9610b45380a120c4e9b0fe38179b73a9b1da23dc35d7f41727e6",
-            "size": 190
+            "sha256": "f02af9cea07d5e01205efa1c238a62d2e5221f3d9d8a00aba4d32db807b6f0fe",
+            "size": 199
           },
           "requirements-ci.txt": {
             "sha256": "db14ad55d9a9d65b401ea8f2527c156590c18dc7fb2ad35701aa649a83f4dbd1",
             "size": 114
           },
           "requirements-launcher.txt": {
-            "sha256": "a5a10fbd877d7e4d5f71e4b5cb185502e3451544a4a958edffe42b40315f276a",
-            "size": 165
+            "sha256": "b21ac07d879ee54c6c2710636fe7d0ea01d7fc463153f89d8f259d677288472a",
+            "size": 174
           },
           "scripts/launch/run_bridge.sh": {
             "sha256": "c5aae884d20e7030633d357eb423053c055ac2a7ca2178e41326e8bf9e57512b",
@@ -15134,8 +15134,8 @@
             "size": 686
           },
           "scripts/validate/affected.sh": {
-            "sha256": "713ed191256b4dabf948a70e99b801062afc3b345b2b6dd37ce45c07075430e7",
-            "size": 144
+            "sha256": "0efce193f321373cd9b62604c84ccd9a50edf0a407bb3b8cf87dadd56fc33bcd",
+            "size": 148
           },
           "scripts/validate/all.sh": {
             "sha256": "8809aef38cdcf50b92e1aa23e81f0bcde97c572dc4de925431e7c54196246554",
@@ -15146,40 +15146,40 @@
             "size": 144
           },
           "scripts/validate/package-preflight.sh": {
-            "sha256": "a548c4d27b59152e55c203be51a826b4d325728b2da0424ee6cb97a78d2defd5",
-            "size": 153
+            "sha256": "d807455385e956c3805e1e386b8d857fa3f296adbcb7886a143211389af13de0",
+            "size": 157
           },
           "scripts/validate/playtest.sh": {
-            "sha256": "eb369e4d7fed856eb83e2656476e0b030c513b21483b31b0b776cac57c07e277",
-            "size": 144
+            "sha256": "5d58018b751bf73fc73facfce961eae46764c7e4e391fb193f337db62a392503",
+            "size": 148
           },
           "scripts/validate/runtime_install.sh": {
             "sha256": "a36c510bd447213ff6890a991151d3281487bc8e8d0338106756cd3a9164de8d",
             "size": 4869
           },
           "scripts/validate/seed-smoke.sh": {
-            "sha256": "ea42134e193bc65e1be24d51517935e458fdbce6f2423adfe818dcb08c29865c",
-            "size": 146
+            "sha256": "dc98ade7adbbfd29e2f190fd1d7f9b655b9135d0309c70dde81dd41900101ebf",
+            "size": 150
           },
           "tools/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "size": 0
           },
           "tools/catalog/__init__.py": {
-            "sha256": "ff902b3b399797a54ee7a78afa1752d1dd52ac9734f088e768e9fad2c33a9431",
-            "size": 35
+            "sha256": "f7b5b4984f90dad7083f0ea9fc4f4aad2af1b8bd32ff6ddd92ffa1e1d7f9e9ae",
+            "size": 36
           },
           "tools/catalog/compile_catalog.py": {
-            "sha256": "fec8b02cc10a239ef1c651a094a4427e1d29dc66dc0d39dbfff93f50761d18a1",
-            "size": 470
+            "sha256": "00c8438f5f9ebe9c6787c8163dfce7af54e095c34d894659ba07ca3ec24179e5",
+            "size": 485
           },
           "tools/content/__init__.py": {
-            "sha256": "cbb956a9c9bc5e93d0cb1070f559ca41f83b26da79ea5816a9b32ac65417a6c9",
-            "size": 67
+            "sha256": "88eb955436c7954524bfb67de0542201543df34410240cab09dba30d3cccfa05",
+            "size": 68
           },
           "tools/content/accept_baseline.py": {
-            "sha256": "768345094bc4ebacd5623db8004711992134cf883139ecef07301707a10ff3ba",
-            "size": 994
+            "sha256": "92d161937256a31d36ee7b64807e96a0a464861c82194af4d824188ee1aeea0a",
+            "size": 1027
           },
           "tools/content/capture_native_enemy_assets.py": {
             "sha256": "a6c574039859e8315c9735aeeed986eeb4e3859157e231f6bc5146d800441a9e",
@@ -15194,16 +15194,16 @@
             "size": 12450
           },
           "tools/content/compile_start_inventory_catalog.py": {
-            "sha256": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
-            "size": 3674
+            "sha256": "c99dde5d7805f697c0efa84b4d6cdc265190102b0ae5f0993bfbfdd952c92372",
+            "size": 3770
           },
           "tools/content/describe_map.py": {
-            "sha256": "ceb630a7199398ece6d71f28b7e44568e110b2ac55d3a39636ca1906b61fface",
-            "size": 2543
+            "sha256": "3eda6f16308e2cf657d64fb2bfcbf12a20bbf9e70c42a24d099500a55d167701",
+            "size": 2620
           },
           "tools/content/new_map.py": {
-            "sha256": "0f837f68ea3873f33e7861a9dbb8a18e8810edd38d247ed97b05fec6123f9669",
-            "size": 3064
+            "sha256": "189502309edc02837c6a5b08ca5f8d33f895eef76f8b9fcb423a59e8f3d7534f",
+            "size": 3163
           },
           "tools/content/read_native_asset_tables.ps1": {
             "sha256": "8f616fa337f8915abf31f97fd67b56b067e89f7e2f2241133deb182cdb97b739",
@@ -15238,16 +15238,16 @@
             "size": 101309
           },
           "tools/decls/weapon_stripping_builder.py": {
-            "sha256": "a24c61e1e6b99b9ec2e4734d2acdf871bd75390ceec8be66bcc8b80d45bc5138",
-            "size": 12350
+            "sha256": "b2448240651fc5c2a8c21dfba066194a291153fb06b656cb2eefc763862f4cc3",
+            "size": 12597
           },
           "tools/diagnostics/save_inspector.py": {
-            "sha256": "07f33df7eb331743cc19b8d611f4799b3ae7516cbcf6ef9d16521649ec7ae59b",
-            "size": 1550
+            "sha256": "4f02fd844d580eaf205457ca7e50e5d5160560d1d41ac8b6c1812173e14273e8",
+            "size": 1606
           },
           "tools/diagnostics/save_scenarios.py": {
-            "sha256": "77458df4c7302b018936a49aa9b69e5ab5482781b696f46e214767fe2147d0fc",
-            "size": 8648
+            "sha256": "aadadf73a9e975f99eeed04702a384b675bd66415d60a17c0917449b74a6da55",
+            "size": 8883
           },
           "tools/maps/__init__.py": {
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -15262,8 +15262,8 @@
             "size": 11659
           },
           "tools/maps/automap_native_decl_builder.py": {
-            "sha256": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
-            "size": 4725
+            "sha256": "1e10c7307e885a2d9bfdf8e3c63712d4da0243afc4afd37a451bef5465e71598",
+            "size": 4841
           },
           "tools/maps/encounter_catalog.py": {
             "sha256": "3e849c766668b5414bbdce1a56beb0f25e9bda65b951cb520e923fa2cebeb54c",
@@ -15298,8 +15298,8 @@
             "size": 7100
           },
           "tools/maps/map_preflight.py": {
-            "sha256": "87c2c02771455edd02722346919af3e3da4e506fc719b6012691b4cc1820ad65",
-            "size": 8699
+            "sha256": "9af020b9cfae52298aa4091d17aaa8069e12bed013e24babe34c9cfb045dd6c9",
+            "size": 8867
           },
           "tools/maps/map_semantic_baseline.py": {
             "sha256": "4b08479ed74eb632a942d6eaae390753c1496f5ba9ab6659c32dc8abf164118e",
@@ -15314,28 +15314,28 @@
             "size": 23125
           },
           "tools/maps/native_recipe_materializer.py": {
-            "sha256": "3fe4544c140df56a669c9d4917e5a58b48c33848ffbf00af900dbe838795e583",
-            "size": 32623
+            "sha256": "14e37ce09ab89a62fb0db296cb6bea7450d1907535649388d354e3d0df409c9b",
+            "size": 32700
           },
           "tools/maps/notification_formatting.py": {
             "sha256": "252d60e862d7b45c75d470afecfaa6cc4958585734f02fab4a6e19c3cc2b978c",
             "size": 7922
           },
           "tools/maps/resource_priority.py": {
-            "sha256": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
-            "size": 2667
+            "sha256": "4edce21e140b24127de2be63b67ff1ae3ad02a9d4006d47b07ae51e99ff403f1",
+            "size": 2736
           },
           "tools/maps/shell_menu_visual.py": {
-            "sha256": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",
-            "size": 3097
+            "sha256": "0d9d60cb411aea3b16228a52db14476f8710199794968485c9f42c4f7bb6625a",
+            "size": 3199
           },
           "tools/maps/unified_campaign.py": {
             "sha256": "22540aa85739f2877873029b27970e35e4eebe65b88bec037a8ca0be364d6206",
             "size": 3671
           },
           "tools/release/__init__.py": {
-            "sha256": "1644f770870150db47a97640da7aaa7b6ea6ce2d30693b181691d02fa85bbd6a",
-            "size": 36
+            "sha256": "63c00233b5d2a1df0127eeb21bcca568e0c3b0099155d0a775765a1d5fe71b41",
+            "size": 37
           },
           "tools/release/apworld_cache.py": {
             "sha256": "fd24c4b7f9138c3c5e52a0dd893170f6eb8f58ae0bb276a1f5f026f9808b500e",
@@ -15370,12 +15370,12 @@
             "size": 11416
           },
           "tools/release/ci_preflight.py": {
-            "sha256": "ee578677adfe9c0122719abd59516f7d15f54bd147c52da1f9ce0708fbe00528",
-            "size": 10900
+            "sha256": "2e3145c76910d45712c0e18641b4b9d24aac3111b87fc01c8b4709f76b20de4a",
+            "size": 10902
           },
           "tools/release/generate_foundation_test_plan.py": {
-            "sha256": "3b47413497298ab49141fb364ff15f9330f36242319ab4d557b2066b226a9ab4",
-            "size": 1822
+            "sha256": "5b9caf34e79f2f7cd695a9e56d9da8e4c90ac6e178d2b0db94d46d81005277fd",
+            "size": 1872
           },
           "tools/release/handoff.py": {
             "sha256": "05b4a3776a9a97231d32a96a33d2c0dccbce7ef4dbb62d3d162b182d43c4dbd7",
@@ -15406,8 +15406,8 @@
             "size": 3046
           },
           "tools/release/stage_room_resources.py": {
-            "sha256": "a395626730b655bfa470562423ec89f1129a1eb66fd99a77826705c7971cec2d",
-            "size": 7255
+            "sha256": "0139147485b872b72f685492d81802b547d36c3f82a1e09e2afe601ef40c4692",
+            "size": 7260
           },
           "tools/release/verify_launcher_runtime.py": {
             "sha256": "4c5325cb20c3a592d4388b8c92988dfa264a28a7fb93b83c316093b182881274",
@@ -15442,12 +15442,12 @@
             "size": 16777
           },
           "tools/validation/audit_resource_packages.py": {
-            "sha256": "c95b15e38b6ff8bbaed48836890880789b962c4f5e322a9ffb0f1357f3d9c0e4",
-            "size": 25307
+            "sha256": "c429f7fa30a0b28692e4e8719d9851c7abcb0eb4b53fa302523f791f6dcf1d37",
+            "size": 25914
           },
           "tools/validation/audit_scripted_location.py": {
-            "sha256": "64b324433367dd556ad2843e894f3fc1cff03c15f370c6cbe351593714722d8d",
-            "size": 12913
+            "sha256": "6427d48aa518dc18265f6c0db51fa062b396f773d7cc3b302e082cb68d464281",
+            "size": 13193
           },
           "tools/validation/authorial.py": {
             "sha256": "33665ee5b773867ecd622a9edb6cdef886e3ac895d34e44de7f5c43c7a4da407",
@@ -15458,16 +15458,16 @@
             "size": 2148
           },
           "tools/validation/physical_option_room_contract.py": {
-            "sha256": "55a6952ceab03707328b7b4db0a37f4ec19730da660b849b3e1483121a0ea7e7",
-            "size": 3175
+            "sha256": "c11109c4f4aeedbb6606df6912bf191847d917090606122b78351c4bbd272e81",
+            "size": 3241
           },
           "tools/validation/pipeline.py": {
             "sha256": "52d9a7dd31ecd047ea486cdbeb1883d88a0274d4d0e039823b03377294a99493",
             "size": 63285
           },
           "tools/validation/release_layout.py": {
-            "sha256": "47cc930899d240a1248c41909a6ac1096a6884b5f2fab2bb3e8b08d1625948cf",
-            "size": 1782
+            "sha256": "0cc9adb36ff18db37c58a1a2766a62793fdb0e561bcd194a069aed7e26bdbdfc",
+            "size": 1843
           },
           "tools/validation/validate_challenge_overrides.py": {
             "sha256": "5ef3281c5b95fa79959857243e82915f34d25c173520a1f07a00f9070228d34b",
@@ -15478,15 +15478,15 @@
             "size": 78479
           },
           "tools/validation/validate_devinvloadout_package.py": {
-            "sha256": "8cc372b5970dd439ce33b1a29e444124c5c4fb517ff980f4103f708fc7755f9f",
-            "size": 4425
+            "sha256": "4cdeb1e00a1fa7dc4f13ae1588777ef8ca06ea112927a70836d664c101cdeda3",
+            "size": 4532
           },
           "tools/validation/validate_item_notification_package.py": {
             "sha256": "25d1d1cc8888b36cf0d0ffe49f768fd72ed48cca9d5531a4b9864c58462b8b6d",
             "size": 19292
           }
         },
-        "fingerprint": "2a8fa7fddc3ff6c9cfcf70526558aa936d05fefcc95a9ee2fecbedeab7dd58b3",
+        "fingerprint": "f9c380cbd86ee4a659c44eb59525c51ce78d9276986451bdea44dfd4dcc2b02c",
         "kind": "working_tree_snapshot"
       }
     }

@@ -1288,7 +1288,9 @@ class RoomCompiler:
         required_sources = set(changed_maps)
         try:
             for row in changed_maps.values():
-                required_sources.update(body["ai"]["map_key"] for recipe in [*row["recipes"], *row.get('compatibility_recipes', [])] for body in recipe["bodies"])
+                required_sources.update(body["ai"]["map_key"] for recipe in
+                    [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
+                    for body in recipe["bodies"])
         except (KeyError, TypeError) as error:
             raise ValueError("Enemy generation source references are malformed") from error
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
@@ -1298,7 +1300,8 @@ class RoomCompiler:
         resource_roots = {}
         for key, row in changed_maps.items():
             references = {tuple(body["ai"][field] for field in ("map_key", "entity", "sha256"))
-                          for recipe in [*row["recipes"], *row.get('compatibility_recipes', [])] for body in recipe["bodies"]}
+                          for recipe in [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
+                          for body in recipe["bodies"]}
             roots, assets = set(), {}
             for map_key, entity, sha in sorted(references):
                 profile = precache.get(sha)
