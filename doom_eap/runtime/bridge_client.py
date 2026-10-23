@@ -2650,6 +2650,8 @@ class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
     game = GAME_NAME
     items_handling = 0b111
+    # full-saga enemy plans exceed Archipelago's default 16 MiB message limit
+    max_size = 64 * 1024 * 1024
 
     def __init__(self, server_address, password):
         super().__init__(server_address, password)
