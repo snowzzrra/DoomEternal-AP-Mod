@@ -6,6 +6,12 @@ import json
 SCRIPTED_BOSS_ACTORS = {'e1m4_boss': frozenset({'boss_intro_ai_superheavy_doomhunter_stage1_1'})}
 FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a_target_spawn_42'})}
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
+SMALL_GROUND_ENEMIES = frozenset({'imp', 'hell_soldier', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper'})
+GROUND_ENCOUNTERS = {
+    ('e1m4_boss', 'train_encounter_manager_intro_train_1'): SMALL_GROUND_ENEMIES,
+    ('e1m4_boss', 'intro_encounter_manager_intro_arena_1'): SMALL_GROUND_ENEMIES | {
+        'carcass', 'dread_knight', 'hell_knight', 'revenant', 'prowler', 'whiplash'},
+}
 
 
 def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_capabilities):

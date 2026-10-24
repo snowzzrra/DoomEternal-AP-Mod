@@ -7,6 +7,7 @@ import math
 from fractions import Fraction
 
 from . import enemy_species
+from .enemy_options import SPECIES_GROUPS
 
 ENEMY_DRAW_REVISION = 3
 
@@ -81,11 +82,14 @@ def _limit_suffix(enemies, species):
     prefix = ''
     if population:
         prefix = f"_a{population['scope']:016x}_p" + ''.join(
-            f"{population[name]:08x}" for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
+            f"{(population[name] | (population.get('heavy', 0) << 8) if name == 'mixed' else population[name]):08x}"
+            for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
         if species in {'baron', 'armored_baron', 'doom_hunter', 'tyrant'}:
             kind = 'h'
         elif species in {'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'hell_soldier'}:
             kind = 'f'
+        elif population.get('heavy') and species in SPECIES_GROUPS['fodder'] and species != 'zombie_t1_screecher':
+            kind = 'o'
     return f"{prefix}_l{values}_k{kind}"
 
 

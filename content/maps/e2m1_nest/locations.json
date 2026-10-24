@@ -115,7 +115,17 @@
       "permanent_resource_budget": false
     },
     "game_pickup_mega_health_1": {
-      "permanent_resource_budget": false
+      "permanent_resource_budget": false,
+      "independent_ap_trigger": true,
+      "gate_relay": "game_target_relay_249",
+      "reveal_entity": "game_target_show_16",
+      "preserve_targets": [],
+      "independent_targets": [
+        "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_1",
+        "ap_remove_location_visual_7770513",
+        "game_encounter_trigger_commit_77",
+        "game_target_remove_39"
+      ]
     }
   },
   "secret_encounters": [

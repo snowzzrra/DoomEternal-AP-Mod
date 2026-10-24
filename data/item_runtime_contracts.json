@@ -40,22 +40,22 @@
                 "name": "Break Blast",
                 "family": "runes",
                 "ownership_primitive": "devinv_is_rune",
-                "runtime_primitive": "context_deferred",
-                "reconcile": "tag_context_only"
+                "runtime_primitive": "native_support_runes",
+                "reconcile": "native_owner"
             },
             "7770146": {
                 "name": "Desperate Punch",
                 "family": "runes",
                 "ownership_primitive": "devinv_is_rune",
-                "runtime_primitive": "context_deferred",
-                "reconcile": "tag_context_only"
+                "runtime_primitive": "native_support_runes",
+                "reconcile": "native_owner"
             },
             "7770147": {
                 "name": "Take Back",
                 "family": "runes",
                 "ownership_primitive": "devinv_is_rune",
-                "runtime_primitive": "context_deferred",
-                "reconcile": "tag_context_only"
+                "runtime_primitive": "native_support_runes",
+                "reconcile": "native_owner"
             }
         }
     },

@@ -384,6 +384,17 @@ class SentinelWeaponPoints:
             raise WeaponPointsBlocked(f"Native normal Rune registration unconfirmed: {result}")
         return result
 
+    def ensure_support_runes(self, mask):
+        if type(mask) is not int or not 0 < mask <= 7:
+            raise WeaponPointsBlocked("Invalid support Rune mask")
+        body = struct.pack("<IIIBb2s", 2, 0, mask, 0, -1, b"\0\0")
+        result = self._execute_typed(32768, "--runes", 33, 34, 36, body)
+        if (result["outcome"] not in (0, 1) or result["flags"] & 11 != 11
+                or result["owned_support_after"] & mask != mask
+                or result["selected_support_after"] != result["selected_support_before"]):
+            raise WeaponPointsBlocked(f"Native support Rune registration unconfirmed: {result}")
+        return result
+
     def publish_checked_locations(self, checked_locations, revision):
         if type(revision) is not int or revision <= 0:
             raise WeaponPointsBlocked("Invalid Automap snapshot revision")

@@ -1672,12 +1672,14 @@ def replace_pickup_reveal_target(content, entity_name, location_id, policy):
     if bounds is None:
         raise ValueError(f"Pickup reveal entity missing: {reveal_name}")
     block = content[slice(*bounds)]
-    if not re.search(r'class\s*=\s*"idTarget_Show";', block) or extract_target_names(block) != [entity_name]:
+    targets = extract_target_names(block)
+    if not re.search(r'class\s*=\s*"idTarget_Show";', block) or targets.count(entity_name) != 1:
         raise ValueError(f"Pickup reveal source target drift: {reveal_name}")
     gate_bounds = find_entity_block_bounds(content, policy["gate_relay"])
     if gate_bounds is None or reveal_name not in extract_target_names(content[slice(*gate_bounds)]):
         raise ValueError(f"Pickup reveal gate does not target its show entity: {reveal_name}")
-    block = replace_targets_block(block, [f"ap_location_visual_{location_id}"])
+    block = replace_targets_block(block, [f"ap_location_visual_{location_id}" if target == entity_name else target
+                                          for target in targets])
     return content[:bounds[0]] + block + content[bounds[1]:]
 
 

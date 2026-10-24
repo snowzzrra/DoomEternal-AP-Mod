@@ -242,10 +242,10 @@ def validate_support_rune_foundation(
             errors.append(f"Support Rune {item_id} contract family drifted")
         if contract.get("ownership_primitive") != "devinv_is_rune":
             errors.append(f"Support Rune {item_id} ownership primitive drifted")
-        if contract.get("runtime_primitive") != "context_deferred":
-            errors.append(f"Support Rune {item_id} context deferral drifted")
-        if contract.get("reconcile") != "tag_context_only":
-            errors.append(f"Support Rune {item_id} context reconciliation drifted")
+        if contract.get("runtime_primitive") != "native_support_runes":
+            errors.append(f"Support Rune {item_id} native registration drifted")
+        if contract.get("reconcile") != "native_owner":
+            errors.append(f"Support Rune {item_id} native reconciliation drifted")
         if policies.get(str(item_id), {}).get("policy") != "replay_manual_only":
             errors.append(f"Support Rune {item_id} replay policy drifted")
     return errors

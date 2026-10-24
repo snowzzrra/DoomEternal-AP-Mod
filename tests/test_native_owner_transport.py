@@ -144,6 +144,18 @@ def test_normal_runes_register_cumulatively_without_slot_changes():
     assert struct.unpack_from("<IIIBb", messages[0][2], 16 + 72 + 65) == (1, mask, 0, 0, -1)
 
 
+def test_support_runes_confirm_registration_without_selecting_a_slot():
+    mask = 5
+    def confirmed(_flag, _operation, request_id):
+        return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build",
+                "state": 3, "kind": 2, "outcome": 0, "flags": 11,
+                "owned_support_after": mask, "selected_support_before": -1, "selected_support_after": -1}
+    link, messages = link_with(confirmed)
+    link.ensure_support_runes(mask)
+    assert struct.unpack_from("<IIIBb", messages[0][2], 16 + 72 + 65) == (2, 0, mask, 0, -1)
+    assert [(flag, operation) for flag, operation, _ in messages] == [("--runes", 33), ("--runes", 36)]
+
+
 def test_automap_publishes_exact_checked_bits_without_native_mutation():
     def result(flag, operation, request_id):
         return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build", "outcome": 0,
