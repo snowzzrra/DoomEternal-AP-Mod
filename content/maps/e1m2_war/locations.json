@@ -32,7 +32,8 @@
     "AP_CHECK_PICKUPS_PICKUP_ARMOR_LARGE_2": 7770493,
     "AP_CHECK_CAPITOL_PICKUP_MEGA_HEALTH_1": 7770494,
     "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1_E1M2": 7770495,
-    "AP_CHECK_TRENCHES_PICKUP_MEGA_HEALTH_1": 7770514
+    "AP_CHECK_TRENCHES_PICKUP_MEGA_HEALTH_1": 7770514,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_1": 7770518
   },
   "location_feedback": {
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_ARACHNOTRON_1": {
@@ -75,6 +76,9 @@
       "policy": "ap_only"
     },
     "AP_CHECK_TRENCHES_PICKUP_MEGA_HEALTH_1": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_1": {
       "policy": "ap_only"
     }
   },
@@ -128,7 +132,8 @@
     "7770493": "Exultia - Secret Armor - Breakable Wall",
     "7770494": "Exultia - Soulsphere - First Ruined Hall",
     "7770495": "Exultia - Automap Station",
-    "7770514": "Exultia - Soulsphere - Trenches Secret Wall"
+    "7770514": "Exultia - Soulsphere - Trenches Secret Wall",
+    "7770518": "Exultia - Soulsphere - Lava Secret Chamber"
   },
   "target_policies": {
     "target_relay_slayergate_4_combat_end": {
@@ -158,6 +163,9 @@
       "permanent_resource_budget": false
     },
     "trenches_pickup_mega_health_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_1": {
       "permanent_resource_budget": false
     }
   }

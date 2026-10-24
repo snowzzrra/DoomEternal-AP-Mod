@@ -1359,10 +1359,13 @@ def generate_inert_location_visual(block, policy):
         raise ValueError(
             f"AP visual reconciliation entity is missing: {visual['entity_name']}"
         )
+    helper_position = "\n".join(
+        f"\t\t\t\t{axis} = {value};" for axis, value in zip(("x", "y", "z"), position)
+    )
     cleanup = ""
     if cleanup_name:
         cleanup = f'''entity {{
-{layers}\tentityDef {cleanup_name} {{
+\tentityDef {cleanup_name} {{
 \t\tinherit = "target/remove";
 \t\tclass = "idTarget_Remove";
 \t\texpandInheritance = false;
@@ -1373,7 +1376,11 @@ def generate_inert_location_visual(block, policy):
 \t\tedit = {{
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
-{bind_info_line}
+\t\t\t\tcanBecomeDormant = false;
+\t\t\t}}
+{bind_info_line}\t\t\tdormancy = {{ allowPvsDormancy = false; }}
+\t\t\tspawnPosition = {{
+{helper_position}
 \t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
@@ -1386,7 +1393,7 @@ def generate_inert_location_visual(block, policy):
     reconciliation = ""
     if reconciliation_name:
         reconciliation = f'''entity {{
-{layers}\tentityDef {reconciliation_name} {{
+\tentityDef {reconciliation_name} {{
 \t\tinherit = "target/hide";
 \t\tclass = "idTarget_Hide";
 \t\texpandInheritance = false;
@@ -1398,7 +1405,12 @@ def generate_inert_location_visual(block, policy):
 \t\t\treuseable = true;
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
-{bind_info_line}\t\t\t\t}}
+\t\t\t\tcanBecomeDormant = false;
+\t\t\t}}
+{bind_info_line}\t\t\tdormancy = {{ allowPvsDormancy = false; }}
+\t\t\tspawnPosition = {{
+{helper_position}
+\t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
 \t\t\t\titem[0] = "{visual["entity_name"]}";
@@ -2237,7 +2249,8 @@ def generate_physical_pickup_spawn(item_id, command_value):
 			whenToSave = "SGT_CHECKPOINT";
 			removeFlag = "RMV_CHECKPOINT_ALLOW_MS";
 			flags = {{
-				canBecomeDormant = true;
+				canBecomeDormant = false;
+				hide = false;
 			}}
 			renderModelInfo = {{
 				contributesToLightProbeGen = false;
@@ -2253,6 +2266,7 @@ def generate_physical_pickup_spawn(item_id, command_value):
 			dormancy = {{
 				delay = 5;
 				distance = 2048;
+				allowPvsDormancy = false;
 			}}
 			spawn_statIncreases = {{
 				num = 1;

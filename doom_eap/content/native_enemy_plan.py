@@ -16,6 +16,7 @@ from threading import Lock
 from .enemy_plan import (BASE_COMBAT_COST, _density_weights, _limit_suffix, _random_for, enemy_combat_cost,
                          effective_special_limits, sample_instance_attributes, sample_species)
 from .enemy_species import enemy_spawn_mask, enemy_tracking_suffix, selected_spawn_type, enemy_speed_capabilities
+from .enemy_options import BALANCE_PRESETS, ENEMY_RECIPES, SPECIES_GROUPS
 
 NATIVE_FAMILIES = {"immediate": "i", "group": "g", "staggered": "t", "maintenance": "m", "archvile": "a",
                    "spirit": "s", "possessed": "p", "buff_pod": "b", "independent_actor": "d", "summon": "u", "direct_point": "f"}
@@ -197,7 +198,8 @@ def _secret_timers(maps, catalog):
 
 def native_body_name(origin, ordinal, logical_count, physical_count, logical_type, body, settings, *, credit_units=None):
     tracking = enemy_tracking_suffix(logical_type, body["spawn_type"])
-    suffix = _limit_suffix(settings, body["species"]) + f"__ap_v070_s{body['attributes']['speed_percent']:05d}"
+    limits = {**settings, **({'population_limits': body['population_limits']} if 'population_limits' in body else {})}
+    suffix = _limit_suffix(limits, body["species"]) + f"__ap_v070_s{body['attributes']['speed_percent']:05d}"
     credit = f"_w{credit_units:08x}" if credit_units is not None else ""
     return f"ap_v070_ai_r{origin}_{ordinal:08x}_q{logical_count:08x}{physical_count:08x}{credit}{tracking}{suffix}"
 
@@ -418,8 +420,132 @@ def _phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalo
     return bodies
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=9):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9):
+def _balanced_phase_bodies(sources, candidates, settings, intensity, *, seed, key, catalog,
+                          stage_index, stage_count, supply_sources, extras, arena, opening=False):
+    profile = BALANCE_PRESETS[settings['balance_preset']]
+    progress = Fraction(stage_index, max(1, stage_count - 1)) if settings['progressive'] else Fraction(1)
+    if opening:
+        progress = min(progress, Fraction(1, 10))
+    large = arena['peak'] >= 8
+    draw = _random_for(seed, arena['key'], 'population')
+    swarm = large and progress >= Fraction(1, 4) and draw.randrange(10) == 0
+    mixed = large and progress >= Fraction(3, 5) and not swarm and draw.randrange(100) < (
+        30 if settings['balance_preset'] == 'icons_wrath' else 10 if settings['balance_preset'] == 'hells_vanguard' else 3)
+    maximum = 6 + round((6 if settings['balance_preset'] == 'icons_wrath' else 4) * progress)
+    maximum += 2 * large
+    if swarm:
+        maximum += 4
+    maximum = max(2, min(128, maximum * settings['density'] // 100))
+    heavy_limit = 1 if progress < Fraction(1, 5) else profile['superheavy']
+    if not large or progress < Fraction(3, 5):
+        heavy_limit = min(2, heavy_limit)
+    population = dict(maximum=maximum, superheavy=heavy_limit,
+                      pressure=min(maximum, 3 + round(4 * progress)), mixed=int(mixed), scope=arena['scope'])
+    groups = [early * (1 - progress) + late * progress
+              for early, late in zip(*profile['groups'])]
+    expected_intensity = sum(value * part for value, part in zip(ENEMY_RECIPES[settings['balance_preset']].intensity,
+                                                               (1 - progress, progress))) / 100
+    for group in (1, 2, 3):
+        groups[group] *= intensity / expected_intensity
+    if swarm:
+        groups = [80, 20, 0, 0]
+    roles = {species: min(index, 3) for index, members in enumerate(SPECIES_GROUPS.values()) for species in members}
+    roles.update(buff_pod=3, zombie_t1_screecher=3)
+    roster = [source for source in sources for _ in range(source['logical_count'] + extras.get(source['id'], 0))]
+    if settings['count_mode'] == 'multiplier':
+        roster = [source for source in sources for _ in range(source['logical_count'] if source['id'] in supply_sources
+                  or source['family'] == 'maintenance' else max(1, round(source['logical_count'] * settings['count_multiplier'] / 100)))]
+    _random_for(seed, key, 'positions').shuffle(roster)
+    bodies = {source['id']: [] for source in sources}
+    ammunition = max(1, (len(roster) + 3) // 4) if len(roster) >= 4 else 0
+    available_ammo = [index for index, source in enumerate(roster) if source['id'] in supply_sources]
+    slots = [index for index, source in enumerate(roster) if any(species in AMMO_FODDER and
+             (not source.get('allowed_species') or species in source['allowed_species']) for species in candidates)]
+    _random_for(seed, key, 'ammunition').shuffle(slots)
+    ammo_slots = set(available_ammo)
+    for index in slots:
+        if len(ammo_slots) >= ammunition:
+            break
+        ammo_slots.add(index)
+    drawn, superheavies, supports = {}, 0, 0
+    for ordinal, source in enumerate(roster):
+        eligible = [species for species in candidates if not source.get('allowed_species')
+                    or species in source['allowed_species']]
+        if progress < Fraction(1, 4):
+            eligible = [s for s in eligible if s not in {'spirit', 'blood_angel', 'stone_imp', 'cursed_prowler',
+                                                        'armored_baron', 'tyrant', 'pain_elemental'}]
+        if source['family'] == 'maintenance' and (not source.get('maximum_emissions')
+                or source['maximum_emissions'] > source['logical_count'] * 2):
+            eligible = [s for s in eligible if roles[s] < 2]
+        if ordinal in ammo_slots:
+            eligible = [s for s in eligible if s in AMMO_FODDER]
+        else:
+            eligible = [s for s in eligible if groups[roles[s]] > 0
+                        and (roles[s] != 2 or len(roster) >= 4 and superheavies < population['superheavy']
+                             and (not supports or mixed))
+                        and (roles[s] != 3 or large and supports < 1 and (not superheavies or mixed))]
+        if not eligible:
+            if source['id'] in supply_sources:
+                raise ValueError(f"Ammunition source has no eligible chainsaw fodder: {source['id']}")
+            raise ValueError(f"No compatible enemy for balanced spawn: {source['id']}")
+        totals = {group: sum(settings['weights'][s] for s in eligible if roles[s] == group) for group in range(4)}
+        weights = {}
+        for species in eligible:
+            group = roles[species]
+            chance = Fraction(1) if ordinal in ammo_slots else Fraction(groups[group])
+            chance *= Fraction(settings['weights'][species], max(1, totals[group]))
+            if species in {'marauder', 'archvile', 'tyrant', 'doom_hunter', 'armored_baron'}:
+                chance *= Fraction({'marauder': 40, 'archvile': 30, 'tyrant': 50,
+                                    'doom_hunter': 70, 'armored_baron': 80}[species], 100)
+            chance /= 1 + drawn.get(species, 0) * Fraction(settings['variety'], 25)
+            weights[species] = max(1, round(chance * 1000000))
+        draw_key = [key, ordinal]
+        species = sample_species({**settings, 'weights': weights}, eligible, seed=seed, instance_key=draw_key)
+        attributes = sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
+            stage_index=stage_index, stage_count=stage_count)
+        bodies[source['id']].append(dict(species=species, attributes=attributes,
+            spawn_type=catalog['species'][species]['spawn_type'], ai=dict(catalog['species'][species]['ai']),
+            hitpoints=_body_hitpoints(catalog['species'][species], attributes), population_limits=dict(population)))
+        drawn[species] = drawn.get(species, 0) + 1
+        superheavies += roles[species] == 2
+        supports += roles[species] == 3
+    return bodies
+
+
+def _wave_peak(bodies):
+    limits = next((body['population_limits'] for body in bodies if body.get('population_limits')), None)
+    if not limits:
+        return {}
+    superheavy = {'baron', 'armored_baron', 'doom_hunter', 'tyrant', 'marauder', 'archvile'}
+    special = {'marauder', 'archvile', 'spirit', 'buff_pod', 'zombie_t1_screecher'}
+    ordered = sorted(bodies, key=lambda body: enemy_combat_cost(body['species'], body['attributes'],
+                     buff_totems=True, screechers=True), reverse=True)
+    peaks = []
+    for mode in ('ordinary', 'superheavy', 'support', 'mixed'):
+        if mode == 'mixed' and not limits['mixed']:
+            continue
+        selected, heavies, supports = [], 0, 0
+        for body in ordered:
+            species = body['species']
+            heavy, support = species in superheavy, species in special
+            if (mode == 'ordinary' and (heavy or support) or mode == 'superheavy' and support and not heavy
+                    or mode == 'support' and heavy or heavy and heavies >= limits['superheavy']):
+                continue
+            ceiling = limits['maximum'] if mode == 'ordinary' else limits['pressure']
+            if len(selected) >= ceiling:
+                break
+            selected.append(body)
+            heavies += heavy
+            supports += support
+        peaks.append((sum(enemy_combat_cost(body['species'], body['attributes'], buff_totems=True,
+                                           screechers=True) for body in selected), len(selected)))
+    cost, count = max(peaks)
+    return dict(peak_cost=float(cost), peak_bodies=count, population_maximum=limits['maximum'],
+                superheavy_maximum=limits['superheavy'])
+
+
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=10):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -507,6 +633,25 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=9):
                 if number.isdigit(): wave_order.setdefault(owner, set()).add(int(number))
         phase_bodies = {}
         phase_progression = {}
+        arenas, extras = {}, {}
+        if revision >= 10 and enemies.get('balance_preset'):
+            for phase, sources in phases.items():
+                owner = phase.rsplit('/', 2)[0]
+                arena = arenas.setdefault(owner, dict(key=[map_key, owner], peak=0, sources=[]))
+                arena['peak'] = max(arena['peak'], sum(source['logical_count'] for source in sources))
+                arena['sources'].extend(sources)
+            for arena in arenas.values():
+                scope = 14695981039346656037
+                for character in arena['key'][1].encode('utf-8'):
+                    scope = ((scope ^ character) * 1099511628211) & 0xffffffffffffffff
+                arena['scope'] = scope
+                eligible = [source for source in arena['sources'] if source['family'] in {'immediate', 'group', 'staggered'}
+                            and not source.get('runtime_only') and source['id'] not in supplies]
+                slots = [source['id'] for source in eligible for _ in range(source['logical_count'])]
+                count = len(slots) * (enemies['length'] - 100) // 100
+                if slots:
+                    for source_id in _random_for(seed, arena['key'], 'length').choices(slots, k=count):
+                        extras[source_id] = extras.get(source_id, 0) + 1
         from .native_enemy_safety import opening_source
         opening_phases = {phase for phase, sources in phases.items()
                           if campaign.get('opening_stage') == map_key
@@ -524,11 +669,17 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=9):
                 phase_intensity = Fraction(enemies['intensity'][0] * (denominator - phase_index)
                     + enemies['intensity'][1] * phase_index, 100 * denominator)
             if revision >= 5: phase_progression[phase] = [phase_index, phase_count]
-            generate_bodies = _revision_one_bodies if revision == 1 else _revision_two_bodies if revision == 2 else _phase_bodies
-            phase_bodies.update(generate_bodies(sources, candidates, settings, phase_intensity, seed=seed,
-                key=[map_key, phase], catalog=catalog, stage_index=phase_index, stage_count=phase_count,
-                **({'balanced': True, 'supply_sources': supplies, 'revision': revision,
-                    'opening': phase in opening_phases} if revision >= 4 else {})))
+            if revision >= 10 and enemies.get('balance_preset'):
+                generated = _balanced_phase_bodies(sources, candidates, settings, phase_intensity, seed=seed,
+                    key=[map_key, phase], catalog=catalog, stage_index=phase_index, stage_count=phase_count,
+                    supply_sources=supplies, extras=extras, arena=arenas[phase.rsplit('/', 2)[0]], opening=phase in opening_phases)
+            else:
+                generate_bodies = _revision_one_bodies if revision == 1 else _revision_two_bodies if revision == 2 else _phase_bodies
+                generated = generate_bodies(sources, candidates, settings, phase_intensity, seed=seed,
+                    key=[map_key, phase], catalog=catalog, stage_index=phase_index, stage_count=phase_count,
+                    **({'balanced': True, 'supply_sources': supplies, 'revision': revision,
+                        'opening': phase in opening_phases} if revision >= 4 else {}))
+            phase_bodies.update(generated)
         for source in origins:
             if source.get("protected_reason"):
                 protected.append({"id": source["id"], "reason": source["protected_reason"]})
@@ -610,6 +761,16 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=9):
                 waves = [{'id': phase, 'cost': float(cost),
                           'bodies': wave_bodies[phase],
                           'progression': phase_progression[phase]} for phase, cost in sorted(wave_costs.items())]
+                if revision >= 10 and enemies.get('balance_preset'):
+                    maintenance = {}
+                    for recipe in active:
+                        if recipe['family'] == 'maintenance':
+                            maintenance.setdefault(recipe['wave'].rsplit('/', 2)[0], []).extend(recipe['bodies'])
+                    for wave in waves:
+                        bodies = [body for recipe in active if recipe['wave'] == wave['id']
+                                  and recipe['family'] != 'maintenance' for body in recipe['bodies']]
+                        bodies += maintenance.get(wave['id'].rsplit('/', 2)[0], [])
+                        wave.update(_wave_peak(bodies))
                 if opening_phases:
                     combat_costs[map_key]['campaign']['opening_waves'] = [wave for wave in waves if wave['id'] in opening_phases]
                     combat_costs[map_key]['campaign']['opening_species'] = sorted({body['species']

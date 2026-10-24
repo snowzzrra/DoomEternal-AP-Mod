@@ -7,12 +7,12 @@ from doom_eap.content.enemy_options import (
 )
 
 
-def test_presets_resolve_controls_and_custom_preserves_effective_values():
+def test_explicit_controls_preserve_the_selected_preset():
     for preset in ENEMY_RECIPES:
         raw = {"enemy_preset": preset}
         before = deepcopy(raw)
         effective = normalize_enemy_options(raw)
-        custom = dict(enemy_preset="custom", enemy_intensity_early=effective["intensity"][0],
+        custom = dict(enemy_preset=preset, enemy_length=effective["length"], enemy_intensity_early=effective["intensity"][0],
                       enemy_intensity_late=effective["intensity"][1], enemy_density=effective["density"],
                       enemy_variety=effective["variety"], enemy_count_mode=effective["count_mode"],
                       enemy_count_multiplier=effective["count_multiplier"], enemy_weights=effective["weights"],
@@ -71,8 +71,8 @@ def test_progressive_attributes_keep_early_damage_at_vanilla_and_respect_manual_
     raw = {'enemy_preset': 'hells_vanguard'}
     current = normalize_enemy_options(raw)
     legacy = normalize_enemy_options({**raw, 'enemies': {'revision': 4}})
-    assert current['attributes']['damage']['global']['early'] == [90, 100]
-    assert current['attributes']['damage']['global']['late'] == [105, 125]
+    assert current['attributes']['damage']['global']['early'] == [100, 100]
+    assert current['attributes']['damage']['global']['late'] == [100, 115]
     assert legacy['attributes']['damage']['global']['early'] == [90, 135]
     manual = normalize_enemy_options({**raw, 'enemy_damage': {'minimum': 150, 'maximum': 180}})
     assert manual['attributes']['damage']['global'] == {'early': [150, 180], 'late': [150, 180]}
@@ -93,7 +93,7 @@ def test_special_limits_preserve_each_manual_ceiling_and_progress_inherited_fiel
     assert all(limits["combined_special"] <= sum(limits[name] for name in ("marauder", "archvile", "spirit"))
                for limits in steps if "combined_special" not in overrides)
     disabled = normalize_enemy_options({**raw, "progressive_difficulty": False})
-    assert all(effective_special_limits(disabled, index, 5) == steps[0] for index in range(5))
+    assert all(effective_special_limits(disabled, index, 5) == steps[-1] for index in range(5))
     assert enemy_options_for_editing(raw)["enemy_special_limits"] == overrides
 
 

@@ -79,6 +79,34 @@ OPENING_REGIONS = {
     'e1m1_intro': ('Hell on Earth - Barge - Hell Priest Barge', 'Hell on Earth - City - Midtown'),
     'e1m2_war': ('Exultia - Exultia - Mourning Spire', 'Exultia - Exultia - Central Rotunda',
                  "Exultia - Exultia - Belphegor's Gate", 'Exultia - Exultia - Dour Slough'),
+    'e1m3_cult': ('Cultist Base - Grotto of Penance', 'Cultist Base - Station of Inquisition',
+                  'Cultist Base - Basilica of Adjuration'),
+    'e1m4_boss': ('Doom Hunter Base - Station of Redemption', 'Doom Hunter Base - Lazarus Generators',
+                  'Doom Hunter Base - Tower of Baphomet'),
+    'e2m1_nest': ('Super Gore Nest - Upper Area - Mixom Square', 'Super Gore Nest - Upper Area - Star Mall',
+                  'Super Gore Nest - Upper Area - Vermilion Canal'),
+    'e2m2_base': ('ARC Complex - Emerson Hotel', "ARC Complex - Mario's Restaurant", 'ARC Complex - ARC Turret'),
+    'e2m3_core': ('Mars Core - Phobos - Phobos Teleport Station', 'Mars Core - Phobos - BFG-10000 Gun Deck',
+                  'Mars Core - UAC - BFG-10000 Ventilation'),
+    'e3m1_slayer': ('Taras Nabad - City Outskirts', 'Taras Nabad - Atrium Plaza',
+                    'Taras Nabad - Slayer Creation Chamber'),
+    'e3m2_hell': ("Nekravol - Pain's Basin", 'Nekravol - The Mill', 'Nekravol - Passage of the Damned'),
+    'e3m2_hell_b': ('Nekravol Part II - Corpse Conveyor', 'Nekravol Part II - Soul Extraction',
+                    'Nekravol Part II - Demon Foundry'),
+    'e3m3_maykr': ('Urdak - Infernal Demodulator', 'Urdak - The Sanctuary', 'Urdak - Guardians of Sanctuary'),
+    'e4m1_rig': ('UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad',
+                 'UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator',
+                 'UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower'),
+    'e4m2_swamp': ('The Blood Swamps - Swamp Entrance', 'The Blood Swamps - Underworld Crossroad',
+                   'The Blood Swamps - Sunken Courtyard'),
+    'e4m3_mcity': ('The Holt - Tranquility', 'The Holt - Crimson Forest', 'The Holt - Maykr Pillars'),
+    'e5m1_spear': ('The World Spear - Sentinel Village - Village Outskirts',
+                   'The World Spear - Sentinel Village - Village Entrance',
+                   'The World Spear - Sentinel Village - Sentinel Village'),
+    'e5m2_earth': ('Reclaimed Earth - City Entrance', 'Reclaimed Earth - Reclaimed Train Stop',
+                   'Reclaimed Earth - Overgrown Offices'),
+    'e5m3_hell': ('Immora - The Dark Lord', 'Immora - Immora Assault - Battlefield',
+                  'Immora - Immora Assault - Plateau Battle'),
 }
 OPENING_PREFIXES = {
     'e1m1_intro': ('barge_', 'mech_', 'corner_street_', 'crack_building_'),
@@ -87,6 +115,8 @@ OPENING_PREFIXES = {
 
 
 def opening_source(stage, source):
+    if stage in OPENING_REGIONS and stage not in OPENING_PREFIXES:
+        return True
     binding = source.get('binding') or {}
     return any(binding.get(field, '').startswith(OPENING_PREFIXES.get(stage, ()))
                for field in ('owner', 'entity'))

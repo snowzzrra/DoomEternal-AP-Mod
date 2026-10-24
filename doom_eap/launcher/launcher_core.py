@@ -1348,6 +1348,28 @@ class RoomCompiler:
                 assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
         return resource_roots
 
+    def _apply_boon_resources(self, assembled, manifest, resource_roots):
+        profiles = json.loads((ROOT / 'content/catalog/native_enemy_assets.json').read_bytes()).get('powerups', {})
+        if set(profiles) != {'berserk', 'onslaught', 'overdrive'}:
+            raise ValueError('Powerup resource catalog is incomplete')
+        entries = dict.fromkeys((entry['mapResourceType'], entry['name'])
+                                for profile in profiles.values() for entry in profile['assets'])
+        roots = {name for _, name in entries} | {f'pickup/powerup/{effect}' for effect in profiles}
+        stages = manifest.options.get('campaign_plan', {}).get('sequence', ())
+        for key in [*stages, 'hub']:
+            row = self.payload_manifest['maps'].get(key)
+            if row is None or row['target_member'] not in assembled:
+                continue
+            member = row['target_member']
+            runtime = member.split('/maps/', 1)[1].removesuffix('.entities')
+            resource_roots[runtime] = sorted(set(resource_roots.get(runtime, ())) | roots)
+            asset_path = member.split('/', 1)[0] + '/EternalMod/assetsinfo/' + runtime.rsplit('/', 1)[1] + '.json'
+            document = json.loads(assembled.get(asset_path, b'{}'))
+            assets = document.setdefault('assets', [])
+            existing = {(entry['mapResourceType'], entry['name']) for entry in assets}
+            assets.extend(dict(mapResourceType=kind, name=name) for kind, name in entries if (kind, name) not in existing)
+            assembled[asset_path] = (json.dumps(document, sort_keys=True) + '\n').encode('utf-8')
+
     def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
         from tools.release.room_payloads import assemble_room_files, canonical_json, write_deterministic_zip
         placements = manifest.require_complete_placements()
@@ -1361,6 +1383,7 @@ class RoomCompiler:
             self.base_resource, self.payload_resource, self.payload_manifest, manifest.options
         )
         resource_roots = self._apply_enemy_plan(assembled, manifest)
+        self._apply_boon_resources(assembled, manifest, resource_roots)
         seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(manifest.options)
         receipt = {

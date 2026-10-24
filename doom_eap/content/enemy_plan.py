@@ -77,7 +77,16 @@ def _limit_suffix(enemies, species):
     if enemies.get('revision', 2) >= 4:
         kinds['zombie_t1_screecher'] = 'c'
     kind = kinds.get(species, "n")
-    return f"_l{values}_k{kind}"
+    population = enemies.get('population_limits')
+    prefix = ''
+    if population:
+        prefix = f"_a{population['scope']:016x}_p" + ''.join(
+            f"{population[name]:08x}" for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
+        if species in {'baron', 'armored_baron', 'doom_hunter', 'tyrant'}:
+            kind = 'h'
+        elif species in {'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'hell_soldier'}:
+            kind = 'f'
+    return f"{prefix}_l{values}_k{kind}"
 
 
 

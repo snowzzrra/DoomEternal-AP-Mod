@@ -3638,7 +3638,8 @@ class DoomEternalContext(CommonContext):
                 )
                 return False
 
-            self._reconcile_native_receipt_owners(trigger)
+            if trigger != "packet":
+                self._reconcile_native_receipt_owners(trigger)
             if self.session_state.get("weapon_points") is not None:
                 try:
                     owner, authoritative = self.weapon_points_receipt_owner()
@@ -6757,6 +6758,18 @@ class DoomEternalContext(CommonContext):
     def last_processed_event_id(self):
         return self.physical_checks.last_event
 
+    async def physical_check_loop(self):
+        while not self.exit_event.is_set():
+            try:
+                if self.item_state_ready and self.server and self.server.socket and not self.server.socket.closed:
+                    await self.flush_check_event_files()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("[Trigger] Check publication interrupted; retrying")
+                await asyncio.sleep(1.0)
+            await asyncio.sleep(0.1)
+
     async def tracker_loop(self):
         logger.info(
             "[Tracking] Starting Doom Eternal runtime tracking loop "
@@ -6864,7 +6877,6 @@ class DoomEternalContext(CommonContext):
                 if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
                     continue
 
-                await self.flush_check_event_files()
                 await self.check_campaign_goal()
                 await self.synchronize_campaign_menu()
 
@@ -7064,6 +7076,7 @@ async def amain(launch_args=None):
         cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_supervisor())
+    ctx.physical_check_task = asyncio.create_task(ctx.physical_check_loop())
 
     log_mission_bridge_identity()
     emit_launcher_event("client_started")
@@ -7121,7 +7134,7 @@ async def amain(launch_args=None):
     await ctx.exit_event.wait()
     emit_launcher_event("client_stopping")
     ctx.reset_queue_session_authority("bridge_shutdown")
-    tasks = [ctx.tracking_task, ctx.death_task, ctx.input_task]
+    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task]
     item_delivery_task = ctx._item_delivery_task
     if item_delivery_task is not None:
         tasks.append(item_delivery_task)

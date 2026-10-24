@@ -2729,13 +2729,31 @@
     },
     {
       "default": "auto",
-      "description": "Choose how many enemies enter each original spawn request when Enemy Count is Auto.\n\n100%: Keep at least the original count. Higher values add enemies. Lower values favor tougher enemies while retaining the original count.\nAuto: Use the selected enemy preset.",
+      "description": "Choose how many enemies can fight at the same time when Enemy Count is Auto.\n\n100%: Use the preset's simultaneous limit. Higher values allow more enemies together.\nEnemy Length controls the total number of enemies across the fight.\nAuto: Use the selected enemy preset.",
       "display_name": "Density",
       "group": "Game Options",
       "key": "enemy_density",
       "maximum": 10000,
       "minimum": 1,
       "source_class": "EnemyDensity",
+      "special_values": [
+        {
+          "key": "auto",
+          "label": "Auto",
+          "value": -1
+        }
+      ],
+      "ui_type": "named_range"
+    },
+    {
+      "default": "auto",
+      "description": "Choose the total enemies across each arena when Enemy Count is Auto.\n\n100%: Keep the original total. 120%: Add up to 20% through finite spawn events.\nMaintained enemies keep their original active counts and replenishment quotas.\nAuto: Use the selected enemy preset.",
+      "display_name": "Enemy Length",
+      "group": "Game Options",
+      "key": "enemy_length",
+      "maximum": 10000,
+      "minimum": 100,
+      "source_class": "EnemyLength",
       "special_values": [
         {
           "key": "auto",
@@ -2791,7 +2809,7 @@
         }
       ],
       "default": "preset",
-      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Keep at least the original count in every spawn request. Density can add enemies; Intensity guides their composition.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nEnemies enter through the fight's normal spawn events.",
+      "description": "Choose how to decide the number of randomized enemies in a fight.\n\nPreset: Use the selected enemy preset's count setting.\nAuto: Preserve original spawn requests. Length can add enemies over the fight; Density controls how many fight together.\nMultiplier: Multiply the fight's original enemy count using Enemy Count Multiplier.\nEnemies enter through the fight's normal spawn events.",
       "display_name": "Enemy Count",
       "group": "Game Options",
       "key": "enemy_count_mode",
@@ -9295,5 +9313,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "bd2c22ddc479ea5bf479f17b82be045c109c4b1fdf4e7e7663a69730abaca73f"
+  "source_sha256": "ad789334ab6dff49f5ba7145630f1b2ce90631f9c110015021f31a2e838044aa"
 }

@@ -1240,7 +1240,7 @@ class LauncherUI(QMainWindow):
             ("STARTING LOADOUT", ("starting_weapon", "special_weapon", "enhanced_melee_damage")),
             ("RANDOMIZATION", ("randomize_chainsaw", "randomize_dash", "include_weapon_mastery_challenges", "mastery_requirements", "include_slayer_gates", "include_secret_encounters")),
             ("RESOURCES", ("resource_profile", "praetor_suit_upgrades_in_pool", "item_pool_counts", "filler_weights", "trap_weights")),
-            ("ENEMIES", ("enemy_randomizer", "enemy_preset", "enemy_intensity_early", "enemy_intensity_late", "enemy_density", "enemy_variety", "progressive_difficulty", "easier_secret_encounters")),
+            ("ENEMIES", ("enemy_randomizer", "enemy_preset", "enemy_intensity_early", "enemy_intensity_late", "enemy_length", "enemy_density", "enemy_variety", "progressive_difficulty", "easier_secret_encounters")),
             ("KILLSANITY", ("killsanity", "kills_per_check", "killsanity_maximum_milestones")),
             ("COMBAT & QoL", ("campaign_difficulty", "logic_difficulty", "reveal_ap_locations_on_automap", "trap_percentage", "enabled_traps")),
             ("MULTIWORLD", ("progression_balancing", "accessibility", "local_items", "non_local_items", "death_link", "death_link_mode")),
@@ -1408,7 +1408,7 @@ class LauncherUI(QMainWindow):
             active = enabled
             if key in ("enemy_randomizer", "easier_secret_encounters"):
                 active = True
-            elif key in ("enemy_intensity_early", "enemy_density"):
+            elif key in ("enemy_intensity_early", "enemy_length", "enemy_density"):
                 active = enabled and not multiplier
             elif key == "enemy_intensity_late":
                 active = enabled and progressive and not multiplier

@@ -468,7 +468,8 @@
     "7770514": "Exultia - Soulsphere - Trenches Secret Wall",
     "7770515": "The Holt - Soulsphere - Crimson Forest Secret Wall",
     "7770516": "UAC Atlantica Facility - Soulsphere - Underwater Facility Secret",
-    "7770517": "Cultist Base - Soulsphere - Central Hub Secret"
+    "7770517": "Cultist Base - Soulsphere - Central Hub Secret",
+    "7770518": "Exultia - Soulsphere - Lava Secret Chamber"
   },
   "schema_version": 1,
   "source": "content/maps/*/locations.json + runtime.json"

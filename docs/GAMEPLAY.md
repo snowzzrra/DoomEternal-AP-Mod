@@ -29,19 +29,22 @@ attributes or special enemy limits to customize a preset.
 
 **Enemy Count: Multiplier** scales the original count: 200% requests twice as many
 enemies. **Auto** preserves at least the original count of each request and wave.
-**Density** can add bodies; **Intensity** changes the preference for stronger enemies.
-Density uses seeded rounding across each wave, so 110% aims for about 10% extra
-enemies without doubling every request for a single enemy. Each original request
-keeps its minimum count.
+**Length** sets the total finite enemies across an arena. **Density** changes how
+many can be alive together; **Intensity** changes the preference for stronger enemies.
+Hell's Vanguard adds up to 20% finite enemies, with at most two superheavies alive
+per arena. Icon's Wrath adds up to 30%, with up to three in large late arenas.
+Limited and unlimited ammunition replacements keep their original quotas.
 **Progressive Difficulty** raises the enemy mix gradually across whole missions,
-with a smaller rise between waves. Mission Access as Items starts with easier
-missions and gives each remaining mission its own step in the difficulty curve.
+with a smaller rise between waves. Mission Access as Items assigns missions
+different difficulty steps and favors earlier Access rewards for easier options.
 
 Health, damage, speed and size ranges use percentages: 100% is the usual value.
 Equal minimum and maximum values fix an attribute. An individual enemy's setting
 overrides the global range. Some scripted enemies and bosses keep their native behavior.
-Automatic progressive damage ranges reach at most 100% at the start and 125% at
-the end. Manually entered ranges take precedence.
+Automatic attributes start at 100%. Slayer's Path ends at up to 110% health,
+105% damage and 105% speed; Hell's Vanguard at 125%, 115% and 110%; Icon's Wrath
+at 135%, 120% and 110%. The two easier presets keep vanilla attributes.
+Manually entered ranges take precedence.
 
 **Special Enemy Limits** caps simultaneous randomized Marauders, Arch-viles,
 Spirits, Buff Totems and Screechers. Totems and Screechers share the Arch-vile

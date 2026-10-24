@@ -20,7 +20,7 @@ def catalog():
 
 
 def settings(**options):
-    return normalize_enemy_options({"enemy_size_variation_chance": 0,
+    return normalize_enemy_options({"enemies": {"revision": 5}, "enemy_size_variation_chance": 0,
         **{f"enemy_{name}": {"minimum": 100, "maximum": 100} for name in ("health", "damage", "speed", "size")},
         **options})
 
@@ -226,7 +226,7 @@ def test_campaign_curve_keeps_ammunition_and_defers_superheavies_until_later():
     from doom_eap.content.native_enemy_plan import _phase_bodies, AMMO_FODDER
     from doom_eap.content.enemy_plan import enemy_combat_cost
     source = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
-    options = normalize_enemy_options({'enemy_preset': 'hells_vanguard', 'enemy_variety': 100})
+    options = normalize_enemy_options({'enemies': {'revision': 5}, 'enemy_preset': 'hells_vanguard', 'enemy_variety': 100})
     candidates = sorted(s for s in source['species'] if options['weights'].get(s, 0) > 0)
     waves, costs = [], []
     for index in range(5):

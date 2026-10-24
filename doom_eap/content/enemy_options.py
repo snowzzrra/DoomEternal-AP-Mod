@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 5
+ENEMY_OPTIONS_REVISION = 6
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -54,6 +54,19 @@ ENEMY_RECIPES = {
                                  (90, 115, 95, 125), 0, (0, 0, 0, 0)),
     "pinata_party": EnemyRecipe((100, 150), 135, 55, (75, 135, 90, 180), (80, 120, 95, 145),
                                 (90, 110, 95, 120), 2, (100, 100, 50, 35)),
+}
+
+BALANCE_PRESETS = {
+    "uac_patrol": dict(groups=((85, 15, 0, 0), (70, 28, 1, 1)),
+                       attributes=(100, 100, 100), length=100, superheavy=1, combined=1),
+    "sentinel_training": dict(groups=((70, 30, 0, 0), (55, 40, 4, 1)),
+                              attributes=(100, 100, 100), length=100, superheavy=1, combined=1),
+    "slayers_path": dict(groups=((60, 40, 0, 0), (40, 49, 9, 2)),
+                         attributes=(110, 105, 105), length=100, superheavy=2, combined=1),
+    "hells_vanguard": dict(groups=((55, 45, 0, 0), (32, 50, 14, 4)),
+                           attributes=(125, 115, 110), length=120, superheavy=2, combined=2),
+    "icons_wrath": dict(groups=((50, 50, 0, 0), (26, 50, 18, 6)),
+                        attributes=(135, 120, 110), length=130, superheavy=3, combined=3),
 }
 
 
@@ -116,7 +129,7 @@ def _attribute(raw, name, automatic, progressive):
 
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, 4, ENEMY_OPTIONS_REVISION):
+    if revision not in (2, 3, 4, 5, ENEMY_OPTIONS_REVISION):
         raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
@@ -124,6 +137,7 @@ def normalize_enemy_options(raw):
     if not isinstance(preset, str) or preset not in ENEMY_RECIPES:
         raise ValueError(f"Unknown Enemy Preset: {preset!r}")
     recipe = ENEMY_RECIPES[preset]
+    balance = BALANCE_PRESETS.get(preset) if revision >= 6 else None
     enabled = _toggle(raw, "enemy_randomizer", True)
     progressive = _toggle(raw, "progressive_difficulty", True)
     dlc = _toggle(raw, "use_dlc_content", True)
@@ -136,7 +150,8 @@ def normalize_enemy_options(raw):
                  for index, end in enumerate(("early", "late"))]
     if not progressive:
         intensity[1] = intensity[0]
-    density = _recipe_number(raw, "enemy_density", recipe.density, 1)
+    density = _recipe_number(raw, "enemy_density", 100 if balance else recipe.density, 1)
+    length = _recipe_number(raw, "enemy_length", balance['length'] if balance else max(100, density), 100)
     variety = _recipe_number(raw, "enemy_variety", recipe.variety, 0, 100)
     multiplier = _recipe_number(raw, "enemy_count_multiplier", 500 if preset == "oops_all_imps" else 100, 1)
     eligible = [species for species in SPECIES_IDS if dlc or species not in DLC_SPECIES]
@@ -169,7 +184,10 @@ def normalize_enemy_options(raw):
     size_groups = set()
     for name in ("health", "damage", "speed", "size"):
         automatic = (100, 100, 100, 100) if name == "size" else getattr(recipe, name)
-        if revision >= 5 and progressive and name != "size":
+        if balance and name != "size":
+            ceiling = balance['attributes'][("health", "damage", "speed").index(name)]
+            automatic = (100, 100 if progressive else ceiling, 100, ceiling)
+        elif revision >= 5 and progressive and name != "size":
             ceiling = 120 if name == "health" else 100
             automatic = (min(automatic[0], ceiling), min(automatic[1], ceiling), *automatic[2:])
             if name == 'damage':
@@ -191,6 +209,12 @@ def normalize_enemy_options(raw):
                    "archvile": max(1, recipe.combined_special),
                    "spirit": max(1, recipe.combined_special),
                    "combined_special": recipe.combined_special * 2, **overrides}
+    if balance:
+        limits = {"marauder": 0, "archvile": 0, "spirit": 0, "combined_special": 0, **overrides}
+        late_limits = {"marauder": 1, "archvile": 1, "spirit": 1,
+                       "combined_special": balance['combined'], **overrides}
+        if not progressive:
+            limits = dict(late_limits)
     for endpoint in (limits, late_limits):
         if "combined_special" not in overrides:
             endpoint["combined_special"] = min(endpoint["combined_special"],
@@ -201,6 +225,7 @@ def normalize_enemy_options(raw):
     if not progressive:
         late_limits = dict(limits)
     return {"revision": revision, "enabled": enabled, "progressive": progressive,
+            **({"balance_preset": preset if balance else None, "length": length} if revision >= 6 else {}),
             "intensity": intensity, "density": density, "variety": variety, "count_mode": count_mode,
             "count_multiplier": multiplier, "weights": weights, "attributes": attributes,
             "size_variation_chance": chance, "size_variation_exclusions": size_exclusions,
@@ -218,6 +243,7 @@ def enemy_options_for_editing(raw):
         **{f"enemy_{key}": values[key] for key in (
             "density", "variety", "count_mode", "count_multiplier", "weights",
             "size_variation_chance")},
+        "enemy_length": values.get("length", max(100, values['density'])),
         "enemy_special_limits": dict(raw.get("enemy_special_limits", {})),
         "enemy_size": dict(raw.get("enemy_size", {})),
     }

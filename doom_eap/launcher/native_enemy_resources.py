@@ -40,9 +40,23 @@ def native_resource_maps(plan):
 
 def prepare_native_resource_banks(base, plan, roots=None, *, hub_world_text=False):
     requested = native_resource_maps(plan)
+    if roots is not None and not isinstance(roots, dict):
+        raise ValueError('Native resource roots must be a map-to-resource mapping')
+    boon_maps = {target for target, values in (roots or {}).items() if isinstance(values, list)
+                 and any(isinstance(value, str) and value.startswith('pickup/powerup/') for value in values)}
+    if boon_maps:
+        catalog = (plan or {}).get('maps') or json.loads(
+            files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())['maps']
+        supported = {stage['runtime_map'] for stage in catalog.values()} | {'game/hub/hub'}
+        if not boon_maps <= supported:
+            raise ValueError('Unknown powerup resource destination')
+    for target in boon_maps:
+        requested.setdefault(target, set()).add('game/sp/e2m2_base/e2m2_base')
     if hub_world_text:
-        requested['game/hub/hub'] = {'game/dlc2/e5m1_spear/e5m1_spear', 'game/horde/e6m3_mcity_horde/e6m3_mcity_horde'}
-        roots = {**(roots or {}), 'game/hub/hub': ['gui/text', 'swf/guientity/generic_text.swf']}
+        requested.setdefault('game/hub/hub', set()).update(
+            {'game/dlc2/e5m1_spear/e5m1_spear', 'game/horde/e6m3_mcity_horde/e6m3_mcity_horde'})
+        roots = {**(roots or {}), 'game/hub/hub': [*(roots or {}).get('game/hub/hub', ()),
+                                                  'gui/text', 'swf/guientity/generic_text.swf']}
     path = base / "packagemapspec.json"
     if not path.is_file() and not requested:
         return {}, {"maps": {}}
@@ -99,6 +113,7 @@ def prepare_native_resource_banks(base, plan, roots=None, *, hub_world_text=Fals
     source_hashes = {path.name: hashlib.sha256(original).hexdigest()}
     if requested:
         expected = {stage['runtime_map'] for stage in (plan or {}).get('maps', {}).values() if stage['recipes']}
+        expected.update(boon_maps)
         if hub_world_text: expected.add('game/hub/hub')
         if (not isinstance(roots, dict) or set(roots) != expected
                 or any(not isinstance(values, list) or any(not isinstance(v, str) for v in values)

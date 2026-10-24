@@ -1,4 +1,4 @@
-"""Capture native cache associations for the frozen enemy body catalog on Windows."""
+"""Capture native cache associations for enemies and powerup pickups on Windows."""
 import argparse
 import ctypes
 import hashlib
@@ -36,6 +36,17 @@ def capture(game_root, output):
         models = {v for v in tokens if v.startswith('md6def/') and v.endswith('.md6')}
         scopes = {actor['inherit'].rsplit('/', 1)[-1]} | {m.split('/')[-3] for m in models}
         bodies.append((species, catalog['maps'][ref['map_key']]['runtime_map'], models, tokens, scopes, ref))
+    powerups = {}
+    source = (root / 'vanillamaps/e2m2_base.map').read_text(encoding='utf-8')
+    for effect, entity in (('berserk', 'pickups_pickup_powerup_berserk_2'),
+                           ('onslaught', 'pickups_pickup_powerup_onslaught_2'),
+                           ('overdrive', 'pickups_pickup_powerup_overdrive_1')):
+        start, end = find_entity_block_bounds(source, entity)
+        block = source[start:end]
+        ref = dict(map_key='e2m2_base', entity=entity, sha256=hashlib.sha256(block.strip().encode()).hexdigest())
+        tokens = {json.loads(m[0]) for m in re.finditer(r'"(?:[^"\\]|\\.)*"', block)}
+        powerups[effect] = ref['sha256']
+        bodies.append(('powerup/' + effect, catalog['maps']['e2m2_base']['runtime_map'], set(), tokens, {effect}, ref))
     needed = set().union(by_map['common'], *(by_map[runtime] for _, runtime, _, _, _, _ in bodies))
     indices = {n: ResourceIndex(base / spec['files'][n]['name']) for n in sorted(needed)}
     raw_masks = read_masks(base)
@@ -100,6 +111,7 @@ def capture(game_root, output):
         print(species, 'cache entries', len(ordered), flush=True)
     document = {'schema_version': 1, 'game_image_sha256': hashlib.sha256((game_root / 'DOOMEternalx64vk.exe').read_bytes()).hexdigest(),
                 'source_tables': {key: {'bank': v['bank'], 'sha256': v['sha256']} for key, v in documents.items()},
+                'powerups': {effect: profiles.pop(sha) for effect, sha in powerups.items()},
                 'bodies': dict(sorted(profiles.items()))}
     output.write_text(json.dumps(document, sort_keys=True, separators=(',', ':')) + '\n', encoding='utf-8', newline='\n')
     print('Native enemy asset snapshot:', len(profiles), 'bodies;', output.stat().st_size, 'bytes')
