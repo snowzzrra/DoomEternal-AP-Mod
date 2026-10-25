@@ -8,9 +8,9 @@ from pathlib import Path, PurePosixPath
 
 ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
-       "campaign_menu": 1, "inventory": 7, "arsenal": 1, "runes": 1,
+       "campaign_menu": 1, "inventory": 8, "arsenal": 1, "runes": 1,
        "special": 1, "deathlink": 1, "automap": 1, "commands": 1,
-       "combat": 2, "combat_presentation": 1, "enemy_movement": 2, "enemy_supply": 1, "enemy_limits": 1, "enemy_tracking": 1}
+       "combat": 2, "combat_presentation": 1, "enemy_movement": 2, "enemy_supply": 1, "enemy_limits": 2, "enemy_tracking": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
@@ -71,7 +71,7 @@ def validate_manifest(value):
     if key[:2] != (1, 1) or not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
     if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list) or any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
-           (number,) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
+           ((7, 8) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")

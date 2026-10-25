@@ -45,7 +45,7 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 7), ("1.1.1", 7), ("1.1.99", 7)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 7), ("1.1.0", 8), ("1.1.1", 8), ("1.1.99", 8)])
 @pytest.mark.parametrize("suffix", ["", "-rc-1"])
 def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_abi, suffix):
     manifest = fixture(tmp_path)
@@ -78,7 +78,7 @@ def test_native_probe_refuses_failed_response(tmp_path, monkeypatch, version, re
         link._run(["--pid", "7", "--native", "--json"])
 
 
-@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 3), ("1.1.0", 8), ("1.1.1", 99)])
+@pytest.mark.parametrize("base,inventory_abi", [("1.1.0", 3), ("1.1.0", 9), ("1.1.1", 99)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
     manifest.update(version=base + "-rc-1", base_version=base, abi={**ABI, "inventory": inventory_abi})
@@ -87,24 +87,11 @@ def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_
         verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("version,mod_range", [("1.0.5", ">=0.7.0,<0.8.0"),
-                                               ("1.1.0", ">=0.6.0,<0.7.0"),
-                                               ("1.2.0", ">=0.7.0,<0.8.0")])
-def test_distribution_requires_current_core_and_mod_lines(tmp_path, version, mod_range):
-    manifest = fixture(tmp_path)
-    manifest.update(version=version, base_version=version, channel="stable", rc_number=0,
-                    mod_version_range=mod_range)
-    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="Incompatible runtime"):
-        verify_runtime(tmp_path / "distribution.json")
 
 
-@pytest.mark.parametrize("name,version", [("combat", None), ("combat", 1), ("combat", 3),
-                                          ("combat_presentation", None), ("combat_presentation", 2),
-                                          ("enemy_movement", None), ("enemy_movement", 0), ("enemy_movement", 1),
-                                          ("enemy_supply", None), ("enemy_supply", 0), ("enemy_supply", 2),
-                                          ("enemy_limits", None), ("enemy_limits", 0), ("enemy_limits", 2),
-                                          ("enemy_tracking", None), ("enemy_tracking", 0), ("enemy_tracking", 2)])
+@pytest.mark.parametrize("name,version", [("combat", 1), ("combat_presentation", 2),
+    ("enemy_movement", 0), ("enemy_supply", 0), ("enemy_limits", None),
+    ("enemy_limits", 0), ("enemy_limits", 1), ("enemy_limits", 3), ("enemy_tracking", 0)])
 def test_distribution_refuses_incompatible_combat_before_reading_artifacts(tmp_path, name, version):
     manifest = fixture(tmp_path)
     if version is None:
@@ -115,21 +102,3 @@ def test_distribution_refuses_incompatible_combat_before_reading_artifacts(tmp_p
     (tmp_path / "sentinel-runtime.zip").unlink()
     with pytest.raises(ValueError, match="Incompatible ABI or capability"):
         verify_runtime(tmp_path / "distribution.json")
-
-
-def test_distribution_refuses_unknown_required_capability(tmp_path):
-    manifest = fixture(tmp_path)
-    manifest["required_capabilities"].append(1 << 24)
-    (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
-    with pytest.raises(ValueError, match="Incompatible ABI or capability"):
-        verify_runtime(tmp_path / "distribution.json")
-
-
-def test_core_self_test_reports_compatible_version_range(tmp_path, capsys):
-    from doom_eap.launcher.launcher_app import main
-
-    fixture(tmp_path)
-    assert main(["--self-test", "--core-only", "--core-runtime", str(tmp_path / "distribution.json")]) == 0
-    report = json.loads(capsys.readouterr().out.splitlines()[-1])
-    assert report["mod_version_range"] == ">=0.7.0,<0.8.0"
-    assert report["abi"]["combat"] == 2

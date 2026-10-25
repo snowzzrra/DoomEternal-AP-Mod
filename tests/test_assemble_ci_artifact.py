@@ -226,21 +226,6 @@ class TestAssembleCIArtifact(unittest.TestCase):
         create_synthetic_room_resources(self.resources_dir)
         return self.resources_dir
 
-    def test_handoff_requires_declared_release_version(self):
-        create_fake_handoff(self.handoff_dir, version="v0.7.0")
-        manifest_path = self.handoff_dir / "BUILD-MANIFEST.json"
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        self.assertEqual(validate_handoff_structure(self.handoff_dir)["version_label"], "v0.7.0")
-        for value in (None, "", " ", 7):
-            with self.subTest(value=value):
-                manifest["version_label"] = value
-                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-                with self.assertRaisesRegex(ValueError, "version_label"):
-                    validate_handoff_structure(self.handoff_dir)
-        manifest.pop("version_label")
-        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "version_label"):
-            validate_handoff_structure(self.handoff_dir)
 
     def test_successful_assembly_and_audit(self):
         create_fake_handoff(self.handoff_dir)

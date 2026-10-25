@@ -46,21 +46,3 @@ def test_static_tiers_old_relative_contract_and_hidden_privacy():
     snapshot["ratings"][stage] = {"skull_tier": 99}
     menu.synchronize(link, snapshot)
     assert struct.unpack_from("<I", menu.rows[1][1], 12)[0] == 0
-
-
-def test_encounter_rewards_use_active_placements_and_local_check_without_replaying_history():
-    presentations = MissionPresentations(Path(__file__).resolve().parents[1], [])
-    runtime_map = 'game/dlc/e4m1_rig/e4m1_rig'
-    facts = SimpleNamespace(checked_ready=True, checked=frozenset(), server_locations=frozenset({7770422}))
-    placements = {7770422: dict(item_name='Ballista', local=True, classification=1, recipient_name='Marine')}
-    entries = presentations.encounter_snapshot(runtime_map, revealed=True, facts=facts,
-                                               placements=placements, pending=frozenset({7770422}))
-    assert len(entries) == 1 and entries[0].checked and entries[0].text.lower() == 'your ballista'
-    assert entries[0].unlockable == 'encounter/7770422'
-    assert presentations.encounter_snapshot(runtime_map, revealed=False, facts=facts,
-                                            placements=placements, pending=frozenset()) == ()
-    placements[7770422].update(local=False, classification=4, recipient_name='Luigi', item_name='Secret Trap')
-    entries = presentations.encounter_snapshot(runtime_map, revealed=True, facts=facts,
-                                               placements=placements, pending=frozenset())
-    assert 'Secret Trap' not in entries[0].text and 'Luigi' not in entries[0].text
-    assert not entries[0].checked

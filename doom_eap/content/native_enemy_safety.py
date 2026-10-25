@@ -7,6 +7,7 @@ SCRIPTED_BOSS_ACTORS = {'e1m4_boss': frozenset({'boss_intro_ai_superheavy_doomhu
 CINEMATIC_BOSS_ACTORS = {'e2m2_base': frozenset({'confront_samuel_ai'})}
 FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a_target_spawn_42'})}
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
+FLYING_SUMMONS = {'e4m3_mcity': frozenset({'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL'})}
 SMALL_GROUND_ENEMIES = frozenset({'imp', 'hell_soldier', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper'})
 GROUND_ENCOUNTERS = {
     ('e1m4_boss', 'train_encounter_manager_intro_train_1'): SMALL_GROUND_ENEMIES,
@@ -18,6 +19,11 @@ GROUND_ENCOUNTERS = {
 def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_capabilities):
     from .native_enemy_plan import _body_hitpoints, native_body_name
 
+    before = body['species']
+    limits = body.get('population_limits', {})
+    if before == 'spirit' and species == 'cacodemon' and limits.get('strict'):
+        body['population_limits'] = {**limits, 'counter': 'spirit', 'heavy': min(limits['maximum'],
+            limits['heavy'] + limits.get('species', {}).get('spirit', 0))}
     donor = catalog['species'][species]
     if speed_capabilities[species] != 'qualified':
         body['attributes']['speed_percent'] = 100
@@ -38,9 +44,10 @@ def project_native_safety(plan, enemies):
 
     if plan is None:
         return None
-    affected = (set(SCRIPTED_BOSS_ACTORS) | set(CINEMATIC_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS)) & set(plan['maps'])
+    affected = (set(SCRIPTED_BOSS_ACTORS) | set(CINEMATIC_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS) | set(FLYING_SUMMONS)) & set(plan['maps'])
     affected.update(key for key, stage in plan['maps'].items()
-                    if any(body['species'] == 'cursed_prowler' for recipe in stage['recipes'] for body in recipe['bodies']))
+                    if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'}
+                           for recipe in stage['recipes'] for body in recipe['bodies']))
     if not affected:
         return plan
     result = deepcopy(plan)
@@ -57,25 +64,36 @@ def project_native_safety(plan, enemies):
             if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
                 stage.setdefault('passthrough_actors', []).append(binding['entity'])
                 changes.append({'origin': recipe['id'], 'action': 'preserve_scripted_boss'})
-            if binding.get('reference') not in points or all(body['species'] in FLYING_REPLACEMENTS for body in recipe['bodies']):
+            flying = (binding.get('reference') in points or (binding['mode'] == 'summon' and
+                      recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ())))
+            if not flying or all(body['species'] in FLYING_REPLACEMENTS for body in recipe['bodies']):
                 continue
             stage.setdefault('compatibility_recipes', []).append(deepcopy(recipe))
             for ordinal, body in enumerate(recipe['bodies']):
                 if body['species'] in FLYING_REPLACEMENTS:
                     continue
-                species = sample_species(enemies, FLYING_REPLACEMENTS, seed=plan['seed'],
+                enabled = [species for species in FLYING_REPLACEMENTS if enemies['weights'][species] > 0]
+                species = (sample_species(enemies, enabled, seed=plan['seed'],
                                          instance_key=[recipe['id'], ordinal, 'flying_spawn'])
+                           if enabled else 'cacodemon')
                 before = body['species']
                 _replace_species(body, species, recipe, ordinal, settings, catalog, speed_capabilities)
                 changes.append({'origin': recipe['id'], 'action': 'flying_spawn', 'before': before, 'after': species})
         for recipe in stage['recipes']:
-            if any(body['species'] == 'cursed_prowler' for body in recipe['bodies']):
+            if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'} for body in recipe['bodies']):
                 alternate = deepcopy(recipe)
                 for ordinal, body in enumerate(alternate['bodies']):
-                    if body['species'] == 'cursed_prowler':
-                        _replace_species(body, 'prowler', alternate, ordinal, settings, catalog, speed_capabilities)
+                    replacement = {'cursed_prowler': 'prowler', 'spirit': 'cacodemon',
+                                   'stone_imp': 'imp', 'armored_baron': 'baron'}.get(body['species'])
+                    if replacement:
+                        _replace_species(body, replacement, alternate, ordinal, settings, catalog, speed_capabilities)
                 stage.setdefault('counter_recipes', []).append(alternate)
-                changes.append({'origin': recipe['id'], 'action': 'blood_punch_fallback', 'after': 'prowler'})
+                for species, replacement, action in (('cursed_prowler', 'prowler', 'blood_punch_fallback'),
+                        ('spirit', 'cacodemon', 'microwave_fallback'),
+                        ('stone_imp', 'imp', 'stone_counter_fallback'),
+                        ('armored_baron', 'baron', 'armored_counter_fallback')):
+                    if any(body['species'] == species for body in recipe['bodies']):
+                        changes.append({'origin': recipe['id'], 'action': action, 'after': replacement})
     if not changes:
         return plan
     result['source_fingerprint'] = plan['fingerprint']
@@ -119,11 +137,18 @@ OPENING_PREFIXES = {
     'e1m1_intro': ('barge_', 'mech_', 'corner_street_', 'crack_building_'),
     'e1m2_war': ('capitol_', 'tutorial_', 'extraction_'),
 }
+OPENING_OWNERS = {
+    'e5m2_earth': frozenset({'ai_encounter_manager_dlc1_opening'}),
+}
 
 
-def opening_source(stage, source):
+def opening_source(stage, source, *, verified=False):
+    binding = source.get('binding') or {}
+    if verified and stage == 'e1m1_intro' and binding.get('owner') == 'mech_street_encounter_manager_amb_caco':
+        return False
+    if verified and stage in OPENING_OWNERS:
+        return any(binding.get(field) in OPENING_OWNERS[stage] for field in ('owner', 'entity'))
     if stage in OPENING_REGIONS and stage not in OPENING_PREFIXES:
         return True
-    binding = source.get('binding') or {}
     return any(binding.get(field, '').startswith(OPENING_PREFIXES.get(stage, ()))
                for field in ('owner', 'entity'))

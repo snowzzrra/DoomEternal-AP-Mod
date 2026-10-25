@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 6
+ENEMY_OPTIONS_REVISION = 7
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -129,7 +129,7 @@ def _attribute(raw, name, automatic, progressive):
 
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, 4, 5, ENEMY_OPTIONS_REVISION):
+    if revision not in (2, 3, 4, 5, 6, ENEMY_OPTIONS_REVISION):
         raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
@@ -151,7 +151,8 @@ def normalize_enemy_options(raw):
     if not progressive:
         intensity[1] = intensity[0]
     density = _recipe_number(raw, "enemy_density", 100 if balance else recipe.density, 1)
-    length = _recipe_number(raw, "enemy_length", balance['length'] if balance else max(100, density), 100)
+    length = _recipe_number(raw, "enemy_length", 100 if balance and revision >= 7 else
+                            balance['length'] if balance else max(100, density), 100)
     variety = _recipe_number(raw, "enemy_variety", recipe.variety, 0, 100)
     multiplier = _recipe_number(raw, "enemy_count_multiplier", 500 if preset == "oops_all_imps" else 100, 1)
     eligible = [species for species in SPECIES_IDS if dlc or species not in DLC_SPECIES]
@@ -185,7 +186,8 @@ def normalize_enemy_options(raw):
     for name in ("health", "damage", "speed", "size"):
         automatic = (100, 100, 100, 100) if name == "size" else getattr(recipe, name)
         if balance and name != "size":
-            ceiling = balance['attributes'][("health", "damage", "speed").index(name)]
+            ceiling = 100 if revision >= 7 and preset == 'slayers_path' else balance['attributes'][
+                ("health", "damage", "speed").index(name)]
             automatic = (100, 100 if progressive else ceiling, 100, ceiling)
         elif revision >= 5 and progressive and name != "size":
             ceiling = 120 if name == "health" else 100
@@ -226,6 +228,7 @@ def normalize_enemy_options(raw):
         late_limits = dict(limits)
     return {"revision": revision, "enabled": enabled, "progressive": progressive,
             **({"balance_preset": preset if balance else None, "length": length} if revision >= 6 else {}),
+            **({"special_limit_overrides": dict(overrides)} if revision >= 7 else {}),
             "intensity": intensity, "density": density, "variety": variety, "count_mode": count_mode,
             "count_multiplier": multiplier, "weights": weights, "attributes": attributes,
             "size_variation_chance": chance, "size_variation_exclusions": size_exclusions,

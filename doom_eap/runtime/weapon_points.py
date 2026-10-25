@@ -339,27 +339,66 @@ class SentinelWeaponPoints:
     def observe_blood_punch(self):
         body = struct.pack("<5I4B", *([0] * 9))
         result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
-        if (result.get("inventory_abi") not in (4, 5, 6, 7) or result.get("outcome") != 1
+        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("outcome") != 1
                 or result.get("flags", 0) & 3 != 3 or result.get("upgrades_after") == 0xffffffff):
             raise WeaponPointsBlocked(f"Blood Punch native observation is unknown or incompatible: {result}")
         return (result["upgrades_after"] >> 11) & 15
 
     def observe_inventory(self):
         body = struct.pack("<5I4B", *([0] * 9))
-        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
+        trace = []
+        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body, trace=trace)
+        if trace:
+            scope = trace[0]["response"]
+            result["_observation_scope"] = tuple(str(scope[key]) for key in
+                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
         if result.get("inventory_abi") == 4:
             result["dash_before"] = result["dash_after"] = 255
         if result.get("inventory_abi") in (4, 5):
             result["slayer_key_before"] = result["slayer_key_after"] = 255
         if result.get("inventory_abi") in (4, 5, 6):
             result["frag_grenade_before"] = result["frag_grenade_after"] = 255
-        if (result.get("inventory_abi") not in (4, 5, 6, 7) or result.get("kind") != 0
+        if result.get("inventory_abi") in (4, 5, 6, 7):
+            result["perks_known"] = result["perks_owned"] = 0
+            result["flame_belch_after"] = result["blood_punch_after"] = 255
+        if result.get("inventory_abi") == 8:
+            try:
+                values = tuple(result[name] for name in ("perks_known", "perks_owned"))
+                if any(type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value))
+                       for value in values):
+                    raise ValueError("invalid integer")
+                known, owned = map(int, values)
+            except (KeyError, ValueError, TypeError) as error:
+                raise WeaponPointsBlocked("Native permanent-perk observation is malformed") from error
+            if not (0 <= owned <= known < 1 << 64) or owned & ~known:
+                raise WeaponPointsBlocked("Native permanent-perk observation is malformed")
+            result["perks_known"], result["perks_owned"] = known, owned
+        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("kind") != 0
                 or result.get("outcome") != 1 or result.get("flags", 0) & 3 != 3
                 or result.get("ice_bomb_after") not in (0, 1, 255)
                 or result.get("dash_after") not in (0, 1, 255)
                 or result.get("slayer_key_after") not in (0, 1, 255)
-                or result.get("frag_grenade_after") not in (0, 1, 255)):
+                or result.get("frag_grenade_after") not in (0, 1, 255)
+                or result.get("flame_belch_after") not in (0, 1, 255)
+                or result.get("blood_punch_after") not in (0, 1, 255)):
             raise WeaponPointsBlocked(f"Native inventory observation is unknown or incompatible: {result}")
+        return result
+
+    def observe_special_inventory(self):
+        body = struct.pack("<IIIIIIIQII", *([0] * 10))
+        trace = []
+        result = self._execute_typed(65536, "--special", 37, 38, 40, body, trace=trace)
+        if trace:
+            scope = trace[0]["response"]
+            result["_observation_scope"] = tuple(str(scope[key]) for key in
+                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
+        known = result.get("native_state_known")
+        if (result.get("outcome") not in (0, 1) or result.get("kind") != 0
+                or result.get("flags", 0) & 3 != 3 or type(known) is not int or not 0 <= known <= 31
+                or any(known & bit and (type(result.get(field)) is not int or not 0 <= result[field] <= maximum)
+                       for bit, field, maximum in ((1, "native_crucible", 1), (2, "native_hammer", 1),
+                                                   (4, "native_hammer_perks", 3)))):
+            raise WeaponPointsBlocked(f"Native Special observation is unavailable: {result}")
         return result
 
     def ensure_masteries(self, mask):

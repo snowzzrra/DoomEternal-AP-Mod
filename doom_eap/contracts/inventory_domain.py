@@ -76,7 +76,14 @@ SPECIAL_WEAPON_ITEM_IDS = frozenset({
     7770902,  # progressive sentinel hammer
 })
 
-# Persistent upgrade item IDs (Support Runes and Slayer Gate Keys)
+PERMANENT_PERK_ITEM_IDS = frozenset({
+    7770058, 7770059, 7770060, 7770061, 7770062, 7770064, 7770071,
+    7770073, 7770075, 7770077, 7770079, 7770081, 7770083,
+    7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095,
+    *range(7770097, 7770105), *range(7770106, 7770119),
+})
+
+# persistent upgrades, registered runes and map-local keys
 PERSISTENT_UPGRADE_ITEM_IDS = frozenset({
     7770145,  # support rune: break blast
     7770146,  # support rune: desperate punch
@@ -89,7 +96,7 @@ PERSISTENT_UPGRADE_ITEM_IDS = frozenset({
     7770153,  # slayer key: arc complex
     7770154,  # slayer key: phobos / mars core
     7770155,  # slayer key: taras nabad
-})
+}) | PERMANENT_PERK_ITEM_IDS
 
 ALL_PERSISTENT_DOMAIN_IDS = frozenset(
     WEAPON_ITEM_IDS
@@ -183,6 +190,15 @@ class InventoryObservation:
         UNKNOWN is never interpreted as missing.
         """
         return self.get_state(item_id) == MISSING
+
+    def confirms_repair(self, item_id: int, stage: int) -> bool:
+        if not self.is_owned(item_id):
+            return False
+        if item_id in CAPACITY_ITEM_IDS:
+            return self.get_observed_stage(item_id) > stage
+        if item_id in {7770901, 7770902}:
+            return self.get_observed_stage(item_id) >= stage
+        return True
 
     def is_stale_for(
         self,

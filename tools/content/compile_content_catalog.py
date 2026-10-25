@@ -267,14 +267,24 @@ def _compile_catalog(
                          (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_plan.py"),
                          (catalog.root / "doom_eap/content/native_enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_balance.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_balance.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_safety.py"),
                          (catalog.root / "doom_eap/content/native_enemy_safety.py").read_bytes())
+    write_bytes_artifact(output.with_name("vanilla_enemy_profiles.py"),
+                         (catalog.root / "doom_eap/content/vanilla_enemy_profiles.py").read_bytes())
     from tools.maps.native_enemy_inventory import build_native_recipe_catalog
 
     native = build_native_recipe_catalog(catalog.root)
     native_catalog = json.dumps(native, sort_keys=True, separators=(",", ":")) + "\n"
     write_artifact(output.with_name("native_enemy_catalog.json"), native_catalog)
     write_artifact(catalog.root / "doom_eap/content/native_enemy_catalog.json", native_catalog)
+    from tools.maps.vanilla_enemy_profiles import build_vanilla_profiles
+
+    vanilla_profiles = json.dumps(build_vanilla_profiles(catalog.root, native),
+                                 sort_keys=True, separators=(",", ":")) + "\n"
+    write_artifact(output.with_name("vanilla_enemy_profiles.json"), vanilla_profiles)
+    write_artifact(catalog.root / "doom_eap/content/vanilla_enemy_profiles.json", vanilla_profiles)
     write_bytes_artifact(output.with_name("enemy_species.py"),
                          (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_species.json"),

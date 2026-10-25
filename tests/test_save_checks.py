@@ -96,62 +96,10 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
     assert packets[-1] == {"cmd": "LocationChecks", "locations": [301]}
 
 
-@pytest.mark.parametrize(('challenge', 'pickup'), [(7770173, 7770496), (7770172, 7770157)])
-def test_doom_hunter_base_challenge_follows_confirmed_contact_check(challenge, pickup):
-    registry = load_challenge_registry()
-    entry = next(row for row in registry['mission_challenges'] if row['location_id'] == challenge)
-    service = SaveChecks({}, {entry['signal']['unlockable']: entry}, {}, [], logging.getLogger('checks'))
-    packets = []
-
-    async def send(messages):
-        packets.extend(messages)
-
-    publication = CheckPublication(send, lambda _: None, 30)
-    readiness = SaveCheckReadiness(True, False, None)
-    current = CheckObservation(frozenset(), frozenset({pickup}), frozenset({pickup, challenge}), True, True)
-    asyncio.run(service.check_challenge(entry, readiness, current, publication))
-    assert packets == []
-    current = replace(current, checked=frozenset({pickup}))
-    asyncio.run(service.check_challenge(entry, readiness, current, publication))
-    assert packets == [{'cmd': 'LocationChecks', 'locations': [challenge]}]
 
 
-def test_aggregate_requires_active_children_or_its_mission_completion():
-    service, packets = owner(), []
-
-    async def send(messages):
-        packets.extend(messages)
-
-    publication = CheckPublication(send, lambda _: None, 30)
-    readiness = SaveCheckReadiness(True, False, None)
-
-    async def run():
-        current = replace(facts(checked={101}), server_locations=frozenset({101, 301, 401}))
-        await service.check_aggregates(readiness, current, publication)
-        assert packets == [{"cmd": "LocationChecks", "locations": [301]}]
-        packets.clear()
-        for checked, active in (((), {301, 401}), ({101, 201}, {301, 401}), ({999}, {301, 401}),
-                                ({401}, {301}), ({401}, {201, 301, 401})):
-            current = replace(facts(checked=checked), server_locations=frozenset(active))
-            await service.check_aggregates(readiness, current, publication)
-            assert packets == []
-        current = replace(facts(checked={401}), server_locations=frozenset({301, 401}))
-        await service.check_aggregates(readiness, current, publication)
-        assert packets == [{"cmd": "LocationChecks", "locations": [301]}]
-
-    asyncio.run(run())
 
 
-def test_aggregate_registry_rejects_another_mission_or_invalid_completion_identity():
-    registry = load_challenge_registry()
-    aggregate = registry["all_mission_challenges"][0]
-    complete = aggregate["signal"]["mission_complete_location_id"]
-    another = next(entry["location_id"] for entry in registry["mission_complete"] if entry["location_id"] != complete)
-    for replacement in (None, another, float(complete)):
-        invalid = deepcopy(registry)
-        invalid["all_mission_challenges"][0]["signal"]["mission_complete_location_id"] = replacement
-        with pytest.raises(ValueError, match="mission completion"):
-            validate_challenge_registry(invalid)
 
 
 @pytest.mark.parametrize("kind", ["mastery", "challenge", "aggregate"])

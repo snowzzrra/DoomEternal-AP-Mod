@@ -238,6 +238,8 @@ def _entrance_landings(recipes, records):
             bounds[axis][0] <= positions[name][axis] <= bounds[axis][1] for axis in ('x','y'))}
         fallback_owners.add(owner)
     choices = {}
+    portal_floors = {'underwater_facility_arena_target_spawn_154': 'underwater_facility_arena_target_spawn_156',
+                     'underwater_facility_arena_target_spawn_155': 'underwater_facility_arena_target_spawn_160'}
     for recipe in recipes:
         for name in points[recipe['binding'].get('reference', '')]:
             edit = records[name]['edit']
@@ -253,6 +255,13 @@ def _entrance_landings(recipes, records):
                     'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION',
                     'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES', 'AIOVERRIDE_SPAWN_ANIM_IDLE',
                     'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}:
+                continue
+            if name in portal_floors:
+                target = portal_floors[name]
+                # the portal animation's name does not describe its final floor position.
+                if target not in records or not ground(target, True):
+                    raise ValueError('Atlantica portal floor differs from the source')
+                choices.setdefault(name, []).append(((0, target), target))
                 continue
             if not edit.get('bindInfo') and _entrance_endpoint(edit) is not None:
                 choices.setdefault(name, []).append(((0, name), name))
@@ -494,6 +503,15 @@ def _post_bfg_awareness(block):
     return _edit(block, path, {**events, 'num': 7, 'item[6]': {'eventCall': call}})
 
 
+def _source_fallback_definition(record):
+    if record['class'] != 'idTarget_Spawn':
+        raise ValueError('Native fallback source is not a spawn point')
+    name = 'ap_v070_source_' + _functional_token(record['name'])
+    settings = {**record['edit'], 'flags': {**record['edit'].get('flags', {}), 'noFlood': False}}
+    return name, ('entity { entityDef ' + name + ' { inherit = ' + _render(record['inherit'], 0) +
+                  '; class = "idTarget_Spawn"; edit = ' + _render(settings, 2) + ' } }')
+
+
 def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
     prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
@@ -597,13 +615,24 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
                      "clipModelInfo": {"type": "CLIPMODEL_NONE"}}
                     if kind == "idTargetSpawnGroup" else
                     {"entityDefs": {"num": 0}, "initialEntityDefs": {"num": 0}, "targets": {"num": 0}})
-        if bounds is not None and kind == 'idTarget_Spawn' and recipe['family'] in {'immediate', 'possessed'}:
-            fallback = 'ap_v070_source_' + _functional_token(target)
+        fallback_record = None
+        if (recipe['family'] == 'group' and binding.get('owner') == '_example_encounter_manager_0' and
+                target == 'breach_wasteland_arena_encounter_spawn_group_zone_2'):
+            if bounds is None or kind != 'idTargetSpawnGroup':
+                raise ValueError('Immora breach source is not a spawn group')
+            fallback_target = 'breach_wasteland_arena_target_spawn_60'
+            fallback_bounds = find_entity_block_bounds(source, fallback_target)
+            if fallback_bounds is None:
+                raise ValueError('Immora breach fallback source is absent')
+            first, last = fallback_bounds
+            fallback_record, = entity_records(source[first:last])
+        elif bounds is not None and kind == 'idTarget_Spawn' and recipe['family'] in {'immediate', 'possessed'}:
+            fallback_record = record
+        if fallback_record:
+            fallback, definition = _source_fallback_definition(fallback_record)
             if fallback not in names:
                 names.add(fallback)
-                settings_copy = {**record['edit'], 'flags': {**record['edit'].get('flags', {}), 'noFlood': False}}
-                aliases.append('entity { entityDef ' + fallback + ' { inherit = ' + _render(inherit, 0) +
-                               '; class = "idTarget_Spawn"; edit = ' + _render(settings_copy, 2) + ' } }')
+                aliases.append(definition)
         aliases.append('entity { entityDef ' + alias + ' { inherit = ' + _render(inherit, 0) +
             '; class = ' + _render(kind, 0) + '; edit = ' + _render(settings, 2) + ' } }')
         block = _edit(block, (*path, "args", f"item[{argument}]", "entity"), alias)

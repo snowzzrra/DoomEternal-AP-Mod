@@ -5596,11 +5596,7 @@ class DoomEternalContext(CommonContext):
             if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
                                    context_identity=self.context_identity):
                 continue
-            if all(native.items.get(command.item_id) is not None
-                   and native.items[command.item_id].state == OWNED
-                   and (command.item_id not in (7770017, 7770088, 7770092, 7770901, 7770902)
-                        or native.get_observed_stage(command.item_id) > command.stage)
-                   for command in plan.commands):
+            if all(native.confirms_repair(command.item_id, command.stage) for command in plan.commands):
                 if any(native.get_state(item_id) == UNKNOWN for item_id in relevant):
                     return plan, "Native ownership pending for item IDs: " + ", ".join(
                             str(item_id) for item_id in sorted(relevant) if native.get_state(item_id) == UNKNOWN)

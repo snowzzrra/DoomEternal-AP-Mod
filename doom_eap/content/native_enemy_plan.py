@@ -199,9 +199,14 @@ def _secret_timers(maps, catalog):
 def native_body_name(origin, ordinal, logical_count, physical_count, logical_type, body, settings, *, credit_units=None):
     tracking = enemy_tracking_suffix(logical_type, body["spawn_type"])
     limits = {**settings, **({'population_limits': body['population_limits']} if 'population_limits' in body else {})}
+    if 'special_limits' in body:
+        limits['special_limits'] = body['special_limits']
     suffix = _limit_suffix(limits, body["species"]) + f"__ap_v070_s{body['attributes']['speed_percent']:05d}"
     credit = f"_w{credit_units:08x}" if credit_units is not None else ""
-    return f"ap_v070_ai_r{origin}_{ordinal:08x}_q{logical_count:08x}{physical_count:08x}{credit}{tracking}{suffix}"
+    name = f"ap_v070_ai_r{origin}_{ordinal:08x}_q{logical_count:08x}{physical_count:08x}{credit}{tracking}{suffix}"
+    if not name.isascii() or len(name) >= 512:
+        raise ValueError('Native recipe body name exceeds the supported ASCII size')
+    return name
 
 
 def _revision_one_bodies(sources, candidates, settings, intensity, *, seed, key, catalog, stage_index, stage_count):
@@ -490,7 +495,7 @@ def _balanced_phase_bodies(sources, candidates, settings, intensity, *, seed, ke
         ammo_slots.add(index)
     drawn, superheavies, supports = {}, 0, 0
     heavy_budget = len(roster) * groups[1] // 100
-    if revision >= 11 and opening:
+    if revision == 11 and opening:
         heavy_budget = min(heavy_budget, 1 if settings['balance_preset'] == 'slayers_path' else 2)
     def compatible(source):
         eligible = [species for species in candidates if not source.get('allowed_species')
@@ -601,8 +606,8 @@ def _wave_peak(bodies):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -640,12 +645,24 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
             or sorted(composition_bands.values()) != list(range(len(sequence)))):
         raise ValueError('Native recipe composition bands are invalid')
     stage_count = (max(bands.values()) + 1 if revision >= 9 else 5) if mai else len(sequence)
+    campaign_stage_count = stage_count
     for stage_index, map_key in enumerate(sequence):
+        stage_count = campaign_stage_count
         if map_key not in catalog["maps"]:
             raise ValueError(f"Missing native recipe map: {map_key}")
         if catalog["maps"][map_key].get("unresolved"):
             raise ValueError(f"Unresolved native origin: {catalog['maps'][map_key]['unresolved'][0]['id']}")
-        if mai and revision >= 8:
+        vanilla_balance = revision >= 13 and enemies.get('balance_preset')
+        if vanilla_balance:
+            from .vanilla_enemy_profiles import CANONICAL_ORDER
+            if mai and map_key in CANONICAL_ORDER:
+                stage_index, stage_count = CANONICAL_ORDER.index(map_key), len(CANONICAL_ORDER)
+            elif not mai:
+                from .native_enemy_balance import PURE_BOSS_MAPS
+                combat_sequence = [key for key in sequence if key not in PURE_BOSS_MAPS]
+                if map_key in combat_sequence:
+                    stage_index, stage_count = combat_sequence.index(map_key), len(combat_sequence)
+        elif mai and revision >= 8:
             stage_index = campaign["enemy_progression_bands"][map_key]
         elif composition_bands is not None:
             stage_index = composition_bands[map_key]
@@ -667,9 +684,10 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
         phases = {}
         origins = [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])]
         if revision >= 6:
-            from .native_enemy_safety import SCRIPTED_BOSS_ACTORS, FLYING_SPAWN_POINTS, FLYING_REPLACEMENTS
+            from .native_enemy_safety import SCRIPTED_BOSS_ACTORS, CINEMATIC_BOSS_ACTORS, FLYING_SPAWN_POINTS, FLYING_REPLACEMENTS
             origins = [{**source, 'protected_reason': 'scripted boss acquisition actor'}
                        if (source.get('binding') or {}).get('entity') in SCRIPTED_BOSS_ACTORS.get(map_key, ())
+                       or revision >= 13 and (source.get('binding') or {}).get('entity') in CINEMATIC_BOSS_ACTORS.get(map_key, ())
                        else {**source, 'protected_reason': 'airborne spawn requires a flying species'}
                        if (source.get('binding') or {}).get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) and not FLYING_REPLACEMENTS.intersection(candidates)
                        else {**source, 'allowed_species': sorted(FLYING_REPLACEMENTS)}
@@ -678,11 +696,38 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
         if revision >= 11:
             from .native_enemy_safety import SMALL_GROUND_ENEMIES, GROUND_ENCOUNTERS
             origins = [{**source, 'allowed_species': sorted(SMALL_GROUND_ENEMIES)}
-                       if 'ENCOUNTER_SPAWN_TENTACLE' in source.get('logical_types', ())
+                       if ('ENCOUNTER_SPAWN_TENTACLE' in source.get('logical_types', ()) if revision < 13 else
+                           source.get('logical_types') == ['ENCOUNTER_SPAWN_TENTACLE'])
                        else {**source, 'allowed_species': sorted(GROUND_ENCOUNTERS[map_key, source['binding']['owner']])}
                        if (map_key, (source.get('binding') or {}).get('owner')) in GROUND_ENCOUNTERS
                        else source for source in origins]
+        if vanilla_balance:
+            from .vanilla_enemy_profiles import SPECIAL_SPECIES, native_source_identity, reference_source, source_species, vanilla_profile
+            lifetimes = {slot['source_id']: slot['renewable'] for wave in vanilla_profile(catalog, map_key)['waves']
+                         for slot in wave['slots']}
+            origins = [{**source, 'renewable': lifetimes[source['id']]} if source['id'] in lifetimes else source
+                       for source in origins]
+            stationary = set(SPECIES_GROUPS['stationary']) - SPECIAL_SPECIES
+            origins = [{**source, 'protected_reason': 'unknown native population choice', 'vanilla_unknown': True}
+                       if reference_source(source) and native_source_identity(source, catalog)['status'] == 'unknown_native_choice' else
+                       {**source, 'protected_reason': 'native stationary spawn', 'vanilla_stationary': True}
+                       if reference_source(source, catalog) and source_species(source, catalog) and
+                       set(source_species(source, catalog)) <= stationary else
+                       {**source, 'protected_reason': 'spawn outside the campaign reference'}
+                       if not source.get('runtime_only') and not source.get('protected_reason') and
+                       not source.get('inactive_reason') and not reference_source(source, catalog) else source for source in origins]
+            origins = [{**source, 'protected_reason': 'native train entry geometry', 'vanilla_passthrough': True}
+                       if map_key == 'e1m4_boss' and (source.get('binding') or {}).get('owner') ==
+                       'train_encounter_manager_intro_train_1' and source.get('logical_types') ==
+                       ['ENCOUNTER_SPAWN_MANCUBUS'] or source.get('family') == 'group' and
+                       (source.get('binding') or {}).get('owner') == 'game_encounter_manager_traindepot_1' and
+                       not (source.get('binding') or {}).get('reference') else source for source in origins]
         supplies = ammunition_sources(origins, catalog, finite=revision >= 9) if revision >= 4 else frozenset()
+        if vanilla_balance:
+            ammo_types = {catalog['species'][species]['spawn_type'] for species in AMMO_FODDER
+                          if species in catalog['species']}
+            supplies = {source['id'] for source in origins if source['id'] in supplies and
+                        set(source.get('logical_types', ())) <= ammo_types}
         for source in origins:
             if not source.get("protected_reason") and not source.get("inactive_reason"):
                 count = source["logical_count"]
@@ -698,7 +743,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
         phase_bodies = {}
         phase_progression = {}
         arenas, extras = {}, {}
-        if revision >= 10 and enemies.get('balance_preset'):
+        if revision >= 10 and enemies.get('balance_preset') and not vanilla_balance:
             for phase, sources in phases.items():
                 owner = phase.rsplit('/', 2)[0]
                 arena = arenas.setdefault(owner, dict(key=[map_key, owner], peak=0, sources=[]))
@@ -724,6 +769,19 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
                           if (revision >= 11 and map_key in campaign.get('starting_stages', ()) or
                               campaign.get('opening_stage') == map_key and
                               any(opening_source(map_key, source) for source in sources))}
+        protected_opening_phases = opening_phases
+        if vanilla_balance:
+            opening_phases = {phase for phase, sources in phases.items() if
+                (map_key in campaign.get('starting_stages', ()) or campaign.get('opening_stage') == map_key)
+                and any(opening_source(map_key, source, verified=True) for source in sources)}
+        vanilla_reference = None
+        if vanilla_balance:
+            from .native_enemy_balance import build_vanilla_stage
+            phase_bodies, limits, vanilla_reference = build_vanilla_stage(origins, settings, campaign, catalog,
+                seed=seed, map_key=map_key, stage_index=stage_index, stage_count=stage_count,
+                supplies=supplies, opening_sources={source['id'] for phase, sources in phases.items()
+                    if phase in protected_opening_phases for source in sources}, hitpoints=_body_hitpoints)
+            settings = {**settings, 'special_limits': limits}
         for phase, sources in phases.items():
             phase_index, phase_count, phase_intensity = stage_index, stage_count, intensity
             if revision >= 5 and enemies['progressive']:
@@ -737,6 +795,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
                 phase_intensity = Fraction(enemies['intensity'][0] * (denominator - phase_index)
                     + enemies['intensity'][1] * phase_index, 100 * denominator)
             if revision >= 5: phase_progression[phase] = [phase_index, phase_count]
+            if vanilla_balance:
+                continue
             if revision >= 10 and enemies.get('balance_preset'):
                 generated = _balanced_phase_bodies(sources, candidates, settings, phase_intensity, seed=seed,
                     key=[map_key, phase], catalog=catalog, stage_index=phase_index, stage_count=phase_count,
@@ -765,7 +825,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
             selected_spawn_type({"spawn_type": source["spawn_type"], "selected_spawn_type": selected_type})
             logical_count = source["logical_count"]
             bodies = phase_bodies[source["id"]]
-            if source['id'] in supplies and not bodies:
+            if source['id'] in supplies and not bodies and not vanilla_balance:
                 raise ValueError(f"Ammunition source has no eligible chainsaw fodder: {source['id']}")
             quantity_ratio = [len(bodies), logical_count]
             if source.get("runtime_only"):
@@ -791,7 +851,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
                 "family": source["family"], "selected_spawn_type": selected_type,
                 "runtime_only": source.get("runtime_only", False), "quantity_ratio": quantity_ratio,
                 "logical_mask": enemy_spawn_mask(selected_type), "logical_count": logical_count,
-                "physical_count": len(bodies), "maximum_emissions": physical_maximum, "renewable": maximum == 0,
+                "physical_count": len(bodies), "maximum_emissions": physical_maximum,
+                "renewable": source.get('renewable', maximum == 0) if vanilla_balance else maximum == 0,
                 "final_credit_units": final_credit,
                 "binding": dict(source["binding"]) if "binding" in source else None,
                 "bodies": bodies})
@@ -800,6 +861,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
                          "recipes": recipes, "protected": protected, "inactive": inactive,
                          "progression": [stage_index, stage_count], "special_limits": limits}
         if revision >= 5: maps[map_key]['wave_progression'] = phase_progression
+        if vanilla_reference is not None:
+            maps[map_key]['vanilla_reference'] = vanilla_reference
         original_cost = sum((Fraction(source["combat_cost"]) for sources in phases.values() for source in sources
                              if not source.get("runtime_only")), Fraction(0))
         actual_cost = sum((enemy_combat_cost(body["species"], body["attributes"], buff_totems=revision >= 6, screechers=revision >= 7)
@@ -844,21 +907,28 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=11):
                     combat_costs[map_key]['campaign']['opening_waves'] = [wave for wave in waves if wave['id'] in opening_phases]
                     combat_costs[map_key]['campaign']['opening_species'] = sorted({body['species']
                         for recipe in active if recipe['wave'] in opening_phases for body in recipe['bodies']})
-                cohorts = {}
+                cohorts, opening_cohorts = {}, {}
                 for recipe in active:
                     identity = native_event_identity(recipe)
                     owner, script = identity.rsplit('/', 2)[:2] if identity else (recipe['id'], '0')
-                    cohort = cohorts.setdefault(owner, {}).setdefault(script, [0, 0, 0])
-                    if recipe['renewable']:
-                        cohort[2] += recipe['physical_count']
-                    else:
-                        cohort[0] += recipe['maximum_emissions']
-                        cohort[1] += (min(recipe['maximum_emissions'], recipe['physical_count'] * 2)
-                                      if recipe['family'] == 'maintenance' else recipe['maximum_emissions'])
+                    targets = [cohorts]
+                    if vanilla_balance and recipe['wave'] in opening_phases:
+                        targets.append(opening_cohorts)
+                    for target_cohorts in targets:
+                        cohort = target_cohorts.setdefault(owner, {}).setdefault(script, [0, 0, 0])
+                        if recipe['renewable']:
+                            cohort[2] += recipe['physical_count']
+                        else:
+                            cohort[0] += recipe['maximum_emissions']
+                            cohort[1] += (min(recipe['maximum_emissions'], recipe['physical_count'] * 2)
+                                          if recipe['family'] == 'maintenance' else recipe['maximum_emissions'])
                 finite = sum(max(value[0] for value in scripts.values()) for scripts in cohorts.values())
                 estimated = sum(max(value[1] + value[2] * 2 for value in scripts.values()) for scripts in cohorts.values())
                 combat_costs[map_key]['campaign'].update(waves=waves, finite_spawns=finite,
                     estimated_kills=estimated, effort=estimated + len(waves) * 4)
+                if vanilla_balance and opening_phases:
+                    combat_costs[map_key]['campaign']['opening_estimated_kills'] = sum(
+                        max(value[1] + value[2] * 2 for value in scripts.values()) for scripts in opening_cohorts.values())
     frozen_campaign = {"sequence": list(sequence), "mode": campaign.get("mode", "linear")}
     if revision >= 11:
         frozen_campaign['starting_stages'] = list(campaign.get('starting_stages', ()))

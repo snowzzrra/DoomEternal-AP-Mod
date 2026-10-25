@@ -69,6 +69,10 @@ def _density_weights(enemies, candidates, *, seed, phase, stage_index, stage_cou
 
 
 
+LIMITED_SPECIES = ('marauder', 'archvile', 'spirit', 'buff_pod', 'zombie_t1_screecher',
+                   'blood_angel', 'cursed_prowler', 'stone_imp', 'armored_baron')
+
+
 def _limit_suffix(enemies, species):
     limits = enemies["special_limits"]
     values = "".join(f"{limits[name]:08x}" for name in ("marauder", "archvile", "spirit", "combined_special"))
@@ -81,14 +85,25 @@ def _limit_suffix(enemies, species):
     population = enemies.get('population_limits')
     prefix = ''
     if population:
-        prefix = f"_a{population['scope']:016x}_p" + ''.join(
-            f"{(population[name] | (population.get('heavy', 0) << 8) if name == 'mixed' else population[name]):08x}"
+        flags = int(population.get('strict', False)) << 1
+        if population.get('counter'):
+            if not population.get('strict') or population['counter'] != 'spirit':
+                raise ValueError('Invalid strict population counter')
+            flags |= 4
+        if 'species' in population:
+            caps = population['species']
+            if not population.get('strict') or set(caps) != set(LIMITED_SPECIES) or any(
+                    type(caps[name]) is not int or not 0 <= caps[name] <= 0x7fffffff for name in LIMITED_SPECIES):
+                raise ValueError('Invalid strict species limits')
+            prefix = '_v' + ''.join(f'{caps[name]:08x}' for name in LIMITED_SPECIES)
+        prefix += f"_a{population['scope']:016x}_p" + ''.join(
+            f"{(population[name] | flags | (population.get('heavy', 0) << 8) if name == 'mixed' else population[name]):08x}"
             for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
         if species in {'baron', 'armored_baron', 'doom_hunter', 'tyrant'}:
             kind = 'h'
         elif species in {'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'hell_soldier'}:
             kind = 'f'
-        elif population.get('heavy') and species in SPECIES_GROUPS['fodder'] and species != 'zombie_t1_screecher':
+        elif (population.get('heavy') or population.get('strict')) and species in SPECIES_GROUPS['fodder'] and species != 'zombie_t1_screecher':
             kind = 'o'
     return f"{prefix}_l{values}_k{kind}"
 

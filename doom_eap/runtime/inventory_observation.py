@@ -2,7 +2,9 @@
 
 import time
 
-from doom_eap.contracts.inventory_domain import InventoryObservation, ItemObservation, MISSING, OWNED
+from doom_eap.contracts.inventory_domain import (
+    InventoryObservation, ItemObservation, MISSING, OWNED, PERMANENT_PERK_ITEM_IDS,
+)
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP
 from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
 
@@ -20,6 +22,9 @@ class SentinelInventoryObservation:
             result = link.observe_inventory()
         except (RuntimeError, OSError, ValueError) as error:
             self.logger.info("INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
+            return None
+        native_scope = result.get("_observation_scope")
+        if native_scope and native_scope[-1] != str(epoch):
             return None
         items = {}
         weapons = result["weapons_after"]
@@ -52,7 +57,41 @@ class SentinelInventoryObservation:
             if type(tier) is int and 0 <= tier <= 4:
                 items[item_id] = ItemObservation(item_id, OWNED if tier else MISSING,
                                                  observed_stage=tier, source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, frag, ice, dash, key, capacity_tiers)
+        for item_id, field in ((7770012, "flame_belch_after"), (7770014, "blood_punch_after")):
+            value = result.get(field, 255)
+            if value in (0, 1):
+                items[item_id] = ItemObservation(item_id, OWNED if value else MISSING, source="sentinel_inventory")
+        known, owned = result.get("perks_known", 0), result.get("perks_owned", 0)
+        for item_id in PERMANENT_PERK_ITEM_IDS | {7770145, 7770146, 7770147}:
+            index = item_id - 7770145 + 61 if item_id >= 7770145 else item_id - 7770058
+            if known & (1 << index):
+                items[item_id] = ItemObservation(item_id, OWNED if owned & (1 << index) else MISSING,
+                                                source="sentinel_perk_availability")
+        if hasattr(link, "observe_special_inventory"):
+            try:
+                special = link.observe_special_inventory()
+            except (RuntimeError, OSError, ValueError) as error:
+                self.logger.info("SPECIAL_INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
+            else:
+                if native_scope != special.get("_observation_scope"):
+                    return None
+                special_known = special.get("native_state_known", 0)
+                for item_id, field, bit in ((7770007, "native_crucible", 1), (7770009, "native_hammer", 2)):
+                    if special_known & bit:
+                        value = special[field]
+                        items[item_id] = ItemObservation(item_id, OWNED if value else MISSING,
+                                                        observed_stage=value, source="sentinel_special")
+                if special_known & 7 == 7:
+                    hammer_stage = 2 if special["native_hammer_perks"] == 3 else 1
+                    stage = hammer_stage + 1 if special["native_hammer"] else int(bool(special["native_crucible"]))
+                    items[7770901] = ItemObservation(7770901, OWNED if stage else MISSING,
+                                                    observed_stage=stage, source="sentinel_special")
+                if special_known & 6 == 6:
+                    stage = (2 if special["native_hammer_perks"] == 3 else 1) if special["native_hammer"] else 0
+                    items[7770902] = ItemObservation(7770902, OWNED if stage else MISSING,
+                                                    observed_stage=stage, source="sentinel_special")
+        signature = (self.context.state_key, link.pid, epoch, context_identity,
+                     tuple(sorted((key, value.state, value.observed_stage) for key, value in items.items())))
         if signature != self.last_logged:
             self.log_event(
                 "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
@@ -66,6 +105,7 @@ class SentinelInventoryObservation:
                 weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
                 slayer_key_owned=key,
                 capacity_tiers=capacity_tiers,
+                perks_known=str(known), perks_owned=str(owned),
                 gate_keys={str(item_id): item.state for item_id, item in items.items()
                            if item_id in GATE_KEY_TO_MAP},
             )

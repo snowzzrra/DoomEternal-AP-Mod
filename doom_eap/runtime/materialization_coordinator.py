@@ -191,7 +191,7 @@ class MaterializationCoordinator:
         try:
             planned = compile_materialization_plan(
                 ownership, context, scope, item_definitions, replay_policies,
-                special_mode, observation=observation,
+                special_mode, observation=observation, selected_item_ids=selected_item_ids,
             )
         except MaterializationPlanError as error:
             if error.blocked:

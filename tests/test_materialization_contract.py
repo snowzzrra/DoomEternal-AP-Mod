@@ -256,3 +256,60 @@ def test_ballista_and_frag_repair_does_not_wait_for_unknown_items(inputs, invent
     observed = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
         context_identity=context.identity, campaign=context.campaign)
     assert observed.get_state(7770004) == OWNED and observed.get_state(7770011) == OWNED
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_checkpoint_missing_full_auto_repairs_without_replaying_receipts(inputs, inventory_adapter, manual):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
+    adapter, link = inventory_adapter
+    reply = {"weapons_after": 1, "ice_bomb_after": 255, "perks_known": 2, "perks_owned": 0}
+    link.observe_inventory = lambda: reply
+    owned = ownership((7770059, 7770059, 7770016, 7770026, 7770903, 7770017))
+    before = copy.deepcopy(owned)
+
+    def plan():
+        native = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+            context_identity=context.identity, campaign=context.campaign)
+        return compile_materialization_plan(owned, context, replace(scope, manual=manual), definitions,
+            policies, "the_crucible", observation=native, selected_item_ids=frozenset((7770059,)))
+
+    missing = plan().reconciliation
+    assert [command.item_id for command in missing.commands] == [7770059]
+    assert owned == before
+    reply["perks_owned"] = 2
+    assert not plan().reconciliation.commands
+    reply.update(perks_known=0, perks_owned=0)
+    with pytest.raises(MaterializationPlanError, match="unresolved native observations"):
+        plan()
+
+
+def test_selected_owned_mod_resync_ignores_unselected_unknown_capacity(inputs):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
+    observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, context.campaign,
+        {7770059: ItemObservation(7770059, OWNED)})
+    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
+    coordinator.bind({})
+    publisher = SimpleNamespace(publish=lambda *args, **kwargs: (True, None), exists=lambda *args: False)
+    result = coordinator.reconcile(scope, context, ownership((7770059, 7770017)), None, definitions, policies,
+        "the_crucible", publisher, lambda: None, observation=observation, selected_item_ids=frozenset((7770059,)))
+    assert result.error is None and result.plan.entitlement_item_ids == (7770059,)
+    assert not result.plan.commands
+
+
+
+
+def test_inventory_observation_defers_if_checkpoint_changes_between_native_reads(inputs, inventory_adapter):
+    _, _, context, scope = inputs
+    adapter, link = inventory_adapter
+    identity = ("created", "instance", "build", str(scope.evidence_epoch))
+    link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
+        "perks_known": 2, "perks_owned": 0, "_observation_scope": identity}
+    link.observe_special_inventory = lambda: {"_observation_scope": (*identity[:-1], "changed")}
+    assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign) is None
+    assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch + 1,
+        context_identity=context.identity, campaign=context.campaign) is None

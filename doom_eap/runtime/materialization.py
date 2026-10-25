@@ -36,7 +36,7 @@ class MaterializationPlanError(ValueError):
 
 def compile_materialization_plan(
     ownership, context, scope, item_definitions, replay_policies, special_mode,
-    *, observation: InventoryObservation | None = None,
+    *, observation: InventoryObservation | None = None, selected_item_ids=None,
 ):
     valid_obs = (
         observation is not None
@@ -88,6 +88,8 @@ def compile_materialization_plan(
         )
     )
     selected_ids = tuple(sorted(set(selected_ids)))
+    if selected_item_ids is not None:
+        selected_ids = tuple(item_id for item_id in selected_ids if item_id in selected_item_ids)
     selected_receipts = tuple(
         item_id for item_id in ownership.reconciliation_item_ids if item_id in selected_ids
     )
@@ -240,7 +242,7 @@ def compile_materialization_plan(
             )
         )
     blood_punch_commands = []
-    if context.campaign != "Base" and 7770014 in received:
+    if context.campaign != "Base" and 7770014 in received and (selected_item_ids is None or 7770014 in selected_item_ids):
         if not (valid_obs and (observation.is_owned(7770014) or not observation.is_proven_missing(7770014))):
             for upgrade in ownership.blood_punch_upgrades:
                 blood_punch_commands.append(
