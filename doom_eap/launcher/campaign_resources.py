@@ -9,7 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mmap
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
 import struct
 import tempfile
@@ -231,8 +231,9 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
             required.add(EXCLUDED_LAYER)
         expected = {name: package.read("gameresources_patch2/" + name)
                     for name in required if "gameresources_patch2/" + name in names}
-        hub_hud_name = "swf/hud/hud_score.swf"
-        hub_hud = package.read("hub_patch1/" + hub_hud_name) if "hub_patch1/" + hub_hud_name in names else None
+        hud_name = "swf/hud/hud_score.swf"
+        huds = {name.split('/')[0]: package.read(name) for name in names
+                if name.count('/') == 3 and name.endswith('/' + hud_name)}
         plan = manifest.get("options", {}).get("enemy_plan")
         if plan:
             from doom_eap.content.native_enemy_safety import project_native_safety
@@ -247,7 +248,7 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
     from .resource_bank import obsolete_banks, cleanup_banks
     spec = json.loads(bank_updates.get('packagemapspec.json', (base / 'packagemapspec.json').read_bytes())) if (base / 'packagemapspec.json').is_file() else {'files': []}
     obsolete = obsolete_banks(base, spec)
-    if not campaign_required and hub_hud is None and not bank_updates and not obsolete:
+    if not campaign_required and not huds and not bank_updates and not obsolete:
         return {"state": "not_applicable"}
     if campaign_required and expected.keys() != required:
         raise ValueError("Incomplete unified campaign resource package")
@@ -257,11 +258,16 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
             raise ValueError(f"Installed campaign streamfile differs from the room package: {name}")
 
     targets = {CONTAINER: {row[0] for row in records.values()}} if records else {}
-    if hub_hud is not None:
-        bank = "game/hub/hub_patch1.resources"
-        index, kind, _, payload, flags = _records(base / bank, {hub_hud_name})[hub_hud_name]
-        if kind != "cswf" or flags or payload != hub_hud:
-            raise ValueError("Installed Fortress HUD differs from the room package")
+    for container, hud in huds.items():
+        containers = {row['name'] for row in spec['files'] if PurePosixPath(row['name']).name == container + '.resources'}
+        if container == 'hub' or container.startswith('hub_patch'):
+            containers = {'game/hub/' + container + '.resources'}
+        if len(containers) != 1:
+            raise ValueError('Ambiguous or missing HUD resource container: ' + container)
+        bank, = containers
+        index, kind, _, payload, flags = _records(base / bank, {hud_name})[hud_name]
+        if kind != "cswf" or flags or payload != hud:
+            raise ValueError('Installed HUD differs from the room package: ' + container)
         targets.setdefault(bank, set()).add(index)
     updates, report = prepare_resource_activation(base, targets) if targets else ({}, {"containers": {}})
     if bank_updates:

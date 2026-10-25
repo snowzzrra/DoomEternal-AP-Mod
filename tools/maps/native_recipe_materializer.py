@@ -1,4 +1,4 @@
-"""Prepare frozen native body definitions without editing encounter commands."""
+"""Prepare frozen native body definitions and encounter bindings."""
 
 import hashlib
 import math
@@ -9,7 +9,7 @@ from doom_eap.content.native_enemy_plan import native_body_name, native_recipe_m
 from tools.maps.ap_map_generator import find_entity_block_bounds
 from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_records, list_items, walk_values
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
-from tools.maps.enemy_attributes import _MISSING, _attribute_source, _get, _render, materialize_enemy_attributes
+from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
 
 
 def _functional_token(name):
@@ -118,12 +118,13 @@ def _functional_sources(source):
         parent = row['edit'].get('targetSpawnParent')
         if parent not in records:
             continue
-        spawners = row['edit'].get('spawners', {})
-        for index in range(spawners.get('num', 0)):
-            name = spawners.get(f'item[{index}]')
-            point = records.get(name)
-            if point and point['class'] in {'idTarget_Spawn', 'idTarget_Spawn_Parent'} and not point['edit'].get('initialEntityDefs', {}).get('num', 0):
-                inherited.setdefault(name, set()).add(parent)
+        for field in ('spawners', 'spawnersTouchingPrimitives'):
+            spawners = row['edit'].get(field, {})
+            for index in range(spawners.get('num', 0)):
+                name = spawners.get(f'item[{index}]')
+                point = records.get(name)
+                if point and point['class'] in {'idTarget_Spawn', 'idTarget_Spawn_Parent'} and not point['edit'].get('initialEntityDefs', {}).get('num', 0):
+                    inherited.setdefault(name, set()).add(parent)
     sources = {}
     def reachable(name, visited=None):
         if visited is None:
@@ -149,6 +150,25 @@ def _functional_sources(source):
     return properties, reachable, records
 
 
+def _entrance_endpoint(edit):
+    animation = edit.get('spawnEditable', {}).get('spawnAnim', '').rsplit('/', 1)[-1]
+    position = edit.get('spawnPosition', {})
+    if 'spawnPosition' not in edit or not all(math.isfinite(position.get(axis, 0)) for axis in ('x','y','z')):
+        return None
+    if animation == 'monster_closet_rand' or re.fullmatch(r'sneaky_spawn_\d+', animation):
+        return dict(position)
+    jump = re.fullmatch(r'jump_forward_(\d+)(?:_(up|down)_(\d+))?', animation)
+    if not jump:
+        return None
+    forward = edit.get('spawnOrientation', {}).get('mat', {}).get('mat[0]', {'x': 1})
+    # animation distances are centimeters; map positions are meters.
+    result = {axis: position.get(axis, 0) + forward.get(axis, 0) * int(jump[1]) / 100
+              for axis in ('x', 'y', 'z')}
+    if jump[2]:
+        result['z'] += int(jump[3]) / (100 if jump[2] == 'up' else -100)
+    return result if all(map(math.isfinite, result.values())) else None
+
+
 def _entrance_landings(recipes, records):
     points = {}
     positions = {name: {axis: row['edit']['spawnPosition'].get(axis, 0) for axis in ('x','y','z')}
@@ -168,7 +188,7 @@ def _entrance_landings(recipes, records):
     def scope(recipe):
         binding = recipe['binding']
         return binding.get('owner', ''), binding.get('path', '').split('.events.item[')[0]
-    def ground(name):
+    def ground(name, verified=False):
         edit = records[name]['edit']; spawn = edit.get('spawnEditable', {})
         templates = [records.get(value.get('name'), {}) for field,value in edit.get('entityDefs', {}).items()
                      if re.fullmatch(r'item\[\d+\]', field) and isinstance(value, dict)]
@@ -177,8 +197,10 @@ def _entrance_landings(recipes, records):
                 and all(template.get('edit', {}).get('aiEditable', {}).get('spawnSettings', {}).get('initialState', 'AIOVERRIDE_DEFAULT') in
                         {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE',
                          'AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER'} for template in templates)
-                and (not templates or any(not any(kind in template.get('inherit', '') for kind in
-                     ('/ambient/', 'cacodemon', 'painelemental', 'lostsoul', 'spirit', 'bloodangel')) for template in templates))
+                and (verified or templates)
+                and (not templates or (any if verified else all)(template.get('class') == 'idAI2' and
+                     not any(kind in template.get('inherit', '') for kind in
+                     ('/ambient/', '/friendly/', 'cacodemon', 'painelemental', 'lostsoul', 'spirit', 'bloodangel')) for template in templates))
                 and not spawn.get('spawnAt')
                 and not edit.get('bindInfo') and name in positions and all(map(math.isfinite, positions[name].values())))
     airborne = {'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_LOST_SOUL',
@@ -190,13 +212,13 @@ def _entrance_landings(recipes, records):
         points.setdefault(reference, resolve(reference))
         footprints.setdefault(scope(recipe), set()).update(points[reference])
         if recipe['selected_spawn_type'] not in airborne:
-            owners.setdefault(scope(recipe), set()).update(name for name in points[reference] if ground(name))
+            owners.setdefault(scope(recipe), set()).update(name for name in points[reference] if ground(name, True))
         else:
             flying_points.update(points[reference])
     ground_points = set().union(*owners.values())
     anchors = {name for name, row in records.items()
                if (row['class'] in {'idInfoCoverExposed', 'idPlayerStart', 'idInfo_TeleportDestination'} or
-                   (row['class'] == 'idTarget_Spawn' and ground(name) and
+                   (row['class'] == 'idTarget_Spawn' and ground(name, name in ground_points) and
                     (name in ground_points or (name not in flying_points and row['edit'].get('entityDefs', {}).get('num', 0) > 0))) or
                    (row['class'] == 'idInfoTraversal' and row['edit'].get('snapToGround') is True))
                and not row['edit'].get('bindInfo')
@@ -229,7 +251,11 @@ def _entrance_landings(recipes, records):
                     continue
             if edit.get('spawnEditable', {}).get('aiStateOverride') not in {
                     'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION',
-                    'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES'}:
+                    'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES', 'AIOVERRIDE_SPAWN_ANIM_IDLE',
+                    'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}:
+                continue
+            if not edit.get('bindInfo') and _entrance_endpoint(edit) is not None:
+                choices.setdefault(name, []).append(((0, name), name))
                 continue
             candidates = owners.get(scope(recipe), set())
             position = positions.get(name, {})
@@ -297,6 +323,8 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
         names.add(helper)
         anchor = records[landing]
         edit = {key: anchor['edit'][key] for key in ('spawnPosition', 'spawnOrientation') if key in anchor['edit']}
+        if point == landing:
+            edit['spawnPosition'] = _entrance_endpoint(anchor['edit'])
         if ('traversalEndpoint' in anchor['edit'] and
                 records[point]['edit'].get('spawnEditable', {}).get('aiStateOverride') in
                 {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}):
@@ -358,6 +386,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                 donors[key] = block, record, baseline
             clone = materialize_enemy_attributes(block, name, base_properties=baseline,
                 **{key: value for key, value in attributes.items() if key != "speed_percent"})
+            clone = _edit(clone, ('flags', 'hide'), False)
             header = ENTITY_HEADER.search(clone)
             generated.append('entity {\n\tlayers { "spawn_target_layer" }\n\t' + clone[header.start():].rstrip())
             for source_name in source_names:
@@ -413,12 +442,69 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
     return source + "\n\n" + "\n\n".join(generated) + "\n"
 
 
-def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
-    from tools.maps.enemy_attributes import _edit
+def _refill_limits(source, recipes):
+    limits = {}
+    owners = {r['binding'].get('owner') for r in recipes
+              if r['family'] == 'maintenance' and not r['maximum_emissions']}
+    records = {r['name']: r for r in entity_records(source, include_names=owners - {None, ''})}
+    for owner, record in records.items():
+        kills, calls, stops = [], [], set()
+        for path, value in walk_values(record['edit']):
+            if path.endswith('.eventDef'):
+                call = _get(record['edit'], tuple(path.rsplit('.', 1)[0].split('.')))
+                if value == 'waitKillCount':
+                    kills.append(set(call['args']['item[0]']['eEncounterSpawnType_t'].split()))
+                if value == 'stopMaintainingAICount' and calls and calls[-1][0] == path.rsplit('.item[', 1)[0]:
+                    previous = calls[-1][1]
+                    if previous['eventDef'] == 'waitAIRemaining':
+                        mask = previous['args']['item[0]']['eEncounterSpawnType_t']
+                        label = next((arg['string'] for arg in list_items(call['args']) if 'string' in arg), '')
+                        stops.add((label, mask))
+                calls.append((path.rsplit('.item[', 1)[0], call))
+        finite = sum(r['maximum_emissions'] for r in recipes if r['binding'].get('owner') == owner
+                     and r['family'] in {'immediate', 'group', 'staggered'})
+        for recipe in recipes:
+            if recipe['binding'].get('owner') != owner or recipe['family'] != 'maintenance' or recipe['maximum_emissions']:
+                continue
+            types = set(recipe['selected_spawn_type'].split())
+            binding = recipe['binding']
+            call = _get(record['edit'], tuple(binding.get('path', '').split('.')))
+            label = _get(call, ('args', 'item[6]', 'string')) if isinstance(call, dict) else _MISSING
+            finite_stop = any(label == stop_label and 'ENCOUNTER_SPAWN_ANY' not in mask.split()
+                              and not types.intersection(mask.split()) for stop_label, mask in stops)
+            if finite and finite_stop and not any('ENCOUNTER_SPAWN_ANY' in mask or mask & types for mask in kills):
+                limits[recipe['origin']] = max(recipe['physical_count'] * 2, finite + recipe['physical_count'])
+    return limits
 
+
+def _post_bfg_awareness(block):
+    owner, = entity_records(block)
+    path = ('encounterComponent', 'entityEvents', 'item[0]', 'events')
+    events = _get(owner['edit'], path)
+    calls = [row['eventCall'] for row in list_items(events)]
+    if (len(calls) != 6 or calls[-2]['eventDef'] != 'waitAIRemaining' or
+            calls[-1]['eventDef'] != 'activateTarget' or
+            calls[-1]['args']['item[0]'].get('entity') != 'phobos_target_relay_119'):
+        raise ValueError('Mars Core post-BFG combat gate differs from the source')
+    # the combat exit also raises awareness if the landing misses its traversal volume
+    call = {'eventDef': 'raiseEventFlagOnExternalScript', 'args': {'num': 3,
+        'item[0]': {'entity': 'phobos_encounter_manager_15'},
+        'item[1]': {'eEncounterEventFlags_t': 'ENCOUNTER_EVENT_FLAG_USER_EVENT'},
+        'item[2]': {'string': 'exit_precom_aware'}}}
+    return _edit(block, path, {**events, 'num': 7, 'item[6]': {'eventCall': call}})
+
+
+def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
     prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
+    for origin, limit in _refill_limits(source, plan['maps'][map_key]['recipes']).items():
+        alias = 'ap_v070_refill_r' + origin
+        if alias in names or limit > 0x7fffffff:
+            raise ValueError('Invalid native refill limit')
+        names.add(alias)
+        aliases.append('entity { entityDef ' + alias + ' { inherit = "target/spawn"; class = "idTarget_Spawn"; '
+                       'edit = { spawnEditableShared = { groupName = "' + str(limit) + '"; } } } }')
     for recipe in plan["maps"][map_key]["recipes"]:
         binding = recipe["binding"]
         if binding["mode"] == "direct_point":
@@ -511,10 +597,20 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
                      "clipModelInfo": {"type": "CLIPMODEL_NONE"}}
                     if kind == "idTargetSpawnGroup" else
                     {"entityDefs": {"num": 0}, "initialEntityDefs": {"num": 0}, "targets": {"num": 0}})
+        if bounds is not None and kind == 'idTarget_Spawn' and recipe['family'] in {'immediate', 'possessed'}:
+            fallback = 'ap_v070_source_' + _functional_token(target)
+            if fallback not in names:
+                names.add(fallback)
+                settings_copy = {**record['edit'], 'flags': {**record['edit'].get('flags', {}), 'noFlood': False}}
+                aliases.append('entity { entityDef ' + fallback + ' { inherit = ' + _render(inherit, 0) +
+                               '; class = "idTarget_Spawn"; edit = ' + _render(settings_copy, 2) + ' } }')
         aliases.append('entity { entityDef ' + alias + ' { inherit = ' + _render(inherit, 0) +
             '; class = ' + _render(kind, 0) + '; edit = ' + _render(settings, 2) + ' } }')
         block = _edit(block, (*path, "args", f"item[{argument}]", "entity"), alias)
         changes[name] = start, end, block
+    if map_key == 'e2m3_core' and 'phobos_encounter_manager_6' in changes:
+        start, end, block = changes['phobos_encounter_manager_6']
+        changes['phobos_encounter_manager_6'] = start, end, _post_bfg_awareness(block)
     compiled = source
     for start, end, block in sorted(changes.values(), reverse=True):
         compiled = compiled[:start] + block + compiled[end:]

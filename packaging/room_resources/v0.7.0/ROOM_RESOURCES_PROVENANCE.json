@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "29fcc79204f3ccbe138f54f19f6fd073927201d453fd5cc4183a8fd0c89c6d46",
-    "size": 13970115
+    "sha256": "88bb862582a3c47e3eac252a0be5c8243094435c7e71625c5c11553802801a8d",
+    "size": 13970547
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
   "inputs_count": 427,
   "release_version": "0.7.0",
   "room_payload_manifest": {
-    "sha256": "d5a228a3d1c39b4f003c0e9cbb01f41b14746ac7a6c6b78dfb3e562eaac62442",
+    "sha256": "923fcfd7c567631ed95089e9746c98a35569999a5999c8c346179c6ac45db3c7",
     "size": 30786
   },
   "room_payloads": {
     "sha256": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
     "size": 18713969
   },
-  "room_resource_input_fingerprint": "548dfea827f5c4084cd14d1596cf7d31506f55f09f1b9d5a65332804b102777f",
+  "room_resource_input_fingerprint": "afa61bc463727c5771f1a79548fead60f68ded670279a040283a45dbb5d6796c",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -63,10 +63,10 @@
     "content/maps/e1m4_boss/locations.json": "29687ec34650759e531553a86ccdfed5044be77e8367a4492dcc747c857c214e",
     "content/maps/e1m4_boss/onboarding.json": "449928c5e70f49f13a737ed8b0127c973c32a106ae601217482412d54f054dbc",
     "content/maps/e1m4_boss/publishers.json": "756fafbc0073e39b2e75a12e310dab687a1e349b9c3825482a6bfbc88c8031c4",
-    "content/maps/e1m4_boss/runtime.json": "ffa1065ff0c7f6d61865389b4e9f36ad1dc88aeae88577814846701e0891767e",
+    "content/maps/e1m4_boss/runtime.json": "fb91dadab807ce4a1a4337f3b0ce6ef3d8f321bb5b488639cb28a84fe096d87a",
     "content/maps/e2m1_nest/assets.json": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
     "content/maps/e2m1_nest/descriptor.json": "3d0f30744f26d6698fbcdafe5a54f6e1c840fc1f3ff5e422441bcdf161da8dd9",
-    "content/maps/e2m1_nest/locations.json": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d",
+    "content/maps/e2m1_nest/locations.json": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918",
     "content/maps/e2m1_nest/onboarding.json": "981f4d60376d4a5c3d7df0feb79a7e87c5738111b78a6b62a6a773955353497c",
     "content/maps/e2m1_nest/publishers.json": "a0a937780b0c8d5b9620a12660970e98a3effbdd7631995a75bef5ca1c879a74",
     "content/maps/e2m1_nest/runtime.json": "d56fc565b1ef32b1912f17c5ceb8b06db22e51e5f28777da89aabf06d9648e2e",
@@ -185,8 +185,8 @@
     "data/campaign_sources/missionlist_dlc2.decl": "0d3c3f6e4b79c5f4f674a65cbe42a2461aa9f5b2ffaffe77ab1725734a2ad9a1",
     "data/campaign_sources/unmaykr_progress.decl": "45f16256aa32ebea9534612320bd90c5c1fc8f398596cdc44307b361424cf7e2",
     "data/campaign_stages.json": "19a18381059532b035b6cb7949baa83765c13c294ea9cad6948f6e6bd9a61403",
-    "data/challenge_location_registry.json": "5447bbc2d86d11946378ab558643b7ea4a2b2c00de54bc66c1d9e53cd691bbd3",
-    "data/checked_location_visuals.json": "f13506e2cd2898b6081f0ba145bdee79c82717aa5e6c539be64051f247dfa105",
+    "data/challenge_location_registry.json": "20f48a5942a040b3545e34e98f2a8e959dd7ede668d08e93cc259b5b0417b38d",
+    "data/checked_location_visuals.json": "aa31a85aab7014c05171764266b9a2e3b9bcfd57bd9b99afa80d416ad0b2e2c0",
     "data/content_identity.json": "b3a493db42d72f2e54bc91d262f13a2a987fb80fb2940a7d3140185c5fe58cdf",
     "data/contextual_location_names.json": "d94cb728d64d006d32af93e4600685b6b4b32c96766fba97fc78e495c36ce6a3",
     "data/devinv_sources/tag/e4m1_rig.decl": "bddcb02c136895c470bbd88a03216086a2e00406bd6fe1d80f347d7f0a797660",
@@ -235,7 +235,7 @@
     "doom_eap/content/mastery_requirements.py": "4a9fb9ef1cf8fe5dbca1c4a3335ca55ee99c38ae8127d6bf16ef6ca3ab2841f2",
     "doom_eap/content/native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
     "doom_eap/content/native_enemy_plan.py": "276666f2cc9f4a573114b38bbf1e3defa12ba0b20d7dbae88434a4c7523f037d",
-    "doom_eap/content/native_enemy_safety.py": "5426bc96ea46198857a9b674524cd0bc74e943f235aa0c749de5e579e80aa255",
+    "doom_eap/content/native_enemy_safety.py": "5670d71e65a8ba9c308132bc1711279f7d158edba4fe0b500ca6f65c2061a4a6",
     "doom_eap/content/options_foundation.py": "0093ff7f21daa5818b99a9ddf3da36b7bb4f7b613919eff588452e7fb13e5b6e",
     "doom_eap/content/physical_options.py": "d42368b639db8c2a91cabfc7212f334c6c49bc37aeb104b301f81ea05ca1b354",
     "doom_eap/content/publisher_loader.py": "3294603980928f10a72eb7944a3367a78dc5b6838f8b65f0082da67a420ea59c",
@@ -289,13 +289,13 @@
     "packaging/mod_assets/e1m1_intro/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
     "packaging/mod_assets/e1m1_intro/swf/hud/hud_score.swf": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
     "packaging/mod_assets/e1m1_intro_patch1/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
-    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
+    "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
     "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": "24e7f41600c64891afda3709952ac11232f2a11b8b8aa7c66428fafbe7ed5d0f",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m2_battle/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e1m2_battle/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
     "packaging/mod_assets/e1m2_battle/swf/hud/hud_score.swf": "b4c04ca45237e214cc9a8194eae90eae3ba6f203e45f6e15b8b3b7e6ddea3dde",
-    "packaging/mod_assets/e1m2_battle_patch1/swf/hud/hud_score.swf": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
+    "packaging/mod_assets/e1m2_battle_patch1/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
     "packaging/mod_assets/e1m2_battle_patch2/swf/hud/hud_score.swf": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e1m3_cult/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
@@ -312,7 +312,7 @@
     "packaging/mod_assets/e2m2_base/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m2_base/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m2_base/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+    "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e2m3_core/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e2m3_core/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e2m3_core/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
@@ -336,7 +336,7 @@
     "packaging/mod_assets/e3m3_maykr/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m3_maykr/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m3_maykr/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
-    "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+    "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/e3m4_boss/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e3m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e3m4_boss/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
@@ -388,7 +388,7 @@
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/logo_base_white.png$bc7$streamed$mtlkind=ui": "d94876fcd004b124dfd8e33dd1654f5f06e9efd684338aa4c0955379df6f0aab",
     "packaging/mod_assets/gameresources/textures/swf_images/start_screen/scanline_a.png$bc7$streamed$mtlkind=ui": "d94876fcd004b124dfd8e33dd1654f5f06e9efd684338aa4c0955379df6f0aab",
     "packaging/mod_assets/gameresources_patch1/generated/decls/damage/damage/triggerhurt/triggerhurt1000_instagib.decl": "b7d1ecbdf3e41250c16eb78b9682e7dddd99d18312d2c604590be26e18418780",
-    "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
+    "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_map.swf": "70b1317db301c4bd069f52a42cfc2e36287f7f39143bcee5fc0f513d0d4fffb1",
     "packaging/mod_assets/gameresources_patch1/swf/hud/menus/end_of_level/eol_challenges.swf": "96465b1e8fa9eb501222a610248d64aa8219894895882336bb0a2d2efdd77437",
@@ -420,7 +420,7 @@
     "tools/decls/rune_slot_builder.py": "657f5e08a322a065532ef48a8b85e0be3167685ceb14223e0e132a11085c41c8",
     "tools/decls/weapon_stripping_builder.py": "a24c61e1e6b99b9ec2e4734d2acdf871bd75390ceec8be66bcc8b80d45bc5138",
     "tools/maps/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/maps/ap_map_generator.py": "d3ad98dcaebcab0514ebbb50f988eda242666498cc2c96e0fa156eef3525fe66",
+    "tools/maps/ap_map_generator.py": "e62ea63c42352e47ea1b52a16288aa85d3555c1b7419cf98d6609303b5cc8ac0",
     "tools/maps/automap_baseline_guard.py": "80f4697708701ab10eb64764d0ebc12c19de2cf711e74ea06a870fe4c253b10d",
     "tools/maps/automap_native_decl_builder.py": "3f563f87e4a79deb9e4c084849f4fa03262cc632d9d20dc17c69940eb881675b",
     "tools/maps/encounter_catalog.py": "ed00150e720ebfce63892d6628d5413f211b86ef460fbfa15bd8afd8d43e7894",
@@ -435,7 +435,7 @@
     "tools/maps/map_semantic_baseline.py": "5d772f2d1afd37362c878ab668234ed1dafab9ca463f3f0b62394b08c0501b79",
     "tools/maps/mission_complete_map_patcher.py": "10c70ebc62be7826783654c66a1d1b2c743bf04804d4645129f8e4441b638b88",
     "tools/maps/native_enemy_inventory.py": "2c6a09b335cdc26edf08d4163302ac8408be97eb7adeef1b98b41be5f0fbf8d9",
-    "tools/maps/native_recipe_materializer.py": "f1df7bae7af89433d5a50a828194ad7cb6f39591dfe56b3073d57eefe5f7e01f",
+    "tools/maps/native_recipe_materializer.py": "efe0eb1e5de6312599145b2042ba5a2511f6a9fd0bb231ff76e1439cae13789e",
     "tools/maps/notification_formatting.py": "10b48794fb330d1fd2bb5044d9c5507be65b915e2cef4fe1337632219e226f70",
     "tools/maps/resource_priority.py": "956fe83c24c088bb855f39d0488e55cae9aba9ce4415947fed5da6d00767397b",
     "tools/maps/shell_menu_visual.py": "7024a2619d04c2590c58aa70c9c9ec9132c3bdc567012d9d7a6de430c030be13",
@@ -447,7 +447,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "b6675c1ff355ad72698c78107c2645724d65400c",
+      "base_commit_sha": "c578a77a74c69ec877c3f4836b4a3296d129e40c",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -4140,8 +4140,8 @@
             "size": 134
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "edab68086e83c18d23600bf2647dfe1999c3164900df8dca0a3a8f2cf061efc2",
-            "size": 37789
+            "sha256": "a44182224eb910160a5a4b17ce657c390c5bee48067a0097640e8f311ee0c0a3",
+            "size": 38440
           },
           "archipelago/worlds/doometernal/campaign_kill_sources.json": {
             "sha256": "ec1bfbe85ae49ced2193964b67a27e4b1fb0160ac7b2e542c3823f30152f2744",
@@ -4224,8 +4224,8 @@
             "size": 61280
           },
           "archipelago/worlds/doometernal/native_enemy_safety.py": {
-            "sha256": "d7572dafe16aba7adfa5dee60a70291ef886d11b389efd34c06eddc0c51d4003",
-            "size": 7999
+            "sha256": "4527f2a8577277d303f8c48b4f3dd64f6909a1ed3270215c7fcccc56f69c9c7b",
+            "size": 8161
           },
           "archipelago/worlds/doometernal/options.py": {
             "sha256": "9326904805dc4c181dcc31a485d3d72a5747042d89ae07cc1d4e859c5113070d",
@@ -13084,12 +13084,12 @@
             "size": 136
           }
         },
-        "fingerprint": "88c935937487222b1714526cfa2b6f724ce7c281ea8150766cfbddbe9c3faa17",
+        "fingerprint": "caf1befc16caf3d4386083dcb1bddc0b2ba3967c2636a75fe6b1b62b4246bc41",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "0c7d8e3c3a96e1877f28da54be8d75d7c4dcf495",
+      "base_commit_sha": "1b2778331fd72c62e135b82019c321869191e620",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -13318,8 +13318,8 @@
             "size": 596
           },
           "content/maps/e1m4_boss/runtime.json": {
-            "sha256": "8f084ca9652957155050d5180a227d5c909e84fa5184a6578c04614ee098b0a2",
-            "size": 4534
+            "sha256": "0d73972d5a18bc07339ba34ec07531ee8b4c6080900274a95895de6d7ebca2e6",
+            "size": 4647
           },
           "content/maps/e2m1_nest/assets.json": {
             "sha256": "d5a5b17e739d51433f329a87e994b4778a2f552f73c8f591b38354a8618711c5",
@@ -13330,8 +13330,8 @@
             "size": 1235
           },
           "content/maps/e2m1_nest/locations.json": {
-            "sha256": "631585b1770ad9fc1a3c7286523bea92063c48e10ef6ca078f2bd1f935302b1a",
-            "size": 9240
+            "sha256": "897d1af437999fdf6669e849a9aec97dbdfdb788fc97b996ffb2d2a85e3a10ed",
+            "size": 9313
           },
           "content/maps/e2m1_nest/onboarding.json": {
             "sha256": "15b76c59866fa8b91924977dc978006136abf32648037094b8d737541d172663",
@@ -13806,11 +13806,11 @@
             "size": 14227
           },
           "data/challenge_location_registry.json": {
-            "sha256": "db685969ddc2e769c495021c86b625f3d32429d9376eebaf8b6e2a32de3c8a74",
-            "size": 66069
+            "sha256": "20f48a5942a040b3545e34e98f2a8e959dd7ede668d08e93cc259b5b0417b38d",
+            "size": 64365
           },
           "data/checked_location_visuals.json": {
-            "sha256": "f13506e2cd2898b6081f0ba145bdee79c82717aa5e6c539be64051f247dfa105",
+            "sha256": "aa31a85aab7014c05171764266b9a2e3b9bcfd57bd9b99afa80d416ad0b2e2c0",
             "size": 609710
           },
           "data/content_identity.json": {
@@ -14010,8 +14010,8 @@
             "size": 61280
           },
           "doom_eap/content/native_enemy_safety.py": {
-            "sha256": "d7572dafe16aba7adfa5dee60a70291ef886d11b389efd34c06eddc0c51d4003",
-            "size": 7999
+            "sha256": "4527f2a8577277d303f8c48b4f3dd64f6909a1ed3270215c7fcccc56f69c9c7b",
+            "size": 8161
           },
           "doom_eap/content/options_foundation.py": {
             "sha256": "2dc58ff4963e46d05e8d8805b0e4a675c697bd21025974a449158fb6183f7b53",
@@ -14118,16 +14118,16 @@
             "size": 3120
           },
           "doom_eap/launcher/campaign_resources.py": {
-            "sha256": "3002394d819707ce8d98e8395d1de8842c16a568a92e11f813ffdefdb672b803",
-            "size": 16400
+            "sha256": "c2584d3a3816a3732620f2c7a874661b6795bc299e850ca2976e1993f5185c27",
+            "size": 16811
           },
           "doom_eap/launcher/connection_errors.py": {
             "sha256": "cd42610fc9666508d8441466901be022b48b2a7a5cd4dab2d3a28212cd1e3a73",
             "size": 7535
           },
           "doom_eap/launcher/launcher_app.py": {
-            "sha256": "7876e34ae6bc93df1d5fb99a58ea180fa377c5c7f495c62688cf6ddf84336879",
-            "size": 18791
+            "sha256": "cb112c99e7824b52232fa29dbfd70a00482c18dd2134a4ee95ab155aa85719ff",
+            "size": 18932
           },
           "doom_eap/launcher/launcher_controller.py": {
             "sha256": "b7024510be3ca72dc48bca89a27797f89fc9da48e959e2150d475c4f3ffc6263",
@@ -14182,8 +14182,8 @@
             "size": 11691
           },
           "doom_eap/launcher/launcher_ui.py": {
-            "sha256": "6f102409c1735115d53115fe2423df8f4cc6c9db32c3dc8359f0c0734347c57d",
-            "size": 203149
+            "sha256": "352a4365b1ecb6b4c2fb715fed3ac064b731ea54c1e8962096dc8ad2ef808263",
+            "size": 203955
           },
           "doom_eap/launcher/launcher_workers.py": {
             "sha256": "dcf713c0c8dfdb0c3705e4c7345954c298d0fde9b14cf30ed0cafcbdca7a49e3",
@@ -14602,8 +14602,8 @@
             "size": 180955
           },
           "packaging/mod_assets/e1m1_intro_patch2/swf/hud/hud_score.swf": {
-            "sha256": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
-            "size": 179901
+            "sha256": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
+            "size": 180955
           },
           "packaging/mod_assets/e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl": {
             "sha256": "24e7f41600c64891afda3709952ac11232f2a11b8b8aa7c66428fafbe7ed5d0f",
@@ -14626,8 +14626,8 @@
             "size": 177722
           },
           "packaging/mod_assets/e1m2_battle_patch1/swf/hud/hud_score.swf": {
-            "sha256": "bfe4a5de32398bc4f263a2aa23d15d80bbe31ca9558f0f87e4e327100c5ee0b9",
-            "size": 179901
+            "sha256": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
+            "size": 180955
           },
           "packaging/mod_assets/e1m2_battle_patch2/swf/hud/hud_score.swf": {
             "sha256": "e0f902375c33412b2f8450a688f2cb5ea022f80cea6f4239cc0662d9e8ddf78e",
@@ -14694,8 +14694,8 @@
             "size": 660
           },
           "packaging/mod_assets/e2m2_base_patch2/swf/hud/hud_score.swf": {
-            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
-            "size": 179901
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e2m3_core/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14790,8 +14790,8 @@
             "size": 660
           },
           "packaging/mod_assets/e3m3_maykr_patch2/swf/hud/hud_score.swf": {
-            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
-            "size": 179901
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/e3m4_boss/art/pickups/codex.lwo": {
             "sha256": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
@@ -14998,8 +14998,8 @@
             "size": 403
           },
           "packaging/mod_assets/gameresources_patch1/swf/hud/hud_score.swf": {
-            "sha256": "86b74827df080313e70a39eeadccf9cb37459b5571715cecb729dc3a8241a747",
-            "size": 179901
+            "sha256": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+            "size": 180955
           },
           "packaging/mod_assets/gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf": {
             "sha256": "e20a110922710e7b8171d772c87f8176f6dd9b50cf0d084fcc433f025077e2e2",
@@ -15254,8 +15254,8 @@
             "size": 0
           },
           "tools/maps/ap_map_generator.py": {
-            "sha256": "d2a8147aba29d308b04d509399de9e24eecac934326a861d03d7ee1e49887192",
-            "size": 143956
+            "sha256": "880076170d8260aab0bd3cdc7f4598b16c91c1a7c4192f698bab2aaf1725a131",
+            "size": 144047
           },
           "tools/maps/automap_baseline_guard.py": {
             "sha256": "b10a4c71fd0243ceee8180cf31134ec47d3778c7a43095ec9137e94def39fb51",
@@ -15314,8 +15314,8 @@
             "size": 23125
           },
           "tools/maps/native_recipe_materializer.py": {
-            "sha256": "14e37ce09ab89a62fb0db296cb6bea7450d1907535649388d354e3d0df409c9b",
-            "size": 32700
+            "sha256": "960e783204eda1a7261996388cba7aed3e728547227f7c29fb061996a3e38405",
+            "size": 39048
           },
           "tools/maps/notification_formatting.py": {
             "sha256": "252d60e862d7b45c75d470afecfaa6cc4958585734f02fab4a6e19c3cc2b978c",
@@ -15486,7 +15486,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "75658f3b7d5133dd073def7bbe0578ace21b33fa0a83bc555a3ad31825837e4a",
+        "fingerprint": "8ec6314fb50f7a4d3dfe98918d509d0189df6777aa684ccd85b2896526238518",
         "kind": "working_tree_snapshot"
       }
     }

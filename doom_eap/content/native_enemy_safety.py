@@ -4,6 +4,7 @@ from importlib.resources import files
 import json
 
 SCRIPTED_BOSS_ACTORS = {'e1m4_boss': frozenset({'boss_intro_ai_superheavy_doomhunter_stage1_1'})}
+CINEMATIC_BOSS_ACTORS = {'e2m2_base': frozenset({'confront_samuel_ai'})}
 FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a_target_spawn_42'})}
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
 SMALL_GROUND_ENEMIES = frozenset({'imp', 'hell_soldier', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper'})
@@ -37,7 +38,7 @@ def project_native_safety(plan, enemies):
 
     if plan is None:
         return None
-    affected = (set(SCRIPTED_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS)) & set(plan['maps'])
+    affected = (set(SCRIPTED_BOSS_ACTORS) | set(CINEMATIC_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS)) & set(plan['maps'])
     affected.update(key for key, stage in plan['maps'].items()
                     if any(body['species'] == 'cursed_prowler' for recipe in stage['recipes'] for body in recipe['bodies']))
     if not affected:
@@ -48,7 +49,7 @@ def project_native_safety(plan, enemies):
     changes = []
     for map_key in sorted(affected):
         stage = result['maps'][map_key]
-        protected = SCRIPTED_BOSS_ACTORS.get(map_key, ())
+        protected = SCRIPTED_BOSS_ACTORS.get(map_key, frozenset()) | CINEMATIC_BOSS_ACTORS.get(map_key, frozenset())
         points = FLYING_SPAWN_POINTS.get(map_key, ())
         settings = {**enemies, 'special_limits': stage['special_limits']}
         for recipe in stage['recipes']:

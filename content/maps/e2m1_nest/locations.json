@@ -119,6 +119,8 @@
       "independent_ap_trigger": true,
       "gate_relay": "game_target_relay_249",
       "reveal_entity": "game_target_show_16",
+      "preserve_layers": false,
+      "preserve_visual_layers": false,
       "preserve_targets": [],
       "independent_targets": [
         "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_1",

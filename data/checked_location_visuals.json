@@ -1,5 +1,5 @@
 {
-  "authoritative_fingerprint": "f696339d39197fd8b14c17ef1d4b73417fb1d3fd626508f6d658decea26018bc",
+  "authoritative_fingerprint": "2aada2a172a0bcf78b06a7508f633cf7569720d86a998e55dfe33a190d88b1c9",
   "catalog_fingerprint": "72b6eea42a9ff8d56787fe4ad0860610cdcb46f62aeedd85c492b7a50b415d87",
   "compiler_revision": 5,
   "content_revision": "0.7.0",
@@ -2894,7 +2894,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_1_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -2922,7 +2922,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_2_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -2950,7 +2950,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_3_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -2978,7 +2978,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_4_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3006,7 +3006,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_PRAETOR_TOKEN_5_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3034,7 +3034,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_MOD_BOT_1_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3062,7 +3062,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_MOD_BOT_2_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3090,7 +3090,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_RUNE_1_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3118,7 +3118,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_RUNE_2_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3146,7 +3146,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_SOLDIER_SHIELD_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3174,7 +3174,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_REVENANT_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3202,7 +3202,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_TIER_3_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3230,7 +3230,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_04_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3258,7 +3258,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_05_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3286,7 +3286,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_5_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3314,7 +3314,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_7_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3342,7 +3342,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_8_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3370,7 +3370,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_9_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3398,7 +3398,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_CODEX_1_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3426,7 +3426,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_CODEX_3_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3454,7 +3454,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_CODEX_4_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3482,7 +3482,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3510,7 +3510,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_2_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3538,7 +3538,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_SENTINEL_BATTERY_3_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3566,7 +3566,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_CHEATS_INFINITE_AMMO_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3594,7 +3594,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "GAME_PICKUP_WEAPON_CHAINGUN_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3618,7 +3618,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "SECRET_ENCOUNTER_SGN_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3642,7 +3642,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "SECRET_ENCOUNTER_SGN_2",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3670,7 +3670,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_PROGRESS_ARGENT_CELL_1_1144181771_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3698,7 +3698,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "SLAYER_GATE_PICKUP_KEYCARD_SLAYER_KEY_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3722,7 +3722,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "SLAYER_GATE_TARGET_RELAY_33",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3750,7 +3750,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "PICKUPS_INTERACT_AUTOMAP_1_E2M1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {
@@ -3765,8 +3765,8 @@
       "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
       "source_identity": {
         "descriptor_sha256": "3d0f30744f26d6698fbcdafe5a54f6e1c840fc1f3ff5e422441bcdf161da8dd9",
-        "location_descriptor_sha256": "2fffea28e4739d468af81325710a27cd06f2dca186f456fb61948f4f1735f18c",
-        "policy_sha256": "3ae955c28f8682e4087da83b6d5148a21f0f5252c3dedca39c345d36c31edb5a",
+        "location_descriptor_sha256": "18d6086c2de950bf3432d5365c67d7d17a264650a3f98d4bf002785a163d1d46",
+        "policy_sha256": "2490057391aa12cff2e059201156921d1172262f0da810a86843543a92cd60dc",
         "resolved_policy": "generated_universal",
         "resource": {
           "relative_entities_path": "game/sp/e2m1_nest/e2m1_nest.entities",
@@ -3778,7 +3778,7 @@
         "resource_sha256": "6e8b6cc0b9b9b92559c623456742d758ae7ed690b04f5f8b2b2d123302c9f73a",
         "source_entity": "GAME_PICKUP_MEGA_HEALTH_1",
         "source_file": "content/maps/e2m1_nest/locations.json",
-        "source_sha256": "f8dca8c2c60a7c1fd4c92a92281740866a7635bfbf530ed95c70193d5ac4d77d"
+        "source_sha256": "ae04696f0ac441b6e06ac9b56f3c3e1e7ae728570122f1ce89918c436f065918"
       }
     },
     {

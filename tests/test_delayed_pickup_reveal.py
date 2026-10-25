@@ -44,7 +44,8 @@ def properties(content, name):
     return parse_object(text[header.end():].rsplit("}", 2)[0])["edit"]
 
 
-def test_delayed_reward_requires_relay_activation_before_touch():
+@pytest.mark.parametrize("delayed_layer", [False, True])
+def test_delayed_reward_requires_relay_activation_before_touch(delayed_layer):
     policy = {
         "independent_ap_trigger": True,
         "gate_relay": "gate",
@@ -52,6 +53,9 @@ def test_delayed_reward_requires_relay_activation_before_touch():
         "independent_position": [0.0, 61.0, 1.95],
     }
     original = source()
+    if delayed_layer:
+        original = original.replace('entityDef pickup', 'layers { "reward_layer" } entityDef pickup')
+        policy.update(preserve_layers=False, preserve_visual_layers=False)
     rewritten = replace_pickup_reveal_target(original, "pickup", 1, policy)
     rewritten = append_target_to_named_entity(rewritten, "gate", "ap_independent_pickup")
     assert properties(rewritten, "gate")["delay"] == 1
@@ -65,6 +69,9 @@ def test_delayed_reward_requires_relay_activation_before_touch():
     assert _spawn_position_from_block(trigger) == (0.0, 61.0, 1.95)
     assert properties(visual, "ap_location_visual_1")["flags"]["hide"] is True
     assert properties(visual, "ap_location_visual_1")["whenToSave"] == "SGT_CHECKPOINT"
+    if delayed_layer:
+        assert 'reward_layer' not in trigger
+        assert 'reward_layer' not in visual
 
 
 def test_crystal_contact_is_armed_without_requiring_the_vanilla_use_relay():

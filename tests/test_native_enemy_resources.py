@@ -1,5 +1,6 @@
 import hashlib
 import json
+from pathlib import Path
 import zipfile
 
 import pytest
@@ -150,20 +151,25 @@ def test_bank_publication_failure_rolls_back_other_resource_metadata(tmp_path, m
     assert {name: (tmp_path / name).read_bytes() for name in names} == originals
 
 
-def test_finalizer_activates_the_packaged_fortress_hud_and_preserves_other_bits(tmp_path, monkeypatch):
+@pytest.mark.parametrize('bank', ['game/hub/hub_patch1.resources', 'game/sp/e2m2_base/e2m2_base_patch2.resources'])
+def test_finalizer_activates_the_packaged_hud_and_preserves_other_bits(tmp_path, monkeypatch, bank):
     import struct
     from test_resource_bank import write_bank
     base = tmp_path / 'base'; base.mkdir()
-    bank = 'game/hub/hub_patch1.resources'
+    container = Path(bank).stem
     (base / bank).parent.mkdir(parents=True)
     name = 'swf/hud/hud_score.swf'; hud = b'packaged AP HUD'
     write_bank(base / bank, [('cswf', name, hud, ())])
     mask = struct.pack('<IIQIQ', 0, 1, 17, 1, 2)
     write_bank(base / 'meta.resources', [('rs_streamfile', 'generated/buildgame/container.mask', mask, ())])
     (base / 'idRehash.map').write_text(bank + ';8\n')
+    files = [{'name': bank}, {'name': bank}]
+    if container == 'hub_patch1':
+        files.append({'name': 'game/dlc/hub/hub_patch1.resources'})
+    (base / 'packagemapspec.json').write_text(json.dumps({'files': files}))
     package = tmp_path / 'room.zip'
     with zipfile.ZipFile(package, 'w') as archive:
-        archive.writestr('hub_patch1/' + name, hud)
+        archive.writestr(container + '/' + name, hud)
     monkeypatch.setattr('doom_eap.launcher.native_enemy_resources.prepare_native_resource_banks',
                         lambda *args, **kwargs: ({}, {'maps': {}}))
     monkeypatch.setattr('doom_eap.launcher.resource_bank.obsolete_banks', lambda *args: {})
@@ -177,8 +183,8 @@ def test_finalizer_activates_the_packaged_fortress_hud_and_preserves_other_bits(
     assert campaign_resources.enable_campaign_resources(tmp_path, package)['state'] == 'enabled'
     before = (base / 'meta.resources').read_bytes()
     with zipfile.ZipFile(package, 'w') as archive:
-        archive.writestr('hub_patch1/' + name, b'different HUD')
-    with pytest.raises(ValueError, match='Fortress HUD differs'):
+        archive.writestr(container + '/' + name, b'different HUD')
+    with pytest.raises(ValueError, match='Installed HUD differs'):
         campaign_resources.enable_campaign_resources(tmp_path, package)
     assert (base / 'meta.resources').read_bytes() == before
 

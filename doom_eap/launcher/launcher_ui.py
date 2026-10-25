@@ -3722,6 +3722,20 @@ class LauncherUI(QMainWindow):
 
     def run(self) -> None:
         self.show()
+        if os.name == 'nt' and getattr(sys, 'frozen', False):
+            import ctypes
+            kernel = ctypes.windll.kernel32
+            user = ctypes.windll.user32
+            kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+            kernel.GetModuleHandleW.restype = ctypes.c_void_p
+            user.LoadIconW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            user.LoadIconW.restype = ctypes.c_void_p
+            user.SendMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+            user.SendMessageW.restype = ctypes.c_ssize_t
+            icon = user.LoadIconW(kernel.GetModuleHandleW(None), 1)
+            if icon:
+                for size in (0, 1):
+                    user.SendMessageW(int(self.winId()), 0x80, size, icon)
         app = QApplication.instance()
         if app is None: raise RuntimeError("LauncherUI requires QApplication")
         app.exec()

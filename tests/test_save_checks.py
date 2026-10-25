@@ -96,9 +96,10 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
     assert packets[-1] == {"cmd": "LocationChecks", "locations": [301]}
 
 
-def test_doom_hunter_base_big_reveal_follows_confirmed_contact_check_without_native_automap_use():
+@pytest.mark.parametrize(('challenge', 'pickup'), [(7770173, 7770496), (7770172, 7770157)])
+def test_doom_hunter_base_challenge_follows_confirmed_contact_check(challenge, pickup):
     registry = load_challenge_registry()
-    entry = next(row for row in registry['mission_challenges'] if row['location_id'] == 7770173)
+    entry = next(row for row in registry['mission_challenges'] if row['location_id'] == challenge)
     service = SaveChecks({}, {entry['signal']['unlockable']: entry}, {}, [], logging.getLogger('checks'))
     packets = []
 
@@ -107,12 +108,12 @@ def test_doom_hunter_base_big_reveal_follows_confirmed_contact_check_without_nat
 
     publication = CheckPublication(send, lambda _: None, 30)
     readiness = SaveCheckReadiness(True, False, None)
-    current = CheckObservation(frozenset(), frozenset({7770496}), frozenset({7770496, 7770173}), True, True)
+    current = CheckObservation(frozenset(), frozenset({pickup}), frozenset({pickup, challenge}), True, True)
     asyncio.run(service.check_challenge(entry, readiness, current, publication))
     assert packets == []
-    current = replace(current, checked=frozenset({7770496}))
+    current = replace(current, checked=frozenset({pickup}))
     asyncio.run(service.check_challenge(entry, readiness, current, publication))
-    assert packets == [{'cmd': 'LocationChecks', 'locations': [7770173]}]
+    assert packets == [{'cmd': 'LocationChecks', 'locations': [challenge]}]
 
 
 def test_aggregate_requires_active_children_or_its_mission_completion():

@@ -172,6 +172,8 @@ def _run_self_test(arguments: list[str]) -> int:
                 if app is None:
                     app = QApplication(["launcher_selftest", "-platform", "offscreen"])
                 ui = LauncherUI(controller)
+                if ui.windowIcon().pixmap(32).isNull():
+                    raise RuntimeError('Launcher window icon could not be loaded')
                 if ui.pages.count() < 5:
                     raise RuntimeError(f"Expected at least 5 UI pages, found {ui.pages.count()}")
                 ui.timer.stop()

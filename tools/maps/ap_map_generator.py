@@ -589,6 +589,7 @@ TARGET_POLICY_CONSUMERS = {
     "no_auto_automap_helper": "generate_map automap helper branch",
     "independent_automap_properties_decl": "build_universal_physical_policy",
     "preserve_layers": "generate_independent_pickup_trigger",
+    "preserve_visual_layers": "generate_inert_location_visual",
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
     "preserve_original_visual": "generate_map original-owner branch",
     "native_entity_contract": "apply_native_entity_contract",
@@ -748,7 +749,7 @@ def validate_target_policies(config_entities, target_policies, content):
         independent_only = {
             "remove_original", "independent_entity_name", "independent_position",
             "independent_size", "independent_targets", "independent_visual",
-            "completion_targets", "no_auto_visual", "preserve_layers", "bind_parent",
+            "completion_targets", "no_auto_visual", "preserve_layers", "preserve_visual_layers", "bind_parent",
             "reveal_entity",
         }
         if "reveal_entity" in policy and not all(
