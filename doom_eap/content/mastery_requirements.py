@@ -15,7 +15,7 @@ def mastery_entries_for_profile(entries, profile):
     for entry in entries:
         requirement = entry["requirement"]
         count = requirement["original_count"]
-        if requirement["kind"] == "repetitions":
+        if requirement["kind"] in {"repetitions", "damage"}:
             count = max(1, (count + divisor - 1) // divisor)
         result.append({**entry, "signal": {**entry["signal"], "rule_0_statCount": count}})
     return tuple(result)

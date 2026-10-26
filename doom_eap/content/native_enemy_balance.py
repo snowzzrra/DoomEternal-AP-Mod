@@ -15,7 +15,9 @@ AMMO_FODDER = frozenset({'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'h
 PURE_BOSS_MAPS = BOSS_MAPS - {'e1m4_boss'}
 
 
-def _category(species):
+def _category(species, mobile=False):
+    if mobile and species in {'tentacle', 'super_tentacle', 'turret'}:
+        return 'fodder' if species == 'tentacle' else 'heavy'
     return species if species in SPECIAL_SPECIES else ROLES[species]
 
 
@@ -58,9 +60,33 @@ def _peak(waves):
     return maximum
 
 
-def _encounters(profile):
+def _encounters(profile, *, mobile=False):
     if 'encounters' in profile:
-        return profile['encounters']
+        if not mobile:
+            return profile['encounters']
+        from .secret_encounter_timers import load_secret_encounter_timers
+        from .native_enemy_safety import AMBIENT_ENCOUNTERS
+        secret = {row['manager'] for row in load_secret_encounter_timers()['maps'].get(
+            profile['map_key'], {}).get('timers', [])}
+        result = []
+        for source in profile['encounters']:
+            row = {**source, 'peak': {**source['peak']}}
+            if row['owner'] in AMBIENT_ENCOUNTERS.get(profile['map_key'], ()):
+                row['kind'] = 'ambient_encounter'
+            elif row['owner'] in secret:
+                row['kind'] = 'secret_encounter'
+            elif all(set(slot['species']) <= {'cueball'} for slot in row['slots']):
+                row['kind'] = 'cueball_encounter'
+            elif all(set(slot['species']) <= {'tentacle', 'super_tentacle', 'turret', 'cueball'}
+                     for slot in row['slots']):
+                row['kind'] = 'stationary_encounter'
+            stationary_heavy = max((sum(slot['count'] for slot in wave['slots']
+                if set(slot['species']) <= {'super_tentacle', 'turret'}) for wave in row['waves']), default=0)
+            row['peak']['heavy'] += stationary_heavy
+            row['spawn_shape'] = (any(not slot['renewable'] for slot in row['slots']),
+                                  any(slot['renewable'] for slot in row['slots']))
+            result.append(row)
+        return result
     grouped = {}
     for wave in profile['waves']:
         identity = wave['id'].rsplit('/', 1)[0] if '/encounterComponent.' in wave['id'] else wave['id']
@@ -74,6 +100,10 @@ def _encounters(profile):
 
 def _quantile(index, count, length):
     return 0 if length == 1 or count == 1 else (index * (length - 1) * 2 + count - 1) // (2 * (count - 1))
+
+
+def _corresponding(index, count, length):
+    return min(length - 1, (2 * index + 1) * length // (2 * count))
 
 
 def _reference_map(catalog, campaign, map_key, stage_index, stage_count, progressive):
@@ -145,7 +175,7 @@ def _allocate_pool_counts(sources, target):
     return counts
 
 
-def _native_budget(encounter, *, seed, renewable):
+def _native_budget(encounter, *, seed, renewable, mobile=False):
     counts = Counter()
     for slot in encounter['slots']:
         if slot['renewable'] != renewable:
@@ -157,11 +187,11 @@ def _native_budget(encounter, *, seed, renewable):
         draw = _random_for(seed, slot['source_id'], 'vanilla_pool')
         for index in range(slot['count']):
             species = slot['species'][draw.randrange(len(slot['species']))]
-            counts[_category(species)] += quotient + (index < remainder)
+            counts[_category(species, mobile)] += quotient + (index < remainder)
     return counts
 
 
-def _native_costs(encounter, *, seed, renewable):
+def _native_costs(encounter, *, seed, renewable, mobile=False):
     costs = Counter()
     for slot in encounter['slots']:
         if slot['renewable'] != renewable:
@@ -171,7 +201,7 @@ def _native_costs(encounter, *, seed, renewable):
         draw = _random_for(seed, slot['source_id'], 'vanilla_pool')
         for index in range(slot['count']):
             species = slot['species'][draw.randrange(len(slot['species']))]
-            costs[_category(species)] += BASE_COMBAT_COST[species] * (quotient + (index < remainder))
+            costs[_category(species, mobile)] += BASE_COMBAT_COST[species] * (quotient + (index < remainder))
     return costs
 
 
@@ -202,15 +232,15 @@ def _reserve_ammo_counts(sources, counts, required, *, candidates, catalog, supp
     return counts
 
 
-def _cost_budget(encounter, desired, *, seed, renewable, candidates):
-    counts = _native_budget(encounter, seed=seed, renewable=renewable)
-    costs = _native_costs(encounter, seed=seed, renewable=renewable)
+def _cost_budget(encounter, desired, *, seed, renewable, candidates, mobile=False):
+    counts = _native_budget(encounter, seed=seed, renewable=renewable, mobile=mobile)
+    costs = _native_costs(encounter, seed=seed, renewable=renewable, mobile=mobile)
     return {category: quantity * (costs[category] / counts[category] if counts[category] else
-        min((BASE_COMBAT_COST[name] for name in candidates if _category(name) == category), default=Fraction(0)))
+        min((BASE_COMBAT_COST[name] for name in candidates if _category(name, mobile) == category), default=Fraction(0)))
         for category, quantity in desired.items()}
 
 
-def _body_costs(sources, bodies, *, renewable):
+def _body_costs(sources, bodies, *, renewable, mobile=False):
     costs = Counter()
     for source in sources:
         roster = bodies[source['id']]
@@ -219,7 +249,7 @@ def _body_costs(sources, bodies, *, renewable):
         total = len(roster) if renewable else _emissions(source, len(roster))
         quotient, remainder = divmod(total, len(roster))
         for ordinal, body in enumerate(roster):
-            costs[_category(body['species'])] += BASE_COMBAT_COST[body['species']] * (quotient + (ordinal < remainder))
+            costs[_category(body['species'], mobile)] += BASE_COMBAT_COST[body['species']] * (quotient + (ordinal < remainder))
     return costs
 
 
@@ -299,11 +329,12 @@ def _special_limits(peak, settings):
     return result
 
 
-def _compatible(source, candidates, catalog, supplies, population, special_limits):
+def _compatible(source, candidates, catalog, supplies, population, special_limits, *, mobile=False):
     eligible = [species for species in candidates if not source.get('allowed_species')
                 or species in source['allowed_species']]
     return [species for species in eligible if
-        (ROLES[species] != 'heavy' or population['heavy'] > 0) and
+        (ROLES[species] != 'heavy' and (not mobile or species not in {'super_tentacle', 'turret'})
+         or population['heavy'] > 0) and
         (ROLES[species] != 'superheavy' or population['superheavy'] > 0) and
         (species not in SPECIAL_SPECIES or population['species'].get(species, 0) > 0) and
         (species not in {'marauder', 'archvile', 'spirit'} or special_limits[species] > 0) and
@@ -312,6 +343,8 @@ def _compatible(source, candidates, catalog, supplies, population, special_limit
 
 def _draw_bodies(sources, counts, budget, *, seed, key, settings, catalog, candidates, supplies,
                  population, stage_index, stage_count, hitpoints, renewable=False, cost_budget=None, ammo_required=0):
+    mobile = settings.get('mobile_stationary', False)
+    vary_cost = mobile and not settings.get('protected_opening', False)
     items = []
     for source in sources:
         count = counts[source['id']]
@@ -319,7 +352,7 @@ def _draw_bodies(sources, counts, budget, *, seed, key, settings, catalog, candi
             continue
         total = count if renewable else _emissions(source, count)
         quotient, remainder = divmod(total, count)
-        eligible = _compatible(source, candidates, catalog, supplies, population, settings['special_limits'])
+        eligible = _compatible(source, candidates, catalog, supplies, population, settings['special_limits'], mobile=mobile)
         if not eligible:
             raise ValueError(f"Vanilla encounter has no enabled compatible enemy: {source['id']}")
         items.extend(dict(source=source, weight=quotient + (ordinal < remainder), eligible=eligible,
@@ -340,7 +373,7 @@ def _draw_bodies(sources, counts, budget, *, seed, key, settings, catalog, candi
     for category in sorted(budget, key=lambda name: (name not in SPECIAL_SPECIES,
             {'superheavy': 0, 'heavy': 1, 'stationary': 2, 'fodder': 3}.get(name, -1), name)):
         available = [index for index in order if items[index]['selected'] is None and
-                     any(_category(species) == category for species in items[index]['eligible'])]
+                     any(_category(species, mobile) == category for species in items[index]['eligible'])]
         for index in _subset(items, budget[category], available):
             items[index]['selected'] = category
     reserved = Counter()
@@ -348,24 +381,28 @@ def _draw_bodies(sources, counts, budget, *, seed, key, settings, catalog, candi
         category = item['selected']
         if category is not None:
             reserved[category] += item['weight'] * min(BASE_COMBAT_COST[species] for species in item['eligible']
-                if _category(species) == category)
+                if _category(species, mobile) == category)
     result, actual, drawn, spent = {source['id']: [] for source in sources}, Counter(), Counter(), Counter()
     for index, item in enumerate(items):
-        eligible = [species for species in item['eligible'] if _category(species) == item['selected']]
+        eligible = [species for species in item['eligible'] if _category(species, mobile) == item['selected']]
         if not eligible:
-            eligible = [species for species in item['eligible'] if _category(species) == 'fodder'] or [
+            eligible = [species for species in item['eligible'] if _category(species, mobile) == 'fodder'] or [
                 min(item['eligible'], key=lambda species: (BASE_COMBAT_COST[species], species))]
-        if item['source']['id'] in supplies and all(_category(species) == 'fodder' for species in eligible):
+        if item['source']['id'] in supplies and all(_category(species, mobile) == 'fodder' for species in eligible):
             eligible = [species for species in eligible if species in AMMO_FODDER] or eligible
-        category = _category(eligible[0])
-        if cost_budget is not None and category in cost_budget:
+        category = _category(eligible[0], mobile)
+        if not vary_cost and cost_budget is not None and category in cost_budget:
             if item['selected'] == category:
                 reserved[category] -= item['weight'] * min(BASE_COMBAT_COST[species] for species in item['eligible']
-                    if _category(species) == category)
+                    if _category(species, mobile) == category)
             fitting = [species for species in eligible if
                 spent[category] + BASE_COMBAT_COST[species] * item['weight'] + reserved[category] <= cost_budget[category]]
             eligible = fitting or [min(eligible, key=lambda name: (BASE_COMBAT_COST[name], name))]
         weights = {species: max(1, settings['weights'][species] * 100 // (1 + drawn[species])) for species in eligible}
+        if vary_cost and cost_budget and cost_budget.get(category):
+            average = cost_budget[category] / max(1, budget[category])
+            weights = {species: max(1, round(weight * min(BASE_COMBAT_COST[species], average) /
+                max(BASE_COMBAT_COST[species], average))) for species, weight in weights.items()}
         draw_key = [key, index]
         species = sample_species({**settings, 'weights': weights}, eligible, seed=seed, instance_key=draw_key)
         attributes = sample_instance_attributes(settings, species, seed=seed, instance_key=draw_key,
@@ -375,8 +412,8 @@ def _draw_bodies(sources, counts, budget, *, seed, key, settings, catalog, candi
             hitpoints=hitpoints(catalog['species'][species], attributes), population_limits=dict(population),
             special_limits=_special_limits(dict(specials=population['species'],
                 combined_special=population['combined_special']), settings)))
-        actual[_category(species)] += item['weight']
-        spent[_category(species)] += BASE_COMBAT_COST[species] * item['weight']
+        actual[_category(species, mobile)] += item['weight']
+        spent[_category(species, mobile)] += BASE_COMBAT_COST[species] * item['weight']
         drawn[species] += 1
     return result, actual
 
@@ -415,16 +452,17 @@ def _compatible_reference(rows, chosen, sources, *, seed, settings, catalog, can
 
 
 def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, stage_index, stage_count,
-                        supplies, opening_sources, hitpoints):
+                        supplies, opening_sources, hitpoints, recipe_revision=13):
+    mobile = recipe_revision >= 14
     reference_map = _reference_map(catalog, campaign, map_key, stage_index, stage_count, settings['progressive'])
     reference = vanilla_profile(catalog, reference_map)
-    encounters = _encounters(reference)
+    encounters = _encounters(reference, mobile=mobile)
     reference_owners = list(dict.fromkeys(row['owner'] for row in encounters))
     grouped = {}
     for source in origins:
         if reference_source(source, catalog) or source.get('vanilla_stationary') or source.get('vanilla_passthrough'):
             grouped.setdefault((_owner(source), _variant(source)), []).append(source)
-    own_encounters = _encounters(vanilla_profile(catalog, map_key))
+    own_encounters = _encounters(vanilla_profile(catalog, map_key), mobile=mobile)
     unknown = [source for source in origins if source.get('vanilla_unknown')]
     target_owners = list(dict.fromkeys(row['owner'] for row in own_encounters
         if any(owner == row['owner'] for owner, _ in grouped)))
@@ -432,7 +470,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
     result, reports = {}, []
     map_peak = _peak([*reference['waves'], *reference.get('unknown_envelopes', [])])
     limits = _special_limits(map_peak, settings)
-    settings = {**settings, 'special_limits': limits}
+    settings = {**settings, 'special_limits': limits, 'mobile_stationary': mobile}
     candidates = sorted(species for species in catalog['species'] if settings['weights'].get(species, 0) > 0)
     progress = Fraction(stage_index, max(1, stage_count - 1)) if settings['progressive'] else Fraction(1)
     expected = sum(value * part for value, part in zip(ENEMY_RECIPES['slayers_path'].intensity,
@@ -441,22 +479,39 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
     for (owner, variant), sources in grouped.items():
         own_row = next((row for row in own_encounters if row['id'] == variant), {})
         kind = own_row.get('kind', 'scripted_encounter')
-        same_kind = [row for row in encounters if row.get('kind', 'scripted_encounter') == kind] or encounters
+        shape = own_row.get('spawn_shape')
+        ammo_geometry = any(_renewable(source) and not source.get('protected_reason') and
+            (not source.get('allowed_species') or AMMO_FODDER.intersection(source['allowed_species']))
+            for source in sources)
+        same_kind = [row for row in encounters if row.get('kind', 'scripted_encounter') == kind
+                     and (not mobile or row['spawn_shape'][0] == shape[0]
+                          and (shape[1] or not row['spawn_shape'][1])
+                          and (ammo_geometry or not _native_ammo_pool(row)))]
+        local_kind = mobile and not same_kind and bool(own_row)
+        same_kind = ([row for row in own_encounters if row.get('kind', 'scripted_encounter') == kind
+                      and row['spawn_shape'][0] == shape[0]
+                      and (shape[1] or not row['spawn_shape'][1])
+                      and (ammo_geometry or not _native_ammo_pool(row))]
+                     if local_kind else same_kind or encounters)
         reference_kind_owners = list(dict.fromkeys(row['owner'] for row in same_kind))
         target_kind_owners = list(dict.fromkeys(row['owner'] for row in own_encounters
-            if row.get('kind', 'scripted_encounter') == kind and row['owner'] in target_owners)) or target_owners
-        ref_owner = owner if reference_map == map_key and owner in reference_kind_owners else reference_kind_owners[
-            _quantile(target_kind_owners.index(owner), len(target_kind_owners), len(reference_kind_owners))]
-        references = [row for row in encounters if row['owner'] == ref_owner]
+            if row.get('kind', 'scripted_encounter') == kind and row['owner'] in target_owners
+            and (not mobile or row['spawn_shape'][0] == shape[0]))) or target_owners
+        index = _corresponding if mobile else _quantile
+        ref_owner = owner if (reference_map == map_key or local_kind) and owner in reference_kind_owners else reference_kind_owners[
+            index(target_kind_owners.index(owner), len(target_kind_owners), len(reference_kind_owners))]
+        references = [row for row in (same_kind if mobile else encounters) if row['owner'] == ref_owner]
         variants = [row['id'] for row in own_encounters if row['owner'] == owner and (owner, row['id']) in grouped]
         variants.extend(key for current, key in grouped if current == owner and key not in variants)
-        chosen = next((row for row in references if row['id'] == variant), None) if reference_map == map_key else None
+        chosen = next((row for row in references if row['id'] == variant), None) if reference_map == map_key or local_kind else None
         finite_target = any(not _renewable(source) and not source.get('protected_reason') for source in sources)
         compatible = [row for row in references if any(not slot['renewable'] for slot in row['slots']) == finite_target]
         references = compatible or references
-        chosen = chosen or references[_quantile(variants.index(variant), len(variants), len(references))]
+        chosen = chosen or references[index(variants.index(variant), len(variants), len(references))]
         translation = 'vanilla_encounter'
-        row_reference_map = reference_map
+        row_reference_map = map_key if local_kind else reference_map
+        if local_kind:
+            translation = 'native_encounter_kind'
         native_only = all(source.get('protected_reason') for source in sources)
         renewable_only = all(_renewable(source) for source in sources)
         unknown_context = [source['id'] for source in unknown if _owner(source) == owner and _variant(source) == variant]
@@ -473,7 +528,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             chosen = own_row
             translation = 'native_renewable_passthrough'
             row_reference_map = map_key
-        elif reference_map != map_key:
+        elif reference_map != map_key and not mobile:
             chosen = _compatible_reference(same_kind, chosen, sources, seed=seed, settings=settings,
                 catalog=catalog, candidates=candidates, supplies=supplies,
                 opening=any(source['id'] in opening_sources for source in sources), factor=factor)
@@ -486,29 +541,30 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         opening = any(source['id'] in opening_sources for source in sources)
         native_stationary_peak = own_row.get('peak', {}).get('stationary', 0)
         reference_stationary_peak = peak.get('stationary', 0)
-        geometry_reserve = max(0, native_stationary_peak - reference_stationary_peak)
+        geometry_reserve = max(0, native_stationary_peak - reference_stationary_peak) if not mobile else 0
         population = _population(peak, owner, opening=opening, settings=settings, geometry_reserve=geometry_reserve)
         finite = [source for source in sources if not _renewable(source) and not source.get('protected_reason')]
         renewable = [source for source in sources if _renewable(source) and not source.get('protected_reason')]
         native_finite = _passthrough_budget(sources, catalog, seed=seed, renewable=False)
         native_renewable = _passthrough_budget(sources, catalog, seed=seed, renewable=True)
-        wanted = _native_budget(chosen, seed=seed, renewable=False)
+        wanted = _native_budget(chosen, seed=seed, renewable=False, mobile=mobile)
         random_wanted = Counter({key: max(0, value - native_finite[key]) for key, value in wanted.items()
                                  if key != 'stationary'})
         target = round(sum(random_wanted.values()) * _volume(settings))
         counts, emitted = _allocate_counts(finite, target)
         desired = _modified_budget(random_wanted, factor, target)
-        cost_budget = _cost_budget(chosen, desired, seed=seed, renewable=False, candidates=candidates)
-        made, actual = _draw_bodies(finite, counts, desired, seed=seed, key=[map_key, variant], settings=settings,
+        cost_budget = _cost_budget(chosen, desired, seed=seed, renewable=False, candidates=candidates, mobile=mobile)
+        encounter_settings = {**settings, 'protected_opening': opening}
+        made, actual = _draw_bodies(finite, counts, desired, seed=seed, key=[map_key, variant], settings=encounter_settings,
             catalog=catalog, candidates=candidates, supplies=supplies, population=population,
             stage_index=stage_index, stage_count=stage_count, hitpoints=hitpoints,
             cost_budget=cost_budget)
-        actual_cost = _body_costs(finite, made, renewable=False)
+        actual_cost = _body_costs(finite, made, renewable=False, mobile=mobile)
         result.update(made)
         actual.update(native_finite)
         desired.update({key: min(value, wanted[key]) for key, value in native_finite.items()})
         desired['stationary'] = wanted['stationary']
-        maintained = _native_budget(chosen, seed=seed, renewable=True)
+        maintained = _native_budget(chosen, seed=seed, renewable=True, mobile=mobile)
         random_maintained = Counter({key: max(0, value - native_renewable[key])
                                     for key, value in maintained.items() if key != 'stationary'})
         renewable_target = round(sum(random_maintained.values()) * Fraction(
@@ -537,10 +593,10 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             special_limits=settings['special_limits'])
         made, active = _draw_bodies(renewable, renewable_counts,
             desired_renewable, seed=seed,
-            key=[map_key, variant, 'renewable'], settings=settings, catalog=catalog, candidates=candidates,
+            key=[map_key, variant, 'renewable'], settings=encounter_settings, catalog=catalog, candidates=candidates,
             supplies=supplies, population=population, stage_index=stage_index, stage_count=stage_count,
             hitpoints=hitpoints, renewable=True,
-            cost_budget=_cost_budget(chosen, desired_renewable, seed=seed, renewable=True, candidates=candidates),
+            cost_budget=_cost_budget(chosen, desired_renewable, seed=seed, renewable=True, candidates=candidates, mobile=mobile),
             ammo_required=ammo_required)
         actual_ammo_pool = native_ammo_pool + sum(body['species'] in AMMO_FODDER for bodies in made.values() for body in bodies)
         result.update(made)
@@ -556,7 +612,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             deviations.append('custom_quantity_scale')
         if settings['count_mode'] == 'auto' and settings['density'] != 100:
             deviations.append('custom_simultaneous_scale')
-        if any(value > cost_budget.get(key, 0) for key, value in actual_cost.items()):
+        if not mobile and any(value > cost_budget.get(key, 0) for key, value in actual_cost.items()):
             deviations.append('compatible_species_minimum_exceeds_native_cost')
         if emitted != target:
             deviations.append('native_quantity_cadence')
@@ -584,7 +640,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             actual_finite_total=sum(actual.values()), reference_renewable=dict(maintained),
             target_renewable=dict(desired_renewable),
             reference_base_cost={key: str(value) for key, value in _native_costs(chosen,
-                seed=seed, renewable=False).items()},
+                seed=seed, renewable=False, mobile=mobile).items()},
             randomized_base_cost_budget={key: str(value) for key, value in cost_budget.items()},
             randomized_base_cost_actual={key: str(value) for key, value in actual_cost.items()},
             actual_renewable=dict(active), population_limits=dict(population), deviations=deviations,
@@ -598,8 +654,11 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             continue
         population = _population(map_peak, _owner(source), settings=settings)
         count = source['logical_count']
-        budget = Counter(_category(species) for species in source_species(source, catalog))
-        if source.get('runtime_only'):
+        budget = Counter(_category(species, mobile) for species in source_species(source, catalog))
+        if source.get('darklord_phantom'):
+            population['heavy'] = int(bool(budget['heavy']))
+            population['superheavy'] = int(bool(budget['superheavy']))
+        elif source.get('runtime_only'):
             budget = Counter()
             for report in reports:
                 budget.update(report['actual_finite'])
@@ -611,7 +670,9 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         made, _ = _draw_bodies([source], {source['id']: count}, allocated,
             seed=seed, key=[map_key, source['id'], 'library'], settings=settings, catalog=catalog,
             candidates=candidates, supplies=supplies, population=population,
-            stage_index=stage_index, stage_count=stage_count, hitpoints=hitpoints, renewable=True)
+            stage_index=stage_index, stage_count=stage_count, hitpoints=hitpoints, renewable=True,
+            cost_budget={category: sum(BASE_COMBAT_COST[name] for name in source_species(source, catalog)) * count
+                         for category in budget} if source.get('darklord_phantom') else None)
         result.update(made)
     return result, limits, dict(map_key=reference_map,
         stage=CANONICAL_ORDER.index(reference_map) + 1 if reference_map in CANONICAL_ORDER else 1,

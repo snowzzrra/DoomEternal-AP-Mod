@@ -342,6 +342,8 @@ class NamedRangeControl(QWidget):
         return self.spin.value() if self.special.currentData() is None else str(self.special.currentData())
 
     def setValue(self, value: object) -> None:
+        if not isinstance(value, str):
+            value = next((key for key, number in self.special_values.items() if number == value), value)
         if isinstance(value, str):
             index = self.special.findData(value)
             self.special.setCurrentIndex(index if index >= 0 else 0)

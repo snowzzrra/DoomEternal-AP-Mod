@@ -162,7 +162,7 @@ def _entrance_endpoint(edit):
         return None
     forward = edit.get('spawnOrientation', {}).get('mat', {}).get('mat[0]', {'x': 1})
     # animation distances are centimeters; map positions are meters.
-    result = {axis: position.get(axis, 0) + forward.get(axis, 0) * int(jump[1]) / 100
+    result = {axis: position.get(axis, 0) + forward.get(axis, int(axis == 'x')) * int(jump[1]) / 100
               for axis in ('x', 'y', 'z')}
     if jump[2]:
         result['z'] += int(jump[3]) / (100 if jump[2] == 'up' else -100)
@@ -241,6 +241,11 @@ def _entrance_landings(recipes, records):
     portal_floors = {'underwater_facility_arena_target_spawn_154': 'underwater_facility_arena_target_spawn_156',
                      'underwater_facility_arena_target_spawn_155': 'underwater_facility_arena_target_spawn_160'}
     for recipe in recipes:
+        needs_floor = recipe['selected_spawn_type'] in {
+            'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_LOST_SOUL',
+            'ENCOUNTER_SPAWN_SPIRIT', 'ENCOUNTER_SPAWN_BLOOD_ANGEL'} and any(
+                body['species'] not in {'cacodemon', 'pain_elemental', 'lost_soul', 'spirit', 'blood_angel'}
+                for body in recipe['bodies'])
         for name in points[recipe['binding'].get('reference', '')]:
             edit = records[name]['edit']
             spawn = edit.get('spawnEditable', {})
@@ -251,7 +256,7 @@ def _entrance_landings(recipes, records):
                         'traversalEndpoint' in traversal['edit']):
                     choices.setdefault(name, []).append(((0, target), target))
                     continue
-            if edit.get('spawnEditable', {}).get('aiStateOverride') not in {
+            if not needs_floor and edit.get('spawnEditable', {}).get('aiStateOverride') not in {
                     'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION',
                     'AIOVERRIDE_ENTRANCE_ANIM_NO_ENEMIES', 'AIOVERRIDE_SPAWN_ANIM_IDLE',
                     'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}:
@@ -340,7 +345,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             endpoint = anchor['edit']['traversalEndpoint']
             matrix = anchor['edit'].get('spawnOrientation', {}).get('mat', {})
             edit['spawnPosition'] = {axis: anchor['edit']['spawnPosition'].get(axis, 0) + sum(
-                endpoint.get(local, 0) * matrix.get(f'mat[{index}]', {local: 1}).get(axis, 0)
+                endpoint.get(local, 0) * matrix.get(f'mat[{index}]', {}).get(axis, int(axis == local))
                 for index, local in enumerate(('x', 'y', 'z'))) for axis in ('x', 'y', 'z')}
             if not all(math.isfinite(value) for value in edit['spawnPosition'].values()):
                 raise ValueError('Native traversal landing is not finite')
@@ -561,7 +566,7 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
                 aliases.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
             aliases.extend(definitions)
             continue
-        if binding["mode"] == "summon" and binding["entity"]:
+        if binding["mode"] == "summon" and binding["entity"] not in {"", "ap_darklord_phantoms"}:
             name = binding["entity"]
             first, last = find_entity_block_bounds(source, name)
             original, = entity_records(source[first:last])

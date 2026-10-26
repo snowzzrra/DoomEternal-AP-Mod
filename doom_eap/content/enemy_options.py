@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 7
+ENEMY_OPTIONS_REVISION = 8
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -129,7 +129,7 @@ def _attribute(raw, name, automatic, progressive):
 
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, 4, 5, 6, ENEMY_OPTIONS_REVISION):
+    if revision not in (2, 3, 4, 5, 6, 7, ENEMY_OPTIONS_REVISION):
         raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
@@ -162,6 +162,10 @@ def normalize_enemy_options(raw):
         weights['buff_pod'] = min(recipe.group_weights[2:])
     if revision >= 4:
         weights['zombie_t1_screecher'] = min(recipe.group_weights[2:])
+    if revision >= 8:
+        weights.update(tentacle=recipe.group_weights[0] // 2,
+                       super_tentacle=recipe.group_weights[1] // 4,
+                       turret=recipe.group_weights[1] // 2)
     if preset == "oops_all_imps":
         weights.update(imp=900, stone_imp=100)
     elif preset == "pinata_party":
@@ -241,22 +245,17 @@ def enemy_options_for_editing(raw):
         "enemy_randomizer": raw.get("enemy_randomizer", True),
         "enemy_preset": raw.get("enemy_preset", "slayers_path"),
         "progressive_difficulty": raw.get("progressive_difficulty", True),
-        "enemy_intensity_early": values["intensity"][0],
-        "enemy_intensity_late": values["intensity"][1],
-        **{f"enemy_{key}": values[key] for key in (
-            "density", "variety", "count_mode", "count_multiplier", "weights",
+        "enemy_intensity_early": raw.get("enemy_intensity_early", "auto"),
+        "enemy_intensity_late": raw.get("enemy_intensity_late", "auto"),
+        **{f"enemy_{key}": raw.get(f"enemy_{key}", "auto") for key in (
+            "density", "variety", "count_multiplier",
             "size_variation_chance")},
-        "enemy_length": values.get("length", max(100, values['density'])),
+        "enemy_count_mode": values["count_mode"],
+        "enemy_weights": dict(raw.get("enemy_weights", {})),
+        "enemy_length": raw.get("enemy_length", "auto"),
         "enemy_special_limits": dict(raw.get("enemy_special_limits", {})),
         "enemy_size": dict(raw.get("enemy_size", {})),
     }
     for attribute in ("health", "damage", "speed"):
-        ranges = values["attributes"][attribute]
-        entries = {}
-        for species, curve in (("", ranges["global"]), *ranges["species"].items()):
-            prefix = f"{species}." if species else ""
-            for end in ("early", "late"):
-                for index, bound in enumerate(("minimum", "maximum")):
-                    entries[f"{prefix}{end}_{bound}"] = curve[end][index]
-        result[f"enemy_{attribute}"] = entries
+        result[f"enemy_{attribute}"] = dict(raw.get(f"enemy_{attribute}", {}))
     return result

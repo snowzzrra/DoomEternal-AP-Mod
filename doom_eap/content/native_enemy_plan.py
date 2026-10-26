@@ -570,7 +570,7 @@ def _balanced_phase_bodies(sources, candidates, settings, intensity, *, seed, ke
     return bodies
 
 
-def _wave_peak(bodies):
+def _wave_peak(bodies, *, mobile=False):
     limits = next((body['population_limits'] for body in bodies if body.get('population_limits')), None)
     if not limits:
         return {}
@@ -586,7 +586,7 @@ def _wave_peak(bodies):
         for body in ordered:
             species = body['species']
             heavy, support = species in superheavy, species in special
-            ordinary = species in SPECIES_GROUPS['heavy']
+            ordinary = species in SPECIES_GROUPS['heavy'] or mobile and species in {'super_tentacle', 'turret'}
             if ordinary and limits.get('heavy') and ordinary_heavies >= limits['heavy']:
                 continue
             if (mode == 'ordinary' and (heavy or support) or mode == 'superheavy' and support and not heavy
@@ -606,8 +606,8 @@ def _wave_peak(bodies):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=14):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -683,6 +683,13 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
         recipes, protected, inactive = [], [], []
         phases = {}
         origins = [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])]
+        if revision >= 14 and map_key == 'e5m4_boss':
+            phantom_types = {catalog['species'][name]['spawn_type'] for name in
+                             ('hell_knight', 'mancubus', 'baron', 'tyrant')}
+            origins.extend({**source, 'id': source['id'].replace('/native_summons/', '/darklord_phantoms/'),
+                'binding': {**source['binding'], 'entity': 'ap_darklord_phantoms'}, 'darklord_phantom': True}
+                for source in catalog['maps'][map_key].get('runtime_origins', [])
+                if source['spawn_type'] in phantom_types)
         if revision >= 6:
             from .native_enemy_safety import SCRIPTED_BOSS_ACTORS, CINEMATIC_BOSS_ACTORS, FLYING_SPAWN_POINTS, FLYING_REPLACEMENTS
             origins = [{**source, 'protected_reason': 'scripted boss acquisition actor'}
@@ -707,7 +714,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
                          for slot in wave['slots']}
             origins = [{**source, 'renewable': lifetimes[source['id']]} if source['id'] in lifetimes else source
                        for source in origins]
-            stationary = set(SPECIES_GROUPS['stationary']) - SPECIAL_SPECIES
+            stationary = ({'cueball'} if revision >= 14 else set(SPECIES_GROUPS['stationary']) - SPECIAL_SPECIES)
             origins = [{**source, 'protected_reason': 'unknown native population choice', 'vanilla_unknown': True}
                        if reference_source(source) and native_source_identity(source, catalog)['status'] == 'unknown_native_choice' else
                        {**source, 'protected_reason': 'native stationary spawn', 'vanilla_stationary': True}
@@ -780,7 +787,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
             phase_bodies, limits, vanilla_reference = build_vanilla_stage(origins, settings, campaign, catalog,
                 seed=seed, map_key=map_key, stage_index=stage_index, stage_count=stage_count,
                 supplies=supplies, opening_sources={source['id'] for phase, sources in phases.items()
-                    if phase in protected_opening_phases for source in sources}, hitpoints=_body_hitpoints)
+                    if phase in protected_opening_phases for source in sources}, hitpoints=_body_hitpoints,
+                recipe_revision=revision)
             settings = {**settings, 'special_limits': limits}
         for phase, sources in phases.items():
             phase_index, phase_count, phase_intensity = stage_index, stage_count, intensity
@@ -902,7 +910,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=13):
                         bodies = [body for recipe in active if recipe['wave'] == wave['id']
                                   and recipe['family'] != 'maintenance' for body in recipe['bodies']]
                         bodies += maintenance.get(wave['id'].rsplit('/', 2)[0], [])
-                        wave.update(_wave_peak(bodies))
+                        wave.update(_wave_peak(bodies, mobile=revision >= 14))
                 if opening_phases:
                     combat_costs[map_key]['campaign']['opening_waves'] = [wave for wave in waves if wave['id'] in opening_phases]
                     combat_costs[map_key]['campaign']['opening_species'] = sorted({body['species']

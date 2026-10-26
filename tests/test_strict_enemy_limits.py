@@ -11,12 +11,14 @@ def settings():
                                   'species': {name: index for index, name in enumerate(LIMITED_SPECIES)}}}
 
 
-def test_strict_caps_keep_zero_heavies_separate_from_fodder():
+@pytest.mark.parametrize('species,revision', [('lost_soul',7),('tentacle',8)])
+def test_strict_caps_keep_zero_heavies_separate_from_fodder(species, revision):
     options = settings()
-    suffix = _limit_suffix(options, 'lost_soul')
+    options['revision'] = revision
+    suffix = _limit_suffix(options, species)
     assert suffix.endswith('_ko')
     assert '_v' + ''.join(f'{index:08x}' for index in range(9)) in suffix
-    body = {'species': 'lost_soul', 'spawn_type': 'ENCOUNTER_SPAWN_LOST_SOUL',
+    body = {'species': species, 'spawn_type': 'ENCOUNTER_SPAWN_' + species.upper(),
             'attributes': {'speed_percent': 100}, 'population_limits': options['population_limits']}
     definition = native_body_name('a' * 20, 0, 1, 1, 'ENCOUNTER_SPAWN_IMP', body, options)
     assert len(definition.encode('ascii')) < 512

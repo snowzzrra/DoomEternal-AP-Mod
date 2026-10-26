@@ -4,6 +4,40 @@ from textwrap import dedent
 
 import pytest
 
+
+def test_sparse_identity_rotation_keeps_the_portal_landing_in_front():
+    from tools.maps.native_recipe_materializer import _entrance_endpoint
+
+    landing = _entrance_endpoint({
+        'spawnPosition': {'x': -149.680283, 'y': 489.999908, 'z': 4.20000219},
+        'spawnOrientation': {'mat': {'mat[0]': {'y': 1.77324068e-06}, 'mat[1]': {'x': -1.77324068e-06}}},
+        'spawnEditable': {'spawnAnim': 'animweb/characters/monsters/marauder/traversals/jump_forward_100'},
+    })
+    assert landing['x'] == pytest.approx(-148.680283)
+    assert landing['y'] == pytest.approx(489.9999097732407)
+    assert landing['z'] == pytest.approx(4.20000219)
+
+
+def test_ground_replacement_of_airborne_secret_uses_its_ground_spawn():
+    from tools.maps.native_recipe_materializer import _entrance_landings
+
+    records = {name: {'class': 'idTarget_Spawn', 'edit': {
+        'spawnPosition': dict(zip(('x', 'y', 'z'), position)),
+        'spawnEditable': {'aiStateOverride': 'AIOVERRIDE_TELEPORT'},
+    }} for name, position in {
+        'air': (-134.999969, 176.750046, -28.5500145),
+        'ground': (-156.999939, 166, -42.8248329),
+    }.items()}
+    recipes = [{
+        'binding': {'owner': 'secret', 'reference': name, 'path': 'encounter.events.item[0]'},
+        'selected_spawn_type': species,
+        'bodies': bodies,
+    } for name, species, bodies in (
+        ('ground', 'ENCOUNTER_SPAWN_ZOMBIE_TIER_1', []),
+        ('air', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', [{'species': 'imp'}]),
+    )]
+    assert _entrance_landings(recipes, records)['air'] == 'ground'
+
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
 from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
 from tools.maps.encounter_catalog import entity_records, list_items
@@ -79,6 +113,18 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
 
 
 
+
+
+@pytest.mark.parametrize('entity', ['', 'ap_darklord_phantoms'])
+def test_runtime_summon_library_compiles_without_an_authorial_template(entity):
+    plan = frozen_plan(binding={'mode': 'summon', 'entity': entity}, family='summon',
+                       logical_count=1, maximum=1, revision=12)
+    compiled = materialize_native_recipe_calls(SOURCE, 'map', plan, {'map': SOURCE})
+    rows = {row['name']: row for row in entity_records(compiled)}
+    recipe, = plan['maps']['map']['recipes']
+    library = rows['ap_v070_bodies_r' + recipe['origin']]['edit']['entityDefs']
+    assert library['num'] == len(recipe['bodies']) > 0
+    assert all(rows[item['name']]['class'] == 'idAI2' for item in list_items(library))
 
 
 def test_immora_group_keeps_its_canonical_spawn_available_after_checkpoint():

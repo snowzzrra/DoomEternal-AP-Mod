@@ -47,7 +47,7 @@ def test_slayers_path_preserves_finite_categories_and_all_special_species(native
     stage = plan['maps'][key]
     report, = stage['vanilla_reference']['encounters']
     assert Counter(report['reference_finite']) == Counter(report['actual_finite'])
-    assert not report['deviations']
+    assert set(report['deviations']) <= {'randomized_species_cost_variation'}
     bodies = [body for recipe in stage['recipes'] for body in recipe['bodies']]
     assert Counter(body['species'] for body in bodies if body['species'] in SPECIAL_SPECIES) == {
         name: 1 for name in SPECIAL_SPECIES}
@@ -113,7 +113,7 @@ def test_opaque_native_population_and_stationary_geometry_are_preserved(native_c
     catalog = fixture_catalog(native_catalog, {key: [known, opaque, stationary]})
     plan = build_native_recipes(effective(), dict(sequence=[key], mode='mission_access_as_items',
         enemy_progression_bands={key: 0}),
-        seed=31, catalog=catalog)
+        seed=31, catalog=catalog, revision=13)
     stage = plan['maps'][key]
     assert set(recipes(stage)) == {known['id']}
     preserved = {row['id']: row['reason'] for row in stage['protected']}
@@ -125,6 +125,33 @@ def test_opaque_native_population_and_stationary_geometry_are_preserved(native_c
     assert relay['translation'] == 'native_geometry_passthrough'
     assert relay['reference_map'] == key
     assert not relay['deviations']
+
+
+def test_longer_map_repeats_the_reference_curve_and_randomizes_tentacles(native_catalog):
+    reference, target = 'e1m1_intro', 'e2m1_nest'
+    baseline = [source(native_catalog, reference, 'imp', index, count=index + 1, maximum=index + 1,
+                       owner=f'fight{index}') for index in range(5)]
+    targets = [source(native_catalog, target, 'imp', index, owner=f'room{index}') for index in range(10)]
+    catalog = fixture_catalog(native_catalog, {reference: baseline, target: targets})
+    plan = build_native_recipes(effective(), dict(sequence=[target, reference], mode='random_mission_order'),
+                                seed=31, catalog=catalog)
+    reports = plan['maps'][target]['vanilla_reference']['encounters']
+    assert [row['actual_finite_total'] for row in reports] == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
+    tentacle = source(native_catalog, reference, 'tentacle', 0, count=2, maximum=2)
+    catalog = fixture_catalog(native_catalog, {reference: [tentacle]})
+    plan = build_native_recipes(effective(), dict(sequence=[reference], mode='random_mission_order'),
+                                seed=31, catalog=catalog)
+    recipe, = plan['maps'][reference]['recipes']
+    assert len(recipe['bodies']) == 2
+    assert all(body['species'] != 'tentacle' for body in recipe['bodies'])
+    catalog = fixture_catalog(native_catalog, {
+        reference: [source(native_catalog, reference, 'cueball', 0)],
+        target: [source(native_catalog, target, 'tentacle', 0, count=2, maximum=2)],
+    })
+    plan = build_native_recipes(effective(), dict(sequence=[target, reference], mode='random_mission_order'),
+                                seed=31, catalog=catalog)
+    recipe, = plan['maps'][target]['recipes']
+    assert len(recipe['bodies']) == 2
 
 
 def test_short_rmo_spans_full_reference_curve_and_mai_keeps_map_identity(native_catalog):
@@ -148,11 +175,22 @@ def test_vanilla_heavy_substitutions_respect_native_pressure(native_catalog):
     key = 'e1m1_intro'
     origins = [source(native_catalog, key, 'cacodemon', 0, count=3, maximum=3)]
     catalog = fixture_catalog(native_catalog, {key: origins})
-    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=0, catalog=catalog)
+    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=0, catalog=catalog, revision=13)
     report, = plan['maps'][key]['vanilla_reference']['encounters']
     bodies = plan['maps'][key]['recipes'][0]['bodies']
     assert Counter(report['actual_finite']) == Counter(heavy=3)
     assert sum(BASE_COMBAT_COST[body['species']] for body in bodies) <= 3 * BASE_COMBAT_COST['cacodemon']
+
+
+def test_superheavy_roster_can_vary_above_the_cheapest_native_species(native_catalog):
+    key = 'e5m3_hell'
+    catalog = fixture_catalog(native_catalog, {key: [source(native_catalog, key, 'baron', 0, count=8, maximum=8)]})
+    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=12, catalog=catalog)
+    report, = plan['maps'][key]['vanilla_reference']['encounters']
+    bodies = plan['maps'][key]['recipes'][0]['bodies']
+    assert Counter(report['actual_finite']) == Counter(superheavy=8)
+    assert any(body['species'] != 'baron' for body in bodies)
+    assert all(body['population_limits']['superheavy'] == 8 for body in bodies)
 
 
 def test_each_encounter_keeps_its_own_combined_special_limit(native_catalog):

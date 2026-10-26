@@ -1549,12 +1549,12 @@
     },
     {
       "default": "all",
-      "description": "Choose how many missions to play in Random Mission Order or Mission Access as Items.\n\nAll: Use every mission in your selected pool.\n3..19: Randomly choose that many missions from the pool.\nThe Dark Lord is an additional boss stage. Vanilla Order uses the whole selected pool.",
+      "description": "Choose how many missions to play in Random Mission Order or Mission Access as Items.\n\nAll: Use every mission in your selected pool.\n6..19: Randomly choose that many missions from the pool.\nThe Dark Lord is an additional boss stage. Vanilla Order uses the whole selected pool.",
       "display_name": "Mission Count",
       "group": "Game Options",
       "key": "mission_count",
       "maximum": 19,
-      "minimum": 3,
+      "minimum": 6,
       "source_class": "MissionCount",
       "special_values": [
         {
@@ -9195,7 +9195,7 @@
     },
     {
       "default": "auto",
-      "description": "Choose how many individual Praetor Suit upgrades you can find.\n\nAuto: Use your campaign's length and Resource Profile.\nRandom: Let the seed choose a moderate amount.\n0: Leave suit upgrades out. A positive number adds exactly that many; the maximum includes them all.",
+      "description": "Choose how many individual Praetor Suit upgrades you can find.\n\nAuto: Include every Praetor Suit upgrade at any campaign length.\nRandom: Let the seed choose a moderate amount.\n0: Leave suit upgrades out. A positive number adds exactly that many; the maximum includes them all.",
       "display_name": "Praetor Suit Upgrades in Pool",
       "group": "Game Options",
       "key": "praetor_suit_upgrades_in_pool",
@@ -9313,5 +9313,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "ad789334ab6dff49f5ba7145630f1b2ce90631f9c110015021f31a2e838044aa"
+  "source_sha256": "2f5715f22278e46c57e6bed167928c984af805dcff2e7d69c5eac532c5999703"
 }

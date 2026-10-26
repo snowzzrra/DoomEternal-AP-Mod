@@ -103,6 +103,8 @@ def _limit_suffix(enemies, species):
             kind = 'h'
         elif species in {'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'hell_soldier'}:
             kind = 'f'
+        elif enemies.get('revision', 2) >= 8 and species == 'tentacle':
+            kind = 'o'
         elif (population.get('heavy') or population.get('strict')) and species in SPECIES_GROUPS['fodder'] and species != 'zombie_t1_screecher':
             kind = 'o'
     return f"{prefix}_l{values}_k{kind}"

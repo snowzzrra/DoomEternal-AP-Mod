@@ -100,6 +100,14 @@ def project_native_safety(plan, enemies):
     result['compiler_adjustments'] = changes
     result['fingerprint'] = native_recipe_fingerprint(result)
     return result
+AMBIENT_ENCOUNTERS = {
+    'e2m3_core': frozenset({
+        'slayer_gate_encounter_manager_ammo_room',
+        'slayer_gate_encounter_manager_slayer_side_closet',
+        'slayer_gate_encounter_manager_slayer_lobby',
+    }),
+}
+
 OPENING_REGIONS = {
     'e1m1_intro': ('Hell on Earth - Barge - Hell Priest Barge', 'Hell on Earth - City - Midtown'),
     'e1m2_war': ('Exultia - Exultia - Mourning Spire', 'Exultia - Exultia - Central Rotunda',
