@@ -50,3 +50,17 @@ def test_proton_selection_precedes_campaign_routing(tmp_path):
     payload = setup_failure_payload(refused.value, phase="campaign_session")
     assert payload["recovery_action"] == "select_proton"
     assert payload["proton_reason"] == "missing_config_info"
+
+
+def test_guest_identity_query_receives_the_selected_executable(tmp_path):
+    from doom_eap.runtime.proton import windows_processes, windows_path
+    configuration = {'game_root': str(tmp_path / 'game')}
+    response = Mock(returncode=0, stdout=json.dumps({'processes': [dict(
+        pid=123, created=456, path='S:\\steamapps\\common\\DOOMEternal\\DOOMEternalx64vk.exe',
+        same_executable=True)]}).encode())
+    with patch('doom_eap.runtime.proton.runtime', return_value=(['fixture-proton'], {})), \
+         patch('doom_eap.runtime.proton.subprocess.run', return_value=response) as run:
+        rows = windows_processes(configuration, tmp_path / 'owner.exe')
+    assert rows[0]['same_executable'] is True
+    command = run.call_args.args[0]
+    assert command[command.index('--expected-game-exe') + 1] == windows_path(tmp_path / 'game/DOOMEternalx64vk.exe')

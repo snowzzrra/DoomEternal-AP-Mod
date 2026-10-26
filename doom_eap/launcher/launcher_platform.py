@@ -618,7 +618,7 @@ class RuntimePrerequisiteReport:
 
 def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
     """Verify the Core runtime pair used by Game Link."""
-    from ..contracts.core_distribution import read_manifest
+    from ..contracts.core_distribution import read_manifest, verify_build_identity
     if game_root is None:
         return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "DOOM folder is not configured.")
     try:
@@ -629,6 +629,7 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
             data = (root / name).read_bytes()
             if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
                 raise ValueError(f"Core runtime hash mismatch: {name}")
+            verify_build_identity(name, data, value["build_id"])
         if (root / "XINPUT1_3.dll").exists():
             raise ValueError("A foreign XINPUT provider is present; resolve its ownership before Core-only admission.")
         return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, f"Sentinel Core {value['version']} pair verified.",

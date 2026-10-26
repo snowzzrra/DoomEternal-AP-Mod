@@ -2,6 +2,7 @@
 
 from collections import Counter
 from fractions import Fraction
+import re
 
 from .enemy_options import ENEMY_RECIPES, SPECIES_GROUPS
 from .enemy_plan import BASE_COMBAT_COST, _random_for, sample_instance_attributes, sample_species
@@ -104,6 +105,8 @@ def _encounters(profile, *, mobile=False, objective_budgets=False):
                 row['finite_total'] = sum(slot['maximum_emissions'] for slot in row['slots'] if not slot['renewable'])
                 if row['kind'] == 'ambient_encounter' and all(set(slot['species']) <= {'stone_imp'} for slot in row['slots']):
                     row['kind'] = 'specialized_encounter'
+                if row['kind'] == 'arena_encounter' and re.search(r'_phase(?:one|two|three|\d+)(?:_|$)', row['owner']):
+                    row['kind'] = 'arena_phase_encounter'
             result.append(row)
         return result
     grouped = {}
@@ -546,7 +549,15 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
                      and (not mobile or row['spawn_shape'][0] == shape[0]
                           and (shape[1] or not row['spawn_shape'][1])
                           and (ammo_geometry or not _native_ammo_pool(row)))]
-        if recipe_revision >= 17 and kind == 'arena_encounter' and own_row.get('combat_rating_scale') == 'COMBAT_RATING_SCALE_LARGE':
+        if (recipe_revision >= 17 and kind == 'arena_encounter' and own_row.get('finite_total', 0) >= 10
+                and len({row['owner'] for row in same_kind}) <= 1):
+            broader = [row for row in encounters if row.get('kind') == kind and row['spawn_shape'][0]
+                       and row.get('combat_rating_scale') != 'COMBAT_RATING_SCALE_SMALL']
+            if len({row['owner'] for row in broader}) > 1:
+                same_kind = broader
+        if (recipe_revision >= 17 and kind == 'arena_encounter' and own_row.get('finite_total', 0) >= 10
+                and own_row.get('combat_rating_scale') == 'COMBAT_RATING_SCALE_LARGE'
+                and any(row.get('combat_rating_scale') == 'COMBAT_RATING_SCALE_SMALL' for row in same_kind)):
             large = [row for row in encounters if row.get('kind') == kind and row['spawn_shape'][0]
                      and row.get('combat_rating_scale') == 'COMBAT_RATING_SCALE_LARGE']
             if large:
@@ -574,6 +585,12 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         chosen = chosen or references[index(variants.index(variant), len(variants), len(references))]
         translation = 'vanilla_encounter'
         row_reference_map = map_key if local_kind else reference_map
+        if (recipe_revision >= 17 and kind in {'ambient_encounter', 'arena_encounter'} and own_row.get('finite_total') == 1
+                and chosen['finite_total'] >= 10):
+            smaller = [row for row in same_kind if 0 < row['finite_total'] <= 2]
+            chosen = min(smaller, key=lambda row: abs(same_kind.index(row) - same_kind.index(chosen))) if smaller else own_row
+            if not smaller:
+                translation, row_reference_map = 'native_incidental_scale', map_key
         if local_kind:
             translation = 'native_encounter_kind'
         native_only = all(source.get('protected_reason') for source in sources)
@@ -602,7 +619,8 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
                 row_reference_map = map_key
         ref_owner = chosen['owner']
         finite_supply = 0
-        if recipe_revision >= 17 and not ammo_geometry and kind == 'arena_encounter' and chosen['spawn_shape'][1]:
+        folded_renewable = recipe_revision >= 17 and not ammo_geometry and kind == 'arena_encounter' and chosen['spawn_shape'][1]
+        if folded_renewable:
             finite_supply = _native_ammo_pool(chosen)
             chosen = {**chosen, 'slots': [{**slot, 'renewable': False, 'maximum_emissions': slot['count']}
                 if slot['renewable'] else slot for slot in chosen['slots']]}
@@ -628,7 +646,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         made, actual = _draw_bodies(finite, counts, desired, seed=seed, key=[map_key, variant], settings=encounter_settings,
             catalog=catalog, candidates=candidates, supplies=supplies, population=population,
             stage_index=stage_index, stage_count=stage_count, hitpoints=hitpoints,
-            cost_budget=cost_budget)
+            cost_budget=cost_budget, ammo_required=min(finite_supply, desired.get('fodder', 0)))
         actual_cost = _body_costs(finite, made, renewable=False, mobile=mobile)
         result.update(made)
         actual.update(native_finite)
@@ -674,7 +692,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         desired_renewable.update({key: min(value, maintained[key]) for key, value in native_renewable.items()})
         desired_renewable['stationary'] = maintained['stationary']
         deviations = []
-        if finite_supply:
+        if folded_renewable:
             deviations.append('renewable_supply_as_finite_bodies')
         if unknown_context:
             deviations.append('native_unknown_context')

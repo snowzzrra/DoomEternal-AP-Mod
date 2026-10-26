@@ -10,7 +10,7 @@ from doom_eap.contracts.core_distribution import ABI, REQUIRED, verify_runtime
 from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
 
 
-def fixture(root):
+def fixture(root, *, build_id="b" * 64, bootstrap_build_id=None):
     pe = bytearray(128)
     pe[:2] = b"MZ"
     struct.pack_into("<I", pe, 60, 64)
@@ -20,6 +20,8 @@ def fixture(root):
     with zipfile.ZipFile(root / "sentinel-runtime.zip", "w") as archive:
         for name in sorted(REQUIRED):
             data = bytes(pe) if name.endswith((".dll", ".exe")) else b"Model fixture notice\n"
+            if name in {"sentinel_core.dll", "msimg32.dll"}:
+                data += ((bootstrap_build_id or build_id) if name == "msimg32.dll" else build_id).encode() + b"\0"
             target = root / name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(data)
@@ -32,7 +34,7 @@ def fixture(root):
                 "channel": "rc", "rc_number": 1, "mod_version_range": ">=0.7.0,<0.8.0", "minimum_launcher_version": "0.7.0",
                 "architecture": "x64", "platform": "windows",
                 "abi": dict(ABI), "required_capabilities": [2097152, 4194304, 8388608], "source_commit": "a" * 40,
-                "source_dirty": False, "build_id": "b" * 64, "pair_id": "b" * 64, "artifacts": artifacts}
+                "source_dirty": False, "build_id": build_id, "pair_id": build_id, "artifacts": artifacts}
     (root / "distribution.json").write_text(json.dumps(document), encoding="utf-8")
     return document
 
@@ -42,6 +44,12 @@ def test_runtime_rejects_direct_artifact_drift(tmp_path):
     verify_runtime(tmp_path / "distribution.json")
     (tmp_path / "sentinel_core.dll").write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="differs from ZIP"):
+        verify_runtime(tmp_path / "distribution.json")
+
+
+def test_runtime_refuses_mixed_builds_with_valid_checksums(tmp_path):
+    fixture(tmp_path, bootstrap_build_id="c" * 64)
+    with pytest.raises(ValueError, match="build identity differs: msimg32.dll"):
         verify_runtime(tmp_path / "distribution.json")
 
 

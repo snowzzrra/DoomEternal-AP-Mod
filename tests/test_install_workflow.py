@@ -46,6 +46,8 @@ def _install_core_fixture(game_root: Path) -> Path:
 def _snapshot() -> RoomSnapshot:
     ids = ModCompiler().active_location_ids({"randomize_dash": False})
     slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_bytes())
+    from doom_eap.content.enemy_options import normalize_enemy_options
+    slot_data['enemies'] = normalize_enemy_options(slot_data)
     placements = [
         {
             "location_id": location_id,
@@ -222,7 +224,7 @@ class TestCorePrerequisiteGate(unittest.TestCase):
             old_manifest.write_text(json.dumps(old), encoding="utf-8")
             new_runtime = Path(directory) / "new-runtime"
             new_runtime.mkdir()
-            incoming = core_distribution_fixture(new_runtime)
+            incoming = core_distribution_fixture(new_runtime, build_id="c" * 64)
             incoming.update(version="1.1.2", base_version="1.1.2", channel="stable", rc_number=0,
                             build_id="c" * 64, pair_id="c" * 64)
             new_manifest = new_runtime / "distribution.json"

@@ -104,6 +104,11 @@ def verify_bytes(name, data, item):
         if offset + 6 > len(data) or data[offset:offset+4] != b"PE\0\0" or struct.unpack_from("<H", data, offset+4)[0] != 0x8664:
             raise ValueError("Artifact is not Windows x64")
 
+def verify_build_identity(name, data, build_id):
+    if build_id.encode() + b"\0" not in data:
+        raise ValueError(f"Runtime binary build identity differs: {name}")
+
+
 def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
     path = Path(manifest_path)
     value = read_manifest(path)
@@ -120,6 +125,8 @@ def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
         for name in names:
             data = archive.read(name)
             verify_bytes(name, data, items[name])
+            if name in {"sentinel_core.dll", "msimg32.dll"}:
+                verify_build_identity(name, data, value["build_id"])
             contents[name] = data
         for name, data in contents.items():
             if bootstrap_from_archive and name == "msimg32.dll":

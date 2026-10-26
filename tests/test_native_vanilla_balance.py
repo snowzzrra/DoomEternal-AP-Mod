@@ -32,6 +32,43 @@ def effective(**overrides):
     return normalize_enemy_options(dict(enemy_preset='slayers_path', use_dlc_content=True, **overrides))
 
 
+def test_mixed_zombie_maintenance_is_not_a_required_hundred_kills(native_catalog):
+    key = 'e1m1_intro'
+    maintenance = source(native_catalog, key, 'zombie_tier_1', 0, count=2, maximum=99)
+    maintenance['family'] = 'maintenance'
+    heavy = source(native_catalog, key, 'hell_knight', 1)
+    mixed = fixture_catalog(native_catalog, {key: [maintenance, heavy]})
+    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=31, catalog=mixed)
+    assert sum(r['maximum_emissions'] for r in plan['maps'][key]['recipes']) == 3
+    only_zombies = fixture_catalog(native_catalog, {key: [maintenance]})
+    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=31, catalog=only_zombies)
+    assert sum(r['maximum_emissions'] for r in plan['maps'][key]['recipes']) == 99
+
+
+def test_arena_progression_and_secret_geometry_keep_arc_quantities(native_catalog):
+    campaign = dict(sequence=['e1m2_war', 'e2m2_base', 'e3m1_slayer', 'e5m2_earth',
+                              'e4m2_swamp', 'e5m4_boss', 'e3m4_boss'],
+                    mode='Random Mission Order', opening_stage='e1m2_war', starting_stages=['e1m2_war'], difficulty=2)
+    options = effective()
+    seed = 164699202125277239605016785186878895188
+    before = build_native_recipes(options, campaign, seed=seed, catalog=native_catalog, revision=16)
+    after = build_native_recipes(options, campaign, seed=seed, catalog=native_catalog)
+    def reports(plan, key):
+        return {e['variant']: (e['actual_finite_total'], e['reference_owner'])
+                for e in plan['maps'][key]['vanilla_reference']['encounters']}
+    assert reports(before, 'e2m2_base') == reports(after, 'e2m2_base')
+    exultia = after['maps']['e1m2_war']
+    secret = [body for r in exultia['recipes'] if r['binding'].get('owner') == 'battle_encounter_manager_3'
+              for body in r['bodies']]
+    assert len(secret) == 5 and all(body['species'] == 'lost_soul' for body in secret)
+    earth = after['maps']['e5m2_earth']['vanilla_reference']['encounters']
+    assert next(e['actual_finite_total'] for e in earth if e['owner'] == 'ai_encounter_manager_dlc1_uacfacility_arena') >= 10
+    final = after['maps']['e3m4_boss']['vanilla_reference']['encounters']
+    arenas = [e for e in final if e['kind'] == 'arena_encounter' and e['primary']]
+    assert len({e['reference_owner'] for e in arenas}) >= 3
+    assert not any(e['reference_owner'] == 'hangar_encounter_manager_dlc2_2' for e in final if e['kind'] == 'ambient_encounter')
+
+
 def recipes(stage):
     return {recipe['id']: recipe for recipe in stage['recipes']}
 

@@ -329,6 +329,19 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
         raise ValueError("Invalid native recipe fingerprint")
     names = {name for name, _, _ in ENTITY_HEADER.findall(source)}
     definitions, donors, generated = [], {}, []
+    if plan.get('revision', 0) >= 17:
+        groups = {}
+        for recipe in stage['recipes']:
+            binding = recipe['binding']
+            if not recipe.get('runtime_only') and '.events.item[' in binding.get('path', ''):
+                key = binding.get('owner', ''), binding['path'].split('.events.item[', 1)[0]
+                groups.setdefault(key, []).append(recipe)
+        for recipes in groups.values():
+            species = {body['species'] for recipe in recipes for body in recipe['bodies']}
+            if species.intersection({'zombie_tier_1', 'zombie_tier_3'}) and species - {'zombie_tier_1', 'zombie_tier_3'}:
+                for recipe in recipes:
+                    marker = 'ap_v070_optional_zombies_r' + recipe['origin']
+                    generated.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
     functional, reachable, records = _functional_sources(source)
     for point, landing in sorted(_entrance_landings(stage['recipes'], records).items()):
         helper = 'ap_v070_landing_' + _functional_token(point)

@@ -90,3 +90,20 @@ def test_process_diagnostics_are_bounded(owner):
         for _ in range(20):
             owner.observe(rows)
     assert owner._admission_capture_attempts == 1
+
+
+@pytest.mark.parametrize('alias', [True, False])
+def test_guest_process_query_checks_the_expected_file(owner, tmp_path, alias):
+    from doom_eap.launcher import session_owner_app
+
+    candidate = tmp_path / 'candidate.exe'
+    if alias:
+        os.link(owner._game_exe, candidate)
+    else:
+        candidate.write_bytes(owner._game_exe.read_bytes())
+    with patch.object(session_owner_app, 'restore_standard_streams'), \
+         patch.object(session_owner_app, 'windows_game_processes', return_value=(process(candidate),)), \
+         patch.object(session_owner_app, 'respond') as respond, \
+         patch.object(session_owner_app.sys, 'argv', ['owner', '--process-identity', '--expected-game-exe', str(owner._game_exe)]):
+        assert session_owner_app.main() == 0
+    assert respond.call_args.args[0]['processes'][0]['same_executable'] is alias
