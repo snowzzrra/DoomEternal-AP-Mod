@@ -46,3 +46,21 @@ def test_details_edge_needs_new_timestamp_and_path_switch_rebaselines(caplog):
     assert len(caplog.records) == 1 and owner.warning == "decoder"
     owner.probe_succeeded()
     assert owner.warning is None
+
+
+def test_room_baseline_counts_first_death_and_each_respawn_once():
+    owner = DeathObservation(logging.getLogger(__name__))
+    assert owner.bind('room-A')
+    owner.start_empty_slot('GAME-AUTOSAVE0')
+    deaths = []
+    for index in range(4):
+        selected = PrimarySaveSelection('GAME-AUTOSAVE0', Path('game_duration.dat'), index * 2 + 1)
+        snapshot = {'checkpoint_death': True, 'raw_num_checkpoint_deaths': 1}
+        deaths.append(owner.observe_checkpoint(snapshot, selected, index, 'map'))
+        assert owner.observe_checkpoint(snapshot, selected, index, 'map') is None
+        selected = PrimarySaveSelection('GAME-AUTOSAVE0', Path('game_duration.dat'), index * 2 + 2)
+        assert owner.observe_checkpoint(snapshot, selected, index + 1, 'map') is None
+    assert len(set(deaths)) == 4 and all(deaths)
+    assert not owner.bind('room-A')
+    assert owner.bind('room-B')
+    assert owner.observe_checkpoint(snapshot, selected, 99, 'map') is None

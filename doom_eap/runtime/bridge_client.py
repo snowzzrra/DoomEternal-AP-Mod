@@ -194,14 +194,14 @@ def doom_process_identity():
     """Return current game PID plus process-start identity when available."""
     if os.name == "nt":
         try:
-            from doom_eap.runtime.observer_lifecycle import windows_game_processes
+            from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
             rows = windows_game_processes()
             if rows is None or len(rows) != 1:
                 return None
             row = rows[0]
             base = globals().get("DOOM_BASE_DIR")
             expected = Path(str(base)).parent / "DOOMEternalx64vk.exe" if base else None
-            if expected is None or os.path.normcase(row["path"]) != os.path.normcase(str(expected.resolve())):
+            if expected is None or not same_executable_path(row["path"], expected.resolve()):
                 return None
             return f"windows:{row['pid']}:{row['created']}"
         except (OSError, ValueError, subprocess.SubprocessError):
@@ -214,7 +214,8 @@ def doom_process_identity():
         if rows is None or len(rows) != 1:
             return None
         row = rows[0]
-        if row["path"].casefold() != expected.casefold() or type(row["pid"]) is not int or type(row["created"]) is not int:
+        if ((row["path"].casefold() != expected.casefold() and row.get("same_executable") is not True)
+                or type(row["pid"]) is not int or type(row["created"]) is not int):
             return None
         return f"windows:{row['pid']}:{row['created']}"
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
@@ -3461,6 +3462,8 @@ class DoomEternalContext(CommonContext):
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             if self.server_checked_locations_ready:
                 self.checked_locations.update(args["checked_locations"])
+                if any(stage["completion_id"] in args["checked_locations"] for stage in STAGES.values()):
+                    self.materialization.trigger("mission_complete")
                 self.snapshot_fast_travel_eligibility(refresh=True)
             self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
             self.reconcile_checked_automap_cleanup("server_checked_update")
@@ -5068,6 +5071,8 @@ class DoomEternalContext(CommonContext):
         # transport state begins fresh for the new connection.
         self.session_state.pop("deathlinked", None)
         self.deathlink.bind(self.state_key, self.session_state)
+        if self.death_observer.bind(namespace_id(effective_seed_name, self.team, self.slot, generation)):
+            self._death_baseline_pending = True
         raw_save_observations = self.session_state.get("save_slot_observations", {})
         self.session_state["save_slot_observations"] = self.save_observer.restore_slot_observations(raw_save_observations)
         self.session_state.pop("sticky_mastery_observed", None)
@@ -6658,11 +6663,50 @@ class DoomEternalContext(CommonContext):
         except Exception as error:
             logger.warning("[Killsanity] Milestone publication pending: %s", error)
 
+    async def prime_death_baseline(self):
+        if not getattr(self, '_death_baseline_pending', False):
+            return
+        from doom_eap.launcher.launcher_platform import launcher_user_paths
+        from doom_eap.launcher.launcher_session import _campaign_native_root
+        from doom_eap.runtime.weapon_points import namespace_id
+        namespace = namespace_id(self.room_seed_name, self.team, self.slot,
+                                 self._connected_slot_data['native_generation_fingerprint'])
+        campaigns = launcher_user_paths().data_dir / 'campaigns'
+        if not (campaigns / namespace / 'native.root').is_file():
+            return
+        token = self.receipt_session.capture(self.state_key)
+        try:
+            root = _campaign_native_root(campaigns, namespace)
+            path = STEAM_REMOTE_DIR / root / 'GAME-AUTOSAVE0' / 'game_duration.dat'
+            try:
+                path.stat()
+            except FileNotFoundError:
+                self.death_observer.start_empty_slot('GAME-AUTOSAVE0')
+                self._death_baseline_pending = False
+                return
+            selected = save_files.admitted_ap_save(STEAM_REMOTE_DIR, root)
+            if selected is None:
+                return
+            snapshot = await asyncio.to_thread(probe_game_duration, selected.path)
+            if not self.receipt_session.is_current(token, self.state_key):
+                return
+            current = save_files.admitted_ap_save(STEAM_REMOTE_DIR, root)
+            if current is None or current.cache_key != selected.cache_key:
+                return
+            # this read establishes history; live save proof still controls death publication.
+            self.death_observer.observe_checkpoint(snapshot, selected, 0, 'session_baseline')
+            self._death_baseline_pending = False
+        except Exception as error:
+            if str(error) != getattr(self, '_death_baseline_error', None):
+                logger.warning('[DeathLink] Initial save baseline pending: %s', error)
+                self._death_baseline_error = str(error)
+
     async def death_monitor_loop(self):
         while not self.exit_event.is_set():
             if not self.item_state_ready:
                 await asyncio.sleep(0.25)
                 continue
+            await self.prime_death_baseline()
             self.check_rpc_autopause()
             self.queue_received_deathlink()
             game_running = bool(doom_process_identity())

@@ -6,6 +6,7 @@ from doom_eap.contracts.inventory_domain import (
     InventoryObservation, ItemObservation, MISSING, OWNED, PERMANENT_PERK_ITEM_IDS,
 )
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP
+from doom_eap.contracts.runtime_context import canonical_map_name
 from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
 
 
@@ -24,7 +25,9 @@ class SentinelInventoryObservation:
             self.logger.info("INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
             return None
         native_scope = result.get("_observation_scope")
-        if native_scope and native_scope[-1] != str(epoch):
+        runtime_context = CONTEXT_BY_IDENTITY.get(context_identity)
+        if native_scope and (runtime_context is None or runtime_context.campaign != campaign or
+                canonical_map_name(result.get("_observation_map")) not in runtime_context.runtime_maps):
             return None
         items = {}
         weapons = result["weapons_after"]
@@ -46,7 +49,6 @@ class SentinelInventoryObservation:
             items[7770015] = ItemObservation(7770015, OWNED if dash else MISSING,
                                              source="sentinel_inventory")
         key = result.get("slayer_key_after", 255)
-        runtime_context = CONTEXT_BY_IDENTITY.get(context_identity)
         if key in (0, 1) and runtime_context is not None and runtime_context.campaign == campaign:
             for item_id, map_key in GATE_KEY_TO_MAP.items():
                 if map_key in runtime_context.map_keys:

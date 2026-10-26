@@ -338,7 +338,9 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
         anchor = records[landing]
         edit = {key: anchor['edit'][key] for key in ('spawnPosition', 'spawnOrientation') if key in anchor['edit']}
         if point == landing:
-            edit['spawnPosition'] = _entrance_endpoint(anchor['edit'])
+            endpoint = _entrance_endpoint(anchor['edit'])
+            if endpoint is not None:
+                edit['spawnPosition'] = endpoint
         if ('traversalEndpoint' in anchor['edit'] and
                 records[point]['edit'].get('spawnEditable', {}).get('aiStateOverride') in
                 {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}):

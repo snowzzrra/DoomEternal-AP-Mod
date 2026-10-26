@@ -21,6 +21,12 @@ DLC_SPECIES = frozenset({"armored_baron", "blood_angel", "chaingun_soldier", "cu
                          "zombie_t1_screecher"})
 
 
+def uses_protected_opening(enemies):
+    return bool(enemies.get('enabled') and enemies.get('progressive') and (
+        enemies.get('count_mode') == 'auto' or
+        enemies.get('count_mode') == 'multiplier' and enemies.get('count_multiplier') == 100))
+
+
 @dataclass(frozen=True)
 class EnemyRecipe:
     intensity: tuple[int, int]
@@ -173,6 +179,7 @@ def normalize_enemy_options(raw):
                   and weights[species] > 0]
         weights = {species: 5 if species in others else 0 for species in SPECIES_IDS}
         weights.update(zombie_maykr=80 * len(others), blood_angel=15 * len(others))
+    weights['chaingun_soldier'] //= 5
     overrides = raw.get("enemy_weights", {})
     if not isinstance(overrides, dict):
         raise ValueError("Enemy Weights must be an object")

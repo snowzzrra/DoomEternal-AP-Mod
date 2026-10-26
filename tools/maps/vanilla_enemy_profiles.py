@@ -261,6 +261,29 @@ def build_vanilla_profiles(root, catalog=None):
         profile['waves'].sort(key=lambda wave: (wave.get('source_line', 0),
                               re.sub(r'\d+', lambda match: match[0].zfill(10), wave['id'])))
         attach_encounters(profile)
+        for encounter in profile['encounters']:
+            record = next((row for row in records if row['name'] == encounter['owner']), None)
+            if record is None:
+                continue
+            scale = record['edit'].get('combatRatingScale', '')
+            music = [argument.get('decl', {}).get('soundstate', '')
+                     for script in list_items(record['edit'].get('encounterComponent', {}).get('entityEvents'))
+                     for event in list_items(script.get('events'))
+                     if event.get('eventCall', {}).get('eventDef') == 'setMusicState'
+                     for argument in list_items(event['eventCall'].get('args'))]
+            encounter['combat_rating_scale'] = scale
+            if 'SLAYER_GATE' in scale:
+                kind = 'slayer_gate_encounter'
+            elif 'ESCALATION' in scale:
+                kind = 'escalation_encounter'
+            elif 'SECRET' in scale:
+                kind = 'secret_encounter'
+            else:
+                kind = ('arena_encounter' if scale in {
+                    'COMBAT_RATING_SCALE_LARGE', 'COMBAT_RATING_SCALE_MEDIUM'} or
+                    any('heavy' in state for state in music)
+                    else 'ambient_encounter')
+            encounter['combat_kind'] = kind
         for row in profile['unknown_envelopes']:
             if row['id'] in owner_peaks:
                 peak, exact, ambiguous = owner_peaks[row['id']]

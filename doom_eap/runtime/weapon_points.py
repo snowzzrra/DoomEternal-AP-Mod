@@ -352,6 +352,7 @@ class SentinelWeaponPoints:
             scope = trace[0]["response"]
             result["_observation_scope"] = tuple(str(scope[key]) for key in
                 ("process_created", "instance_id", "build_id", "lifecycle_generation"))
+            result["_observation_map"] = scope.get("current_map")
         if result.get("inventory_abi") == 4:
             result["dash_before"] = result["dash_after"] = 255
         if result.get("inventory_abi") in (4, 5):
@@ -392,6 +393,7 @@ class SentinelWeaponPoints:
             scope = trace[0]["response"]
             result["_observation_scope"] = tuple(str(scope[key]) for key in
                 ("process_created", "instance_id", "build_id", "lifecycle_generation"))
+            result["_observation_map"] = scope.get("current_map")
         known = result.get("native_state_known")
         if (result.get("outcome") not in (0, 1) or result.get("kind") != 0
                 or result.get("flags", 0) & 3 != 3 or type(known) is not int or not 0 <= known <= 31

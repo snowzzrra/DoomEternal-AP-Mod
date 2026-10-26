@@ -24,7 +24,7 @@ import zipfile
 from types import SimpleNamespace
 
 from doom_eap.contracts.core_distribution import verify_runtime
-from doom_eap.runtime.observer_lifecycle import windows_game_processes
+from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 from doom_eap.runtime.weapon_points import namespace_id
 
 _UNSET = object()
@@ -300,12 +300,15 @@ class APSessionOwner:
             raise refused
         return value
 
-    def _capture_admission_failure(self, process, admission=None, error=None):
+    def _capture_admission_failure(self, process=None, admission=None, error=None, *, processes=_UNSET):
         runtime = getattr(self, "_runtime", None)
         if runtime is None:
             return
         admission = admission or {}
-        key = (process["pid"], str(process["created"]), self.namespace,
+        process = process or {}
+        candidates = None if processes is None else list(processes[:8]) if processes is not _UNSET else []
+        key = (process.get("pid"), str(process.get("created")), self.namespace,
+               self.status.get("state"), json.dumps(candidates, sort_keys=True),
                *(admission.get(field) for field in ("state", "fault", "prepared_routes", "instance_id")))
         now = time.monotonic()
         if key != getattr(self, "_admission_capture_key", None):
@@ -316,11 +319,13 @@ class APSessionOwner:
         self._admission_capture_attempts += 1
         self._next_admission_capture = now + 5
         document = {"at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    "pid": process["pid"], "process_created": str(process["created"]),
+                    "pid": process.get("pid"), "process_created": str(process.get("created")),
                     "namespace_id": self.namespace, "build_id": self._build,
                     "probe": str(runtime / "sentinel_probe.exe"), "attempt": self._admission_capture_attempts,
                     "admission": admission, "admission_error": str(error) if error else None, "queries": {}}
-        for flag in ("--native", "--engine", "--save-installation"):
+        document.update(state=self.status.get("state"), expected_game_path=str(self._game_exe),
+                        expected_process=self._process, processes=candidates)
+        for flag in (("--native", "--engine", "--save-installation") if processes is _UNSET else ()):
             query = {}
             document["queries"][flag] = query
             try:
@@ -346,7 +351,7 @@ class APSessionOwner:
                     value = getattr(failed, stream, None)
                     if value:
                         query[stream] = value[:4096].decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)[:4096]
-        native = document["queries"]["--native"]
+        native = document["queries"].get("--native", {})
         if (native.get("identity_matches") and native.get("response", {}).get("availability") in {"enabled", "disabled", "retained"}
                 and all(query.get("identity_matches") and query.get("returncode") == 0 for query in document["queries"].values())):
             self._admission_capture_attempts = 4
@@ -845,19 +850,30 @@ class APSessionOwner:
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes is None:
                 self.status.update(state="process_unknown", ready=False)
+                self._capture_admission_failure(error="Game process identity query failed", processes=None)
                 return dict(self.status)
             if not processes:
                 if self._process is not None:
                     self.retire(processes)
                     self.status.update(state="game_exited", ready=False)
                 return dict(self.status)
-            if len(processes) != 1 or os.path.normcase(str(processes[0]["path"])) != os.path.normcase(str(self._game_exe)):
+            path_matches = False
+            path_error = None
+            if len(processes) == 1:
+                try:
+                    path_matches = same_executable_path(processes[0]["path"], self._game_exe)
+                except OSError as error:
+                    path_error = error
+            if not path_matches:
                 self.status.update(state="process_ambiguous", ready=False)
+                self._capture_admission_failure(error=path_error or "Game process count or executable does not match",
+                                                processes=processes)
                 return dict(self.status)
             process = processes[0]
             identity = process["pid"], process["created"]
             if self._process is not None and identity != self._process:
                 self.status.update(state="process_changed", ready=False)
+                self._capture_admission_failure(error="The prepared game process identity changed", processes=processes)
                 return dict(self.status)
             self._process = identity
             self.status.update(pid=process["pid"], process_created=process["created"])

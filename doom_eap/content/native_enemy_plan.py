@@ -16,7 +16,7 @@ from threading import Lock
 from .enemy_plan import (BASE_COMBAT_COST, _density_weights, _limit_suffix, _random_for, enemy_combat_cost,
                          effective_special_limits, sample_instance_attributes, sample_species)
 from .enemy_species import enemy_spawn_mask, enemy_tracking_suffix, selected_spawn_type, enemy_speed_capabilities
-from .enemy_options import BALANCE_PRESETS, ENEMY_RECIPES, SPECIES_GROUPS
+from .enemy_options import BALANCE_PRESETS, ENEMY_RECIPES, SPECIES_GROUPS, uses_protected_opening
 
 NATIVE_FAMILIES = {"immediate": "i", "group": "g", "staggered": "t", "maintenance": "m", "archvile": "a",
                    "spirit": "s", "possessed": "p", "buff_pod": "b", "independent_actor": "d", "summon": "u", "direct_point": "f"}
@@ -606,8 +606,8 @@ def _wave_peak(bodies, *, mobile=False):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=14):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=17):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -638,8 +638,9 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=14):
     if campaign.get('opening_stage') is not None:
         from .native_enemy_safety import OPENING_REGIONS
         if (revision < 8 or campaign['opening_stage'] not in OPENING_REGIONS
-                or campaign['opening_stage'] not in sequence or enemies['count_mode'] != 'auto'):
-            raise ValueError('Native recipe opening needs a supported mission and Auto enemy count')
+                or campaign['opening_stage'] not in sequence or not (enemies['count_mode'] == 'auto'
+                    or revision >= 16 and uses_protected_opening(enemies))):
+            raise ValueError('Native recipe opening needs a supported mission and progressive enemy count')
     if composition_bands is not None and (not isinstance(composition_bands, dict) or set(composition_bands) != set(sequence)
             or any(type(value) is not int for value in composition_bands.values())
             or sorted(composition_bands.values()) != list(range(len(sequence)))):
@@ -659,7 +660,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=14):
                 stage_index, stage_count = CANONICAL_ORDER.index(map_key), len(CANONICAL_ORDER)
             elif not mai:
                 from .native_enemy_balance import PURE_BOSS_MAPS
-                combat_sequence = [key for key in sequence if key not in PURE_BOSS_MAPS]
+                pure_boss_maps = PURE_BOSS_MAPS - {'e3m4_boss'} if revision >= 15 else PURE_BOSS_MAPS
+                combat_sequence = [key for key in sequence if key not in pure_boss_maps]
                 if map_key in combat_sequence:
                     stage_index, stage_count = combat_sequence.index(map_key), len(combat_sequence)
         elif mai and revision >= 8:
@@ -729,6 +731,9 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=14):
                        ['ENCOUNTER_SPAWN_MANCUBUS'] or source.get('family') == 'group' and
                        (source.get('binding') or {}).get('owner') == 'game_encounter_manager_traindepot_1' and
                        not (source.get('binding') or {}).get('reference') else source for source in origins]
+        if vanilla_balance and revision >= 17:
+            from .native_enemy_balance import prepare_encounter_sources
+            origins = prepare_encounter_sources(origins, catalog, map_key)
         supplies = ammunition_sources(origins, catalog, finite=revision >= 9) if revision >= 4 else frozenset()
         if vanilla_balance:
             ammo_types = {catalog['species'][species]['spawn_type'] for species in AMMO_FODDER

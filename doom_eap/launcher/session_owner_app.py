@@ -10,7 +10,7 @@ import time
 from doom_eap.launcher.launcher_session import APSessionOwner
 from doom_eap.launcher.launcher_core import RoomSnapshot
 from doom_eap.launcher.launcher_platform import restore_standard_streams
-from doom_eap.runtime.observer_lifecycle import windows_game_processes
+from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 
 
 def respond(document):
@@ -27,7 +27,12 @@ def respond(document):
 def main():
     restore_standard_streams(require_pipes=True)
     if "--process-identity" in sys.argv:
-        respond({"processes": windows_game_processes()})
+        processes = windows_game_processes()
+        if "--expected-game-exe" in sys.argv:
+            expected = sys.argv[sys.argv.index("--expected-game-exe") + 1]
+            processes = tuple({**row, "same_executable": same_executable_path(row["path"], expected)}
+                              for row in processes) if processes is not None else None
+        respond({"processes": processes})
         return 0
     owner = None
     native = None

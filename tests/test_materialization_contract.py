@@ -307,9 +307,36 @@ def test_inventory_observation_defers_if_checkpoint_changes_between_native_reads
     adapter, link = inventory_adapter
     identity = ("created", "instance", "build", str(scope.evidence_epoch))
     link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
-        "perks_known": 2, "perks_owned": 0, "_observation_scope": identity}
+        "perks_known": 2, "perks_owned": 0, "_observation_scope": identity,
+        "_observation_map": context.runtime_maps[0]}
     link.observe_special_inventory = lambda: {"_observation_scope": (*identity[:-1], "changed")}
     assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
         context_identity=context.identity, campaign=context.campaign) is None
     assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch + 1,
         context_identity=context.identity, campaign=context.campaign) is None
+
+
+@pytest.mark.parametrize('native_map,accepted', [('game/hub/hub', True),
+    ('game/sp/e2m3_core/e2m3_core', False), (None, False)])
+def test_fixed_dash_repair_accepts_independent_native_generation_in_the_same_map(inputs, inventory_adapter,
+                                                                              native_map, accepted):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY['base/hub']
+    adapter, link = inventory_adapter
+    identity = ('created', 'instance', 'build', '99')
+    link.observe_inventory = lambda: {'weapons_after': 0, 'ice_bomb_after': 0, 'dash_after': 0,
+        '_observation_scope': identity, '_observation_map': native_map}
+    link.observe_special_inventory = lambda: {'_observation_scope': identity, 'native_state_known': 0}
+    observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign)
+    assert (observation is not None) == accepted
+    if not accepted:
+        return
+    owned = effective_ownership((), randomize_chainsaw=True, randomize_dash=False,
+        checked_locations=frozenset({7770122}), local_checked_locations=frozenset(),
+        server_checked_ready=True, hell_on_earth_locations=frozenset(), exultia_complete_location=7770122, slot=1)
+    plan = compile_materialization_plan(owned, context, scope, definitions, policies, 'the_crucible',
+                                        observation=observation)
+    assert any(command.item_id == 7770015 for command in plan.reconciliation.commands)

@@ -10,12 +10,13 @@ Choose options under **CREATE PLAYER** before generation. During a session,
 sequence. **Mission Access as Items** lets you enter a mission after finding its
 Access item. Completed missions can be replayed from the Fortress of Doom.
 
-With the Enemy Randomizer enabled, Random Mission Order ranks the generated fights
-by their enemy composition, attributes and wave pressure. Equipment preparation
+Mission planning uses generated enemy composition, attributes and wave pressure.
+Slayer's Path maps vanilla combat progression onto shuffled missions. Equipment preparation
 and mandatory boss requirements contribute to difficulty; the configured goal stays last.
 
 **Use DLC Content** controls DLC gear and enemy types separately from the mission
-selection. Choose your **Goal** and any **Additional Victory Requirements** before
+selection. Slayer Gate keys follow the missions and enabled gates, including DLC missions.
+Choose your **Goal** and any **Additional Victory Requirements** before
 generation. The launcher shows the tasks you still need during play.
 
 **Campaign Difficulty** controls the game's difficulty. **Logic Difficulty** controls

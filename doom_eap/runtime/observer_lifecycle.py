@@ -25,6 +25,14 @@ MAX_PATH = 260
 _windows_process_probe_warning_emitted = False
 
 
+def same_executable_path(actual, expected):
+    try:
+        return (os.path.normcase(os.path.abspath(actual)) == os.path.normcase(os.path.abspath(expected))
+                or os.path.samefile(actual, expected))
+    except (OSError, ValueError):
+        return False
+
+
 class PROCESSENTRY32W(ctypes.Structure):
     _fields_ = [
         ("dwSize", ctypes.c_ulong),

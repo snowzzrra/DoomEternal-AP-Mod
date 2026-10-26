@@ -36,14 +36,67 @@ def recipes(stage):
     return {recipe['id']: recipe for recipe in stage['recipes']}
 
 
-def test_slayers_path_preserves_finite_categories_and_all_special_species(native_catalog):
+def test_contextual_balance_keeps_blood_swamps_arenas_separate_from_torches(native_catalog):
+    campaign = dict(sequence=['e1m1_intro', 'e2m4_boss', 'e2m3_core', 'e3m2_hell_b',
+                              'e4m2_swamp', 'e5m4_boss', 'e3m4_boss'], mode='random_mission_order')
+    plan = build_native_recipes(effective(), campaign, seed=19414182160040271551, catalog=native_catalog)
+    reports = plan['maps']['e4m2_swamp']['vanilla_reference']['encounters']
+    torches = [row for row in reports if 'torch' in row['owner'] and row['primary']]
+    arenas = [row for row in reports if row['owner'] in {'arena_encounter_manager_1',
+              'arena_encounter_manager_arena3', 'boss_encounter_manager_forest_arena_2'} and row['primary']]
+    assert torches and arenas
+    assert all(row['kind'] == row['reference_kind'] == 'ambient_encounter' for row in torches)
+    assert all(row['reference_kind'] == 'arena_encounter' for row in arenas)
+    assert min(row['actual_finite_total'] for row in arenas) > max(row['actual_finite_total'] for row in torches)
+    assert validate_native_recipes(plan, effective(), campaign, catalog=native_catalog) == plan
+
+
+def test_fodder_draw_includes_drone_and_trooper_with_fewer_riot_shields(native_catalog):
+    key = 'e1m1_intro'
+    catalog = fixture_catalog(native_catalog, {key: [source(native_catalog, key, 'imp', 0,
+                                                           count=600, maximum=600)]})
+    options = effective()
+    plan = build_native_recipes(options, dict(sequence=[key]), seed=31, catalog=catalog)
+    counts = Counter(body['species'] for recipe in plan['maps'][key]['recipes'] for body in recipe['bodies'])
+    assert counts['zombie_maykr'] and counts['demonic_trooper'] and counts['gargoyle']
+    assert counts['chaingun_soldier'] < counts['hell_soldier']
+    assert counts['chaingun_soldier'] < counts['demonic_trooper']
+    drone = native_catalog['species']['zombie_maykr']
+    assert drone['ai']['entity'] == 'gameplay_ai_fodder_zombie_maykr_1'
+    khan = next(row for row in native_catalog['maps']['e3m3_maykr']['origins']
+                if row['id'] == 'e3m3_maykr/khan_boss_intro_ida2')
+    assert khan['protected_reason'] == 'native boss actor'
+
+
+def test_specials_exchange_within_native_superheavy_and_support_counts(native_catalog):
+    key = 'e5m3_hell'
+    catalog = fixture_catalog(native_catalog, {key: [
+        source(native_catalog, key, 'marauder', 0, count=12, maximum=12),
+        source(native_catalog, key, 'spirit', 1, count=12, maximum=12)]})
+    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=31, catalog=catalog)
+    report, = plan['maps'][key]['vanilla_reference']['encounters']
+    counts = Counter(body['species'] for recipe in plan['maps'][key]['recipes'] for body in recipe['bodies'])
+    assert counts['marauder'] and counts['archvile']
+    assert sum(counts[name] for name in ('marauder', 'archvile', 'armored_baron')) == 12
+    assert counts['buff_pod'] and counts['zombie_t1_screecher'] and counts['spirit']
+    assert sum(counts[name] for name in ('buff_pod', 'zombie_t1_screecher', 'spirit')) == 12
+    assert Counter(report['actual_finite']) == Counter(report['target_finite'])
+    assert report['population_limits']['superheavy'] == 12
+    assert report['population_limits']['combined_special'] == 24
+    for recipe in plan['maps'][key]['recipes']:
+        for body in recipe['bodies']:
+            assert body['population_limits']['species'][body['species']] > 0
+            assert body['special_limits']['combined_special'] > 0
+
+
+def test_revision14_preserves_finite_categories_and_all_special_species(native_catalog):
     key = 'e5m3_hell'
     species = ['imp', 'hell_knight', 'baron', *sorted(SPECIAL_SPECIES)]
     origins = [source(native_catalog, key, name, index) for index, name in enumerate(species)]
     catalog = fixture_catalog(native_catalog, {key: origins})
     options = effective()
     campaign = dict(sequence=[key], mode='mission_access_as_items', enemy_progression_bands={key: 0})
-    plan = build_native_recipes(options, campaign, seed=127, catalog=catalog)
+    plan = build_native_recipes(options, campaign, seed=127, catalog=catalog, revision=14)
     stage = plan['maps'][key]
     report, = stage['vanilla_reference']['encounters']
     assert Counter(report['reference_finite']) == Counter(report['actual_finite'])

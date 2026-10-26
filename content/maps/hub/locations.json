@@ -119,8 +119,8 @@
     "pickup_equipment_ice_bomb": {
       "independent_ap_trigger": true,
       "independent_position": [
-        0.47,
-        -22.27,
+        0.5,
+        -13.0,
         -14.38
       ],
       "independent_size": [
@@ -131,18 +131,19 @@
       "independent_visual": {
         "entity_name": "ap_location_visual_7770074",
         "cleanup_entity": "ap_remove_location_visual_7770074",
-        "inherit": "func/dynamic",
+        "class": "idProp2",
+        "inherit": null,
         "model": "art/pickups/codex.lwo",
         "thinkComponentDecl": "bob_rotate_slow",
         "position": [
-          0.47,
-          -22.27,
-          -15.38
+          0.5,
+          -13.0,
+          -14.0
         ],
         "scale": [
-          1.75,
-          1.75,
-          1.75
+          1.0,
+          1.0,
+          1.0
         ]
       },
       "drop_targets": [
