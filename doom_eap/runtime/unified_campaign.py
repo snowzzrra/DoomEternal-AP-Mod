@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from doom_eap.content.fortress_economy import validate_battery_economy
+
 CAPABILITY = "unified_campaign_v1"
 STAGES = {stage["id"]: stage for stage in json.loads(
     (Path(__file__).resolve().parents[2] / "data/campaign_stages.json").read_text(encoding="utf-8")
@@ -85,14 +87,10 @@ def validate_plan(slot_data):
             raise ValueError("Fortress spend groups are invalid")
         cost = sum(groups[key]["cost"] for key in active)
         percent = FORTRESS_POLICY["battery_surplus_percent"]
-        surplus = (cost * percent + 99) // 100
-        expected_economy = {
-            "cost": cost, "surplus": surplus, "total": cost + surplus,
-            "surplus_percent": percent,
-            "native_first_battery": int(not slot_data["randomize_first_battery"] and "e1m2_war" in sequence),
-        }
-        if plan.get("battery_economy") != expected_economy:
-            raise ValueError("Fortress Battery economy contradicts its native spend groups")
+        validate_battery_economy(
+            plan.get("battery_economy"), cost=cost, percent=percent,
+            native_first_battery=int(not slot_data["randomize_first_battery"] and "e1m2_war" in sequence),
+        )
     if plan["mode"] == "Vanilla Order":
         chronological = [key for key in STAGES if key in enabled and key != goal] + ([goal] if goal else [])
         if sequence != chronological:

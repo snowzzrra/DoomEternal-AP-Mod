@@ -291,6 +291,8 @@ def _compile_catalog(
     write_artifact(output.parent / "docs/setup_en.md", setup_guide)
     write_bytes_artifact(output.with_name("enemy_options.py"),
                          (catalog.root / "doom_eap/content/enemy_options.py").read_bytes())
+    write_bytes_artifact(output.with_name("fortress_economy.py"),
+                         (catalog.root / "doom_eap/content/fortress_economy.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_plan.py"),
                          (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_plan.py"),
