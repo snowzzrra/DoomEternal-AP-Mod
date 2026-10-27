@@ -83,11 +83,15 @@
     {
       "content_revision": "0.5.0",
       "reason": "Phase5: add only the two WUP AP notification entities; native Sentinel owns granting, no RPC writer"
+    },
+    {
+      "content_revision": "0.7.0",
+      "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
     }
   ],
   "asset_package_contract_sha256": "2114d4f3c8372ca53a27512f26623011a29cb31af9600d4f8bde3b342062491c",
-  "content_revision": "0.5.0",
-  "manifest_sha256": "41b170495d026914c14005baef9d02dbf532ddf489411dab05046c0bb7b9afda",
+  "content_revision": "0.7.0",
+  "manifest_sha256": "40e7f3f92e5e94a6b25c508f54c1f6390dd589f7788fee165eb753ac64f28014",
   "map_key": "e2m1_nest",
   "physical_ap_ids": [
     7770176,
@@ -120,9 +124,11 @@
     7770203,
     7770204,
     7770205,
-    7770488
+    7770488,
+    7770498,
+    7770513
   ],
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "1d061bb1db373d5251c233247e43a7fecaf86bf0ea1c12a8904700911be3def6"
+  "scripted_contract_sha256": "1b5d647a4c5a5e600e35b0e10e7050b83a4b34ce3f6b4c0919803c8f506817e2"
 }

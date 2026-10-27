@@ -26,6 +26,7 @@ from doom_eap.contracts.foundation import (
     validate_primitive_registry,
 )
 from doom_eap.content.item_classification import load_item_classification_identity
+from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.map_registry import load_map_registry, validation_plan
 from doom_eap.contracts.source_bytes import first_party_text_bytes
 from tools.decls.devinv_builder import load_devinv_mapping
@@ -363,6 +364,8 @@ def validate_automap_family_registry(
             encoding="utf-8"
         )
         for ap_check, location_id in config.get("entities", {}).items():
+            if config.get("target_policies", {}).get(ap_check.removeprefix("AP_CHECK_").lower(), {}).get("legacy_alias_of"):
+                continue
             entity_name, bounds = find_check_source(source_text, ap_check, config["entities"])
             if bounds is None:
                 errors.append(f"Automap source entity missing: {map_key}/{entity_name}")
@@ -785,6 +788,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     errors: list[str] = []
     warnings: list[str] = []
+    aliases = {location.location_id for location in load_content_catalog(ROOT).physical_locations
+               if location.policy.get("legacy_alias_of")}
 
     try:
         assert_frozen_map_baselines()
@@ -834,6 +839,7 @@ def main(argv: list[str] | None = None) -> int:
             for location_id, name in location_identity.get(
                 "locations", {}
             ).items()
+            if int(location_id) not in aliases
         }
         if (
             location_identity.get("schema_version") != 1
@@ -1131,9 +1137,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 350:
+    if physical_location_count != 377:
         errors.append(
-            f"Expected 350 physical entity locations, found {physical_location_count}"
+            f"Expected 377 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids
@@ -1243,7 +1249,7 @@ def main(argv: list[str] | None = None) -> int:
     missing_commands = sorted(set(item_ids.values()) - set(commands))
     extra_commands = sorted(set(commands) - set(item_ids.values()))
     declared_runtime_locations = runtime_locations & set(location_ids.values())
-    manifest_location_id_set = set(manifest_location_ids)
+    manifest_location_id_set = set(manifest_location_ids) - aliases
     missing_locations = sorted(manifest_location_id_set - set(location_ids.values()))
     unmanifested_locations = sorted(
         set(location_ids.values()) - manifest_location_id_set - runtime_locations
@@ -1517,7 +1523,7 @@ def main(argv: list[str] | None = None) -> int:
                 if not isinstance(perk, str) or not perk.startswith("perk/player/"):
                     errors.append(f"Perk command {item_id} has invalid path: {perk}")
                 continue
-            if command_type == "transient_effect":
+            if command_type in {"transient_effect", "physical_pickup_spawn"}:
                 continue
             if command_type != "currency":
                 errors.append(f"Entity command {item_id} has unsupported type: {command_value.get('type')}")

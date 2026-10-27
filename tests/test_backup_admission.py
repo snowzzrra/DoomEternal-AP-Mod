@@ -62,7 +62,8 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
     assert result['result'] == 'protective_backup_ready'
     assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
     for name in ('tracker_loop', 'death_monitor_loop'):
-        stopped = SimpleNamespace(exit_event=asyncio.Event(),
+        stopped = SimpleNamespace(exit_event=asyncio.Event(), item_state_ready=True,
+            prime_death_baseline=AsyncMock(),
             reset_transient_effects=Mock(), invalidate_map_identity=Mock(),
             check_rpc_autopause=Mock(), queue_received_deathlink=Mock(), check_killsanity=AsyncMock())
 
