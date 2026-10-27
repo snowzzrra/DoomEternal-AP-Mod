@@ -14,7 +14,7 @@
     "sha256": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
     "size": 18713969
   },
-  "room_resource_input_fingerprint": "3132876cd849e0793dabb60b71c2569ef9d350f2ccb77f22fec9d6fb153ba6ed",
+  "room_resource_input_fingerprint": "a5fe7c89a1603ab821ac7e8f25e117a845d705f319b34218a2f46f1f5569a8a9",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
@@ -412,7 +412,7 @@
     "packaging/shell_menu_assetsinfo.json": "c19bc85853c42e7063b66b2d0292df9d6d0e80ad78e2b935f01d1873abd3f653",
     "player_templates/DoomSlayer.yaml": "4b99b845e228242d432f5481acbf9c25cefd03a14184a5f628c53d526e72a088",
     "player_templates/Marine.yaml": "e4829c3a36ec9610b45380a120c4e9b0fe38179b73a9b1da23dc35d7f41727e6",
-    "tools/content/compile_content_catalog.py": "f6f6a33443ea86d63f2def85e5c926c61e1574ff066482afe864d0e854bd8cdb",
+    "tools/content/compile_content_catalog.py": "c46f439c2f6e9ebf539fcc400d09d58694e60e8c70cb5a27e1b2ad261c4b5fb7",
     "tools/content/compile_start_inventory_catalog.py": "ebebd6f3647b150332c513651f74a8681c5747317504afcf9fec603695170969",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "tools/decls/campaign_builder.py": "18122b06d9596780ef7a6793be45bf61e892385b9a89c92a117e1e9582e91515",

@@ -18,11 +18,10 @@ from scripts.release.assemble_ci_artifact import (
 )
 from tools.release.release_manifest import MANIFEST_FILENAME
 from doom_eap.contracts.challenge_registry import load_challenge_registry
-from tools.decls.mastery_decl_builder import _reward_free_override
+from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
 from tools.validation.release_layout import ROOM_COMPILER_RESOURCE_FILES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-CANONICAL_LOCAL_RESOURCES = REPO_ROOT / "build" / "release" / "client" / "resources"
 
 
 def create_fake_handoff(
@@ -137,11 +136,12 @@ def create_synthetic_room_resources(
     base_bytes = b"base_entities_content_data"
     rep_bytes = b"replacement_entities_content_data"
     source_bytes = b"canonical source\r\nentity {\r\n}\r\n"
-    mastery_sources = {
-        "gameresources/generated/decls/" + entry["decls"]["unlockable"]["path"]:
-        _reward_free_override(entry)[0].encode("utf-8")
-        for entry in load_challenge_registry()["weapon_masteries"]
-    }
+    with zipfile.ZipFile(get_frozen_bundle_dir(REPO_ROOT) / "base_mod.zip") as archive:
+        mastery_sources = {
+            member: archive.read(member)
+            for entry in load_challenge_registry()["weapon_masteries"]
+            for member in ["gameresources/generated/decls/" + entry["decls"]["unlockable"]["path"]]
+        }
 
     base_hash = hashlib.sha256(base_bytes).hexdigest()
     rep_hash = hashlib.sha256(rep_bytes).hexdigest()
@@ -221,8 +221,6 @@ class TestAssembleCIArtifact(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _get_resources_dir(self) -> Path:
-        if CANONICAL_LOCAL_RESOURCES.is_dir():
-            return CANONICAL_LOCAL_RESOURCES
         create_synthetic_room_resources(self.resources_dir)
         return self.resources_dir
 
@@ -233,7 +231,7 @@ class TestAssembleCIArtifact(unittest.TestCase):
         self.assertEqual(manifest["version_label"], "v0.4.0-beta.4")
 
         resources_dir = self._get_resources_dir()
-        validate_room_resources(resources_dir, repo_root=REPO_ROOT if resources_dir == CANONICAL_LOCAL_RESOURCES else None)
+        validate_room_resources(resources_dir)
 
         stage_dir = Path(self.temp_dir) / "stage"
         lin_stage = assemble_platform_release("linux", self.handoff_dir, REPO_ROOT, resources_dir, manifest, stage_dir)

@@ -12,6 +12,7 @@ from tools.maps.encounter_catalog import text_sha256
 from tools.maps.ap_map_generator import find_entity_block_bounds
 from tools.release.room_payloads import map_physical_option_keys
 from tools.maps.mission_complete_map_patcher import _patch_hell
+from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
@@ -25,16 +26,19 @@ def cold_case(tmp_path, monkeypatch):
     compiler.base_resource = tmp_path / "base.zip"
     contract = json.loads((ROOT / "data/mission_complete_map_contracts.json").read_text())["hell_on_earth"]
     base = tmp_path / "base"
-    _patch_hell(contract, ROOT, base)
+    resources = get_frozen_bundle_dir(ROOT)
+    with ZipFile(resources / "base_mod.zip") as archive:
+        retained = {contract["override_path"]: archive.read(contract["override_path"])}
+    _patch_hell(contract, ROOT, base, retained_overrides=retained)
     with ZipFile(compiler.base_resource, "w") as archive:
         archive.writestr(TARGET, b"previous compiled content")
         archive.writestr(contract["override_path"], (base / contract["override_path"]).read_bytes())
     compiler.payload_resource = tmp_path / "payloads.zip"
     snapshots = {}
-    with ZipFile(compiler.payload_resource, "w") as archive:
+    with ZipFile(resources / "room_payloads.zip") as sources, ZipFile(compiler.payload_resource, "w") as archive:
         for key in sorted(keys):
-            data = (ROOT / "vanillamaps" / f"{key}.map").read_bytes()
             member = f"sources/{key}.entities"
+            data = sources.read(member)
             archive.writestr(member, data)
             snapshots[key] = {"member": member, "sha256": text_sha256(data.decode()), "size": len(data)}
     targets = {key: TARGET if key == "e1m1_intro" else f"{key}/maps/{key}.entities" for key in keys}

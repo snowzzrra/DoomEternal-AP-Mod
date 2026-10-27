@@ -223,6 +223,34 @@ def compile_kill_sources(catalog, native):
     return kill_catalog
 
 
+def _prebuilt_enemy_catalogs(root: Path) -> tuple[dict, dict]:
+    from doom_eap.content.vanilla_enemy_profiles import CANONICAL_ORDER
+    from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
+
+    provenance = json.loads((get_frozen_bundle_dir(root) / "ROOM_RESOURCES_PROVENANCE.json").read_bytes())
+    documents = []
+    for name in ("native_enemy_catalog.json", "vanilla_enemy_profiles.json"):
+        path = root / "doom_eap/content" / name
+        payload = first_party_text_bytes(path.read_bytes())
+        if hashlib.sha256(payload).hexdigest() != provenance["source_hashes"][path.relative_to(root).as_posix()]:
+            raise ValueError(f"Committed enemy catalog differs from room resource provenance: {name}")
+        documents.append(json.loads(payload))
+    native, profiles = documents
+    descriptors = {path.parent.name: json.loads(path.read_bytes())
+                   for path in (root / "content/maps").glob("*/descriptor.json")}
+    if (native.get("schema_version") != 1 or set(native["maps"]) != set(descriptors)
+            or profiles.get("schema_version") != 1 or tuple(profiles.get("order", ())) != CANONICAL_ORDER
+            or set(profiles["maps"]) != set(CANONICAL_ORDER)):
+        raise ValueError("Committed enemy catalogs have invalid map coverage or schema")
+    for key, descriptor in descriptors.items():
+        if (native["maps"][key]["source_sha256"] != descriptor["source_sha256"]
+                or native["maps"][key]["runtime_map"] != descriptor["runtime_map"]
+                or key in profiles["maps"]
+                and profiles["maps"][key]["source_sha256"] != descriptor["source_sha256"]):
+            raise ValueError(f"Committed enemy catalog source differs from descriptor: {key}")
+    return native, profiles
+
+
 def _compile_catalog(
     output: Path = DEFAULT_OUTPUT,
     *,
@@ -275,13 +303,17 @@ def _compile_catalog(
                          (catalog.root / "doom_eap/content/vanilla_enemy_profiles.py").read_bytes())
     from tools.maps.native_enemy_inventory import build_native_recipe_catalog
 
-    native = build_native_recipe_catalog(catalog.root)
+    from tools.maps.vanilla_enemy_profiles import build_vanilla_profiles
+
+    if source_only and not (catalog.root / "vanillamaps").exists():
+        native, profiles = _prebuilt_enemy_catalogs(catalog.root)
+    else:
+        native = build_native_recipe_catalog(catalog.root)
+        profiles = build_vanilla_profiles(catalog.root, native)
     native_catalog = json.dumps(native, sort_keys=True, separators=(",", ":")) + "\n"
     write_artifact(output.with_name("native_enemy_catalog.json"), native_catalog)
     write_artifact(catalog.root / "doom_eap/content/native_enemy_catalog.json", native_catalog)
-    from tools.maps.vanilla_enemy_profiles import build_vanilla_profiles
-
-    vanilla_profiles = json.dumps(build_vanilla_profiles(catalog.root, native),
+    vanilla_profiles = json.dumps(profiles,
                                  sort_keys=True, separators=(",", ":")) + "\n"
     write_artifact(output.with_name("vanilla_enemy_profiles.json"), vanilla_profiles)
     write_artifact(catalog.root / "doom_eap/content/vanilla_enemy_profiles.json", vanilla_profiles)
