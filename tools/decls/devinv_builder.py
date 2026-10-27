@@ -478,8 +478,13 @@ def _entry_for_name(name: str, mapping: Mapping[int, dict[str, Any]]) -> dict[st
 
 def _materialized_representations(
     name: str, quantity: int, mapping: Mapping[int, dict[str, Any]], seen_dedupe: set[str],
+    starting_inventory: Mapping[str, int],
 ) -> list[tuple[str, str, tuple[str, ...]]]:
     entry = _entry_for_name(name, mapping)
+    # frag upgrades can unlock the base throwable when equipped.
+    if name in {"Frag Grenade Cooldown", "Frag Grenade Concussive Blast", "Frag Grenade Cluster Bombs",
+                "Second Frag Grenade"} and not starting_inventory.get("Frag Grenade"):
+        return []
     if entry["kind"] == "currency":
         return []
     if entry["kind"] == "stored_charge":
@@ -717,7 +722,7 @@ def build_devinv_loadout(
         if entry["kind"] == "currency":
             currency_totals[entry["currency"]] = currency_totals.get(entry["currency"], 0) + quantity * entry["countPerItem"]
             continue
-        for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe):
+        for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe, starting_inventory):
             entries.append(_decl_item(field, path, flags, index))
             index += 1
     if starting_weapon is not None and starting_weapon != "Combat Shotgun":
@@ -833,7 +838,7 @@ def validate_devinv_source(
                 raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
             if starting_weapon == name:
                 raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
-            for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe):
+            for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe, starting_inventory):
                 expected[(field, path, flags)] = expected.get((field, path, flags), 0) + 1
         actual: dict[tuple[str, str, tuple[str, ...]], int] = {}
         for body in dynamic_blocks:
@@ -1036,7 +1041,7 @@ def build_tag_devinv_overrides(
         existing_bodies = [body for body in existing_bodies if "perk/player/blood_punch/" not in body]
         quantity = (starting_inventory or {}).get("Progressive Blood Punch", 0)
         for field, path, flags in _materialized_representations(
-                "Progressive Blood Punch", quantity, load_devinv_mapping(), set()):
+                "Progressive Blood Punch", quantity, load_devinv_mapping(), set(), starting_inventory or {}):
             blood_punch_bodies.append(_ITEM_BLOCK_RE.search(_decl_item(field, path, flags, 0)).group("body"))
     all_bodies = existing_bodies[:4] + blood_punch_bodies + existing_bodies[4:]
     new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]

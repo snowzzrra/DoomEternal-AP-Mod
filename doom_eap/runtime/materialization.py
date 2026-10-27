@@ -55,6 +55,9 @@ def compile_materialization_plan(
     for item_id in ownership.reconciliation_item_ids:
         received_counts[item_id] = received_counts.get(item_id, 0) + 1
     materializable_ids = context_item_ids(context, received)
+    if 7770011 not in received:
+        materializable_ids = tuple(item_id for item_id in materializable_ids
+                                   if item_id not in {7770111, 7770112, 7770113, 7770114})
     allowed_replay_policies = {"replay_idempotent", "replay_manual_only"}
     selected_special_ids = {
         "progressive_special_weapon": {7770901},

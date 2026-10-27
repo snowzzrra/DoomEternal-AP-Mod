@@ -46,6 +46,34 @@ def missing_special(scope, context):
     )
 
 
+@pytest.mark.parametrize("base_received,base_state", [(False, MISSING), (False, OWNED),
+                                                       (True, MISSING), (True, UNKNOWN), (True, OWNED)])
+def test_frag_upgrades_wait_for_owned_base(inputs, base_received, base_state):
+    definitions, policies, _, scope = inputs
+    context = RuntimeContext("base-hub", "Base", ("game/hub/hub",), ("hub",), frozenset())
+    upgrades = (7770111, 7770112, 7770113, 7770114)
+    received = (7770011, *upgrades) if base_received else upgrades
+    observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, "Base",
+        {7770011: ItemObservation(7770011, base_state),
+         **{item_id: ItemObservation(item_id, MISSING) for item_id in upgrades}})
+    for manual in (False, True):
+        plan = compile_materialization_plan(ownership(received), context, replace(scope, manual=manual),
+            definitions, policies, "the_crucible", observation=observation)
+        applied = {command.item_id for command in plan.reconciliation.commands} & set(upgrades)
+        assert applied == (set(upgrades) if base_received else set())
+
+
+@pytest.mark.parametrize("base_received", [False, True])
+def test_starting_frag_upgrades_wait_for_base(base_received):
+    from tools.decls.devinv_builder import build_devinv_loadout
+
+    inventory = {"Second Frag Grenade": 1}
+    if base_received:
+        inventory["Frag Grenade"] = 1
+    loadout = build_devinv_loadout(inventory, "Ballista")
+    assert ("perk/player/equipment/frag_max_capacity" in loadout) == base_received
+
+
 def test_fixed_dash_uses_configured_completion_ack_and_native_missing(inputs):
     definitions, policies, context, scope = inputs
     def derived(checked=(), ready=True):
