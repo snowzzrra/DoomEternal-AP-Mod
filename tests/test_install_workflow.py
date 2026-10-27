@@ -21,7 +21,7 @@ from doom_eap.launcher.launcher_core import (
     RoomCompiler,
     RoomSnapshot,
 )
-from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
+from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, setup_failure_payload
 from doom_eap.launcher.launcher_platform import (
     WINDOWS_INJECTOR_REQUIRED_MEMBERS,
     DependencyManager,
@@ -253,6 +253,52 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 rollback_core(root, None)
                 self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
 
+    def test_incompatible_core_upgrade_preserves_backups_and_foreign_files(self):
+        from doom_eap.contracts.core_distribution import verify_runtime
+        from doom_eap.launcher.launcher_core_install import NAMES
+
+        for changed in (None, "missing_bootstrap", "missing_pair", *NAMES):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                root = self._create_mock_game_root(base / "doom")
+                old_runtime = base / "old-runtime"
+                old_runtime.mkdir()
+                old = core_distribution_fixture(old_runtime)
+                old.update(version="1.0.7", base_version="1.0.7", channel="stable", rc_number=0,
+                           mod_version_range=">=0.6.0,<0.7.0", minimum_launcher_version="0.6.0",
+                           abi={"base": 1, "inventory": 6})
+                old_manifest = old_runtime / "distribution.json"
+                old_manifest.write_text(json.dumps(old), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "Incompatible runtime"):
+                    verify_runtime(old_manifest)
+                for name in NAMES:
+                    shutil.copyfile(old_manifest if name == NAMES[2] else old_runtime / name, root / name)
+                self.assertFalse(launcher_platform_mod.probe_meathook(root).ok)
+                if changed in {"missing_bootstrap", "missing_pair"}:
+                    (root / "msimg32.dll").unlink()
+                    if changed == "missing_pair":
+                        (root / "sentinel_core.dll").unlink()
+                elif changed:
+                    (root / changed).write_bytes(b"foreign")
+                before = {name: (root / name).read_bytes() for name in NAMES if (root / name).exists()}
+                new_runtime = base / "new-runtime"
+                new_runtime.mkdir()
+                core_distribution_fixture(new_runtime, build_id="c" * 64)
+                with patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()):
+                    if changed in NAMES:
+                        with self.assertRaisesRegex(RuntimeError, "ownership"):
+                            install_meathook(root, None, consent=lambda _: False,
+                                             local_artifact=new_runtime / "distribution.json")
+                        self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
+                        continue
+                    result = install_meathook(root, None, consent=lambda _: False,
+                                              local_artifact=new_runtime / "distribution.json")
+                verified = launcher_platform_mod.probe_meathook(root)
+                self.assertTrue(verified.ok)
+                self.assertEqual(verified.details["build_id"], "c" * 64)
+                backup = Path(result.backup_path) / "original"
+                self.assertEqual(before, {path.name: path.read_bytes() for path in backup.iterdir()})
+
     def test_bootstrap_recovery_uses_verified_zip_and_reports_defender(self):
         from doom_eap.contracts.core_distribution import verify_runtime
 
@@ -338,6 +384,14 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                     workflow.execute(_snapshot())
 
             self.assertIn("Repair Core", str(ctx.exception))
+            failure = setup_failure_payload(ctx.exception, phase=workflow._failure_phase)
+            self.assertEqual(failure["recovery_action"], "repair_game_integration")
+            self.assertEqual(failure["failure_domain"], "game_setup")
+            with patch.object(workflow, "ensure_game_link", side_effect=ValueError("Invalid Core manifest")):
+                with self.assertRaisesRegex(ValueError, "Invalid Core manifest") as refused:
+                    workflow.execute(_snapshot())
+            failure = setup_failure_payload(refused.exception, phase=workflow._failure_phase)
+            self.assertEqual(failure["recovery_action"], "repair_game_integration")
             # assert zero mutations
             self.assertFalse((game_root / "XINPUT1_3.dll").exists())
             self.assertEqual(list((game_root / "Mods").glob("*.zip")), [])

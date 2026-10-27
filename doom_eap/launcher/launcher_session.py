@@ -417,10 +417,10 @@ class APSessionOwner:
                 raise RuntimeError("Game process identity is unknown; AP session preparation refused")
             if processes:
                 if recovery_basename is not None:
-                    raise RuntimeError("Exit DOOM Eternal before restoring an AP backup")
+                    raise RuntimeError("Close DOOM Eternal before restoring a backup.")
                 if self._handle and namespace == self.namespace and self._config_identity == config_identity:
                     return self.observe(processes)
-                raise RuntimeError("Exit DOOM Eternal before preparing this AP session")
+                raise RuntimeError("Close DOOM Eternal before preparing this save.")
             if recovery_basename is None and self._handle and namespace == self.namespace and self._config_identity == config_identity and self.status["state"] == "prelaunch_ready":
                 return dict(self.status)
             self.retire(processes)
@@ -684,7 +684,7 @@ class APSessionOwner:
     def backup_local_files(self, snapshot, config):
         with self._lock:
             if self.game_processes(config) != ():
-                raise RuntimeError("Close DOOM Eternal before copying local AP files")
+                raise RuntimeError("Close DOOM Eternal before copying saves.")
             inspection = self.inspect_campaign(snapshot, config)
             if inspection["status"] in {"inaccessible", "wrong_type", "metadata_invalid", "not_configured", "session_busy"}:
                 raise RuntimeError("Inspect AP save details before copying local files: " + inspection["status"])
@@ -923,7 +923,7 @@ class APSessionOwner:
                 return
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes != ():
-                raise RuntimeError("The AP session owner must remain open until the game has exited")
+                raise RuntimeError("Close DOOM Eternal before closing this launcher.")
             self._api.CloseHandle(self._handle)
             self._handle = None
             if self._control.exists() and self._control.read_bytes() == self._control_bytes:

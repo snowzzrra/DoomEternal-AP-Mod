@@ -1,4 +1,4 @@
-"""Sanitized report preview, local export and HTTPS submission."""
+"""Sanitized report preview, local drafts and GitHub issue links."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import tempfile
 from threading import Lock
 import uuid
 import zipfile
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from urllib.request import Request, HTTPRedirectHandler, build_opener
 from dataclasses import dataclass
 from pathlib import Path
@@ -43,7 +43,7 @@ class ProblemReport:
     url: str | None = None
 
 
-# ponytail: one draft lock; use per-draft locks if separate drafts run at the same time
+# shortcut: one draft lock, split it if separate drafts run at the same time
 _draft_lock = Lock()
 
 
@@ -53,7 +53,7 @@ def save_report_draft(filename: Path, payload: dict, *, path: Path | None = None
         if filename.exists():
             previous = json.loads(filename.read_text(encoding="utf-8"))
             if previous.get("submitted") and previous["payload"] != payload:
-                raise ValueError("An attempted report is immutable. Retry the saved report before starting another.")
+                raise ValueError("Retry the saved report before starting a new one. Its submitted text cannot be changed.")
             submitted = submitted or previous.get("submitted", False)
             path = path or previous.get("path")
             url = url or previous.get("url")
@@ -74,39 +74,49 @@ def report_problem(controller: SupportReportGenerator, *, logs: list[str], job: 
     if draft_path is not None and draft_path.exists():
         saved = json.loads(draft_path.read_text(encoding="utf-8"))
         path = Path(saved["path"]) if saved.get("path") else None
-        message = ("Report confirmed: " + saved["url"] if saved.get("url") else
-                   "Saved report restored. Retrying sends the same reviewed payload and report key.")
+        message = ("Report sent: " + saved["url"] if saved.get("url") else
+                   "Saved report reopened. Review the text before opening a GitHub issue.")
         return ProblemReport(path, saved["payload"], message, bool(saved.get("submitted")), saved.get("url"))
     path = None
     diagnostics = ""
+    report_id = str(uuid.uuid4())
     try:
         path = controller.create_support_bundle(
             Path.home() / f"DOOM-Eternal-Archipelago-support-{uuid.uuid4().hex[:12]}.zip", logs=logs,
         )
         with zipfile.ZipFile(path) as archive:
-            document = json.loads(archive.read("doctor.json"))
-            summary = {key: document[key] for key in ("version", "support_diagnostics", "support_condump",
-                      "last_connection_error", "last_setup_failure", "log_provenance") if key in document}
-            diagnostics = json.dumps(summary, ensure_ascii=False, indent=2)[:6000]
-            names = [name for name in archive.namelist() if name.endswith(".log")]
-            names.sort(key=lambda name: (not any(token in name.lower() for token in ("ap_client", "sentinel", "bridge")), name))
-            for name in names[:5]:
-                if name in archive.namelist():
-                    with archive.open(name) as source:
-                        content = source.read(256000).decode("utf-8", errors="replace")
-                        diagnostics += f"\n{name}\n" + content[-1800:]
-        message = "Review the sanitized text before sending. The support ZIP is available locally."
+            report_id = json.loads(archive.read("doctor.json"))["report_id"]
+            diagnostics = archive.read("summary.txt").decode("utf-8")
+        message = "Review the text before opening a GitHub issue. A support report file was also saved."
     except LauncherWorkCancelled:
         raise
-    except Exception:
-        message = "Support ZIP unavailable. Describe the problem and review the text before sending."
+    except (OSError, ValueError, zipfile.BadZipFile) as error:
+        message = "The support file could not be created. Describe the problem and review the report before opening a GitHub issue."
     if job is not None:
         job.check()
-    payload = {"schema_version":1, "idempotency_key":str(uuid.uuid4()), "title":"Launcher problem",
-                "description":"", "diagnostics":str(sanitize_support_value(diagnostics))[:15000]}
+    payload = {"schema_version":1, "idempotency_key":report_id, "title":"Launcher problem",
+                "description":"", "diagnostics":str(sanitize_support_value(diagnostics))}
     if draft_path is not None:
         save_report_draft(draft_path, payload, path=path)
     return ProblemReport(path, payload, message)
+
+
+def report_text(payload: dict) -> str:
+    reviewed = sanitize_support_value(payload)
+    return f"{reviewed['title']}\n\n{reviewed['description']}\n\n{reviewed['diagnostics']}".strip()
+
+
+def github_issue_url(payload: dict) -> tuple[str, str | None]:
+    reviewed = sanitize_support_value(payload)
+    full_summary = report_text(reviewed)
+    summary = full_summary.split("\nLast warnings/errors", 1)[0]
+    params = {"template": "problem.yml", "title": str(reviewed["title"])[:120], "summary": summary}
+    base = "https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new?"
+    url = base + urlencode(params)
+    if len(url.encode("utf-8")) < 2000:
+        return url, None
+    del params["summary"]
+    return base + urlencode(params), full_summary
 
 
 def submission_endpoint(bundle: Path) -> str | None:
@@ -133,7 +143,7 @@ def report_body(payload: dict) -> bytes:
         raise ValueError("Enter a title and describe the problem")
     body = json.dumps(sanitized, ensure_ascii=False).encode("utf-8")
     if len(body) > 32768:
-        raise ValueError("Report is too large")
+        raise ValueError("Report is too large. Shorten the description and retry.")
     return body
 
 
@@ -144,5 +154,5 @@ def submit_report(endpoint: str, payload: dict) -> str:
         result = json.loads(response.read(4097))
     url = result.get("url", "")
     if not re.fullmatch(r"https://github\.com/snowzzrra/DoomEternal-AP-Mod/issues/[1-9][0-9]*", url):
-        raise ValueError("Report submission has not been confirmed")
+        raise ValueError("Sending could not be confirmed. Retry the saved report.")
     return url

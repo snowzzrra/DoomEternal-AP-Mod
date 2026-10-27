@@ -12,7 +12,7 @@ import urllib.error
 import zipfile
 
 from doom_eap.contracts.core_distribution import validate_manifest, verify_bytes, verify_runtime, version_key
-from .launcher_platform import UrlDownloadTransport, probe_meathook, detect_doom_processes
+from .launcher_platform import UrlDownloadTransport, probe_meathook, detect_doom_processes, ProcessInspectionError
 
 RELEASES_URL = "https://api.github.com/repos/snowzzrra/Sentinel-Core/releases?per_page=100"
 
@@ -60,7 +60,7 @@ class CoreRuntime:
             link = re.search(r'<([^>]+)>; rel="next"', received.get("link", ""))
             next_url = link.group(1) if link else None
             if next_url and not next_url.startswith(RELEASES_URL.split("?")[0] + "?"):
-                raise ValueError("Unexpected Core release pagination URL")
+                raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
             temporary = saved.with_suffix(".incoming")
             temporary.write_text(json.dumps({"value": value, "etag": received.get("etag"), "next": next_url}))
             temporary.replace(saved)
@@ -87,18 +87,18 @@ class CoreRuntime:
             except (OSError, ValueError):
                 deferred_until = 0
             if isinstance(deferred_until, (int, float)) and deferred_until > time.time():
-                self.emit("core_update_status", state="deferred", message="Core update check deferred by the server.")
+                self.emit("core_update_status", state="deferred", message="Update service is busy. Try again later.")
                 return
-            self.emit("core_update_status", state="checking", message="Checking compatible Core releases...")
+            self.emit("core_update_status", state="checking", message="Checking for game connection updates…")
             try:
                 releases, url, visited = [], RELEASES_URL, set()
                 while url:
                     if url in visited:
-                        raise ValueError("Repeated Core release page")
+                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
                     visited.add(url)
                     page, url = self._metadata(url)
                     if not isinstance(page, list):
-                        raise ValueError("Invalid Core releases response")
+                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
                     releases.extend(page)
                 candidates = []
                 for release in releases:
@@ -108,14 +108,15 @@ class CoreRuntime:
                     if "distribution.json" not in assets or "sentinel-runtime.zip" not in assets:
                         continue
                     if any(not assets[name].startswith("https://github.com/snowzzrra/Sentinel-Core/releases/download/") for name in ("distribution.json", "sentinel-runtime.zip")):
-                        raise ValueError("Core assets must belong to the official repository")
+                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
                     try:
                         manifest, _ = self._metadata(assets["distribution.json"])
                         validate_manifest(manifest)
                         if manifest["channel"] == "stable":
                             candidates.append((manifest, assets))
                     except (ValueError, KeyError, TypeError) as error:
-                        self.emit("core_update_status", state="skipped", message=f"Core release skipped: {error}")
+                        self.emit("core_update_status", state="skipped",
+                                  message=f"Core release {release.get('tag_name', 'unknown')} skipped: {error}")
                 if candidates:
                     manifest, assets = max(candidates, key=lambda row: version_key(row[0]["version"]))
                     self._download(manifest, assets)
@@ -123,9 +124,9 @@ class CoreRuntime:
                         if manifest["build_id"] == preferred_build:
                             self._download(manifest, assets)
                             break
-                self.emit("core_update_status", state="checked", message="Core update check complete.")
+                self.emit("core_update_status", state="checked", message="Update check finished.")
             except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
-                self.emit("core_update_status", state="deferred", message=f"Core update deferred: {error}")
+                self.emit("core_update_status", state="deferred", message="Update check failed. Retry later.")
 
     def _download(self, manifest, assets):
         identity = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
@@ -136,7 +137,7 @@ class CoreRuntime:
                 return
             except (OSError, ValueError, zipfile.BadZipFile):
                 pass
-        self.emit("core_update_status", state="downloading", message=f"Downloading Core {manifest['version']}...")
+        self.emit("core_update_status", state="downloading", message=f"Downloading game connection files {manifest['version']}…")
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             stage = Path(directory)
             archive = stage / "sentinel-runtime.zip"
@@ -145,10 +146,10 @@ class CoreRuntime:
             verify_bytes(archive.name, archive.read_bytes(), records[archive.name])
             with zipfile.ZipFile(archive) as package:
                 if set(package.namelist()) != set(records) - {archive.name} or len(package.namelist()) != len(records) - 1:
-                    raise ValueError("Unexpected runtime ZIP contents")
+                    raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
                 for name in package.namelist():
                     if package.getinfo(name).file_size != records[name]["size"]:
-                        raise ValueError(f"Unexpected runtime artifact size: {name}")
+                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
                     data = package.read(name)
                     verify_bytes(name, data, records[name])
                     path = stage / name
@@ -180,7 +181,11 @@ class CoreRuntime:
                     selected = None
             except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile):
                 selected = None
-        hold = installed.ok and (detect_doom_processes() or (not config.get("core_auto_update", True) and not refresh))
+        try:
+            running = bool(detect_doom_processes())
+        except ProcessInspectionError:
+            running = True
+        hold = installed.ok and (running or (not config.get("core_auto_update", True) and not refresh))
         if hold and selected and not refresh:
             return Path(str(selected))
         preferred_build = installed.details["build_id"] if installed.ok and not config.get("core_auto_update", True) else None

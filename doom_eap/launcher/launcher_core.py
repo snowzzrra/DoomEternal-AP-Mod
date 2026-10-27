@@ -1331,7 +1331,7 @@ class RoomCompiler:
                 output_path = staged / f"{map_key}.entities"
                 source_path.write_bytes(materialized.encode("utf-8"))
                 compiler.compile_map(neutral_manifest, source_path, output_path, map_key,
-                                     encounter_source=sources[map_key])
+                                     encounter_source=sources[map_key], write_seed_sidecar=False)
                 audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
                                                      {map_key: output_path}, staged / "publishers",
                                                      source_maps=sources, retained_overrides=assembled)
@@ -1554,7 +1554,8 @@ class ModCompiler:
         return project_map_config(config, manifest.options)
 
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,
-                    map_key: str = "e1m2_war", *, encounter_source: str | None = None) -> Path:
+                    map_key: str = "e1m2_war", *, encounter_source: str | None = None,
+                    write_seed_sidecar: bool = True) -> Path:
         """Compile one supported campaign map with map-local room transforms."""
         from doom_eap.content.item_classification import load_item_classifications
         from doom_eap.runtime.item_reconciliation import load_policy_registry
@@ -1596,10 +1597,11 @@ class ModCompiler:
                     else [record.document() for record in placements]
                 ),
             )
-        output_entities.with_suffix(".seed.json").write_text(
-            json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        newline="\n")
+        if write_seed_sidecar:
+            output_entities.with_suffix(".seed.json").write_text(
+                json.dumps(manifest.document(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+                newline="\n")
         return output_entities
 
 
@@ -1637,24 +1639,24 @@ class LaunchWorkflow:
             or remote.parent.parent.parent.name.casefold() != "userdata"
         ):
             raise ValueError(
-                "steam_remote_dir must end with userdata/<STEAM_ID3>/782330/remote"
+                "The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT."
             )
         account = remote.parent.parent.name
         if not account.isascii() or not account.isdigit() or int(account) <= 0:
             raise ValueError(
-                "steam_remote_dir must contain numeric userdata/<STEAM_ID3>"
+                "The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT."
             )
         inferred = int(account)
         if configured is not None:
             if isinstance(configured, bool) or not isinstance(configured, (int, str)):
-                raise ValueError("steam_id3 must be a positive integer")
+                raise ValueError("The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.")
             try:
                 configured_id = int(configured)
             except ValueError as error:
-                raise ValueError("steam_id3 must be a positive integer") from error
+                raise ValueError("The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.") from error
             if configured_id <= 0 or configured_id != inferred:
                 raise ValueError(
-                    "steam_id3 does not match userdata directory in steam_remote_dir"
+                    "The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT."
                 )
         return inferred
 
@@ -1671,7 +1673,7 @@ class LaunchWorkflow:
         path.parent.mkdir(parents=True, exist_ok=True)
         config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
         if not isinstance(config, dict):
-            raise ValueError("native client configuration must contain an object")
+            raise ValueError("The game connection settings could not be read. Select Help -> SAVE SUPPORT REPORT.")
 
         source = dict(runtime_config or {})
         for key in CLIENT_CONFIG_FIELDS - {"steam_id3", "steam_remote_dir"}:

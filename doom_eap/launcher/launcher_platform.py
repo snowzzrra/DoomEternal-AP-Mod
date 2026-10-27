@@ -234,18 +234,17 @@ class DiscoverySentinel:
 def validate_game_root(path: Path) -> Path:
     root = path.expanduser().resolve()
     if not (root / "DOOMEternalx64vk.exe").is_file() or not (root / "base").is_dir():
-        raise ValueError(f"invalid DOOM Eternal installation: {root}")
+        raise ValueError("Choose the folder containing DOOMEternalx64vk.exe.")
     return root
 
 
 def validate_save_directory(path: Path) -> Path:
     root = path.expanduser().resolve()
     if not root.is_dir():
-        raise ValueError(f"invalid DOOM Eternal save directory: {root}")
+        raise ValueError("Choose an existing save folder ending in id Software/DOOMEternal/base.")
     if not is_saved_games_base_shape(root):
         raise ValueError(
-            "invalid DOOM Eternal save directory: expected the Saved Games base "
-            f"(.../id Software/DOOMEternal/base), got: {root}"
+            "Choose an existing save folder ending in id Software/DOOMEternal/base."
         )
     return root
 
@@ -620,7 +619,7 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
     """Verify the Core runtime pair used by Game Link."""
     from ..contracts.core_distribution import read_manifest, verify_build_identity
     if game_root is None:
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "DOOM folder is not configured.")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "Choose the game folder.")
     try:
         root = validate_game_root(game_root)
         value = read_manifest(root / "sentinel-distribution.json")
@@ -628,15 +627,15 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
         for name in ("sentinel_core.dll", "msimg32.dll"):
             data = (root / name).read_bytes()
             if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
-                raise ValueError(f"Core runtime hash mismatch: {name}")
+                raise ValueError(f"Game connection file {name} is damaged. Open Help and select REPAIR GAME CONNECTION.")
             verify_build_identity(name, data, value["build_id"])
         if (root / "XINPUT1_3.dll").exists():
-            raise ValueError("A foreign XINPUT provider is present; resolve its ownership before Core-only admission.")
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, f"Sentinel Core {value['version']} pair verified.",
+            raise ValueError("XINPUT1_3.dll conflicts with DoomEAP. Uninstall the mod that installed it, then retry. If you do not know which mod installed it, select Help -> SAVE SUPPORT REPORT.")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, "Game connection files checked.",
                                  {"path": str(root / "sentinel_core.dll"), "sha256": records["sentinel_core.dll"]["sha256"],
                                   "version": value["version"], "build_id": value["build_id"]})
     except (OSError, ValueError, KeyError, TypeError) as error:
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, f"Core runtime unavailable: {error}")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "Game connection files are unavailable. Open Help and select Fix Setup.")
 
 
 
@@ -1007,12 +1006,12 @@ Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Oper
             allowed = setting and setting["data"]["New Value"].endswith("= 0x6")
             detail = (f"An allow action is recorded at {setting['time']}. Retry setup to restore the verified file. "
                       "If it is removed again, check Protection History for this exact path."
-                      if allowed else "Review this exact detection in Windows Security > Protection history, then retry setup.")
+                      if allowed else "Review this detection in Windows Security -> Protection history before retrying.")
             return RuntimeError(f"{message} Defender detected {data.get('Threat Name', 'this file')} at "
                                 f"{event['time']}. {detail}")
     except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
-        return RuntimeError(message + " Defender history could not be read; export Support for diagnosis.")
-    return RuntimeError(message + " No matching Defender detection was found; export Support for diagnosis.")
+        return RuntimeError(message + " Protection history could not be read. Select Help -> SAVE SUPPORT REPORT.")
+    return RuntimeError(message + " No matching detection was found. Select Help -> SAVE SUPPORT REPORT.")
 
 
 def install_meathook(
@@ -1022,11 +1021,15 @@ def install_meathook(
     from .launcher_core_install import game_write_lock, recover_interrupted
     root = validate_game_root(game_root)
     with game_write_lock(root):
-        if detect_doom_processes():
+        processes = detect_doom_processes()
+        if processes:
             if probe_meathook(root).ok and not force_repair:
                 installed = probe_meathook(root)
                 return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
-            raise RuntimeError("Close DOOM Eternal before installing the Core runtime.")
+            detected = ", ".join(f"{item['name']} (PID {item['pid']})" for item in processes)
+            error = RuntimeError(f"Close DOOM Eternal before repairing its connection files. Detected: {detected}")
+            error.processes = processes
+            raise error
         recover_interrupted(root, state_dir)
         return _install_core_pair(root, state_dir, consent, local_artifact, force_repair)
 
@@ -1040,7 +1043,7 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         if installed.ok:
             return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
                                   sha256=str(installed.details["sha256"]), ownership="verified")
-        raise RuntimeError("Select distribution.json from the compatible Core runtime release; installation is unchanged.")
+        raise RuntimeError("Select the matching distribution.json file.")
     manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
     try:
         value, contents = verify_runtime(manifest, bootstrap_from_archive=True)
@@ -1056,12 +1059,12 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         if installed.details["build_id"] == value["build_id"] and not force_repair:
             return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
     if (root / "XINPUT1_3.dll").exists():
-        raise RuntimeError("Resolve the existing XINPUT provider with its owner before Core-only installation.")
+        raise RuntimeError("XINPUT1_3.dll conflicts with DoomEAP. Uninstall the mod that installed it, then retry. If you do not know which mod installed it, select Help -> SAVE SUPPORT REPORT.")
     existing = root / "sentinel-distribution.json"
     owned_partial = False
     if not installed.ok and existing.is_file():
         try:
-            previous = {item["path"]: item for item in read_manifest(existing)["artifacts"]}
+            previous = {item["path"]: item for item in read_manifest(existing, require_compatible=False)["artifacts"]}
             owned_partial = all(not (root / name).exists() or
                 (len((root / name).read_bytes()) == previous[name]["size"] and
                  hashlib.sha256((root / name).read_bytes()).hexdigest() == previous[name]["sha256"])
@@ -1069,7 +1072,7 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         except (OSError, ValueError, KeyError, TypeError):
             pass
     if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok and not owned_partial:
-        spec = DependencySpec("Replace foreign Core/bootstrap with backup", value["version"],
+        spec = DependencySpec("Back up and replace conflicting connection files?", value["version"],
             str(root), value["build_id"], "", "local")
         if not force_repair or not consent(spec):
             raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
@@ -1079,7 +1082,7 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         backup = replace_pair(root, state_dir, incoming)
     except OSError as error:
         raise _core_file_error(Path(error.filename) if error.filename else root / "sentinel_core.dll", error) from error
-    return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Sentinel Core {value['version']} installed.",
+    return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Game connection files {value['version']} installed.",
                           path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
                           ownership="launcher_installed", backup_path=str(backup))
 
@@ -1813,6 +1816,7 @@ def verify_linux_mod_installation(
 
 
 def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
+    require_doom_closed("staging a room mod")
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
         raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
     mods = game_root / "Mods"
@@ -1856,6 +1860,7 @@ def stage_room_mod(
     legacy_removal_sink: Callable[[Path], None] | None = None,
 ) -> Path:
     """Atomically replace only recognized DOOM Eternal Archipelago mod ZIPs."""
+    require_doom_closed("staging a room mod")
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
         raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
     mods = game_root / "Mods"
@@ -1874,34 +1879,65 @@ def stage_room_mod(
 
     previous_path = Path(str(previous.get("staged_mod", ""))) if previous.get("staged_mod") else None
     previous_sha = str(previous.get("staged_sha256", ""))
+    candidates = []
     for candidate in sorted(mods.glob("*.zip")):
         owned = False
         if previous_path is not None and candidate.resolve() == previous_path.resolve():
             owned = digest(candidate) == previous_sha
+            if not owned:
+                raise RuntimeError(f"Room mod ownership hash does not match: {candidate}")
         recognized = is_legacy_doom_ap_mod(candidate)
         if not (recognized or owned):
             continue
-        try:
-            candidate.unlink()
-        except OSError as error:
-            raise RuntimeError(
-                f"could not remove legacy DOOM Eternal Archipelago mod {candidate}: {error}"
-            ) from error
-        if legacy_removal_sink is not None:
-            legacy_removal_sink(candidate)
+        if candidate.is_symlink():
+            raise RuntimeError(f"Room mod is a symbolic link: {candidate}")
+        candidates.append(candidate)
+    if destination.exists() and destination not in candidates:
+        raise RuntimeError(f"Refusing to overwrite an unowned room mod: {destination}")
 
-    staged = _stage_mod(mod_zip, game_root)
+    expected_sha = digest(mod_zip)
+    with tempfile.NamedTemporaryFile(dir=mods, prefix=".room-mod-", suffix=".incoming", delete=False) as handle:
+        incoming = Path(handle.name)
+    backups = []
+    published = False
+    temporary = ownership_receipt.with_suffix(f"{ownership_receipt.suffix}.tmp")
     receipt = {
         "schema": 1,
         "manifest_hash": manifest_hash,
-        "staged_mod": str(staged.resolve()),
-        "staged_sha256": digest(staged),
+        "staged_mod": str(destination.resolve()),
+        "staged_sha256": expected_sha,
     }
-    ownership_receipt.parent.mkdir(parents=True, exist_ok=True)
-    temporary = ownership_receipt.with_suffix(f"{ownership_receipt.suffix}.tmp")
-    temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    publish_file(temporary, ownership_receipt, operation="room_receipt_publish")
-    return staged
+    try:
+        shutil.copy2(mod_zip, incoming)
+        if digest(incoming) != expected_sha or not zipfile.is_zipfile(incoming):
+            raise RuntimeError("Room mod copy verification failed")
+        require_doom_closed("publishing a room mod")
+        for candidate in candidates:
+            backup = incoming.with_name(f"{incoming.name}.{candidate.name}.bak")
+            publish_file(candidate, backup, operation="room_mod_backup")
+            backups.append((candidate, backup))
+        publish_file(incoming, destination, operation="room_mod_stage")
+        published = True
+        ownership_receipt.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        publish_file(temporary, ownership_receipt, operation="room_receipt_publish")
+    except Exception:
+        if published and destination not in candidates:
+            destination.unlink()
+        for candidate, backup in reversed(backups):
+            publish_file(backup, candidate, operation="room_mod_restore")
+        raise
+    finally:
+        incoming.unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
+    for candidate, backup in backups:
+        try:
+            backup.unlink()
+        except OSError:
+            pass  # retained backups stay outside the injector's ZIP scan
+        if legacy_removal_sink is not None:
+            legacy_removal_sink(candidate)
+    return destination
 
 
 def configure_windows_injector_settings(game_root: Path) -> Path:
@@ -2203,9 +2239,7 @@ class WindowsModInjectorAdapter:
                 command=list(command),
                 staged_mod=staged_mod,
                 message=(
-                    "EternalModInjector is open in a separate command window.\n\n"
-                    "Follow the prompts in that window. Do not close this launcher.\n"
-                    "When the installer is finished, close the command window. Doom Eternal Archipelago will continue automatically."
+                    "Follow the instructions in the EternalModInjector window. Keep this launcher open. When installation finishes, close the installer window to continue."
                 ),
             )
 
@@ -2214,7 +2248,7 @@ class WindowsModInjectorAdapter:
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Could not launch EternalModInjector.bat: {error}.",
+                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                 command=command,
                 details={"launch_error": str(error)},
             )
@@ -2226,7 +2260,7 @@ class WindowsModInjectorAdapter:
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Error waiting for EternalModInjector.bat: {error}.",
+                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                 command=command,
                 details={"wait_error": str(error)},
             )
@@ -2237,9 +2271,9 @@ class WindowsModInjectorAdapter:
         return AdapterResult(
             state="applied" if returncode == 0 else "failed",
             message=(
-                "EternalModInjector completed successfully."
+                "Installation finished."
                 if returncode == 0
-                else f"EternalModInjector exited with code {returncode}."
+                else "Installer failed. Select Help -> SAVE SUPPORT REPORT."
             ),
             command=command,
             returncode=returncode,
@@ -2253,12 +2287,13 @@ class WindowsModInjectorAdapter:
         operation: str = "install",
         uninstall_confirmation: Callable[[], bool] | None = None,
     ) -> AdapterResult:
+        require_doom_closed("running EternalModInjector")
         try:
             recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Could not recover stale sandbox hold left by an older launcher build: {error}.",
+                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                 details={"staging_error": str(error)},
             )
         try:
@@ -2270,7 +2305,7 @@ class WindowsModInjectorAdapter:
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Could not stage Windows injector toolchain: {error}.",
+                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                 details={"staging_error": str(error)},
             )
 
@@ -2307,7 +2342,7 @@ class WindowsModInjectorAdapter:
             return AdapterResult(
                 state="failed",
                 message=(
-                    "EternalModInjector exited successfully, but uninstall post-run confirmation failed."
+                    "Removal could not be confirmed. Select Help -> SAVE SUPPORT REPORT."
                     + (f" {confirmation_error}" if confirmation_error else "")
                 ),
                 command=result.command,
@@ -2318,7 +2353,7 @@ class WindowsModInjectorAdapter:
             )
         return AdapterResult(
             state=result.state,
-            message="EternalModInjector uninstall cleanup confirmed.",
+            message="Removal finished.",
             command=result.command,
             stdout=result.stdout,
             stderr=result.stderr,
@@ -2348,11 +2383,11 @@ class WindowsModInjectorAdapter:
                 from doom_eap.launcher.campaign_resources import enable_campaign_resources
                 campaign_resources = enable_campaign_resources(game_root, staged)
             except Exception as error:
-                return AdapterResult(state="failed", message=f"Campaign resource installation failed: {error}",
+                return AdapterResult(state="failed", message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                                      command=result.command, returncode=1)
             return AdapterResult(
                 state="applied",
-                message="Mod installed successfully. Start DOOM Eternal through the launcher.",
+                message="Mod installed. Start DOOM Eternal normally through Steam and keep this launcher open.",
                 command=result.command,
                 returncode=0,
                 details={
@@ -2367,7 +2402,7 @@ class WindowsModInjectorAdapter:
 
         return AdapterResult(
             state="manual_install_required",
-            message="Mod installation was not confirmed in EternalModInjector. Follow manual installation steps in INSTALL.md.",
+            message="Installation was not confirmed. Follow Windows manual installation in INSTALL.md.",
             command=result.command,
             returncode=1,
             details={
@@ -2410,7 +2445,7 @@ class LinuxModManagerAdapter:
             destination.parent.mkdir(parents=True, exist_ok=True)
             if destination.is_file():
                 if hashlib.sha256(destination.read_bytes()).digest() != hashlib.sha256(source.read_bytes()).digest():
-                    raise RuntimeError(f"refusing to overwrite different injector tool: {destination}")
+                    raise RuntimeError("The installer could not finish. Select Help -> SAVE SUPPORT REPORT.")
                 continue
             shutil.copy2(source, destination)
         prepared = game_root / relative_executable
@@ -2466,12 +2501,13 @@ class LinuxModManagerAdapter:
         config.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
 
     def run(self, game_root: Path) -> AdapterResult:
+        require_doom_closed("running InjectorShell")
         try:
             recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Could not recover stale sandbox hold: {error}.",
+                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
                 details={"staging_error": str(error)},
             )
         executable = self._prepare_tools(game_root)
@@ -2496,7 +2532,7 @@ class LinuxModManagerAdapter:
         except subprocess.TimeoutExpired as error:
             return AdapterResult(
                 state="timed_out",
-                message="Mod installation timed out. Review details and try again.",
+                message="Installation timed out. Retry once, then select Help -> SAVE SUPPORT REPORT.",
                 command=command,
                 stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
                 stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
@@ -2515,13 +2551,12 @@ class LinuxModManagerAdapter:
         return AdapterResult(
             state=state,
             message=(
-                "Mod installed successfully. Start DOOM Eternal through Steam."
+                "Mod installed. Start through Steam and keep the launcher open."
                 if state == "applied"
                 else (
-                    "The injector shell could not load its host libraries. DoomEAP removed inherited "
-                    "loader overrides; review the full stderr in the Support Report."
+                    "Installer could not start. Select Help -> SAVE SUPPORT REPORT."
                     if loader_symbol_failure
-                    else "Mod installation failed. Review details and try again."
+                    else "Installation failed. Retry once, then select Help -> SAVE SUPPORT REPORT."
                 )
             ),
             command=command,
@@ -2554,7 +2589,7 @@ class LinuxModManagerAdapter:
         except Exception as error:
             return AdapterResult(
                 state="failed",
-                message=f"Mod injector completed, but post-install verification failed: {error}",
+                message="Installation could not be checked. Select Help -> SAVE SUPPORT REPORT before playing.",
                 command=result.command,
                 stdout=result.stdout,
                 stderr=result.stderr,
@@ -2568,7 +2603,7 @@ class LinuxModManagerAdapter:
             )
         return AdapterResult(
             state="applied",
-            message="Mod installed and verified successfully. Start DOOM Eternal through Steam.",
+            message="Mod installed and checked. Start through Steam.",
             command=result.command,
             stdout=result.stdout,
             stderr=result.stderr,
@@ -2819,38 +2854,38 @@ class SteamInstallationLocator:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.FOUND.value,
                 path=inst_roots[0],
-                reason="DOOM Eternal installation discovered",
+                reason="Game folder found.",
                 trace=tuple(trace),
             )
         elif len(inst_roots) > 1:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.AMBIGUOUS.value,
                 candidates=inst_roots,
-                reason=f"multiple DOOM Eternal installations found ({len(inst_roots)})",
+                reason="More than one game folder was found. Choose the one used by Steam.",
                 trace=tuple(trace),
             )
         elif not any_root_exists:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason="Steam root directory not found",
+                reason="Steam was not found. Choose your DOOM Eternal folder.",
                 trace=tuple(trace),
             )
         elif not any_manifest_exists:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason=f"DOOM Eternal app manifest ({self.APP_MANIFEST}) not found in declared Steam libraries",
+                reason="DOOM Eternal was not found in Steam's libraries. Choose its game folder.",
                 trace=tuple(trace),
             )
         elif any_installdir_found and not installations:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.INVALID.value,
-                reason="DOOM Eternal manifest found but game files (DOOMEternalx64vk.exe/base) are invalid",
+                reason="Game files are missing. Verify DOOM Eternal in Steam.",
                 trace=tuple(trace),
             )
         else:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason="Steam installation was not found",
+                reason="Steam was not found. Choose the game folder.",
                 trace=tuple(trace),
             )
 
@@ -2879,6 +2914,19 @@ class SteamInstallationLocator:
         }
 
 
+class ProcessInspectionError(RuntimeError):
+    """The launcher cannot establish whether DOOM Eternal is closed."""
+
+
+def require_doom_closed(operation: str) -> None:
+    processes = detect_doom_processes()
+    if processes:
+        detected = ", ".join(f"{item['name']} (PID {item['pid']})" for item in processes)
+        error = RuntimeError(f"Close DOOM Eternal before {operation}. Detected: {detected}")
+        error.processes = processes
+        raise error
+
+
 def detect_doom_processes(
     *,
     process_list: Sequence[Sequence[str]] | None = None,
@@ -2887,6 +2935,7 @@ def detect_doom_processes(
     supported_names = {
         "doometernalx64vk.exe": "doometernalx64vk.exe",
         "doometernalx64vk": "doometernalx64vk",
+        "doometernalx64v": "doometernalx64vk.exe",
         "ap_client.exe": "ap_client.exe",
         "ap_client": "ap_client",
     }
@@ -2894,19 +2943,6 @@ def detect_doom_processes(
     def basename(value: object) -> str:
         text = str(value).strip().strip("\"'")
         return text.replace("\\", "/").rsplit("/", 1)[-1].casefold()
-
-    def matching_name(*values: object) -> str | None:
-        for value in values:
-            name = basename(value)
-            if name in supported_names:
-                return supported_names[name]
-            # Proton/Wine command lines can wrap the Windows executable in a
-            # loader command or quote a Windows-style path.
-            for token in re.split(r"[\s\"'`]+", str(value)):
-                name = basename(token)
-                if name in supported_names:
-                    return supported_names[name]
-        return None
 
     rows: list[dict[str, object]] = []
     if process_list is None:
@@ -2917,9 +2953,12 @@ def detect_doom_processes(
                     capture_output=True, text=True, timeout=3, check=False,
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
+                completed.check_returncode()
                 process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
-            except (OSError, subprocess.SubprocessError):
-                process_list = ()
+            except (OSError, subprocess.SubprocessError, IndexError, UnicodeError) as error:
+                raise ProcessInspectionError(
+                    "Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry."
+                ) from error
         else:
             try:
                 completed = subprocess.run(
@@ -2929,26 +2968,37 @@ def detect_doom_processes(
                     timeout=3,
                     check=False,
                 )
+                completed.check_returncode()
                 process_list = tuple(
                     tuple(line.split(None, 2))
                     for line in completed.stdout.splitlines()
                     if line.strip()
                 )
-            except (OSError, subprocess.SubprocessError):
-                process_list = ()
+            except (OSError, subprocess.SubprocessError, UnicodeError) as error:
+                raise ProcessInspectionError(
+                    "Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry."
+                ) from error
     for row in process_list:
         values = tuple(row)
-        if not values:
-            continue
-        name = matching_name(*values)
-        if name is None:
+        if len(values) < 2:
             continue
         # tasklist emits name,pid; ps emits pid,comm,args
-        value_iterator = iter(values)
-        first_value = next(value_iterator, "")
-        second_value = next(value_iterator, "")
-        pid = str(second_value) if matching_name(first_value) else str(first_value)
-        rows.append({"name": name, "pid": pid})
+        windows_row = not str(values[0]).isdigit()
+        process_name, pid = (values[0], values[1]) if windows_row else (values[1], values[0])
+        command = re.findall(r'''"[^"]*"|'[^']*'|\S+''', str(values[2])) if not windows_row and len(values) > 2 else []
+        executable = command[0].strip("\"'")[:512] if command else ""
+        name = supported_names.get(basename(process_name))
+        matched_by = "process_name"
+        if name is None and command:
+            # the proton script outlives the game while it waits for wineserver, so only wine processes count
+            if len(command) > 1 and basename(command[0]) in {"wine", "wine64", "wine-preloader", "wine64-preloader"}:
+                command = command[1:]
+            name = supported_names.get(basename(command[0]))
+            matched_by = "launch_target"
+        if name is None:
+            continue
+        rows.append({"name": name, "pid": str(pid), "process_name": str(process_name)[:128],
+                     "command_executable": executable, "matched_by": matched_by})
     return tuple(rows)
 
 
@@ -3004,7 +3054,7 @@ class ValveVdfParser:
             if match is None:
                 if not text[position:].strip():
                     break
-                raise ValueError(f"invalid VDF at offset {position}")
+                raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
             position = match.end()
             quoted, brace, bare = match.groups()
             if quoted is not None:
@@ -3021,13 +3071,13 @@ class ValveVdfParser:
             while index < len(tokens):
                 if tokens[index] == "}":
                     if not expect_close:
-                        raise ValueError("unexpected VDF closing brace")
+                        raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
                     index += 1
                     return result
                 key = tokens[index]
                 index += 1
                 if index >= len(tokens):
-                    raise ValueError(f"missing VDF value for {key}")
+                    raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
                 if tokens[index] == "{":
                     index += 1
                     result[key] = mapping(True)
@@ -3035,12 +3085,12 @@ class ValveVdfParser:
                     result[key] = tokens[index]
                     index += 1
             if expect_close:
-                raise ValueError("unterminated VDF mapping")
+                raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
             return result
 
         document = mapping(False)
         if index != len(tokens):
-            raise ValueError("trailing VDF tokens")
+            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
         return document
 
 
@@ -3057,7 +3107,7 @@ class SteamLaunchOptionsManager:
             text = localconfig.read_text(encoding="utf-8", errors="strict")
             document = ValveVdfParser.parse(text)
         except (OSError, UnicodeError, ValueError) as error:
-            raise ValueError(f"Failed to parse Steam VDF {localconfig}: {error}") from error
+            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.") from error
         current: object = document
         for key in ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps", DOOM_ETERNAL_APP_ID):
             if not isinstance(current, dict):
@@ -3075,7 +3125,7 @@ class SteamLaunchOptionsManager:
     @classmethod
     def compose(cls, current: str) -> str:
         if "%command%" not in current:
-            raise ValueError("Steam launch options must contain %command%")
+            raise ValueError("Keep exactly one %command% in the launch option.")
         match = cls.ASSIGNMENT.search(current)
         values: list[str] = []
         if match:
@@ -3092,13 +3142,13 @@ class SteamLaunchOptionsManager:
     def compose_bridge(cls, current: str, bridge_script: Path, *, delay: int = 5) -> str:
         """Place Linux bridge wrapper before %command% while preserving command arguments."""
         if delay < 0:
-            raise ValueError("AP client delay must be non-negative")
+            raise ValueError("Enter a launch delay of 0 or more.")
         try:
             tokens = shlex.split(current, posix=True)
         except ValueError as error:
-            raise ValueError(f"Steam launch options have invalid quoting: {error}") from error
+            raise ValueError("The Steam launch option has unmatched quotation marks. Check the option or select Help -> SAVE SUPPORT REPORT.") from error
         if tokens.count("%command%") != 1:
-            raise ValueError("Steam launch options must contain exactly one %command%")
+            raise ValueError("Keep exactly one %command% in the launch option.")
         script = str(bridge_script)
         override_tokens = [token for token in tokens if token.startswith("WINEDLLOVERRIDES=")]
         delay_tokens = [token for token in tokens if token.startswith("AP_CLIENT_DELAY=")]
@@ -3184,7 +3234,7 @@ class SteamLaunchOptionsManager:
     @staticmethod
     def backup(plan: LaunchOptionPlan, backup_path: Path, *, consent: bool) -> str:
         if not consent:
-            raise PermissionError("Steam launch option change declined")
+            raise PermissionError("Steam launch option change cancelled.")
         backup_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"app_id": DOOM_ETERNAL_APP_ID, "launch_options": plan.previous}
         temporary = backup_path.with_suffix(f"{backup_path.suffix}.tmp")
@@ -3196,7 +3246,7 @@ class SteamLaunchOptionsManager:
     def restore(backup_path: Path) -> str:
         payload = json.loads(backup_path.read_text(encoding="utf-8"))
         if payload.get("app_id") != DOOM_ETERNAL_APP_ID:
-            raise ValueError("Steam launch option backup belongs to another app")
+            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
         return str(payload["launch_options"])
 
 
@@ -3234,7 +3284,7 @@ def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | N
     if legacy and (len(tokens) != 2 or tokens[0] != header):
         return None
     if len(raw) >= 128 or len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header):
-        raise ValueError(f"Invalid AP shortcut file: {name}")
+        raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
     return tokens[-1]
 
 

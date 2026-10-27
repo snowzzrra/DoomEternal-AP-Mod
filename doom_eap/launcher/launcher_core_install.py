@@ -42,16 +42,16 @@ def restore(root, backup):
     from .launcher_platform import _atomic_write_bytes
     record = json.loads((backup / "record.json").read_text())
     if record["game_root"] != str(root.resolve()):
-        raise RuntimeError("Core recovery belongs to another installation")
+        raise RuntimeError("These recovery files belong to another game folder. Select Help -> SAVE SUPPORT REPORT.")
     for name in NAMES:
         current = _read(root / name)
         accepted = (record["original"][name], record["incoming"][name])
         digest = hashlib.sha256(current).hexdigest() if current is not None else None
         if digest not in accepted:
-            raise RuntimeError(f"Core recovery preserves an unrecognized file: {root / name}")
+            raise RuntimeError("Recovery stopped because a file could not be identified. Existing files were kept. Select Help -> SAVE SUPPORT REPORT.")
         original = _read(backup / "original" / name)
         if (hashlib.sha256(original).hexdigest() if original is not None else None) != record["original"][name]:
-            raise ValueError(f"Core backup hash mismatch: {name}")
+            raise ValueError("A backup file is damaged. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
     for name in NAMES:
         original = _read(backup / "original" / name)
         if original is None:
@@ -67,7 +67,7 @@ def recover_interrupted(root, state_dir):
         record = json.loads(active.read_text())
         token = record["backup"]
         if len(token) != 32 or any(char not in "0123456789abcdef" for char in token):
-            raise ValueError("Invalid Core recovery record")
+            raise ValueError("Recovery details could not be read. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
         restore(root, directory / token)
         active.unlink()
         (root / "sentinel-core-update.txt").unlink(missing_ok=True)
@@ -75,19 +75,20 @@ def recover_interrupted(root, state_dir):
         marker = root / "sentinel-core-update.txt"
         token = json.loads((directory / "previous.json").read_text())["backup"]
         if len(token) != 32 or any(char not in "0123456789abcdef" for char in token):
-            raise ValueError("Invalid completed Core recovery record")
+            raise ValueError("Recovery details could not be read. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
         record = json.loads((directory / token / "record.json").read_text())
         if record["game_root"] != str(root.resolve()) or marker.read_bytes() != b"sentinel-update-v1\n":
-            raise RuntimeError("Unknown Core update marker was preserved")
+            raise RuntimeError("Update details could not be read and were kept. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
         for name in NAMES:
             data = _read(root / name)
             if data is None or hashlib.sha256(data).hexdigest() != record["incoming"][name]:
-                raise RuntimeError("Completed Core update differs from its recovery record")
+                raise RuntimeError("Updated files do not match the saved recovery details. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
         marker.unlink()
 
 
 def replace_pair(root, state_dir, incoming):
-    from .launcher_platform import _atomic_write_bytes, detect_doom_processes, probe_meathook
+    from .launcher_platform import _atomic_write_bytes, detect_doom_processes, probe_meathook, require_doom_closed
+    require_doom_closed("replacing Core")
     directory = backup_root(root, state_dir)
     backup = directory / secrets.token_hex(16)
     backup.mkdir(parents=True)
@@ -106,10 +107,10 @@ def replace_pair(root, state_dir, incoming):
     try:
         for name in NAMES:
             if detect_doom_processes():
-                raise RuntimeError("DOOM Eternal started during Core replacement; close it before recovery")
+                raise RuntimeError("DOOM Eternal started while connection files were being replaced. Close the game before retrying recovery.")
             _atomic_write_bytes(root / name, incoming[name])
         if not probe_meathook(root).ok:
-            raise RuntimeError("Core pair verification failed after installation")
+            raise RuntimeError("Game connection files could not be checked after installation. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
     except Exception:
         if not detect_doom_processes():
             restore(root, backup)
@@ -125,15 +126,15 @@ def rollback_core(root, state_dir):
     from .launcher_platform import detect_doom_processes
     with game_write_lock(root):
         if detect_doom_processes():
-            raise RuntimeError("Close DOOM Eternal before restoring Core")
+            raise RuntimeError("Close DOOM Eternal before restoring the previous game connection files.")
         recover_interrupted(root, state_dir)
         directory = backup_root(root, state_dir)
         token = json.loads((directory / "previous.json").read_text())["backup"]
         if len(token) != 32 or any(char not in "0123456789abcdef" for char in token):
-            raise ValueError("Invalid Core backup record")
+            raise ValueError("Backup details could not be read. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.")
         target = directory / token
         if not all((target / "original" / name).is_file() for name in NAMES):
-            raise RuntimeError("A complete previous Core installation is unavailable")
+            raise RuntimeError("No complete previous version is available. Select Help -> SAVE SUPPORT REPORT.")
         replace_pair(root, state_dir, {name: (target / "original" / name).read_bytes() for name in NAMES})
         (directory / "previous.json").unlink()
         return target

@@ -20,79 +20,79 @@ class ConnectionFailure:
 
 _BY_CODE = {
     "missing_slot": ConnectionFailure(
-        "invalid_slot", "Player name is required",
-        "Enter the player name generated for this room.",
-        "Use the exact player name, including spelling and capitalization.",
+        "invalid_slot", "Player name required",
+        "Enter your player name exactly as shown in the room.",
+        "Copy the name from the room page, including capital letters.",
     ),
     "invalid_slot": ConnectionFailure(
         "invalid_slot", "Player name not found",
-        "The room accepted the connection, but this player name is not in the generated room.",
-        "Use the exact player name from the room, including spelling and capitalization.",
+        "This room has no player with that name.",
+        "Check the player name in the room and enter it exactly.",
     ),
     "invalid_password": ConnectionFailure(
-        "invalid_password", "Room password rejected",
-        "The server rejected the supplied room password.",
+        "invalid_password", "Incorrect room password",
+        "The password does not match this room.",
         "Check the room password and try again.",
     ),
     "password_required": ConnectionFailure(
         "password_required", "Room password required",
-        "This room requires a password, but none was supplied.",
+        "Enter the password for this room.",
         "Enter the room password and try again.",
     ),
     "invalid_game": ConnectionFailure(
-        "invalid_game", "Wrong game for this player",
-        "This player entry is not a DOOM Eternal slot in the generated room.",
-        "Choose the DOOM Eternal player name from this room.",
+        "invalid_game", "This player is assigned another game",
+        "This player name belongs to another game in the room.",
+        "Enter the DOOM Eternal player name from this room.",
     ),
     "incompatible_version": ConnectionFailure(
-        "incompatible", "Incompatible Archipelago version",
-        "The room and this DoomEAP build use incompatible protocol versions.",
-        "Update DoomEAP or use a compatible Archipelago server, then retry.",
+        "incompatible", "DoomEAP and the room are incompatible",
+        "This DoomEAP version cannot connect to the room.",
+        "Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.",
     ),
     "invalid_items_handling": ConnectionFailure(
-        "incompatible", "Incompatible room settings",
-        "The room rejected the item-handling mode used by this client.",
-        "Update DoomEAP or rebuild the room with compatible settings.",
+        "incompatible", "Room settings are incompatible",
+        "This DoomEAP version cannot use the room settings.",
+        "Select Help -> SAVE SUPPORT REPORT and send it to the room host.",
     ),
     "room_incompatible": ConnectionFailure(
-        "incompatible", "Incompatible room package",
-        "The connection succeeded, but the room data is not compatible with this DoomEAP build.",
-        "Update DoomEAP or rebuild the room package with the matching version.",
+        "incompatible", "Room version mismatch",
+        "This room is incompatible with your DoomEAP version.",
+        "Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.",
     ),
     "connection_refused": ConnectionFailure(
-        "refused", "Server refused the connection",
-        "Nothing accepted the Archipelago connection at that address.",
-        "Check that the server is running and that the host and port are correct.",
+        "refused", "Cannot reach the server",
+        "The server did not accept the connection.",
+        "Check the room address and port. Ask the host whether the server is running.",
     ),
     "dns_failed": ConnectionFailure(
         "dns", "Server name not found",
         "The server name could not be found.",
-        "Check the hostname or use the room's numeric address.",
+        "Check the spelling of the server address or copy it again from the room page.",
     ),
     "connection_timeout": ConnectionFailure(
         "timeout", "Connection timed out",
-        "The Archipelago server did not respond in time.",
-        "Check the address, firewall, VPN, and server availability, then retry.",
+        "The server did not respond in time.",
+        "Check the room address and your internet connection, then retry. If it continues, select Help -> SAVE SUPPORT REPORT.",
     ),
     "tls_failed": ConnectionFailure(
         "tls", "Secure connection failed",
-        "Windows could not establish or verify the secure server connection.",
-        "Check the server address, certificate, system clock, and network inspection software.",
+        "Windows could not connect securely to the server.",
+        "Check the room address and Windows date and time, then retry. If it continues, select Help -> SAVE SUPPORT REPORT.",
     ),
     "malformed_address": ConnectionFailure(
-        "malformed_address", "Server address is invalid",
-        "The server address is not in a supported host:port, ws://, or wss:// form.",
-        "Correct the server address and try again.",
+        "malformed_address", "Invalid server address",
+        "The room address has an incorrect format.",
+        "Enter the address and port, for example archipelago.gg:12345, or paste the room's connection address.",
     ),
     "connection_closed": ConnectionFailure(
         "closed", "Server closed the connection",
-        "The Archipelago server closed the connection before login completed.",
-        "Check the server log and room availability, then retry.",
+        "The server closed the connection before you could join.",
+        "Retry once. If it continues, ask the host whether the room is running and select Help -> SAVE SUPPORT REPORT.",
     ),
     "malformed_server_data": ConnectionFailure(
-        "malformed", "Malformed room data",
-        "The server returned room data that DoomEAP could not safely use.",
-        "Verify the room file and server build. If it persists, generate a Support Report.",
+        "malformed", "Room data could not be read",
+        "DoomEAP could not read the room settings.",
+        "Select Help -> SAVE SUPPORT REPORT and send it to the room host.",
     ),
 }
 
@@ -135,9 +135,9 @@ def normalize_connection_failure(event: Mapping[str, object]) -> ConnectionFailu
     if any(token in technical for token in ("invalid uri", "invalid address", "invalid port", "malformed")):
         return _BY_CODE["malformed_address"]
     return ConnectionFailure(
-        "unexpected", "Could not connect to the room",
-        "DoomEAP could not complete the Archipelago connection.",
-        "Retry once. If it still fails, generate a Support Report.",
+        "unexpected", "Could not connect",
+        "DoomEAP could not join the room.",
+        "Retry once. If it still fails, select Help -> SAVE SUPPORT REPORT.",
     )
 
 

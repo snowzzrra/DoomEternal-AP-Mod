@@ -45,36 +45,33 @@ EventSink = Callable[[str, dict[str, object]], None]
 ConsentCallback = Callable[[object], bool]
 ConfirmationCallback = Callable[[], bool]
 
-ROOM_PACKAGE_FAILURE_TITLE = "ROOM PACKAGE NEEDS ATTENTION"
+ROOM_PACKAGE_FAILURE_TITLE = "ROOM MOD COULD NOT BE BUILT"
 ROOM_PACKAGE_FAILURE_MESSAGE = (
-    "This room package could not be prepared with the current launcher. "
-    "Rebuild the room package and try again."
+    "Open Session and select REBUILD ROOM PACKAGE. If it fails again, select Help -> SAVE SUPPORT REPORT."
 )
 ROOM_PACKAGE_FAILURE_ACTION = "REBUILD ROOM PACKAGE"
-APPLICATION_PACKAGE_FAILURE_TITLE = "APPLICATION PACKAGE INCOMPLETE"
+APPLICATION_PACKAGE_FAILURE_TITLE = "LAUNCHER FILES MISSING OR DAMAGED"
 APPLICATION_PACKAGE_FAILURE_MESSAGE = (
-    "The application package is incomplete or corrupted. "
-    "Re-extract the full DOOM Eternal Archipelago release package."
+    "Extract the complete DoomEAP download into a new folder and run it again."
 )
-APPLICATION_PACKAGE_FAILURE_ACTION = "RE-EXTRACT RELEASE PACKAGE"
+APPLICATION_PACKAGE_FAILURE_ACTION = "EXTRACT THE COMPLETE DOWNLOAD"
 MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE = (
     "A required mod-building tool could not be prepared. "
     "Check your connection and try rebuilding the Room Package."
 )
 GAME_SETUP_FAILURE_TITLE = "GAME SETUP NEEDS ATTENTION"
 GAME_SETUP_FAILURE_MESSAGE = (
-    "Game setup could not be completed. Repair game integration and try again."
+    "Open Help and select Fix Setup. If it fails again, select Help -> SAVE SUPPORT REPORT."
 )
-GAME_SETUP_FAILURE_ACTION = "REPAIR GAME INTEGRATION"
-INSTALLED_PACKAGE_FAILURE_TITLE = "ROOM PACKAGE NEEDS UPDATE"
+GAME_SETUP_FAILURE_ACTION = "REPAIR GAME CONNECTION"
+INSTALLED_PACKAGE_FAILURE_TITLE = "ROOM MOD UPDATE REQUIRED"
 INSTALLED_PACKAGE_FAILURE_MESSAGE = (
-    "This room's installed package needs an update. Update the room package and try again."
+    "Select UPDATE ROOM PACKAGE before playing."
 )
 INSTALLED_PACKAGE_FAILURE_ACTION = "UPDATE ROOM PACKAGE"
-ROOM_PACKAGE_INCOMPATIBLE_TITLE = "ROOM PACKAGE NEEDS REBUILDING"
+ROOM_PACKAGE_INCOMPATIBLE_TITLE = "ROOM MOD NEEDS REBUILDING"
 ROOM_PACKAGE_INCOMPATIBLE_MESSAGE = (
-    "This room package was built with an older DOOM Eternal APWorld. "
-    "Rebuild it with the current launcher and try again."
+    "This room is incompatible with this launcher. Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use."
 )
 ROOM_PACKAGE_INCOMPATIBLE_ACTION = "REBUILD ROOM PACKAGE"
 
@@ -107,6 +104,8 @@ def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
     )
     if any(token in text for token in app_tokens):
         return "application_package"
+    if phase == "game_setup":
+        return "game_setup"
     if phase in {"room_snapshot", "manifest", "room_package"}:
         return "room_package"
     room_tokens = (
@@ -170,8 +169,8 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         user_action = "SELECT PROTON"
     elif failure_domain == "campaign_session":
         recovery_action = "inspect_campaign"
-        user_title = "AP campaign preparation needs attention"
-        user_message = "The installed room package is retained. Inspect AP SAVE and the preparation diagnostic before retrying this room."
+        user_title = "SAVE SETUP FAILED"
+        user_message = "Close DOOM Eternal. Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again."
         user_action = "AP SAVE"
     else:
         recovery_action = "repair_game_integration"
@@ -184,6 +183,7 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "raw_message": raw_message,
         "technical_error_type": type(error).__name__,
         "technical_message": raw_message,
+        "processes": getattr(error, "processes", None),
         "errno": getattr(error, "cause_errno", getattr(error, "errno", None)),
         "winerror": getattr(error, "cause_winerror", getattr(error, "winerror", None)),
         "filename": getattr(
@@ -749,7 +749,10 @@ class IntegratedLaunchWorkflow:
         selected = self.core_runtime.resolve(config, game_root, refresh=force_repair and local_artifact is None)
         config["selected_core_runtime_manifest"] = str(selected)
         self._configuration_snapshot = config
-        self._emit("core_runtime_selected", path=str(selected), development_override=bool(config.get("core_runtime_manifest")))
+        from ..contracts.core_distribution import read_manifest
+        selected_manifest = read_manifest(selected)
+        self._emit("core_runtime_selected", path=str(selected), development_override=bool(config.get("core_runtime_manifest")),
+                   message=f"Core {selected_manifest['version']} selected (build {selected_manifest['build_id']}).")
         dep_manager = DependencyManager(self.state_dir / "dependencies")
         result = install_meathook(
             game_root,
@@ -856,7 +859,7 @@ class IntegratedLaunchWorkflow:
             self.session_owner.prepare(snapshot, config)
             return cached
 
-        # Verify the selected Core pair before preparing the room mod.
+        self._failure_phase = "game_setup"
         local_key = "core_runtime_manifest"
         local_val = config.get(local_key)
         local_artifact = Path(str(local_val)).expanduser() if local_val else None
@@ -918,6 +921,7 @@ class IntegratedLaunchWorkflow:
             failed = [c.message for c in prereqs.checks if not c.ok]
             raise RuntimeError(f"Runtime prerequisites not met: {'; '.join(failed)}")
 
+        self._failure_phase = "room_package"
         manifest = self._manifest_for(snapshot)
         self._emit(
             "room_validated",

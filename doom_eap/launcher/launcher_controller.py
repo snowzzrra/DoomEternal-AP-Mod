@@ -42,6 +42,7 @@ from .launcher_integration import (
 from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_platform import (
     SavedGamesSelection,
+    ProcessInspectionError,
     SteamInstallationLocator,
     cleanup_legacy_doomeap_cfg,
     cleanup_stale_doom_config_bind,
@@ -95,11 +96,11 @@ def normalize_ammo_refill_keybind(keybind: str) -> str:
     if not value or value.casefold() == "unbound":
         return ""
     if "\n" in value or "\r" in value or "+" in value or len(value) > 32:
-        raise ValueError("Ammo Refill keybind must be one simple key")
+        raise ValueError("Choose one key without Ctrl, Alt, or Shift.")
     folded = {token.casefold(): token for token in AMMO_REFILL_SUPPORTED_KEY_TOKENS}
     canonical = folded.get(value.casefold())
     if canonical is None:
-        raise ValueError("Ammo Refill keybind uses an unsupported physical key")
+        raise ValueError("Choose a letter, number, function key, or navigation key.")
     return canonical
 
 
@@ -143,6 +144,7 @@ class LauncherController:
         self.config_path = self.user_paths.config_dir / "launcher.json"
         self.events: queue.Queue[dict[str, object]] = queue.Queue()
         self.diagnostic_history: deque[str] = deque(maxlen=500)
+        self._injector_output: str | None = None
         self.config = self._load_config()
         self.config.setdefault("core_auto_update", True)
         self.config.setdefault("death_link_grace", 0)
@@ -220,39 +222,27 @@ class LauncherController:
     ) -> None:
         if reason == "native_helper_missing":
             message = (
-                "The Game integration helper is missing and may have been quarantined. "
-                "Check Windows Security Protection history, repair or reinstall DoomEAP, "
-                "then retry. Generate a Support Report if the problem continues."
+                "A required DoomEAP file is missing. Check Windows Security -> Protection history, then reinstall DoomEAP from its official download. If it happens again, select Help -> SAVE SUPPORT REPORT."
             )
         elif reason == "native_helper_application_control_blocked":
             message = (
-                "Windows application control blocked the Game integration helper. "
-                "Generate a Support Report and ask the device administrator or DoomEAP "
-                "maintainer to review the signed release artifact."
+                "Windows blocked DoomEAP from starting its game connection. Select Help -> SAVE SUPPORT REPORT and ask your device administrator or DoomEAP support for help."
             )
         elif reason == "native_helper_removed_after_validation":
             message = (
-                "The Game integration helper disappeared while Windows was starting it and "
-                "may have been quarantined. Check Windows Security Protection history, "
-                "repair or reinstall DoomEAP, then retry."
+                "DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues."
             )
         elif reason == "native_helper_access_denied":
             message = (
-                "Windows denied access to the Game integration helper. Windows Security "
-                "or antivirus software may have blocked it. Check Protection history, "
-                "repair or reinstall DoomEAP, then retry. Generate a Support Report if "
-                "the problem continues."
+                "DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues."
             )
         elif reason == "immediate_exit":
             message = (
-                "The Game integration helper stopped immediately before Game Link became "
-                "ready. Windows Security or antivirus software may have blocked it. "
-                "Retry once, then generate a Support Report if the problem continues."
+                "DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues."
             )
         else:
             message = (
-                "Windows could not create the Game integration helper process. "
-                "Retry once, then generate a Support Report if the problem continues."
+                "DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues."
             )
         detail = (
             f"Game integration helper startup failed: reason={reason} "
@@ -263,7 +253,7 @@ class LauncherController:
         self._record_diagnostic(detail)
         self.emit(
             "native_client_start_failed",
-            title="Game integration helper could not start",
+            title="Game connection could not start",
             message=message,
             reason=reason,
             executable_path=str(executable_path),
@@ -464,12 +454,12 @@ class LauncherController:
         if base_dir is not None:
             cleanup_legacy_doomeap_cfg(base_dir)
 
-        is_running = self.is_game_running()
+        is_running = self.game_running_or_unknown()
         cleanup_stale_doom_config_bind(self.config, is_game_running=is_running)
 
         special = normalize_ammo_refill_keybind(str(self.config.get("special_toggle_keybind", "F10")))
         if normalized_keybind and normalized_keybind == special:
-            raise ValueError("Ammo Refill and Special Weapon toggle must use different keys")
+            raise ValueError("Choose different keys for Ammo Refill and Special Weapon.")
         state_file = write_ap_hotkey_states(base_dir, normalized_keybind, special)
         logger.info(
             "AMMO_HOTKEY_CONFIG path=%s token=%s state=%s",
@@ -497,7 +487,7 @@ class LauncherController:
         proton_changed = any(key in updates and updates[key] != self.config.get(key)
             for key in ("proton_executable", "proton_compat_data_dir"))
         if proton_changed and self.is_game_running():
-            raise RuntimeError("Close DOOM Eternal before changing its Proton runtime.")
+            raise RuntimeError("Close DOOM Eternal before changing Proton.")
         self.config.update(updates)
         self._persist_config()
         LaunchWorkflow.write_client_config(
@@ -556,7 +546,7 @@ class LauncherController:
             app_dir=self.application_dir,
             client_dir=client_dir,
             game_root=root_path,
-            game_running=self.is_game_running(),
+            game_running=self.game_running_or_unknown(),
         )
 
     def discover(self) -> dict[str, object]:
@@ -617,6 +607,13 @@ class LauncherController:
     def game_processes(self) -> tuple[dict[str, object], ...]:
         """Return bounded facts for supported game/client processes."""
         return detect_doom_processes()
+
+    def game_running_or_unknown(self) -> bool:
+        """Treat an unreadable process list as running so callers stay on the safe side."""
+        try:
+            return self.is_game_running()
+        except ProcessInspectionError:
+            return True
 
     def is_game_running(self) -> bool:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
@@ -858,7 +855,7 @@ class LauncherController:
                 if action_key in {"repair_core", "repair_session", "rollback_core"}:
                     root = workflow._game_root(config)
                     if workflow.session_owner.game_processes(config) != ():
-                        raise RuntimeError("Close DOOM Eternal before repairing its session or restoring Core")
+                        raise RuntimeError("Close DOOM Eternal before repairing save setup or restoring a previous version.")
                     if action_key == "rollback_core":
                         from .launcher_core_install import rollback_core
                         self.save_config({"core_auto_update": False})
@@ -867,7 +864,7 @@ class LauncherController:
                         backup = rollback_core(root, self.state_dir)
                         self.save_config({"core_auto_update": False, "core_runtime_manifest": None, "selected_core_runtime_manifest": None})
                         workflow.core_runtime.checked = False
-                        message = f"Previous Core restored: {backup}. Automatic update is off; reconnect to the same room."
+                        message = "Previous game connection version restored. Automatic updates are off. Reconnect to the same room."
                     elif action_key == "repair_core":
                         workflow.session_owner.retire()
                         self._stop_native_client()
@@ -876,7 +873,7 @@ class LauncherController:
                         if not repair_event:
                             raise RuntimeError("Connect to the same room before repairing its session")
                         workflow.ensure_game_link(root)
-                        message = "Session prepared in the same room; saves and receipts preserved."
+                        message = "Save setup repaired. Saves, received items, and spending records were kept."
                     if action_key != "rollback_core" and repair_event:
                         job.check()
                         config.update(workflow._config())
@@ -950,7 +947,7 @@ class LauncherController:
         draft = self.user_paths.data_dir / "reports" / "draft.json"
         saved = json.loads(draft.read_text(encoding="utf-8"))
         if not saved.get("url"):
-            raise ValueError("Resolve or retry the saved report before starting another.")
+            raise ValueError("Retry the saved report before starting a new one. Its submitted text cannot be changed.")
         archived = draft.with_name(str(uuid.UUID(saved["payload"]["idempotency_key"])) + ".json")
         publish_file(draft, archived, operation="report_archive_publish")
         return self.request_problem_report(logs=logs)
@@ -958,7 +955,7 @@ class LauncherController:
     def request_report_submission(self, payload: dict) -> bool:
         endpoint = submission_endpoint(self.client_dir)
         if endpoint is None:
-            raise RuntimeError("Online submission is awaiting service deployment. Export the report locally.")
+            raise RuntimeError("Sending reports is unavailable. Open Report a Problem in Help to save a copy.")
         payload = deepcopy(payload)
         report_body(payload)
         def operation(job):
@@ -1070,6 +1067,7 @@ class LauncherController:
                 support_condump=support_condump,
                 support_diagnostics=support_diagnostics,
                 archive_directory=self.user_paths.data_dir / "support-bundles",
+                injector_output=getattr(self, "_injector_output", None),
         )
         timing = {"archive_ms": round((time.monotonic() - stage) * 1000),
                   "total_ms": round((time.monotonic() - started) * 1000), **timings}
@@ -1109,7 +1107,7 @@ class LauncherController:
                 "requested_at": requested_at,
             }
         # use fresh native readiness on proton; diagnostics don't need to wait for the host process-name check
-        game_running = bool(native_health.get("ready")) if supervisor_available else self.is_game_running()
+        game_running = bool(native_health.get("ready")) if supervisor_available else self.game_running_or_unknown()
         if not game_running:
             return {
                 "status": "unavailable",
@@ -1216,7 +1214,7 @@ class LauncherController:
     def _record_diagnostic(self, text: object) -> None:
         sanitized = redact_secrets(str(text)).replace("\r", " ").replace("\n", " ").strip()
         if sanitized:
-            self.diagnostic_history.append(sanitized[:1000])
+            self.diagnostic_history.append(time.strftime("%Y-%m-%dT%H:%M:%SZ ", time.gmtime()) + sanitized[:1000])
 
     def _record_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
@@ -1340,6 +1338,11 @@ class LauncherController:
             generation = payload.get("launcher_job_generation")
             if generation is not None and not self.workers.accepts(generation):
                 return
+            if kind == "injector_started":
+                self._injector_output = None
+            elif kind == "injector_finished":
+                output = f"stdout:\n{payload.get('stdout', '')}\nstderr:\n{payload.get('stderr', '')}"
+                self._injector_output = output.encode("utf-8")[-64 * 1024:].decode("utf-8", errors="ignore")
             if kind == "core_runtime_selected":
                 old = self.config.get("selected_core_runtime_manifest")
                 self.config["selected_core_runtime_manifest"] = payload["path"]
@@ -1500,11 +1503,11 @@ class LauncherController:
             raise ValueError(str(error)) from error
         with self._lifecycle_lock:
             if "new_ap_save" in self.workers.active:
-                raise RuntimeError("Wait for the AP save backup and restart to finish before reconnecting")
+                raise RuntimeError("Wait for the save operation to finish before reconnecting.")
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
-                raise RuntimeError("disconnect the current bridge worker before connecting again")
+                raise RuntimeError("Disconnect from the current room first.")
             if self.state is LauncherState.DISCONNECTING:
-                raise RuntimeError("bridge worker is still disconnecting")
+                raise RuntimeError("Disconnecting… Wait before joining another room.")
             self.connection_attempt_id += 1
             self.item_history_status = None
             self.setup.invalidate()
@@ -1527,9 +1530,9 @@ class LauncherController:
         stop_failed_worker: BridgeSupervisor | None = None
         with self._lifecycle_lock:
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
-                raise RuntimeError("disconnect the current bridge worker before connecting again")
+                raise RuntimeError("Disconnect from the current room first.")
             if self.state is LauncherState.DISCONNECTING:
-                raise RuntimeError("bridge worker is still disconnecting")
+                raise RuntimeError("Disconnecting… Wait before joining another room.")
             if self.supervisor is not None:
                 self._pending_connect = connection
                 self.state = LauncherState.CONNECTING
@@ -1669,7 +1672,10 @@ class LauncherController:
                 current_running = None if processes is None else bool(processes)
                 status = self.workflow.session_owner.observe(processes)
             else:
-                current_running = self.is_game_running()
+                try:
+                    current_running = self.is_game_running()
+                except ProcessInspectionError:
+                    current_running = None
                 status = self.workflow.session_owner.observe()
             semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
                         status.get("process_created"),
@@ -1692,7 +1698,7 @@ class LauncherController:
     def set_ap_keybinds(self, refill: str, special: str) -> None:
         refill, special = normalize_ammo_refill_keybind(refill), normalize_ammo_refill_keybind(special)
         if refill and refill == special:
-            raise ValueError("Ammo Refill and Special Weapon toggle must use different keys")
+            raise ValueError("Choose different keys for Ammo Refill and Special Weapon.")
         previous = {key: self.config.get(key) for key in (AMMO_REFILL_KEYBIND_CONFIG, "special_toggle_keybind")}
         write_ap_hotkey_states(doom_base_dir_from_config(self.config), refill, special)
         try:
@@ -1722,7 +1728,7 @@ class LauncherController:
 
     def set_death_link_grace(self, deaths: int) -> None:
         if type(deaths) is not int or not 0 <= deaths <= 2147483647:
-            raise ValueError("DeathLink Grace must be a whole number from 0 to 2147483647")
+            raise ValueError("Enter a whole number of deaths from 0 to 2147483647.")
         previous = self.config.get("death_link_grace", 0)
         try:
             self.save_config({"death_link_grace": deaths})
@@ -1764,7 +1770,7 @@ class LauncherController:
                 if copy_files:
                     archive = job.publish(lambda: self.workflow.session_owner.backup_local_files(snapshot, configuration))
                     self.emit("ap_backup_result", **job.event({"message":
-                        f"Local files copied and archive verified: {archive}. Native restore and gameplay are unverified."}))
+                        f"Backup saved and checked: {archive}. Loading it in the game has not been tested."}))
                 else:
                     inspection = self.workflow.session_owner.inspect_campaign(snapshot, configuration)
                     job.check()
@@ -1792,9 +1798,7 @@ class LauncherController:
                 raise RuntimeError("The bridge has not stopped; existing saves were kept")
             archive = job.publish(lambda: self.workflow.session_owner.restart_campaign(snapshot, configuration))
             self.emit("ap_backup_result", message=(
-                f"Your previous game save and AP receipt state were backed up to {archive}. "
-                "Reconnect to the same room and wait for AP save preparation, then start DOOM Eternal through Steam. "
-                "The multiworld is unchanged; items in the server's current history will be delivered to the new save."
+                f"Previous save backed up to {archive}. Reconnect to the same room, wait for save setup, then start through Steam. Your room progress is kept, and received items will be restored."
             ))
 
         return self.workers.submit("new_ap_save", operation, generation=self.workers.generation)
@@ -1809,7 +1813,7 @@ class LauncherController:
             job.check()
             if restore is not None:
                 self.workflow.session_owner.prepare(snapshot,configuration,recovery_basename=restore)
-                message="Compatible recovery is staged. Play this room to let the game restore it. Receipt history, purchases and consumables were preserved."
+                message="Backup ready to restore. Start this room to load it. Received items, purchases, and consumable spending were kept."
             else:
                 from .launcher_session import namespace_id
                 expected=namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
@@ -1817,7 +1821,7 @@ class LauncherController:
                 if self.workflow.session_owner.namespace != expected:
                     raise RuntimeError("The live AP session belongs to a different room")
                 result=self.workflow.session_owner.create_backup()
-                message=f"AP backup captured and verified: {result['basename']}. Opening it in-game remains unverified."
+                message=f"Backup saved and checked: {result['basename']}. Loading it in the game has not been tested."
             job.check()
             self.emit("ap_backup_result",**job.event({"message":message}))
 
@@ -1941,7 +1945,7 @@ class LauncherController:
 
     def close(self) -> None:
         if not self.workflow.session_owner.can_close():
-            raise RuntimeError("Keep the launcher open until DOOM Eternal has exited")
+            raise RuntimeError("Close DOOM Eternal before closing this launcher.")
         self.workflow.session_owner.retire()
         self._game_lifecycle_stop.set()
         lifecycle_thread = self._game_lifecycle_thread

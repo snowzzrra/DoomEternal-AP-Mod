@@ -55,12 +55,12 @@ def _unique(pairs):
         result[key] = value
     return result
 
-def read_manifest(path):
+def read_manifest(path, *, require_compatible=True):
     value = json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=_unique)
-    validate_manifest(value)
+    validate_manifest(value, require_compatible=require_compatible)
     return value
 
-def validate_manifest(value):
+def validate_manifest(value, *, require_compatible=True):
     if type(value["schema"]) is not int or value["schema"] != 1 or value["product"] != "sentinel-core":
         raise ValueError("Unsupported distribution")
     key = version_key(value["version"])
@@ -68,10 +68,14 @@ def validate_manifest(value):
     channel = "stable" if key[3] else "rc"
     if value["base_version"] != base or value["channel"] != channel or type(value["rc_number"]) is not int or value["rc_number"] != key[4]:
         raise ValueError("Inconsistent version fields")
-    if key[:2] != (1, 1) or not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
+    if value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
-    if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list) or any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
-           ((7, 8) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
+    if require_compatible and (key[:2] != (1, 1) or not mod_compatible(value)):
+        raise ValueError("Incompatible runtime")
+    if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list):
+        raise ValueError("Incompatible ABI or capability")
+    if require_compatible and (any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
+           ((7, 8) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES):
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")
