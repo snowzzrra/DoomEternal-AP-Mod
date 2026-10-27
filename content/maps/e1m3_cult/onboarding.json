@@ -10,5 +10,53 @@
   "owner": {
     "resource": "game/sp/e1m3_cult/e1m3_cult_patch3.resources",
     "priority": 42
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "game_interact_automap_1_e1m3": {
+        "location_id": 7770497,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 118.980011,
+          "y": 73.0199966,
+          "z": -4.58126068
+        },
+        "region": "Cultist Base - Basilica of Adjuration",
+        "qualification": "Basilica automap room joins the red-moat route to the first Secret Encounter.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e1m3_cult/e1m3_cult.decl",
+          "sha256": "f1c088e591b48d69f0664ad8aff23230aab6df69b20298088d3f1a7f386d8d0a",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      },
+      "game_pickup_mega_health_2": {
+        "location_id": 7770517,
+        "inherit": "pickup/mega_health",
+        "class": "idProp2",
+        "position": {
+          "x": 0.0,
+          "y": 61.0,
+          "z": 1.95000017
+        },
+        "source_omitted_zero_axes": [
+          "x"
+        ],
+        "region": "Cultist Base - Basilica of Adjuration",
+        "qualification": "The central-hub secret relay reveals the reward and awards the native secret after a one-second delay. Its native fast-travel anchor at x=0,y=61 is Basilica of Adjuration.",
+        "native_graph": {
+          "relay": "game_target_relay_megareward",
+          "delay_seconds": 1,
+          "show": "game_target_show_93",
+          "secret": "game_target_secret_1",
+          "sound": "game_sound_soundentity_1411"
+        },
+        "physical_gate": "triggerFirst requires native relay activation before physical touch can fire the AP check; the show event reveals only the AP visual.",
+        "reference": "https://wiki.eternalmods.com/books/eternal-level-modding/page/idtrigger"
+      }
+    }
   }
 }

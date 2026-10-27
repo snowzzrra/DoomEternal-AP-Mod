@@ -1,7 +1,9 @@
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 
 from doom_eap.runtime.campaign_menu import CampaignMenu
+from doom_eap.runtime.mission_presentation import MissionPresentations
 
 
 class NativeLink:

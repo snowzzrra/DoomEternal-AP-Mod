@@ -27,9 +27,9 @@
     "rune_page": "ap_bootstrap_v2_rune_page"
   },
   "counts": {
-    "items": 129,
-    "locations": 443,
-    "map_checks": 374,
+    "items": 132,
+    "locations": 468,
+    "map_checks": 399,
     "route_sentinel_batteries": 18,
     "runtime_goals": 1,
     "runtime_locations": 69

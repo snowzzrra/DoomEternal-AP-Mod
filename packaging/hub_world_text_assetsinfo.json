@@ -1,19 +1,16 @@
 {
-  "resources": [
+  "assets": [
     {
-      "name": "e5m1_spear.resources"
+      "name": "swf/guientity/generic_text.swf", "mapResourceType": "cswf"
     },
     {
-      "name": "e5m1_spear_patch1.resources"
+      "name": "gui/text", "mapResourceType": "entityDef"
     },
     {
-      "name": "e5m1_spear_patch2.resources"
+      "name": "editors/models/gui_text.lwo", "mapResourceType": "model"
     },
     {
-      "name": "e6m3_mcity_horde.resources"
-    },
-    {
-      "name": "e6m3_mcity_horde_patch1.resources"
+      "name": "editor/worldeditor/gui_text", "mapResourceType": "material2"
     }
   ]
 }

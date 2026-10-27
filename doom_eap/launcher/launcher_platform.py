@@ -36,6 +36,31 @@ REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
 
 
+def restore_standard_streams(*, require_pipes=False):
+    if sys.platform != 'win32':
+        return
+    import ctypes
+    import msvcrt
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.GetStdHandle.argtypes = [ctypes.c_ulong]
+    kernel.GetStdHandle.restype = ctypes.c_void_p
+    # windowed builds keep inherited pipes but leave Python's streams unset
+    for name, number, mode, flags in (('stdin', -10, 'r', os.O_RDONLY),
+                                     ('stdout', -11, 'w', os.O_WRONLY),
+                                     ('stderr', -12, 'w', os.O_WRONLY)):
+        if getattr(sys, name) is not None:
+            continue
+        handle = kernel.GetStdHandle(number & 0xffffffff)
+        if not handle or handle == ctypes.c_void_p(-1).value:
+            if require_pipes:
+                raise RuntimeError(f'The session supervisor requires an inherited {name} pipe')
+            stream = open(os.devnull, mode, encoding='utf-8')
+        else:
+            descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
+            stream = os.fdopen(descriptor, mode, buffering=1, encoding='utf-8')
+        setattr(sys, name, stream)
+
+
 @lru_cache(maxsize=32)
 def _sha256_file_identity(path: str, size: int, modified_ns: int, created_ns: int) -> str:
     """Hash immutable file identity once; metadata changes invalidate the entry."""
@@ -593,7 +618,7 @@ class RuntimePrerequisiteReport:
 
 def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
     """Verify the Core runtime pair used by Game Link."""
-    from ..contracts.core_distribution import read_manifest
+    from ..contracts.core_distribution import read_manifest, verify_build_identity
     if game_root is None:
         return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "DOOM folder is not configured.")
     try:
@@ -604,6 +629,7 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
             data = (root / name).read_bytes()
             if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
                 raise ValueError(f"Core runtime hash mismatch: {name}")
+            verify_build_identity(name, data, value["build_id"])
         if (root / "XINPUT1_3.dll").exists():
             raise ValueError("A foreign XINPUT provider is present; resolve its ownership before Core-only admission.")
         return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, f"Sentinel Core {value['version']} pair verified.",
@@ -619,7 +645,7 @@ def probe_runtime_prerequisites(
     client_dir: Path | None = None,
     config: Mapping[str, object] | None = None,
 ) -> RuntimePrerequisiteReport:
-    """Probe the MOD 0.6.0 game, Core and client prerequisites."""
+    """Probe the game, Core and client prerequisites."""
     checks: list[PrerequisiteCheck] = []
 
     # game installation check
@@ -2465,6 +2491,7 @@ class LinuxModManagerAdapter:
                 capture_output=True,
                 timeout=self.TIMEOUT_SECONDS,
                 check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except subprocess.TimeoutExpired as error:
             return AdapterResult(
@@ -2888,6 +2915,7 @@ def detect_doom_processes(
                 completed = subprocess.run(
                     ["tasklist", "/fo", "csv", "/nh"],
                     capture_output=True, text=True, timeout=3, check=False,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
                 )
                 process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
             except (OSError, subprocess.SubprocessError):

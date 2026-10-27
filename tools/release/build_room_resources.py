@@ -20,6 +20,7 @@ from tools.release.room_payloads import (
     BASE_RESOURCE_NAME,
     ROOM_PAYLOAD_MANIFEST_NAME,
     ROOM_PAYLOAD_RESOURCE_NAME,
+    ROOM_PAYLOAD_SCHEMA_VERSION,
     canonical_json,
     plan_map_local_states,
     validate_room_payload_manifest,
@@ -94,13 +95,22 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
     compiler = ModCompiler(root)
     catalog = load_content_catalog(root)
     raw_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-    release_keys = tuple(spec.key for spec in catalog.enabled_maps())
+    release_keys = tuple(spec.key for spec in catalog.compiler_maps())
     maps = {
         key: (entry["resource_path"], entry["relative_entities_path"], root / "vanillamaps" / entry["source_file"])
-        for key, entry in raw_sources.items() if key in release_keys and entry["enabled"]
+        for key, entry in raw_sources.items() if key in release_keys
     }
     if set(maps) != set(release_keys):
         raise ValueError("room payload map set does not match the content catalog")
+    source_snapshots, source_files = {}, {}
+    for key, (_, _, vanilla) in maps.items():
+        data = vanilla.read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != catalog.maps[key].source_sha256:
+            raise ValueError(f"room source snapshot differs from its descriptor: {key}")
+        member = f"sources/{key}.entities"
+        source_snapshots[key] = {"member": member, "sha256": digest, "size": len(data)}
+        source_files[member] = data
 
     compiler_identity, _ = compute_room_resource_input_fingerprint(root)
     # A caller may supply a registry outside the default source tree.
@@ -144,15 +154,6 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
         cache.write(material, entities.read_bytes(), packed.read_bytes())
 
-    for key, (resource_path, relative, vanilla) in maps.items():
-        target = staged / f"{Path(resource_path).stem}/maps/{relative}"
-        plan = plans[key]
-        if plan.compile_base:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            compile_state(key, vanilla, plan.base_options, work / f"{key}-base.entities", target)
-        elif not target.is_file():
-            raise ValueError(f"prepared authorial staging is missing {target}")
-
     for context in dlc_contexts():
         key = context.map_keys[0]
         spec = catalog.maps[key]
@@ -165,8 +166,18 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
             target.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
 
+
+    for key, (resource_path, relative, vanilla) in maps.items():
+        target = staged / f"{Path(resource_path).stem}/maps/{relative}"
+        plan = plans[key]
+        if plan.compile_base:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            compile_state(key, vanilla, plan.base_options, work / f"{key}-base.entities", target)
+        elif not target.is_file():
+            raise ValueError(f"prepared authorial staging is missing {target}")
+
     base_members = zip_directory(staged, output / BASE_RESOURCE_NAME)
-    payload_files: dict[str, bytes] = {}
+    payload_files: dict[str, bytes] = source_files
     records: dict[str, object] = {}
     for key, (resource_path, relative, vanilla) in maps.items():
         plan = plans[key]
@@ -186,8 +197,9 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         records[key] = {"option_keys": list(plan.option_keys), "target_member": target_member,
                         "states": states, "state_policy": plan.state_policy}
     manifest = {
-        "schema_version": 1, "model": "dependent_map_payloads",
+        "schema_version": ROOM_PAYLOAD_SCHEMA_VERSION, "model": "dependent_map_payloads",
         "physical_option_keys": list(PHYSICAL_OPTION_KEYS), "base_members": sorted(base_members), "maps": records,
+        "source_snapshots": source_snapshots,
         "context_targets": {context.identity: f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
                             for context in dlc_contexts()},
     }

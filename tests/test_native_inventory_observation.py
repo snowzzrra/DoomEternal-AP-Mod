@@ -37,7 +37,7 @@ def test_independent_dash_observation(abi, dash):
     link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)
     reply = {"inventory_abi": abi, "kind": 0, "outcome": 1, "flags": 3,
              "equipment_after": 0xffffffff, "ice_bomb_after": 255, "dash_after": dash}
-    link._execute_typed = lambda *args: reply
+    link._execute_typed = lambda *args, **kwargs: reply
     result = link.observe_inventory()
     assert result["dash_after"] == (dash if abi == 5 else 255)
     assert result["equipment_after"] == 0xffffffff
@@ -53,7 +53,7 @@ def test_frag_observation_is_independent_of_ice(abi, frag):
     reply = {"inventory_abi": abi, "kind": 0, "outcome": 1, "flags": 3,
              "ice_bomb_after": 0, "dash_after": 255, "slayer_key_after": 255,
              "frag_grenade_after": frag}
-    link._execute_typed = lambda *args: reply
+    link._execute_typed = lambda *args, **kwargs: reply
     assert link.observe_inventory()["frag_grenade_after"] == (frag if abi == 7 else 255)
     reply.update(inventory_abi=7, frag_grenade_after=2)
     with pytest.raises(WeaponPointsBlocked):
@@ -65,11 +65,29 @@ def test_independent_slayer_key_observation(abi, key):
     link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)
     reply = {"inventory_abi": abi, "kind": 0, "outcome": 1, "flags": 3,
              "ice_bomb_after": 255, "dash_after": 1, "slayer_key_after": key}
-    link._execute_typed = lambda *args: reply
+    link._execute_typed = lambda *args, **kwargs: reply
     assert link.observe_inventory()["slayer_key_after"] == (key if abi == 6 else 255)
     reply.update(inventory_abi=6, slayer_key_after=2)
     with pytest.raises(WeaponPointsBlocked):
         link.observe_inventory()
     reply.update(slayer_key_after=0, flags=1)
     with pytest.raises(WeaponPointsBlocked):
+        link.observe_inventory()
+
+
+@pytest.mark.parametrize("known,owned", [(0, 0), (2, 0), (2, 2), (1 << 63, 1 << 63)])
+def test_permanent_perk_masks_preserve_unknown_missing_owned_and_high_bit(known, owned):
+    link = SentinelWeaponPoints.__new__(SentinelWeaponPoints)
+    reply = dict(inventory_abi=8, kind=0, outcome=1, flags=3,
+                 ice_bomb_after=255, dash_after=255, slayer_key_after=255,
+                 frag_grenade_after=255, flame_belch_after=0, blood_punch_after=1,
+                 perks_known=str(known), perks_owned=str(owned))
+    link._execute_typed = lambda *args, **kwargs: reply
+    result = link.observe_inventory()
+    assert result["perks_known"] == known and result["perks_owned"] == owned
+    reply.update(perks_known="0", perks_owned="2")
+    with pytest.raises(WeaponPointsBlocked, match="malformed"):
+        link.observe_inventory()
+    reply.update(perks_known=str(1 << 64), perks_owned="0")
+    with pytest.raises(WeaponPointsBlocked, match="malformed"):
         link.observe_inventory()

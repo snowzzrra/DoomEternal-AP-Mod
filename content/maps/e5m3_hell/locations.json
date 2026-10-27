@@ -11,7 +11,8 @@
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770481,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770482,
     "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770483,
-    "AP_CHECK_TARGET_RELAY_ESCALATION_2_DONE": 7770484
+    "AP_CHECK_TARGET_RELAY_ESCALATION_2_DONE": 7770484,
+    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": 7770512
   },
   "names": {
     "7770476": "Immora - Codex - Battlefield Second Bend",
@@ -22,10 +23,14 @@
     "7770481": "Immora - Extra Life - Battlefield Breakable Wall",
     "7770482": "Immora - Extra Life - Plateau Battle 2-Up",
     "7770483": "Immora - Escalation Encounter Wave 1",
-    "7770484": "Immora - Escalation Encounter Wave 2"
+    "7770484": "Immora - Escalation Encounter Wave 2",
+    "7770512": "Immora - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
     "pickups_progress_codex_1": {
@@ -85,6 +90,9 @@
           "whenToSave = \"SGT_NORMAL\";"
         ]
       }
+    },
+    "pickups_interact_automap_1": {
+      "permanent_resource_budget": false
     }
   }
 }

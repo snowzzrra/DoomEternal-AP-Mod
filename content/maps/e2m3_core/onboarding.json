@@ -10,5 +10,29 @@
   "owner": {
     "resource": "game/sp/e2m3_core/e2m3_core_patch2.resources",
     "priority": 10
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "phobos_interact_automap_1_e2m3": {
+        "location_id": 7770500,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 2174.39917,
+          "y": 1195.49988,
+          "z": -76.2900009
+        },
+        "region": "Mars Core - UAC - BFG-10000 Ventilation",
+        "qualification": "After BFG Core turbine, cracked fuse box and three pistons; before the four-piston exit.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e2m3_core/e2m3_core.decl",
+          "sha256": "ad469816b6f05865f326624c07c2168f4b77d02fb098e56b1472c1a090cc437e",
+          "station_groups": [
+            "AUTOMAP_GROUP_A"
+          ]
+        }
+      }
+    }
   }
 }

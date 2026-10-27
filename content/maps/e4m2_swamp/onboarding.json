@@ -10,5 +10,29 @@
   "owner": {
     "resource": "game/dlc/e4m2_swamp/e4m2_swamp_patch2.resources",
     "priority": 48
+  },
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "automap_interact_automap_1": {
+        "location_id": 7770508,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -192.504089,
+          "y": 199.004166,
+          "z": 26.6505318
+        },
+        "region": "The Blood Swamps - Swamp Entrance",
+        "qualification": "Surface ledge after the RAD Suit swimming tunnel; before the Baron and skull-gate route to Underworld Crossroad.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/6",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc/e4m2_swamp/e4m2_swamp.decl",
+          "sha256": "b1d34355839e3855ad0eee9cd8057bc09cebd70c59066b3e2f768f50be81faf9",
+          "station_groups": [
+            "AUTOMAP_GROUP_A"
+          ]
+        }
+      }
+    }
   }
 }

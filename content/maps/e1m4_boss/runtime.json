@@ -18,14 +18,18 @@
       "name": "Doom Hunter Base - Mission Challenge - Musical Interlude",
       "location_id": 7770172,
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e1m4/challenge_1",
         "numUnlockableRules": 1,
         "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
         "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
-        "unlockableIsUnlocked": true
+        "unlockableIsUnlocked": true,
+        "physical_location_ids": [
+          7770157
+        ],
+        "required_count": 1
       },
       "completion_owner": {
         "path": "unlockable/mission_challenge/e1m4/challenge_1.decl",
@@ -38,7 +42,7 @@
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       },
       "order": 24,
-      "strategy": "unlockable_record",
+      "strategy": "physical_event_equivalent",
       "category": "mission_challenges",
       "mission_key": "e1m4"
     },
@@ -46,14 +50,18 @@
       "name": "Doom Hunter Base - Mission Challenge - Big Reveal",
       "location_id": 7770173,
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "unlockable": "mission_challenge/e1m4/challenge_2",
         "numUnlockableRules": 1,
         "rule_0_statname": "STAT_AUTOMAP",
         "rule_0_statDuration": 5,
         "rule_0_satisfied": true,
-        "unlockableIsUnlocked": true
+        "unlockableIsUnlocked": true,
+        "physical_location_ids": [
+          7770496
+        ],
+        "required_count": 1
       },
       "completion_owner": {
         "path": "unlockable/mission_challenge/e1m4/challenge_2.decl",
@@ -66,7 +74,7 @@
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       },
       "order": 25,
-      "strategy": "unlockable_record",
+      "strategy": "physical_event_equivalent",
       "category": "mission_challenges",
       "mission_key": "e1m4"
     },
@@ -110,7 +118,8 @@
           7770174
         ],
         "required_count": 3,
-        "authority": "server_checked_locations"
+        "authority": "server_checked_locations",
+        "mission_complete_location_id": 7770162
       },
       "order": 37,
       "strategy": "aggregate",

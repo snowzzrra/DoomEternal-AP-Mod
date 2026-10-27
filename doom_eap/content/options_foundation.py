@@ -11,9 +11,12 @@ from typing import Any, Mapping, cast
 
 import yaml
 
+from doom_eap.content.enemy_options import normalize_enemy_options
+from doom_eap.content.enemy_species import speed_capability_notice
 
-OPTIONS_SCHEMA_VERSION = 2
-SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "option_set", "range", "named_range"})
+
+OPTIONS_SCHEMA_VERSION = 3
+SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "option_set", "option_dict", "range", "named_range"})
 GAME_NAME = "DOOM Eternal"
 START_INVENTORY_KEY = "start_inventory"
 
@@ -94,6 +97,20 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
                 raise ValueError(f"option set {key} default contains unknown values")
             if len(default) != len(set(default)):
                 raise ValueError(f"option set {key} default contains duplicate values")
+        elif ui_type == "option_dict":
+            entries = option.get("entries")
+            if not isinstance(entries, list) or not entries:
+                raise ValueError(f"option dictionary {key} lacks entries")
+            seen = set()
+            for entry in entries:
+                if (not isinstance(entry, Mapping) or not isinstance(entry.get("key"), str)
+                        or not entry["key"] or entry["key"] in seen
+                        or not isinstance(entry.get("label"), str) or not entry["label"]
+                        or type(entry.get("minimum")) is not int or type(entry.get("maximum")) is not int
+                        or entry["minimum"] < 0 or entry["maximum"] < entry["minimum"]):
+                    raise ValueError(f"option dictionary {key} contains invalid entry")
+                seen.add(entry["key"])
+            _validate_option_dict(option, option.get("default"))
         elif ui_type in {"range", "named_range"}:
             minimum = option.get("minimum")
             maximum = option.get("maximum")
@@ -169,6 +186,17 @@ def load_options_schema(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"could not load options schema: {error}") from error
     return validate_options_schema(document)
+
+
+def _validate_option_dict(option, value):
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{option['key']} must be a dictionary of explicit integer overrides")
+    entries = {entry["key"]: entry for entry in option["entries"]}
+    for name, count in value.items():
+        if (name not in entries or type(count) is not int
+                or not entries[name]["minimum"] <= count <= entries[name]["maximum"]):
+            raise ValueError(f"{option['key']} contains invalid override {name!r}: {count!r}")
+    return dict(sorted(value.items()))
 
 
 def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
@@ -251,6 +279,8 @@ def validate_option_values(
             if len(value) != len(set(value)):
                 raise ValueError(f"{key} must not contain duplicate values")
             value = sorted(value)
+        elif option["ui_type"] == "option_dict":
+            value = _validate_option_dict(option, value)
         elif option["ui_type"] == "range":
             if isinstance(value, bool) or not isinstance(value, int):
                 raise ValueError(f"{key} must be an integer")
@@ -273,6 +303,11 @@ def validate_option_values(
                 )
         result[key] = value
     result[START_INVENTORY_KEY] = validate_start_inventory(values[START_INVENTORY_KEY])
+    overlap = set(result.get("local_items", ())) & set(result.get("non_local_items", ()))
+    if overlap:
+        raise ValueError("Items cannot be both local and non-local: " + ", ".join(sorted(overlap)))
+    if "enemy_randomizer" in result:
+        normalize_enemy_options(result)
     return result
 
 
@@ -317,7 +352,8 @@ def dump_player_yaml(
             GAME_NAME: {**imported[GAME_NAME], **document[GAME_NAME]},
         }
     document[GAME_NAME].pop("randomize_first_battery", None)
-    return yaml.safe_dump(
+    notice = "# " + speed_capability_notice() + "\n" if "enemy_speed" in document[GAME_NAME] else ""
+    return notice + yaml.safe_dump(
         document,
         allow_unicode=True,
         default_flow_style=False,
@@ -380,6 +416,11 @@ def load_player_yaml(path: Path, schema: Mapping[str, Any]) -> tuple[str, dict[s
     raw_options = document.get(GAME_NAME)
     if not isinstance(raw_options, dict):
         raise ValueError("Player YAML lacks DOOM Eternal settings")
+    if "dlc_logic_timing" in raw_options:
+        raise ValueError(
+            "DLC Logic Timing belongs to DoomEAP 0.6. "
+            "Use the DoomEAP 0.7 template to create a new room."
+        )
     values = default_option_values(schema)
     for option in schema["options"]:
         key = option["key"]

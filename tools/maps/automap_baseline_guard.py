@@ -81,6 +81,7 @@ def assert_separate_automap_helper_guard() -> int:
                 if not target_policies.get(
                     ap_check.removeprefix("AP_CHECK_").lower(), {}
                 ).get("no_auto_automap_helper")
+                and not target_policies.get(ap_check.removeprefix("AP_CHECK_").lower(), {}).get("legacy_alias_of")
             } | {
                 f"ap_automap_location_{location_id}"
                 for location_id in secret_automap_owners
@@ -99,6 +100,11 @@ def assert_separate_automap_helper_guard() -> int:
                     raise ValueError(f"Automap helper source/owner missing: {map_key}/{location_id}")
                 source_block = source_text[source_bounds[0]:source_bounds[1]]
                 target_policy = target_policies.get(entity_name, {})
+                alias = target_policies.get(ap_check.removeprefix("AP_CHECK_").lower(), {}).get("legacy_alias_of")
+                if alias:
+                    if helper_bounds is not None or find_entity_block_bounds(generated, f"ap_automap_location_{alias}") is None:
+                        raise ValueError(f"Shared pickup Automap owner drift: {map_key}/{location_id}")
+                    continue
                 if target_policy.get("no_auto_automap_helper"):
                     if helper_bounds is not None:
                         raise ValueError(f"Redundant Automap helper retained: {map_key}/{location_id}")

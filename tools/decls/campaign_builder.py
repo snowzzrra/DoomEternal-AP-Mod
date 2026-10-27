@@ -33,6 +33,22 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
                              skip_dlc2_credits: bool = False) -> dict[str, bytes]:
     manifest = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
     result = {}
+    for tier in ("area_of_effect", "ai_charge_rate", "max_charges"):
+        source = _source("blood_punch_" + tier, manifest)
+        source, count = re.subn(r'notificationSubtext = "[^"]+";',
+            'notificationSubtext = "#str_decl_callout_ability_blood_punch_acquired_GHOST81679";', source)
+        if count != 1:
+            raise ValueError(f"Blood Punch notification source drifted: {tier}")
+        result[PREFIX + f"perks/perk/player/blood_punch/{tier}.decl"] = source.encode("utf8")
+    progress = _source("unmaykr_progress", manifest)
+    name = 'name = "unmaykr_unlocked_To_unnmaykr_acquired";'
+    first = progress.index(name)
+    last = progress.index("requiredActions", first)
+    transition, count = re.subn(r'\s*sync(?:EntityDef|AnimPath) = "[^"]+";', '', progress[first:last])
+    if count != 2:
+        raise ValueError("Unmaykr acquisition animation source drifted")
+    result["hub_patch2/generated/decls/interaction/interactables/progress.decl"] = (
+        progress[:first] + transition + progress[last:]).encode("utf8")
     for key in ("dlc1", "dlc2"):
         raw = (SOURCES / f"{key}.decl").read_bytes()
         if hashlib.sha256(raw).hexdigest() != manifest[key]["sha256"]:
@@ -113,6 +129,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
     # Entity layer membership belongs to the destination map's separate table.
     hub_assets = json.loads(hub_assetsinfo)
     hub_assets["layers"] = hub_assets.get("layers", []) + [{"name": layer} for layer in resource_layers]
+    hub_assets.setdefault("assets", []).append({"name": "interactables/progress", "mapResourceType": "interaction"})
     result["hub_patch2/EternalMod/assetsinfo/hub.json"] = (
         json.dumps(hub_assets, indent=2) + "\n"
     ).encode("utf-8")

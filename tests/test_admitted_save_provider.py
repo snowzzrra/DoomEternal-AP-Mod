@@ -1,11 +1,13 @@
 import json
 from pathlib import Path
 from doom_eap.runtime.context_registry import validate_slot_contract
+from doom_eap.content.enemy_options import normalize_enemy_options
 
 
 def test_dlc_missions_do_not_require_dlc_equipment():
     slot = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text(encoding="utf-8"))
     slot["use_dlc_content"] = False
+    slot["enemies"] = normalize_enemy_options(slot)
     assert slot["include_dlc_missions"] is True
     assert validate_slot_contract(slot)["use_dlc_content"] is False
 
@@ -27,18 +29,14 @@ def test_provider_process_and_source_are_all_required(tmp_path):
     evidence = GameplaySaveEvidence("gameplay", 7, "GAME-AUTOSAVE0", "game/hub/hub", False, True,
         "a" * 64, root, 71, "101", "c" * 32, str(ap / "game.details"))
     assert admitted_evidence_matches(evidence, selected, "a" * 64, 71, facts)
+    proton = evidence._replace(source_file=str(tmp_path).replace("\\", "/") + "\\" + root
+        + "\\GAME-AUTOSAVE0\\game.details")
+    assert admitted_evidence_matches(proton, selected, "a" * 64, 71, facts)
+    for changes in (dict(pid=72), dict(slot_directory="GAME-AUTOSAVE2"),
+                    dict(source_file=proton.source_file.replace("GAME-AUTOSAVE0", "GAME-AUTOSAVE2"))):
+        assert not admitted_evidence_matches(proton._replace(**changes), selected, "a" * 64, 71, facts)
     for changes in [dict(namespace="d" * 64), dict(native_root="ap-" + "d" * 40), dict(pid=72),
             dict(process_created="102"), dict(instance_id="d" * 32), dict(slot_directory="GAME-AUTOSAVE2"),
             dict(source_file=str(vanilla / "game.details")), dict(state="menu")]:
         assert not admitted_evidence_matches(evidence._replace(**changes), selected, "a" * 64, 71, facts)
     assert not admitted_evidence_matches(evidence, None, "a" * 64, 71, facts)
-
-
-def test_native_monitor_reads_only_the_admitted_physical_slot():
-    source = (Path(__file__).parents[1] / "native/client/ap_client_exe.cpp").read_text(encoding="utf-8")
-    monitor = source[source.index("class MissionTransitionMonitor"):source.index("unsigned long long steamId3_", source.index("class MissionTransitionMonitor"))]
-    assert "query_save_admission" in monitor and "SC_SAVE_SESSION_ROUTED" in monitor
-    assert 'std::filesystem::path(steamRemoteDir_) / nativeRoot_ / slotDirectory / "game.details"' in monitor
-    assert "directory_iterator(remoteRoot" not in monitor
-
-

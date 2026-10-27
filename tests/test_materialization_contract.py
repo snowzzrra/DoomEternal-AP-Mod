@@ -190,19 +190,12 @@ def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs(
 
 @pytest.fixture
 def inventory_adapter():
-    import ast
-    import time
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
-    root = Path(__file__).resolve().parents[1]
-    # Load the production adapter without CommonClient's application configuration.
-    tree = ast.parse((root / "doom_eap/runtime/bridge_client.py").read_text(encoding="utf-8-sig"))
-    node = next(row for row in tree.body if isinstance(row, ast.ClassDef) and row.name == "SentinelInventoryObservation")
-    namespace = dict(InventoryObservation=InventoryObservation, ItemObservation=ItemObservation,
-        OWNED=OWNED, MISSING=MISSING, GATE_KEY_TO_MAP=GATE_KEY_TO_MAP, CONTEXT_BY_IDENTITY=CONTEXT_BY_IDENTITY,
-        time=time, logger=logging.getLogger(__name__), log_item_event=lambda *args, **kwargs: None)
-    exec(compile(ast.Module(body=[node], type_ignores=[]), "production-observation-adapter", "exec"), namespace)
+    from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
+
     link = SimpleNamespace(pid=123, namespace="offline")
-    adapter = namespace["SentinelInventoryObservation"](SimpleNamespace(state_key="published-room", native_game_link=lambda: link))
+    adapter = SentinelInventoryObservation(
+        SimpleNamespace(state_key="published-room", native_game_link=lambda: link),
+        logging.getLogger(__name__), lambda *args, **kwargs: None)
     return adapter, link
 
 
@@ -263,3 +256,87 @@ def test_ballista_and_frag_repair_does_not_wait_for_unknown_items(inputs, invent
     observed = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
         context_identity=context.identity, campaign=context.campaign)
     assert observed.get_state(7770004) == OWNED and observed.get_state(7770011) == OWNED
+
+
+@pytest.mark.parametrize("manual", [False, True])
+def test_checkpoint_missing_full_auto_repairs_without_replaying_receipts(inputs, inventory_adapter, manual):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
+    adapter, link = inventory_adapter
+    reply = {"weapons_after": 1, "ice_bomb_after": 255, "perks_known": 2, "perks_owned": 0}
+    link.observe_inventory = lambda: reply
+    owned = ownership((7770059, 7770059, 7770016, 7770026, 7770903, 7770017))
+    before = copy.deepcopy(owned)
+
+    def plan():
+        native = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+            context_identity=context.identity, campaign=context.campaign)
+        return compile_materialization_plan(owned, context, replace(scope, manual=manual), definitions,
+            policies, "the_crucible", observation=native, selected_item_ids=frozenset((7770059,)))
+
+    missing = plan().reconciliation
+    assert [command.item_id for command in missing.commands] == [7770059]
+    assert owned == before
+    reply["perks_owned"] = 2
+    assert not plan().reconciliation.commands
+    reply.update(perks_known=0, perks_owned=0)
+    with pytest.raises(MaterializationPlanError, match="unresolved native observations"):
+        plan()
+
+
+def test_selected_owned_mod_resync_ignores_unselected_unknown_capacity(inputs):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
+    observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, context.campaign,
+        {7770059: ItemObservation(7770059, OWNED)})
+    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
+    coordinator.bind({})
+    publisher = SimpleNamespace(publish=lambda *args, **kwargs: (True, None), exists=lambda *args: False)
+    result = coordinator.reconcile(scope, context, ownership((7770059, 7770017)), None, definitions, policies,
+        "the_crucible", publisher, lambda: None, observation=observation, selected_item_ids=frozenset((7770059,)))
+    assert result.error is None and result.plan.entitlement_item_ids == (7770059,)
+    assert not result.plan.commands
+
+
+
+
+def test_inventory_observation_defers_if_checkpoint_changes_between_native_reads(inputs, inventory_adapter):
+    _, _, context, scope = inputs
+    adapter, link = inventory_adapter
+    identity = ("created", "instance", "build", str(scope.evidence_epoch))
+    link.observe_inventory = lambda: {"weapons_after": 0, "ice_bomb_after": 255,
+        "perks_known": 2, "perks_owned": 0, "_observation_scope": identity,
+        "_observation_map": context.runtime_maps[0]}
+    link.observe_special_inventory = lambda: {"_observation_scope": (*identity[:-1], "changed")}
+    assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign) is None
+    assert adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch + 1,
+        context_identity=context.identity, campaign=context.campaign) is None
+
+
+@pytest.mark.parametrize('native_map,accepted', [('game/hub/hub', True),
+    ('game/sp/e2m3_core/e2m3_core', False), (None, False)])
+def test_fixed_dash_repair_accepts_independent_native_generation_in_the_same_map(inputs, inventory_adapter,
+                                                                              native_map, accepted):
+    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+
+    definitions, policies, _, scope = inputs
+    context = CONTEXT_BY_IDENTITY['base/hub']
+    adapter, link = inventory_adapter
+    identity = ('created', 'instance', 'build', '99')
+    link.observe_inventory = lambda: {'weapons_after': 0, 'ice_bomb_after': 0, 'dash_after': 0,
+        '_observation_scope': identity, '_observation_map': native_map}
+    link.observe_special_inventory = lambda: {'_observation_scope': identity, 'native_state_known': 0}
+    observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
+        context_identity=context.identity, campaign=context.campaign)
+    assert (observation is not None) == accepted
+    if not accepted:
+        return
+    owned = effective_ownership((), randomize_chainsaw=True, randomize_dash=False,
+        checked_locations=frozenset({7770122}), local_checked_locations=frozenset(),
+        server_checked_ready=True, hell_on_earth_locations=frozenset(), exultia_complete_location=7770122, slot=1)
+    plan = compile_materialization_plan(owned, context, scope, definitions, policies, 'the_crucible',
+                                        observation=observation)
+    assert any(command.item_id == 7770015 for command in plan.reconciliation.commands)

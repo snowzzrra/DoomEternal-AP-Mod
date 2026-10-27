@@ -1,0 +1,16 @@
+{
+	inherit = "actorpopulation/default/default_no_bosses";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 30;
+			item[29] = {
+				entityDef = "ai/boss/icon_of_sin_base";
+				aiType = "POPULATION_TYPE_ICON_OF_SIN";
+				pointValue = 250;
+				spawnWeight = 0.00100000005;
+				factionName = "icon";
+				defaultSensorySettings = "boss";
+			}
+		}
+	}
+}

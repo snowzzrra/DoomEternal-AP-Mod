@@ -1,10 +1,12 @@
 import asyncio
 import logging
+from copy import deepcopy
 from dataclasses import replace
 
 import pytest
 
 from doom_eap.contracts.check_observation import CheckObservation
+from doom_eap.contracts.challenge_registry import load_challenge_registry, validate_challenge_registry
 from doom_eap.runtime.check_publication import CheckPublication
 from doom_eap.runtime.save_checks import SaveChecks, SaveCheckReadiness
 from doom_eap.runtime.save_check_observation import SaveCheckBinding, SaveCheckObservations
@@ -17,7 +19,8 @@ MASTERY = {"location_id": 101, "signal": dict(SIGNAL, unlockable="mastery")}
 PHYSICAL = {"location_id": 201, "signal": dict(kind="physical_event_equivalent", unlockable="physical",
                                             physical_location_ids=[101], required_count=1)}
 AGGREGATE = {"location_id": 301, "signal": dict(authority="server_checked_locations",
-                                             children=[101, 201], required_count=2)}
+                                             children=[101, 201], required_count=2,
+                                             mission_complete_location_id=401)}
 
 
 def owner():
@@ -86,11 +89,17 @@ def test_physical_and_aggregate_checks_require_confirmed_children_without_save_p
     assert packets == []
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}), publication))
     asyncio.run(service.check_challenge(PHYSICAL, readiness, facts(checked={101}, submitted={201}), publication))
-    assert len(packets) == 2 and submitted == set()  # existing retry-until-server-ack behavior
+    assert len(packets) == 2 and submitted == set()
     asyncio.run(service.check_aggregates(readiness, facts(checked={101}, submitted={201}), publication))
     assert len(packets) == 2
     asyncio.run(service.check_aggregates(readiness, facts(checked={101, 201}), publication))
     assert packets[-1] == {"cmd": "LocationChecks", "locations": [301]}
+
+
+
+
+
+
 
 
 @pytest.mark.parametrize("kind", ["mastery", "challenge", "aggregate"])

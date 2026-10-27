@@ -24,7 +24,7 @@ import zipfile
 from types import SimpleNamespace
 
 from doom_eap.contracts.core_distribution import verify_runtime
-from doom_eap.runtime.observer_lifecycle import windows_game_processes
+from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 from doom_eap.runtime.weapon_points import namespace_id
 
 _UNSET = object()
@@ -59,7 +59,7 @@ def archive_prelaunch(path, state_dir, *, explicit=False):
         return None
     with path.open("rb") as stream:
         raw = stream.read(65537)
-    match = re.match(rb"sentinel-run-v1\nrun=[0-9a-f]{32}\nprotection=[0-9a-f]{64}\nowner=([1-9][0-9]*)\ncreated=([1-9][0-9]*)\nsentinel-test-session-v2\n", raw)
+    match = re.match(rb"sentinel-run-v1\nrun=[0-9a-f]{32}\nprotection=[0-9a-f]{64}\nowner=([1-9][0-9]*)\ncreated=([1-9][0-9]*)\nsentinel-test-session-v3\n", raw)
     recognized = match and len(raw) <= 65536 and int(match[1]) <= 0xffffffff and int(match[2]) <= 0xffffffffffffffff
     state = prelaunch_owner_state(int(match[1]), int(match[2])) if recognized else "legacy"
     if state == "alive":
@@ -300,12 +300,15 @@ class APSessionOwner:
             raise refused
         return value
 
-    def _capture_admission_failure(self, process, admission=None, error=None):
+    def _capture_admission_failure(self, process=None, admission=None, error=None, *, processes=_UNSET):
         runtime = getattr(self, "_runtime", None)
         if runtime is None:
             return
         admission = admission or {}
-        key = (process["pid"], str(process["created"]), self.namespace,
+        process = process or {}
+        candidates = None if processes is None else list(processes[:8]) if processes is not _UNSET else []
+        key = (process.get("pid"), str(process.get("created")), self.namespace,
+               self.status.get("state"), json.dumps(candidates, sort_keys=True),
                *(admission.get(field) for field in ("state", "fault", "prepared_routes", "instance_id")))
         now = time.monotonic()
         if key != getattr(self, "_admission_capture_key", None):
@@ -316,11 +319,13 @@ class APSessionOwner:
         self._admission_capture_attempts += 1
         self._next_admission_capture = now + 5
         document = {"at_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    "pid": process["pid"], "process_created": str(process["created"]),
+                    "pid": process.get("pid"), "process_created": str(process.get("created")),
                     "namespace_id": self.namespace, "build_id": self._build,
                     "probe": str(runtime / "sentinel_probe.exe"), "attempt": self._admission_capture_attempts,
                     "admission": admission, "admission_error": str(error) if error else None, "queries": {}}
-        for flag in ("--native", "--engine", "--save-installation"):
+        document.update(state=self.status.get("state"), expected_game_path=str(self._game_exe),
+                        expected_process=self._process, processes=candidates)
+        for flag in (("--native", "--engine", "--save-installation") if processes is _UNSET else ()):
             query = {}
             document["queries"][flag] = query
             try:
@@ -346,7 +351,7 @@ class APSessionOwner:
                     value = getattr(failed, stream, None)
                     if value:
                         query[stream] = value[:4096].decode("utf-8", errors="replace") if isinstance(value, bytes) else str(value)[:4096]
-        native = document["queries"]["--native"]
+        native = document["queries"].get("--native", {})
         if (native.get("identity_matches") and native.get("response", {}).get("availability") in {"enabled", "disabled", "retained"}
                 and all(query.get("identity_matches") and query.get("returncode") == 0 for query in document["queries"].values())):
             self._admission_capture_attempts = 4
@@ -359,6 +364,8 @@ class APSessionOwner:
             logging.getLogger(__name__).exception("AP_ADMISSION_DIAGNOSTIC_WRITE_FAILED diagnostic=%s", document)
 
     def prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
+        from .launcher_core import _normalize_slot_data
+        _normalize_slot_data(snapshot.slot_data)
         try:
             if os.name != "nt" or not (config.get("game_root") or config.get("doom_base_dir")):
                 return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
@@ -471,8 +478,9 @@ class APSessionOwner:
             difficulty = snapshot.slot_data["campaign_plan"].get("difficulty")
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError("Room campaign difficulty is unsupported")
-            descriptor = (f"sentinel-test-session-v2\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
+            descriptor = (f"sentinel-test-session-v3\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
                           f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
+                          "slot_data_revision=0.7.0\nsession_mod_contract_revision=2\n"
                           f"provenance=synthetic-fixture\nroot={campaign_root}\ncampaign=unified\nstarting_stage=hub\n"
                           f"difficulty={difficulty}\nintent={intent}\n")
             if intent in {"resume", "recover"}:
@@ -508,7 +516,7 @@ class APSessionOwner:
                 protection = module.protect(SimpleNamespace(action="prepare", steam_account=account,
                     steam_app_root=str(remote.parent), local_provider_root=str(local), backup_directory=str(backup),
                     ap_root=str(campaign_root), uninstall_root=[str(self.state_dir)], reference_directory=None,
-                    run_backup_parent=None))
+                    run_backup_parent=None, slot_data_revision="0.7.0", mod_contract_revision=2))
             except (module.Refused, OSError, ValueError) as error:
                 refused = RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}")
                 refused.stage = getattr(error, "stage", "vanilla_protection")
@@ -842,19 +850,30 @@ class APSessionOwner:
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes is None:
                 self.status.update(state="process_unknown", ready=False)
+                self._capture_admission_failure(error="Game process identity query failed", processes=None)
                 return dict(self.status)
             if not processes:
                 if self._process is not None:
                     self.retire(processes)
                     self.status.update(state="game_exited", ready=False)
                 return dict(self.status)
-            if len(processes) != 1 or os.path.normcase(str(processes[0]["path"])) != os.path.normcase(str(self._game_exe)):
+            path_matches = False
+            path_error = None
+            if len(processes) == 1:
+                try:
+                    path_matches = same_executable_path(processes[0]["path"], self._game_exe)
+                except OSError as error:
+                    path_error = error
+            if not path_matches:
                 self.status.update(state="process_ambiguous", ready=False)
+                self._capture_admission_failure(error=path_error or "Game process count or executable does not match",
+                                                processes=processes)
                 return dict(self.status)
             process = processes[0]
             identity = process["pid"], process["created"]
             if self._process is not None and identity != self._process:
                 self.status.update(state="process_changed", ready=False)
+                self._capture_admission_failure(error="The prepared game process identity changed", processes=processes)
                 return dict(self.status)
             self._process = identity
             self.status.update(pid=process["pid"], process_created=process["created"])

@@ -1,6 +1,8 @@
 from doom_eap.runtime.materialization import authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
 from doom_eap.runtime.receipt_delivery import base_special_receipt_allowed
 from doom_eap.runtime.physical_checks import PhysicalChecks
+from doom_eap.runtime.killsanity import Killsanity
+from doom_eap.content.killsanity_plan import milestone_ids
 from doom_eap.runtime.task_supervision import SessionTasks
 from doom_eap.runtime.level_ready import LevelReady
 from doom_eap.runtime.location_setup import LocationSetup
@@ -21,7 +23,8 @@ import sys
 import time
 import traceback
 import uuid
-from doom_eap.contracts.inventory_domain import InventoryObservation, InventoryObservationPort, ItemObservation, OWNED, MISSING, UNKNOWN
+from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
+from doom_eap.contracts.inventory_domain import InventoryObservationPort, OWNED, UNKNOWN
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
 from doom_eap.runtime.death_observation import DeathObservation
 from doom_eap.contracts.goal_policy import GoalPolicy
@@ -46,7 +49,9 @@ from doom_eap.runtime.fast_travel import FastTravel
 from doom_eap.runtime.materialization_coordinator import MaterializationCoordinator
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime import save_files
+from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
 from doom_eap.runtime.save_records import read_unlockable_record
+from doom_eap.content.mastery_requirements import mastery_entries_for_profile
 from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
 from collections.abc import Mapping
 from pathlib import Path
@@ -116,11 +121,6 @@ from doom_eap.runtime.transient_effects import (
     TRANSIENT_EFFECTS,
     TransientEffectManager,
 )
-
-try:
-    from .save_decrypt import decrypt, steam_id64
-except ImportError:
-    pass
 
 MODULE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -195,14 +195,14 @@ def doom_process_identity():
     """Return current game PID plus process-start identity when available."""
     if os.name == "nt":
         try:
-            from doom_eap.runtime.observer_lifecycle import windows_game_processes
+            from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
             rows = windows_game_processes()
             if rows is None or len(rows) != 1:
                 return None
             row = rows[0]
             base = globals().get("DOOM_BASE_DIR")
             expected = Path(str(base)).parent / "DOOMEternalx64vk.exe" if base else None
-            if expected is None or os.path.normcase(row["path"]) != os.path.normcase(str(expected.resolve())):
+            if expected is None or not same_executable_path(row["path"], expected.resolve()):
                 return None
             return f"windows:{row['pid']}:{row['created']}"
         except (OSError, ValueError, subprocess.SubprocessError):
@@ -215,7 +215,8 @@ def doom_process_identity():
         if rows is None or len(rows) != 1:
             return None
         row = rows[0]
-        if row["path"].casefold() != expected.casefold() or type(row["pid"]) is not int or type(row["created"]) is not int:
+        if ((row["path"].casefold() != expected.casefold() and row.get("same_executable") is not True)
+                or type(row["pid"]) is not int or type(row["created"]) is not int):
             return None
         return f"windows:{row['pid']}:{row['created']}"
     except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
@@ -627,6 +628,7 @@ REVISION_ONE_RUNE_IDS = {
 NORMAL_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate((
     7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095,
 ))}
+SUPPORT_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate(sorted(SUPPORT_RUNE_IDS))}
 REVISION_TWO_SUIT_IDS = {7770021}
 REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
 REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
@@ -1539,13 +1541,18 @@ def _validated_catalog_maps(active_maps):
 KNOWN_CATALOG_MAPS = _validated_catalog_maps(
     load_foundation_contracts().get("active_maps")
 )
+MATERIALIZATION_MAPS = _validated_catalog_maps({
+    **{context.map_keys[0]: runtime_map for runtime_map, context in CONTEXT_BY_MAP.items()
+       if len(context.map_keys) == 1},
+    **KNOWN_CATALOG_MAPS,
+})
 
 
-def _catalog_map_key(runtime_map):
+def _materialization_map_key(runtime_map):
     runtime_map = canonical_map_name(runtime_map)
     matches = [
         map_key
-        for map_key, catalog_runtime_map in KNOWN_CATALOG_MAPS.items()
+        for map_key, catalog_runtime_map in MATERIALIZATION_MAPS.items()
         if catalog_runtime_map == runtime_map
     ]
     return matches[0] if len(matches) == 1 else None
@@ -2112,7 +2119,7 @@ def parse_active_map_marker(path, mtime_ns):
         return None
 
     return RuntimeLifecycle.parse_authored_marker(
-        content, path, mtime_ns, KNOWN_CATALOG_MAPS, CONTEXT_BY_MAP,
+        content, path, mtime_ns, MATERIALIZATION_MAPS, CONTEXT_BY_MAP,
     )
 
 
@@ -2172,16 +2179,13 @@ def discover_telemetry_markers():
 
 def parse_goal_transition_event(path, include_raw=False):
     data = {}
-    try:
-        with open(path, encoding="utf-8", errors="ignore") as f:
-            for raw_line in f:
-                line = raw_line.strip()
-                if not line or "=" not in line:
-                    continue
-                key, value = line.split("=", 1)
-                data[key] = value
-    except OSError:
-        return None
+    with open(path, encoding="utf-8", errors="ignore") as f:
+        for raw_line in f:
+            line = raw_line.strip()
+            if not line or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            data[key] = value
 
     if not data.get("from_map") or not data.get("to_map"):
         return None
@@ -2650,78 +2654,12 @@ class DoomCommandProcessor(ClientCommandProcessor):
 GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABILITIES, GOAL_ENDPOINT_LOCATION_IDS, GOAL_REQUIREMENT_SUFFIXES)
 
 
-class SentinelInventoryObservation:
-    def __init__(self, context):
-        self.context = context
-        self.last_logged = None
-
-    def observe_inventory(self, *, room_seed_name, epoch, context_identity, campaign):
-        try:
-            link = self.context.native_game_link()
-            result = link.observe_inventory()
-        except (RuntimeError, OSError, ValueError) as error:
-            logger.info("INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
-            return None
-        items = {}
-        weapons = result["weapons_after"]
-        if weapons != 0xffffffff:
-            for bit, item_id in enumerate((7770900, 7770003, 7770000, 7770005, 7770001,
-                                           7770004, 7770002, 7770006, 7770010, 7770008)):
-                items[item_id] = ItemObservation(item_id, OWNED if weapons & (1 << bit) else MISSING,
-                                                source="sentinel_inventory")
-        frag = result.get("frag_grenade_after", 255)
-        if frag in (0, 1):
-            items[7770011] = ItemObservation(7770011, OWNED if frag else MISSING,
-                                            source="sentinel_inventory")
-        ice = result["ice_bomb_after"]
-        if ice != 255:
-            items[7770013] = ItemObservation(7770013, OWNED if ice else MISSING,
-                                             source="sentinel_inventory")
-        dash = result.get("dash_after", 255)
-        if dash in (0, 1):
-            items[7770015] = ItemObservation(7770015, OWNED if dash else MISSING,
-                                             source="sentinel_inventory")
-        key = result.get("slayer_key_after", 255)
-        runtime_context = CONTEXT_BY_IDENTITY.get(context_identity)
-        if key in (0, 1) and runtime_context is not None and runtime_context.campaign == campaign:
-            for item_id, map_key in GATE_KEY_TO_MAP.items():
-                if map_key in runtime_context.map_keys:
-                    items[item_id] = ItemObservation(item_id, OWNED if key else MISSING,
-                                                     source="sentinel_inventory")
-        capacity_tiers = tuple(result.get(f"{family}_tier_after", 255) for family in ("health", "armor", "ammo"))
-        for item_id, tier in zip((7770017, 7770088, 7770092), capacity_tiers):
-            if type(tier) is int and 0 <= tier <= 4:
-                items[item_id] = ItemObservation(item_id, OWNED if tier else MISSING,
-                                                 observed_stage=tier, source="sentinel_inventory")
-        signature = (self.context.state_key, link.pid, epoch, context_identity, weapons, frag, ice, dash, key, capacity_tiers)
-        if signature != self.last_logged:
-            log_item_event(
-                "ITEM_NATIVE_INVENTORY", state_key=self.context.state_key,
-                namespace=link.namespace, process_id=link.pid, epoch=epoch,
-                context=context_identity, rocket=items.get(7770002, ItemObservation(7770002)).state,
-                bfg=items.get(7770006, ItemObservation(7770006)).state,
-                ballista=items.get(7770004, ItemObservation(7770004)).state,
-                frag=items.get(7770011, ItemObservation(7770011)).state,
-                ice=items.get(7770013, ItemObservation(7770013)).state,
-                dash=items.get(7770015, ItemObservation(7770015)).state,
-                weapons_mask=weapons, ice_bomb=ice, dash_owned=dash,
-                slayer_key_owned=key,
-                capacity_tiers=capacity_tiers,
-                gate_keys={str(item_id): item.state for item_id, item in items.items()
-                           if item_id in GATE_KEY_TO_MAP},
-            )
-            self.last_logged = signature
-        return InventoryObservation(
-            room_seed_name, epoch, context_identity, campaign, items,
-            state_key=self.context.state_key, process_id=link.pid,
-            provider_namespace=link.namespace, timestamp_ns=time.time_ns(),
-        )
-
-
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
     game = GAME_NAME
     items_handling = 0b111
+    # full-saga enemy plans exceed Archipelago's default 16 MiB message limit
+    max_size = 64 * 1024 * 1024
 
     def __init__(self, server_address, password):
         super().__init__(server_address, password)
@@ -2752,6 +2690,8 @@ class DoomEternalContext(CommonContext):
         self.last_tracker_error = None
         self.last_heartbeat_timestamp = None
         self.item_state_ready = False
+        self._slot_validation_task = None
+        self._pending_slot_packages = []
         self.reconnect_resync_attempted = False
         self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
         self.state_key = ""
@@ -2768,8 +2708,10 @@ class DoomEternalContext(CommonContext):
         self.receipt_delivery = ReceiptDelivery(logger)
         self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
         self.death_observer = DeathObservation(logger)
+        self.killsanity = Killsanity(logger)
+        self.killsanity_counter_visible = config.get("killsanity_counter_visible", True) is True
         self.save_observer = SaveObserver()
-        self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self)
+        self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self, logger, log_item_event)
         self.runtime_observation_lease = RuntimeObservationLease()
         self.save_observer.clear_mission_select()
         self.last_observer_lease_block = None
@@ -2840,6 +2782,11 @@ class DoomEternalContext(CommonContext):
 
 
     def reset_queue_session_authority(self, reason):
+        task = getattr(self, "_slot_validation_task", None)
+        if task is not None:
+            task.cancel()
+        self._slot_validation_task = None
+        self._pending_slot_packages = []
         self._ammo_projection_active = False
         self._publish_native_ammo_refill(reason)
         self.runtime_lifecycle.invalidate_work()
@@ -3004,7 +2951,7 @@ class DoomEternalContext(CommonContext):
             if generation <= 0 or int(scope["context_generation"]) != generation:
                 return None
             runtime_map = canonical_map_name(scope.get("current_map"))
-            if len([key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map]) != 1:
+            if len([key for key, value in MATERIALIZATION_MAPS.items() if value == runtime_map]) != 1:
                 return None
             return (link.namespace, admission["native_root"], link.pid, *identity, generation, runtime_map)
         except (RuntimeError, OSError, ValueError, KeyError, TypeError):
@@ -3027,7 +2974,7 @@ class DoomEternalContext(CommonContext):
         if epoch is None:
             return False
         marker = {**self.runtime_lifecycle.new_map_proposal(
-            _catalog_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
+            _materialization_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
             "native_scope": scope}
         self.invalidate_active_save_proof()
         self.accept_map_identity(marker, evidence.epoch)
@@ -3191,6 +3138,9 @@ class DoomEternalContext(CommonContext):
             self._report_launcher_connection_failure(msg, technical_message=msg)
 
     async def connection_closed(self):
+        diagnostics = getattr(self, "connection_diagnostics", None)
+        if diagnostics is not None:
+            diagnostics.disconnected()
         state_key = self.state_key
         self.reset_transient_effects("connection_closed")
         self.reset_queue_session_authority("connection_closed")
@@ -3373,7 +3323,48 @@ class DoomEternalContext(CommonContext):
     def _consume_ammo_refill_request_file(self):
         return self.ammo_requests.consume(ammo_refill_request_files())
 
+    def _reject_slot_contract(self, error):
+        message = f"Unsupported DOOM Eternal slot contract: {error}"
+        logger.error("[Contract] Connected slot rejected: %s", error)
+        self._report_launcher_connection_failure(message, code="room_incompatible", technical_message=message)
+
+    async def _validate_connected_package(self, args):
+        slot_data = args.get("slot_data", {})
+        started = time.perf_counter()
+        try:
+            await asyncio.to_thread(validate_slot_contract, slot_data if isinstance(slot_data, dict) else {})
+        except ValueError as error:
+            self._slot_validation_task = None
+            self._pending_slot_packages = []
+            self._reject_slot_contract(error)
+            return
+        logger.info("ROOM_SLOT_VALIDATION elapsed_ms=%d", round((time.perf_counter() - started) * 1000))
+        pending, self._pending_slot_packages = self._pending_slot_packages, []
+        self._slot_validation_task = None
+        self._handle_package("Connected", args)
+        if self.item_state_ready:
+            for cmd, packet, received_count in pending:
+                self._handle_package(cmd, packet, received_count=received_count)
+
     def on_package(self, cmd: str, args: dict):
+        if cmd == "Connected":
+            task = self._slot_validation_task
+            if task is not None:
+                task.cancel()
+            self._pending_slot_packages = []
+            self.item_state_ready = False
+            self._slot_validation_task = asyncio.create_task(self._validate_connected_package(args))
+        elif self._slot_validation_task is not None and cmd not in {"RoomInfo", "ConnectionRefused"}:
+            if len(self._pending_slot_packages) >= 256:
+                self.reset_queue_session_authority("pending_packets_limit")
+                self._reject_slot_contract(ValueError("Too many packets received before room validation completed"))
+            else:
+                received_count = len(self.items_received) if cmd == "ReceivedItems" else None
+                self._pending_slot_packages.append((cmd, args, received_count))
+        else:
+            self._handle_package(cmd, args)
+
+    def _handle_package(self, cmd: str, args: dict, *, received_count=None):
         if cmd == "RoomInfo":
             self.reset_transient_effects("room_info")
             # Durable item state cannot authorize queue work until matching
@@ -3381,7 +3372,7 @@ class DoomEternalContext(CommonContext):
             self.reset_queue_session_authority("room_info")
             self.room_seed_name = args.get("seed_name")
         elif cmd == "ReceivedItems":
-            self._on_received_items_packet(args)
+            self._on_received_items_packet(args, authoritative_count=received_count)
         elif cmd == "Connected":
             self._item_history_received = False
             self._room_session_established = True
@@ -3392,13 +3383,7 @@ class DoomEternalContext(CommonContext):
             try:
                 slot_data = validate_slot_contract(slot_data)
             except ValueError as error:
-                message = f"Unsupported DOOM Eternal slot contract: {error}"
-                logger.error("[Contract] Connected slot rejected: %s", error)
-                self._report_launcher_connection_failure(
-                    message,
-                    code="room_incompatible",
-                    technical_message=message,
-                )
+                self._reject_slot_contract(error)
                 return
             self._connected_slot_data = slot_data
             previous_state_key = self.state_key
@@ -3442,7 +3427,7 @@ class DoomEternalContext(CommonContext):
             )
             self.server_checked_locations_ready = False
             try:
-                active = self.location_setup.begin(args, _doom_location_ids())
+                active = self.location_setup.begin(args, _doom_location_ids(), milestone_ids(slot_data["killsanity"]))
             except ValueError as error:
                 self._fail_placement_scout(str(error))
                 return
@@ -3486,6 +3471,8 @@ class DoomEternalContext(CommonContext):
             self.server_checked_locations_ready = isinstance(args.get("checked_locations"), (list, tuple, set, frozenset))
             if self.server_checked_locations_ready:
                 self.checked_locations.update(args["checked_locations"])
+                if any(stage["completion_id"] in args["checked_locations"] for stage in STAGES.values()):
+                    self.materialization.trigger("mission_complete")
                 self.snapshot_fast_travel_eligibility(refresh=True)
             self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
             self.reconcile_checked_automap_cleanup("server_checked_update")
@@ -3565,7 +3552,7 @@ class DoomEternalContext(CommonContext):
             ammo_refills_authoritative=balance["authoritative"],
         )
 
-    def _on_received_items_packet(self, args):
+    def _on_received_items_packet(self, args, *, authoritative_count=None):
         """Record packet metadata and wake delivery without doing delivery work."""
         packet_received_ns = time.monotonic_ns()
         packet_items = args.get("items", ()) if isinstance(args, dict) else ()
@@ -3573,7 +3560,8 @@ class DoomEternalContext(CommonContext):
             packet_item_count = len(packet_items)
         except TypeError:
             packet_item_count = 0
-        authoritative_count = len(self.items_received)
+        if authoritative_count is None:
+            authoritative_count = len(self.items_received)
         packet_start_index, packet_accepted = self.receipt_session.observe_packet(
             args.get("index") if isinstance(args, dict) else None,
             packet_item_count, authoritative_count, packet_received_ns,
@@ -3663,7 +3651,8 @@ class DoomEternalContext(CommonContext):
                 )
                 return False
 
-            self._reconcile_native_receipt_owners(trigger)
+            if trigger != "packet":
+                self._reconcile_native_receipt_owners(trigger)
             if self.session_state.get("weapon_points") is not None:
                 try:
                     owner, authoritative = self.weapon_points_receipt_owner()
@@ -3683,6 +3672,9 @@ class DoomEternalContext(CommonContext):
                     item_index,
                     receipt_identity(network_item),
                 )
+                retry_key = (receipt_session_token, observation_key)
+                if getattr(self, "_rune_budget_retry", (None,))[0] != retry_key:
+                    self._rune_budget_retry = (retry_key, 0, 0.0)
                 pending = not duplicate and self.receipt_session.was_observed(observation_key)
                 log_delivery_event(
                     "ITEM_RECEIPT_CLASSIFIED",
@@ -3811,10 +3803,43 @@ class DoomEternalContext(CommonContext):
                     logger.info("[WUP] AP receipt %s confirmed: +3 native Weapon Upgrade Points", item_index)
                     continue
 
-                if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS:
+                if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS or item_id in SUPPORT_RUNE_IDS:
+                    if time.monotonic() < self._rune_budget_retry[2]:
+                        break
                     try:
                         result = self._apply_native_owner_receipt(item_index, network_item)
                     except (RuntimeError, OSError, ValueError) as error:
+                        native_result = getattr(error, "native_result", None)
+                        budget_refused = (
+                            (item_id in NORMAL_RUNE_ITEM_BITS or item_id in SUPPORT_RUNE_IDS)
+                            and isinstance(native_result, dict)
+                            and native_result.get("state") == 4
+                            and native_result.get("reason") == 25
+                            and native_result.get("kind") in (1, 2)
+                            and native_result.get("operations_applied") in (0, "0")
+                        )
+                        if budget_refused:
+                            attempts = self._rune_budget_retry[1] + 1
+                            self._rune_budget_retry = (retry_key, attempts, time.monotonic() + (5 if attempts == 1 else 10))
+                            if attempts >= 3:
+                                notified, notification_error = self.spool_deferred_receipt_notification(item_id, item_index)
+                                if not notified:
+                                    logger.warning("[NativeOwner] Receipt %s notification pending: %s", item_index, notification_error)
+                                    break
+                                self._record_processed_receipt(network_item)
+                                self.receipt_session.advance()
+                                self.persist_session_state()
+                                self._rune_budget_retry = (None, 0, 0.0)
+                                log_item_event(
+                                    "ITEM_RECEIPT_DEFERRED", receipt_index=item_index, item_id=item_id,
+                                    receipt_id=receipt_identity(network_item), reason="native_budget",
+                                    decision="ownership_recorded_native_pending", boundary=self.items_processed,
+                                    trigger=trigger, state_key=getattr(self, "state_key", None),
+                                )
+                                batch_count += 1
+                                continue
+                        else:
+                            self._rune_budget_retry = (retry_key, 0, 0.0)
                         reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
                         log_item_event(
                             "ITEM_RECEIPT_DEFERRED",
@@ -3830,6 +3855,7 @@ class DoomEternalContext(CommonContext):
                         )
                         logger.info("[NativeOwner] Receipt %s held: %s", item_index, error)
                         break
+                    self._rune_budget_retry = (None, 0, 0.0)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,
@@ -4234,7 +4260,7 @@ class DoomEternalContext(CommonContext):
                 return True
             if cached and cached.get("native_scope"):
                 return False
-        decision = self.runtime_lifecycle.classify_native_load(evidence, KNOWN_CATALOG_MAPS)
+        decision = self.runtime_lifecycle.classify_native_load(evidence, MATERIALIZATION_MAPS)
         if decision is None:
             return False
         evidence_epoch = decision.evidence_epoch
@@ -4515,6 +4541,9 @@ class DoomEternalContext(CommonContext):
             }
             projection["masteries"] = self._mission_presentations.mastery_snapshot(
                 facts, placements, WEAPON_MASTERY_ENTRIES)
+            projection['encounter_rewards'] = {row['stage']: self._mission_presentations.encounter_snapshot(
+                row['map'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
+                for row in projection['rows']}
             ratings = self._connected_slot_data.get("mission_presentation_v2",
                                                     self._connected_slot_data.get("mission_presentation_v1", {}))
             projection["ratings_version"] = 2 if "mission_presentation_v2" in self._connected_slot_data else 1
@@ -4813,7 +4842,7 @@ class DoomEternalContext(CommonContext):
                 if lease is not None:
                     lease.observe_gameplay_loaded(evidence_mtime)
                 marker_data = self.runtime_lifecycle.new_map_proposal(
-                    _catalog_map_key(active_map), active_map, evidence_epoch,
+                    _materialization_map_key(active_map), active_map, evidence_epoch,
                     evidence_mtime, materialization_epoch,
                 )
                 self.accept_map_identity(marker_data, evidence_epoch)
@@ -5062,8 +5091,14 @@ class DoomEternalContext(CommonContext):
         if not isinstance(existing_session, dict):
             existing_session = default_session_state()
         self.session_state = normalize_session_state(existing_session)
+        from doom_eap.runtime.weapon_points import namespace_id
+        self.killsanity.bind(
+            self.session_state, namespace_id(effective_seed_name, self.team, self.slot, generation),
+            slot_data.get("killsanity", {}).get("milestones", ()),
+        )
         self.goals.bind(self.state_key, self.session_state)
-        self.save_checks.bind()
+        masteries = mastery_entries_for_profile(WEAPON_MASTERY_ENTRIES, slot_data["mastery_requirements"])
+        self.save_checks.bind({entry["signal"]["unlockable"]: entry for entry in masteries})
         self.receipt_delivery.bind(self.session_state)
         self.publisher_dispatch.bind(self.session_state.setdefault("publisher_acknowledgements", {}))
         self.save_observer.bind_baselines(SaveObserverBaselineStore(self.session_state))
@@ -5082,6 +5117,8 @@ class DoomEternalContext(CommonContext):
         # transport state begins fresh for the new connection.
         self.session_state.pop("deathlinked", None)
         self.deathlink.bind(self.state_key, self.session_state)
+        if self.death_observer.bind(namespace_id(effective_seed_name, self.team, self.slot, generation)):
+            self._death_baseline_pending = True
         raw_save_observations = self.session_state.get("save_slot_observations", {})
         self.session_state["save_slot_observations"] = self.save_observer.restore_slot_observations(raw_save_observations)
         self.session_state.pop("sticky_mastery_observed", None)
@@ -5236,13 +5273,16 @@ class DoomEternalContext(CommonContext):
         hook_owned = any(item.item == 7770083 for item in authoritative)
         mastery_mask = 0
         rune_mask = 0
+        support_mask = 0
         for item in authoritative:
             mastery_mask |= MASTERY_ITEM_BITS.get(item.item, 0)
             rune_mask |= NORMAL_RUNE_ITEM_BITS.get(item.item, 0)
+            support_mask |= SUPPORT_RUNE_ITEM_BITS.get(item.item, 0)
         for fact in self.receipt_session.starting_materialization:
             if fact.quantity:
                 mastery_mask |= MASTERY_ITEM_BITS.get(fact.item_id, 0)
                 rune_mask |= NORMAL_RUNE_ITEM_BITS.get(fact.item_id, 0)
+                support_mask |= SUPPORT_RUNE_ITEM_BITS.get(fact.item_id, 0)
         starting_special_count = sum(
             fact.quantity for fact in self.receipt_session.starting_materialization
             if fact.item_id == 7770901
@@ -5264,22 +5304,24 @@ class DoomEternalContext(CommonContext):
             hook_owned=hook_owned,
             mastery_mask=mastery_mask,
             rune_mask=rune_mask,
+            support_mask=support_mask,
             special_count=special_count,
             starting_special_count=starting_special_count,
             hammer_count=hammer_count,
             state_key=getattr(self, "state_key", None),
         )
-        if not hook_owned and not special_count and not hammer_count and not mastery_mask and not rune_mask:
+        if not hook_owned and not special_count and not hammer_count and not mastery_mask and not rune_mask and not support_mask:
             return
         for domain, desired in (("arsenal", hook_owned), ("special", special_count),
                                 ("hammer", hammer_count),
-                                ("arsenal_mastery", mastery_mask), ("normal_runes", rune_mask)):
+                                ("arsenal_mastery", mastery_mask), ("normal_runes", rune_mask), ("support_runes", support_mask)):
             if not desired:
                 continue
             try:
                 link = self.native_game_link()
                 result = (link.ensure_meat_hook() if domain == "arsenal" else
                            link.ensure_normal_runes(desired) if domain == "normal_runes" else
+                           link.ensure_support_runes(desired) if domain == "support_runes" else
                            link.ensure_masteries(desired) if domain == "arsenal_mastery" else
                            link.ensure_progressive_special_weapon(desired, hammer_only=True) if domain == "hammer" else
                           link.ensure_progressive_special_weapon(desired))
@@ -5328,14 +5370,15 @@ class DoomEternalContext(CommonContext):
             result = link.ensure_meat_hook()
         elif item.item in MASTERY_ITEM_BITS:
             result = link.ensure_masteries(MASTERY_ITEM_BITS[item.item])
-        elif item.item in NORMAL_RUNE_ITEM_BITS:
+        elif item.item in NORMAL_RUNE_ITEM_BITS or item.item in SUPPORT_RUNE_IDS:
+            bits = SUPPORT_RUNE_ITEM_BITS if item.item in SUPPORT_RUNE_IDS else NORMAL_RUNE_ITEM_BITS
             mask = 0
             for fact in self.receipt_session.starting_materialization:
                 if fact.quantity:
-                    mask |= NORMAL_RUNE_ITEM_BITS.get(fact.item_id, 0)
+                    mask |= bits.get(fact.item_id, 0)
             for receipt in self.items_received[:index + 1]:
-                mask |= NORMAL_RUNE_ITEM_BITS.get(receipt.item, 0)
-            result = link.ensure_normal_runes(mask)
+                mask |= bits.get(receipt.item, 0)
+            result = link.ensure_support_runes(mask) if item.item in SUPPORT_RUNE_IDS else link.ensure_normal_runes(mask)
         else:
             hammer_only = item.item == 7770902
             count = min(2 if hammer_only else 3, max(
@@ -5604,11 +5647,7 @@ class DoomEternalContext(CommonContext):
             if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
                                    context_identity=self.context_identity):
                 continue
-            if all(native.items.get(command.item_id) is not None
-                   and native.items[command.item_id].state == OWNED
-                   and (command.item_id not in (7770017, 7770088, 7770092, 7770901, 7770902)
-                        or native.get_observed_stage(command.item_id) > command.stage)
-                   for command in plan.commands):
+            if all(native.confirms_repair(command.item_id, command.stage) for command in plan.commands):
                 if any(native.get_state(item_id) == UNKNOWN for item_id in relevant):
                     return plan, "Native ownership pending for item IDs: " + ", ".join(
                             str(item_id) for item_id in sorted(relevant) if native.get_state(item_id) == UNKNOWN)
@@ -6311,7 +6350,7 @@ class DoomEternalContext(CommonContext):
             first_sample_locations=frozenset(self.server_locations) - frozenset(self.checked_locations))
 
     def observe_sticky_mastery(self, snapshot, path):
-        """Sticky compatibility wrapper used by the proven 24→25 regression."""
+        """Observe one Sticky Bombs native mastery record."""
         record = {
             "numUnlockableRules": STICKY_MASTERY_ENTRY["signal"]["numUnlockableRules"],
             "rule_0_statDuration": STICKY_MASTERY_ENTRY["signal"]["rule_0_statDuration"],
@@ -6353,7 +6392,6 @@ class DoomEternalContext(CommonContext):
             self.check_observation(), self.check_publication())
 
     async def check_sticky_mastery_location(self):
-        """Sticky compatibility wrapper preserving its exact send contract."""
         await self.check_weapon_mastery_location(STICKY_MASTERY_ENTRY)
 
     async def check_game_details_death(self):
@@ -6363,7 +6401,8 @@ class DoomEternalContext(CommonContext):
             await self.report_local_death()
 
     async def report_local_death(self):
-        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self))
+        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self),
+            grace=load_config().get("death_link_grace", 0), persist=self.persist_session_state)
 
     @staticmethod
     def goal_objective_ids(slot_data, server_locations):
@@ -6440,7 +6479,11 @@ class DoomEternalContext(CommonContext):
             if not path.exists():
                 continue
             observed = True
-            valid, contents, digest = read_map_event(path, trigger["marker"])
+            try:
+                valid, contents, digest = read_map_event(path, trigger["marker"])
+            except OSError as error:
+                logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", filename, error)
+                continue
             if not valid:
                 quarantine_malformed_event(
                     path,
@@ -6481,12 +6524,17 @@ class DoomEternalContext(CommonContext):
 
         for path in goal_event_files():
             observed = True
-            event = parse_goal_transition_event(path, include_raw=True)
+            try:
+                event = parse_goal_transition_event(path, include_raw=True)
+            except OSError as error:
+                logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", os.path.basename(path), error)
+                continue
             if event is None:
                 try:
                     raw = Path(path).read_text(encoding="utf-8", errors="replace")
-                except OSError:
-                    raw = ""
+                except OSError as error:
+                    logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", os.path.basename(path), error)
+                    continue
                 digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
                 quarantine_malformed_event(
                     Path(path),
@@ -6622,11 +6670,94 @@ class DoomEternalContext(CommonContext):
         if self.bootstrap.observe_supported_map(map_name):
             self.onboard_bootstrap("on_supported_map_load")
 
+    async def check_killsanity(self, game_running):
+        tracker = self.killsanity
+        if not tracker.enabled or not self.item_state_ready:
+            return
+        identity = (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch)
+        link = None
+        try:
+            if game_running:
+                link = self.native_game_link()
+                if link.namespace != tracker.namespace:
+                    return
+                snapshot = await asyncio.to_thread(link.observe_combat, set(CONTEXT_BY_MAP))
+                if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
+                    return
+                tracker.consume(snapshot, self.persist_session_state)
+            self._killsanity_observation_error = None
+        except Exception as error:
+            signature = str(error)
+            if signature != getattr(self, "_killsanity_observation_error", None):
+                logger.warning("[Killsanity] Observation pending: %s", error)
+                self._killsanity_observation_error = signature
+        if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
+            return
+        if game_running and link is not None:
+            try:
+                await tracker.present(link, getattr(self, "killsanity_counter_visible", True))
+                self._killsanity_presentation_error = None
+            except Exception as error:
+                signature = str(error)
+                if signature != getattr(self, "_killsanity_presentation_error", None):
+                    logger.warning("[Killsanity] Presentation pending: %s", error)
+                    self._killsanity_presentation_error = signature
+        if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
+            return
+        try:
+            await tracker.publish(self.check_observation(), self.check_publication())
+        except Exception as error:
+            logger.warning("[Killsanity] Milestone publication pending: %s", error)
+
+    async def prime_death_baseline(self):
+        if not getattr(self, '_death_baseline_pending', False):
+            return
+        from doom_eap.launcher.launcher_platform import launcher_user_paths
+        from doom_eap.launcher.launcher_session import _campaign_native_root
+        from doom_eap.runtime.weapon_points import namespace_id
+        namespace = namespace_id(self.room_seed_name, self.team, self.slot,
+                                 self._connected_slot_data['native_generation_fingerprint'])
+        campaigns = launcher_user_paths().data_dir / 'campaigns'
+        if not (campaigns / namespace / 'native.root').is_file():
+            return
+        token = self.receipt_session.capture(self.state_key)
+        try:
+            root = _campaign_native_root(campaigns, namespace)
+            path = STEAM_REMOTE_DIR / root / 'GAME-AUTOSAVE0' / 'game_duration.dat'
+            try:
+                path.stat()
+            except FileNotFoundError:
+                self.death_observer.start_empty_slot('GAME-AUTOSAVE0')
+                self._death_baseline_pending = False
+                return
+            selected = save_files.admitted_ap_save(STEAM_REMOTE_DIR, root)
+            if selected is None:
+                return
+            snapshot = await asyncio.to_thread(probe_game_duration, selected.path)
+            if not self.receipt_session.is_current(token, self.state_key):
+                return
+            current = save_files.admitted_ap_save(STEAM_REMOTE_DIR, root)
+            if current is None or current.cache_key != selected.cache_key:
+                return
+            # this read establishes history; live save proof still controls death publication.
+            self.death_observer.observe_checkpoint(snapshot, selected, 0, 'session_baseline')
+            self._death_baseline_pending = False
+        except Exception as error:
+            if str(error) != getattr(self, '_death_baseline_error', None):
+                logger.warning('[DeathLink] Initial save baseline pending: %s', error)
+                self._death_baseline_error = str(error)
+
     async def death_monitor_loop(self):
         while not self.exit_event.is_set():
+            if not self.item_state_ready:
+                await asyncio.sleep(0.25)
+                continue
+            await self.prime_death_baseline()
             self.check_rpc_autopause()
             self.queue_received_deathlink()
-            if not doom_process_identity():
+            game_running = bool(doom_process_identity())
+            await self.check_killsanity(game_running)
+            if not game_running:
                 await asyncio.sleep(1.0)
                 continue
             work_token = self.runtime_lifecycle.capture_work()
@@ -6720,6 +6851,18 @@ class DoomEternalContext(CommonContext):
     def last_processed_event_id(self):
         return self.physical_checks.last_event
 
+    async def physical_check_loop(self):
+        while not self.exit_event.is_set():
+            try:
+                if self.item_state_ready and self.server and self.server.socket and not self.server.socket.closed:
+                    await self.flush_check_event_files()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("[Trigger] Check publication interrupted; retrying")
+                await asyncio.sleep(1.0)
+            await asyncio.sleep(0.1)
+
     async def tracker_loop(self):
         logger.info(
             "[Tracking] Starting Doom Eternal runtime tracking loop "
@@ -6735,6 +6878,9 @@ class DoomEternalContext(CommonContext):
 
         while not self.exit_event.is_set():
             self.last_heartbeat_timestamp = time.time()
+            if not self.item_state_ready:
+                await asyncio.sleep(0.25)
+                continue
             if not doom_process_identity():
                 self.invalidate_map_identity("game_not_running")
                 await asyncio.sleep(4.0)
@@ -6824,7 +6970,6 @@ class DoomEternalContext(CommonContext):
                 if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
                     continue
 
-                await self.flush_check_event_files()
                 await self.check_campaign_goal()
                 await self.synchronize_campaign_menu()
 
@@ -6947,6 +7092,10 @@ async def launcher_control_loop(ctx):
             continue
         if not isinstance(control, dict):
             continue
+        if control.get("type") == "killsanity_counter_visibility":
+            if type(control.get("visible")) is bool:
+                ctx.killsanity_counter_visible = control["visible"]
+            continue
         if control.get("type") == "core_runtime_reload":
             updated = load_config()
             for key in ("core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"):
@@ -7010,6 +7159,9 @@ async def amain(launch_args=None):
 
     ctx = DoomEternalContext(args.connect, args.password)
     ctx.auth = args.name
+    ctx.connection_diagnostics = ConnectionDiagnostics(APCommonClient.websockets, ctx)
+    APCommonClient.websockets = ctx.connection_diagnostics
+    loop_monitor = asyncio.create_task(ctx.connection_diagnostics.monitor_loop(), name="bridge loop diagnostics")
     try:
         set_rpc_execution(False)
     except Exception as error:
@@ -7020,6 +7172,7 @@ async def amain(launch_args=None):
         cleanup_telemetry_dumps()
     ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
     ctx.death_task = asyncio.create_task(ctx.death_monitor_supervisor())
+    ctx.physical_check_task = asyncio.create_task(ctx.physical_check_loop())
 
     log_mission_bridge_identity()
     emit_launcher_event("client_started")
@@ -7077,7 +7230,7 @@ async def amain(launch_args=None):
     await ctx.exit_event.wait()
     emit_launcher_event("client_stopping")
     ctx.reset_queue_session_authority("bridge_shutdown")
-    tasks = [ctx.tracking_task, ctx.death_task, ctx.input_task]
+    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task, loop_monitor]
     item_delivery_task = ctx._item_delivery_task
     if item_delivery_task is not None:
         tasks.append(item_delivery_task)
@@ -7089,6 +7242,8 @@ async def amain(launch_args=None):
     await ctx.session_tasks.close()
     await asyncio.gather(*tasks, return_exceptions=True)
     await ctx.shutdown()
+    await ctx.connection_diagnostics.close()
+    APCommonClient.websockets = ctx.connection_diagnostics.websockets
 
 
 def launch(*launch_args):

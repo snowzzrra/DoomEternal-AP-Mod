@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import json
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,6 +24,63 @@ def bridge(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "INV_DUMP_DIR", str(tmp_path))
     monkeypatch.setattr(module, "doom_process_identity", lambda: "fixture-process")
     return module
+
+
+@pytest.mark.parametrize('baseline,stale', [(None, False), (False, False), (True, False), (False, True)])
+def test_death_baseline_precedes_gameplay_and_rejects_a_changed_session(bridge, tmp_path, monkeypatch, baseline, stale):
+    import logging
+    from doom_eap.launcher import launcher_platform
+    from doom_eap.runtime.death_observation import DeathObservation
+    from doom_eap.runtime.weapon_points import namespace_id
+
+    namespace = namespace_id('seed-A', 0, 1, 'a' * 64)
+    native_root = 'ap-' + 'b' * 40
+    campaign = tmp_path / 'campaigns' / namespace
+    campaign.mkdir(parents=True)
+    (campaign / 'native.root').write_text(
+        f'sentinel-native-root-v1\nnamespace={namespace}\nroot={native_root}\n', encoding='ascii', newline='\n')
+    remote = tmp_path / 'remote'
+    save = remote / native_root / 'GAME-AUTOSAVE0' / 'game_duration.dat'
+    save.parent.mkdir(parents=True)
+    if baseline is not None:
+        save.write_bytes(b'isolated save fixture')
+    monkeypatch.setattr(bridge, 'STEAM_REMOTE_DIR', remote)
+    monkeypatch.setattr(launcher_platform, 'launcher_user_paths', lambda: SimpleNamespace(data_dir=tmp_path))
+    monkeypatch.setattr(bridge, 'probe_game_duration', lambda path: {'checkpoint_death': baseline})
+    owner = DeathObservation(logging.getLogger(__name__))
+    owner.bind(namespace)
+    context = SimpleNamespace(_death_baseline_pending=True, room_seed_name='seed-A', team=0, slot=1,
+        _connected_slot_data={'native_generation_fingerprint': 'a' * 64}, state_key='room-A',
+        receipt_session=SimpleNamespace(capture=lambda key: 'token', is_current=lambda *args: not stale),
+        death_observer=owner)
+    asyncio.run(bridge.DoomEternalContext.prime_death_baseline(context))
+    assert context._death_baseline_pending == stale
+    if not stale:
+        from doom_eap.contracts.save_observation import PrimarySaveSelection
+        event = owner.observe_checkpoint({'checkpoint_death': True},
+            PrimarySaveSelection('GAME-AUTOSAVE0', save, 10), 1, 'map')
+        assert bool(event) == (baseline is not True)
+
+
+
+
+@pytest.mark.parametrize('location,expected', [(7770122, {'mission_complete'}), (7770100, set())])
+def test_server_mission_completion_wakes_inventory_materialization(bridge, monkeypatch, location, expected):
+    from doom_eap.runtime.materialization_coordinator import MaterializationCoordinator
+    import logging
+
+    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
+    coordinator.bind({})
+    context = SimpleNamespace(checked_locations=set(), materialization=coordinator,
+        snapshot_fast_travel_eligibility=lambda **kwargs: None,
+        publisher_dispatch=SimpleNamespace(observe_protocol=lambda observation: None),
+        reconcile_checked_automap_cleanup=lambda trigger: None,
+        reconcile_fast_travel_unlock=lambda trigger: None,
+        session_tasks=SimpleNamespace(start=lambda task: None),
+        check_mission_challenge_locations=lambda: None, evaluate_campaign_goal=lambda reason: None)
+    monkeypatch.setattr(bridge.DoomEternalContext, 'check_observation', lambda self: None)
+    bridge.DoomEternalContext._handle_package(context, 'RoomUpdate', {'checked_locations': [location]})
+    assert coordinator.snapshot.triggers == expected
 
 
 @pytest.mark.parametrize("old_key", [None, "room-A", "room-B"])

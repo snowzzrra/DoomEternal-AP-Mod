@@ -91,11 +91,15 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.6.4 CI audit: synchronize the baseline with the v0.6.3 ARC Complex console policy cleanup; preserve public IDs and native targets."
+    },
+    {
+      "content_revision": "0.7.0",
+      "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
     }
   ],
   "asset_package_contract_sha256": "2e588bf2d2a403e3911f57fa3f5d765568586850f45ed4af54657508382e33cb",
-  "content_revision": "0.5.0",
-  "manifest_sha256": "a80b2c373a3fbce1325c474c55a6878e003f76a09586100ecc601212915cde6f",
+  "content_revision": "0.7.0",
+  "manifest_sha256": "232abac2f0543a701a03b0ab79504c53dfbe8f778ed14a4937ad318052d4dd41",
   "map_key": "e2m2_base",
   "physical_ap_ids": [
     7770211,
@@ -132,9 +136,10 @@
     7770250,
     7770251,
     7770252,
-    7770489
+    7770489,
+    7770499
   ],
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "93bf216a2a858775804764886b99773b87daf1e06780342b953bf4737c0b1203"
+  "scripted_contract_sha256": "91934a451cd90bccc8958c755cb32e029448db3306bae043e87bc1ee60f7a885"
 }

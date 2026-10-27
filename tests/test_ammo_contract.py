@@ -166,6 +166,34 @@ def test_readiness_preserves_order_and_requires_no_universal_save_proof():
     assert ammo_readiness(**facts)[0] == "placement_connected"
 
 
+@pytest.mark.parametrize("changes,predicate,message", [
+    ({"placement_ready": False}, "placement_connected", "Disconnected from Archipelago"),
+    ({"item_ready": False}, "item_state_ready", "waiting for items from Archipelago"),
+    ({"connected": False}, "connected", "Disconnected from Archipelago"),
+    ({"namespace_match": False}, "namespace_match", "waiting for the current room's game session"),
+    ({"marker": None}, "marker_valid", "current level to finish preparing"),
+    ({"active_lease": "other"}, "lease_match", "current level to finish preparing"),
+    ({"native_safe": False}, "native_safe", "return to DOOM and unpause"),
+    ({"runtime_ready": False}, "runtime_effects_ready", "waiting for the active save and game session"),
+])
+def test_unavailable_explains_failed_requirement_without_spending(tmp_path, caplog, changes, predicate, message):
+    messages = []
+
+    async def send(packets):
+        messages.extend(packets)
+
+    ammo, spool, _, events = setup_ammo(tmp_path, send)
+    facts = dict(placement_ready=True, item_ready=True, connected=True, namespace_match=True,
+                 marker={"gameplay_epoch": "1:2"}, active_lease="1:2", native_safe=True,
+                 runtime_ready=True, active_slot="GAME-AUTOSAVE0", available=3)
+    caplog.set_level(logging.INFO, logger="ammo-contract")
+    assert not asyncio.run(ammo.request(AmmoCommandScope("room-A", "map", "GAME-AUTOSAVE0", False),
+                                       ammo_readiness(**(facts | changes))))
+    assert message in events[-1][1]["message"]
+    assert f"predicate={predicate}" in caplog.text
+    assert messages == [] and ammo.available == 3 and not list(tmp_path.glob("*.cmd"))
+
+
 def test_request_file_worker_cancels_old_room_without_replaying_removed_files(tmp_path):
     async def run():
         calls = []

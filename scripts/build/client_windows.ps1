@@ -51,7 +51,7 @@ function Invoke-NativeBuild {
     if ($LASTEXITCODE -ne 0) { throw "Resource compiler failed creating ap_client.res" }
 
     $clientOutput = Join-Path $BuildDirectory "ap_client.exe"
-    & link.exe /nologo /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /GUARD:CF "/OUT:$clientOutput" @objects $resourceObject bcrypt.lib version.lib user32.lib
+    & link.exe /nologo /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /GUARD:CF "/OUT:$clientOutput" @objects $resourceObject bcrypt.lib version.lib user32.lib
     if ($LASTEXITCODE -ne 0) { throw "MSVC linker failed creating ap_client.exe" }
 
     $probeOutput = Join-Path $BuildDirectory "save_death_probe.exe"

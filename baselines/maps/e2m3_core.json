@@ -99,11 +99,15 @@
     {
       "content_revision": "0.5.0",
       "reason": "v0.6.4 CI audit: synchronize the baseline with v0.6.3 native Plasma Rifle suppression; preserve progression and AP checks."
+    },
+    {
+      "content_revision": "0.7.0",
+      "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
     }
   ],
   "asset_package_contract_sha256": "44f245d18af308a34e53a687aff0079bad3ada1dcec8663deb79a77b29501511",
-  "content_revision": "0.5.0",
-  "manifest_sha256": "7734014d86c1c4946b560241d9bfcbe8650f9b97fdb2c078bdab13e487a6086c",
+  "content_revision": "0.7.0",
+  "manifest_sha256": "ab57bf3f3923d0e440ca19fc14ee6b96145374effc471b40ea2890839606c96f",
   "map_key": "e2m3_core",
   "physical_ap_ids": [
     7770256,
@@ -134,9 +138,10 @@
     7770281,
     7770283,
     7770284,
-    7770490
+    7770490,
+    7770500
   ],
   "runtime_location_ids": [],
   "schema_version": 2,
-  "scripted_contract_sha256": "163b22f9466e1f09a065ce2fa3bbe1f822d64b34fbd1414809869fdd19b37e00"
+  "scripted_contract_sha256": "3dccb8c1495240ae20d16b7ffddbb093f4d79db47531ac2d23719e57cef2b515"
 }

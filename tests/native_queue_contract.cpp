@@ -227,14 +227,22 @@ int main() {
         Dispatch(queue, transport);
         assert(transport.commands.size() == beforeMap + 1);
         assert(!std::filesystem::exists("base/ap_queue/recv-fedcba9876543210-stale-map.processing"));
+        Write("base/ap_queue/recv-fedcba9876543210-visual.cmd",
+              "AP_EXECUTION_CLASS_V1 MAP_ENTITY_SAFE\nAP_MAP_ENTITY_OPERATION_V1 CHECKED_VISUAL_HIDE\n"
+              "AP_MATERIALIZATION_LEASE_V1 1:3\nai_ScriptCmdEnt ap_hide_location_visual_7770302 activate player1\n");
+        queue.Import();
+        Sleep(260);
+        Dispatch(queue, transport, {false, true});
+        assert(transport.commands.back() == "ai_ScriptCmdEnt ap_hide_location_visual_7770302 activate player1");
 
+        const auto beforeEffect = transport.commands.size();
         Write(kTransientScopePath, "effectscope-0123456789abcdef");
         Write("base/ap_queue/recv-fedcba9876543210-effect.cmd",
               "AP_EXECUTION_CLASS_V1 TRANSIENT_EFFECT\n"
               "AP_TRANSIENT_SCOPE_V1 effectscope-0123456789abcdef\ng_infiniteAmmo 1\n");
         queue.Import();
         Dispatch(queue, transport, {true, true}, false);
-        assert(transport.commands.size() == beforeMap + 1);
+        assert(transport.commands.size() == beforeEffect);
         Sleep(260);
         Dispatch(queue, transport, {true, true}, true);
         assert(transport.commands.back() == "g_infiniteAmmo 1");

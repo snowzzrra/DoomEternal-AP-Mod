@@ -95,7 +95,13 @@
         "sha256": "2f5905b716eef48dfad260e9f71ab6a0a8c9bd254515f3c97ff1ef01b09fdb34",
         "currency": "CURRENCY_PRAETOR_UPGRADE"
       },
-      "order": 58
+      "order": 58,
+      "enemy_targets": {
+        "species": [
+          "zombie_maykr"
+        ],
+        "minimum": 5
+      }
     },
     {
       "category": "all_mission_challenges",
@@ -111,7 +117,8 @@
           7770409
         ],
         "required_count": 3,
-        "authority": "server_checked_locations"
+        "authority": "server_checked_locations",
+        "mission_complete_location_id": 7770411
       },
       "order": 59
     },

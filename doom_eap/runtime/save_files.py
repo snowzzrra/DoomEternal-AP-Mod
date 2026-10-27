@@ -7,6 +7,7 @@ import shutil
 import subprocess
 
 from doom_eap.runtime.save_decrypt import decrypt, steam_id64
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
 
 from doom_eap.contracts.runtime_context import canonical_map_name
 from doom_eap.contracts.save_observation import GameplaySaveEvidence, PrimarySaveSelection
@@ -92,6 +93,7 @@ def read_gameplay_save_evidence(path):
     )
 
 
+@timed_sync_call
 def unpack_game_duration(path, *, steam_id, runtime_directory, probe_path, oodle_path,
                          compat_data, proton_path, steam_install, host_exec):
     """Return checkpoint-death and native unlockable records from one save."""
@@ -148,6 +150,7 @@ def unpack_game_duration(path, *, steam_id, runtime_directory, probe_path, oodle
         text=True,
         timeout=10,
         check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if result.returncode in {0, 20}:
         return runtime_unpacked.read_bytes(), result.returncode, result.stdout

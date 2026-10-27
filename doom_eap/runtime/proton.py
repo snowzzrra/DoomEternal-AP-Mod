@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import json
 import subprocess
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
 
 
 class ProtonSelectionError(RuntimeError):
@@ -56,12 +57,16 @@ def runtime(configuration):
     return [str(proton), "runinprefix"], environment
 
 
+@timed_sync_call
 def windows_processes(configuration, helper):
     """Return qualified guest identities, an empty tuple, or UNKNOWN (None)."""
     try:
         command, environment = runtime(configuration)
+        root = Path(configuration.get("game_root") or configuration["doom_base_dir"]).resolve()
+        expected = (root.parent if root.name.casefold() == "base" else root) / "DOOMEternalx64vk.exe"
         # the windowed supervisor requires stdin even for process queries
-        response = subprocess.run([*command, windows_path(helper), "--process-identity"],
+        response = subprocess.run([*command, windows_path(helper), "--process-identity",
+                                   "--expected-game-exe", windows_path(expected)],
                                   env=environment, input=b"", capture_output=True, timeout=30, check=False)
         rows = json.loads(response.stdout).get("processes")
         if response.returncode or not isinstance(rows, list):

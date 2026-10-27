@@ -25,6 +25,7 @@ class DeathLinkSession:
         self._seen = set()
         self._confirmed_echo = None
         self._generation = 0
+        self._state = {}
 
     @property
     def enabled(self):
@@ -59,6 +60,7 @@ class DeathLinkSession:
     def bind(self, state_key, state):
         self.invalidate_outbound()
         self._state_key = state_key
+        self._state = state
         seen = state.get("received_deathlink_event_ids", [])
         if not isinstance(seen, list):
             seen = []
@@ -136,7 +138,10 @@ class DeathLinkSession:
                 result.detail,
             )
 
-    async def report_local_death(self, player, send, publication):
+
+    async def report_local_death(self, player, send, publication, *, grace=0, persist=lambda: None):
+        if type(grace) is not int or not 0 <= grace <= 2147483647:
+            raise ValueError("DeathLink Grace must be a whole number from 0 to 2147483647")
         if not self._enabled:
             self._logger.info("[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=death_link_disabled")
             return
@@ -153,6 +158,19 @@ class DeathLinkSession:
                 (receive_result.event_id or "unknown")[:12],
             )
             return
+        if grace > 1:
+            progress = self._state.get("death_link_grace", {})
+            deaths = progress.get("deaths", 0) if isinstance(progress, dict) and progress.get("interval") == grace else 0
+            if type(deaths) is not int or not 0 <= deaths < grace:
+                deaths = 0
+            deaths = (deaths + 1) % grace
+            self._state["death_link_grace"] = {"interval": grace, "deaths": deaths}
+            persist()
+            if deaths:
+                self._logger.info("[DeathLink] Grace: local death %d/%d; outgoing link skipped", deaths, grace)
+                return
+        elif self._state.pop("death_link_grace", None) is not None:
+            persist()
         player = player or "The Doom Slayer"
         cause = random.choice(self._messages).format(player=player)
         self._logger.info("[DeathLink] DEATHLINK_OUTBOUND_ACCEPTED cause=%s", cause)

@@ -12,7 +12,9 @@
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770428,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1_B": 7770429,
     "AP_CHECK_PICKUPS_PROGRESS_CODEX_6": 7770430,
-    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11": 7770431
+    "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11": 7770431,
+    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": 7770507,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_2": 7770516
   },
   "secret_encounters": [
     {
@@ -42,24 +44,43 @@
     "7770428": "UAC Atlantica Facility - Extra Life - Submerged Sub-Station 1",
     "7770429": "UAC Atlantica Facility - Extra Life - Submerged Sub-Station 2",
     "7770430": "UAC Atlantica Facility - Book of the Seraphs - Part I Codex",
-    "7770431": "UAC Atlantica Facility - Extra Life - Exterior Crane Walkway"
+    "7770431": "UAC Atlantica Facility - Extra Life - Exterior Crane Walkway",
+    "7770507": "UAC Atlantica Facility - Automap Station",
+    "7770516": "UAC Atlantica Facility - Soulsphere - Underwater Facility Secret"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": {
+      "policy": "ap_only"
+    },
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_2": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
+    "pickups_pickup_extra_life_extra_life_2up_1_b": {
+      "legacy_alias_of": 7770428
+    },
     "pickups_pickup_keycard_slayer_key_1": {
       "independent_ap_trigger": true,
       "remove_original": true,
-      "independent_size": [1.3, 1.3, 1.3],
+      "independent_size": [
+        1.3,
+        1.3,
+        1.3
+      ],
       "preserve_targets": [
         "slayer_gate_corridor_temp_sunken_rig_geo_func_mover_key_grate_961496569_1"
       ],
-      "drop_targets": ["checkpoints_target_relay_54"]
+      "drop_targets": [
+        "checkpoints_target_relay_54"
+      ]
     },
     "slayer_gate_progress_support_rune_1": {
       "native_entity_contract": {
-        "original_targets": ["slayer_gate_target_changelayer_slayergate_5"],
+        "original_targets": [
+          "slayer_gate_target_changelayer_slayergate_5"
+        ],
         "required_snippets": [
           "inherit = \"progress/support_rune\";",
           "class = \"idInteractable_Rune\";",
@@ -71,6 +92,12 @@
       },
       "duplicate_policy": "native_only",
       "no_auto_automap_helper": true
+    },
+    "pickups_interact_automap_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_2": {
+      "permanent_resource_budget": false
     }
   }
 }

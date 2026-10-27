@@ -30,7 +30,9 @@ class SaveChecks:
     def invalidate(self):
         self._generation += 1
 
-    def bind(self):
+    def bind(self, masteries=None):
+        if masteries is not None:
+            self._mastery_entries = dict(masteries)
         self.invalidate()
         self.reset_observations(populate=False)
 

@@ -150,7 +150,29 @@
       ],
       "unlock_target": "fast_travel_target_fast_travel_unlock_1"
     },
-    "terminal": "checkpoints_target_level_transition_1"
+    "terminal": "checkpoints_target_level_transition_1",
+    "physical_pickup_sources": {
+      "game_interact_automap_e5m2_earth": {
+        "location_id": 7770511,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 202,
+          "y": -739.5,
+          "z": -137.00119
+        },
+        "region": "Reclaimed Earth - Reclaimed Train Stop",
+        "qualification": "Raised platform just after the train-stop cutscene; before climbing through the train window.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/7",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/dlc2/e5m2_earth/e5m2_earth.decl",
+          "sha256": "9e943adbfc2bd0ca33534fa9c3d1c74bc408d7daab8215aa99b33622d4b463fb",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
   },
   "locations": [
     {

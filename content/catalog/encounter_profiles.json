@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "qualification_gaps": {
+    "campaign_execution": "Layer selection, concurrent scripts, alternative paths and scripted external AI require review before summing finite kill budgets.",
+    "completion": "Waits and stopMaintainingAICount calls are extracted; termination and renewable initial cohorts require graph qualification.",
+    "geometry": "Spawn conditions, positions and traversal flags are source evidence; compatible replacement families require spatial review.",
+    "simultaneous_ai_limit": "Engine cap and headroom for natural summons and protected actors are unqualified.",
+    "individual_attributes": "Per-actor HP, outgoing damage, speed and scale operations require engine qualification; template references do not prove isolation.",
+    "resources": "AI reference candidates are extracted; minimal transitive resources/streamdb dependencies and DLC-in-Base precedence require qualification.",
+    "kill_observation": "Player attribution, duplicate death delivery, respawn, pooling and despawn discrimination require a qualified enemy-death source."
+  },
+  "maps": {
+    "e5m2_earth": {
+      "ai_encounter_manager_dlc1_opening": {
+        "category": "combat",
+        "legacy_protection": {
+          "spawn_events": [
+            {
+              "script": 0,
+              "event": 5
+            }
+          ],
+          "reason": "This Cursed Prowler introduces the curse mechanic."
+        }
+      }
+    },
+    "e1m4_boss": {
+      "stage1_encounter_manager": {
+        "category": "boss",
+        "protection": {
+          "entities": [
+            "stage1_doom_hunter",
+            "stage1_boss_pos"
+          ],
+          "spawn_events": [
+            {
+              "script": 1,
+              "event": 1
+            }
+          ],
+          "reason": "Doom Hunter boss participates in the dh_01_detach/DOOM_HUNTER waits and stage1_complete sequence; checkpoint script restores the same boss.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e1m4_boss.map:417121 stage1_encounter_manager scripts; stage1_boss_pos entityDefs references stage1_doom_hunter."
+      },
+      "stage2_encounter_manager": {
+        "category": "boss",
+        "protection": {
+          "entities": [
+            "stage2_spawn_group_boss",
+            "stage2_spawn_parent_boss",
+            "stage2_boss_pos_01",
+            "stage2_boss_pos_02",
+            "stage2_doom_hunter_01",
+            "stage2_doom_hunter_02"
+          ],
+          "spawn_events": [
+            {
+              "script": 0,
+              "event": 2
+            }
+          ],
+          "reason": "Two Doom Hunters occupy the boss group consumed by stage-2 boss waits and completion events.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e1m4_boss.map:449546 stage2_encounter_manager; stage2_spawn_group_boss targetSpawnParent references stage2_spawn_parent_boss; authored boss points reference both Doom Hunters."
+      }
+    },
+    "e2m2_base": {
+      "fort_encounter_manager_tower": {
+        "category": "boss_sequence",
+        "protection": {
+          "entities": [
+            "fort_target_spawn_marauder_1",
+            "fort_ai_superheavy_marauder_1"
+          ],
+          "spawn_events": [
+            {
+              "script": 1,
+              "event": 1
+            }
+          ],
+          "reason": "The ARC Complex exit waits for this Marauder before fodder cleanup and level-end activation; checkpoint script restores the same occurrence.",
+          "adds_qualified": false
+        },
+        "evidence": "vanillamaps/e2m2_base.map:618106 fort_encounter_manager_tower; script0 event4 waits for MARAUDER=0; events5/6/8 stop and kill marauder_fodder; script1 event1 uses fort_target_spawn_marauder_1."
+      }
+    },
+    "e5m1_spear": {
+      "ai_combat_encounter_manager_dlc1_4": {
+        "category": "combat",
+        "legacy_protection": {
+          "manager_sha256": "188b20f5373a41992f0580499e884d7b683894f2896272b7cb074fd229f6ad6d",
+          "spawn_events": [
+            {
+              "script": 0,
+              "event": 9
+            },
+            {
+              "script": 0,
+              "event": 10
+            },
+            {
+              "script": 0,
+              "event": 11
+            },
+            {
+              "script": 0,
+              "event": 12
+            }
+          ],
+          "reason": "These Screechers demonstrate the mechanic introduced by the tutorial."
+        }
+      },
+      "ai_combat_encounter_manager_dlc2_13": {
+        "category": "combat",
+        "legacy_protection": {
+          "entire_encounter": true,
+          "manager_sha256": "af539da989e826b24b5fcb0f475eafc3a17b4f8502c46ae958e5ce66fa3008cb",
+          "reason": "This fight teaches Stone Imps and keeps respawning them until eight Stone Imp kills."
+        }
+      }
+    },
+    "e1m2_war": {
+      "tutorial_encounter_manager_blood_punch_1": {
+        "category": "exclusive_tutorial",
+        "protection": {
+          "entire_encounter": true,
+          "manager_sha256": "9515f70381ff887bd70bd5798dd4755d08fd40436a523f11f184620a75beb82f",
+          "reason": "Blood Punch tutorial spawns its demonstration targets before repositioning the player."
+        },
+        "evidence": "tutorial_encounter_trigger_commit_blood_punch_1; final relays tutorial_target_relay_blood_punch_tutorial_stage_1 and tutorial_trigger_teleport_fade_blood_punch_tutorial_part_2."
+      }
+    },
+    "e1m1_intro": {
+      "barge_encounter_manager_glory_kill_tutorial": {
+        "category": "exclusive_tutorial",
+        "protection": {
+          "entire_encounter": true,
+          "manager_sha256": "1cdce71deaf768c0731e2e7a443ace6a8b121854c02713c95beb718eb40963f3",
+          "reason": "Glory Kill tutorial layer cp_01_gk_tutorial."
+        },
+        "evidence": "Tutorials Off; map source SHA256 5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6. Shared ordinary priest-room and Chainsaw hall fights are separate occurrences."
+      },
+      "encounter_manager_2": {
+        "category": "exclusive_tutorial",
+        "protection": {
+          "entire_encounter": true,
+          "manager_sha256": "74b7e6679de2d331bc8c90f82ac1ffd331d6d26f98f2feee257687294fd09892",
+          "reason": "Chainsaw pickup targets tutorial_target_relay_chainsaw_picked_up; the AP pickup transformation removes this edge."
+        },
+        "evidence": "Tutorials Off; map source SHA256 5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6. Shared ordinary priest-room and Chainsaw hall fights are separate occurrences."
+      }
+    }
+  }
+}

@@ -22,7 +22,8 @@
     "AP_CHECK_BARGE_PICKUP_COLLECTIBLE_TOYS_ZOMBIE_1": 7770017,
     "AP_CHECK_MECH_STREET_PICKUP_COLLECTIBLE_TOYS_DOOMGUY_1": 7770018,
     "AP_CHECK_CORNER_STREET_PICKUP_COLLECTIBLE_TOYS_IMP_2": 7770019,
-    "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": 7770020
+    "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": 7770020,
+    "AP_CHECK_CATHEDRAL_INTERACT_AUTOMAP_1_E1M1": 7770492
   },
   "location_feedback": {
     "AP_CHECK_UAC_HQ_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E1M1": {
@@ -39,6 +40,9 @@
     },
     "AP_CHECK_UAC_BASEMENT_PROGRESS_CHEATS_INFINITE_EXTRA_LIVES_2": {
       "policy": "vanilla_only"
+    },
+    "AP_CHECK_CATHEDRAL_INTERACT_AUTOMAP_1_E1M1": {
+      "policy": "ap_only"
     }
   },
   "target_removals": {
@@ -48,7 +52,14 @@
   },
   "target_policies": {
     "uac_basement_progress_cheats_infinite_extra_lives_2": {
-      "independent_size": [1.3, 1.3, 1.3]
+      "independent_size": [
+        1.3,
+        1.3,
+        1.3
+      ]
+    },
+    "cathedral_interact_automap_1_e1m1": {
+      "permanent_resource_budget": false
     }
   },
   "schema_version": 1,
@@ -72,6 +83,7 @@
     "7770017": "Hell on Earth - Zombie Toy",
     "7770018": "Hell on Earth - Doom Slayer Toy",
     "7770019": "Hell on Earth - Imp Toy",
-    "7770020": "Hell on Earth - Infinite Extra Lives Cheat"
+    "7770020": "Hell on Earth - Infinite Extra Lives Cheat",
+    "7770492": "Hell on Earth - Automap Station"
   }
 }

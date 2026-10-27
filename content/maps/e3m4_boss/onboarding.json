@@ -133,7 +133,7 @@
   },
   "campaign_goal": {
     "schema_version": 1,
-    "release": "0.6.0",
+    "release": "0.7.0",
     "publisher_key": "final_sin_mission_complete",
     "event_filename": "ap_mission_final_sin_complete.txt",
     "marker": "AP_MISSION_EVENT_FINAL_SIN_COMPLETE",
@@ -149,5 +149,29 @@
     "native Mission Challenges and Secret Encounters absent",
     "Icon phases, checkpoints, cinematics, credits and return-to-menu flow are untouched",
     "Mission Complete publishes before the separate campaign goal"
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "chasm_interact_automap_1_e3m4": {
+        "location_id": 7770506,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -507.700012,
+          "y": -502.700012,
+          "z": -45.001255
+        },
+        "region": "Final Sin - Starstruct Industries",
+        "qualification": "Exit from the first combat encounter, before the chasm crossing to Viris West.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e3m4_boss/e3m4_boss.decl",
+          "sha256": "3d0fa76cde502ff73362b0150104f7b0074e369c840632682e8d69b83065b03c",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }

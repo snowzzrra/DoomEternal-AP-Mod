@@ -141,14 +141,12 @@ def remove_balanced_entity_blocks(content, name_prefix):
         result.append(content[pos:m.start()])
         depth = m.group(0).count('{') - m.group(0).count('}')
 
-        i = m.end()
-        while depth > 0 and i < len(content):
-            if content[i] == '{':
-                depth += 1
-            elif content[i] == '}':
-                depth -= 1
-            i += 1
-        pos = i
+        pos = len(content)
+        for brace in _BRACES.finditer(content, m.end()):
+            depth += 1 if brace[0] == '{' else -1
+            if depth == 0:
+                pos = brace.end()
+                break
     result.append(content[pos:])
     return ''.join(result)
 
@@ -161,14 +159,12 @@ def remove_property_blocks(content, property_name):
             continue
         result.append(content[pos:match.start()])
         depth = 1
-        i = match.end()
-        while depth > 0 and i < len(content):
-            if content[i] == '{':
-                depth += 1
-            elif content[i] == '}':
-                depth -= 1
-            i += 1
-        pos = i
+        pos = len(content)
+        for brace in _BRACES.finditer(content, match.end()):
+            depth += 1 if brace[0] == '{' else -1
+            if depth == 0:
+                pos = brace.end()
+                break
     result.append(content[pos:])
     return ''.join(result)
 
@@ -386,18 +382,19 @@ def retain_single_stat_increase(content, property_name, stat_name):
     return content[:match.start()] + replacement + content[close_brace + 1:]
 
 
+_BRACES = re.compile(r"[{}]")
+
+
 def find_matching_brace(content, open_brace_index):
     depth = 1
-    i = open_brace_index + 1
-    while depth > 0 and i < len(content):
-        if content[i] == "{":
+    for match in _BRACES.finditer(content, open_brace_index + 1):
+        if match[0] == "{":
             depth += 1
-        elif content[i] == "}":
+        else:
             depth -= 1
-        i += 1
-    if depth != 0:
-        raise ValueError("Unbalanced braces while parsing entities content")
-    return i
+        if depth == 0:
+            return match.end()
+    raise ValueError("Unbalanced braces while parsing entities content")
 
 
 def find_entity_block_bounds(content, entity_name):
@@ -571,6 +568,8 @@ def apply_native_entity_contract(block, contract):
 
 
 TARGET_POLICY_CONSUMERS = {
+    "permanent_resource_budget": "authorial resource budget metadata",
+    "legacy_alias_of": "compile_content_catalog shared physical pickup",
     "independent_ap_trigger": "generate_map independent-trigger branch",
     "remove_original": "generate_map original-owner branch",
     "drop_targets": "build_independent_targets",
@@ -578,6 +577,7 @@ TARGET_POLICY_CONSUMERS = {
     "safe_target_graph": "audit_preserved_target_graph",
     "forbidden_target_terms": "audit_preserved_target_graph",
     "gate_relay": "append_target_to_named_entity",
+    "reveal_entity": "replace_pickup_reveal_target",
     "independent_entity_name": "generate_independent_pickup_trigger",
     "independent_position": "generate_independent_pickup_trigger",
     "independent_visual_z_offset": "build_universal_physical_policy",
@@ -589,6 +589,7 @@ TARGET_POLICY_CONSUMERS = {
     "no_auto_automap_helper": "generate_map automap helper branch",
     "independent_automap_properties_decl": "build_universal_physical_policy",
     "preserve_layers": "generate_independent_pickup_trigger",
+    "preserve_visual_layers": "generate_inert_location_visual",
     "bind_parent": "generate_independent_pickup_trigger/generate_inert_location_visual",
     "preserve_original_visual": "generate_map original-owner branch",
     "native_entity_contract": "apply_native_entity_contract",
@@ -715,6 +716,14 @@ def validate_target_policies(config_entities, target_policies, content):
                 f"Target policy has unsupported key(s) for {entity_name}: "
                 + ", ".join(unknown)
             )
+        if "legacy_alias_of" in policy:
+            primary = policy["legacy_alias_of"]
+            if (type(primary) is not int or not entity_name.endswith("_b") or
+                    set(policy) != {"legacy_alias_of"} or
+                    config_entities.get(f"AP_CHECK_{entity_name[:-2].upper()}") != primary or
+                    find_entity_block_bounds(content, entity_name[:-2]) is None):
+                raise ValueError(f"Legacy pickup alias has no matching primary check: {entity_name}")
+            continue
         if policy.get("ap_touch_only"):
             if "native_entity_contract" not in policy:
                 raise ValueError(
@@ -740,9 +749,15 @@ def validate_target_policies(config_entities, target_policies, content):
         independent_only = {
             "remove_original", "independent_entity_name", "independent_position",
             "independent_size", "independent_targets", "independent_visual",
-            "completion_targets", "no_auto_visual", "preserve_layers", "bind_parent",
+            "completion_targets", "no_auto_visual", "preserve_layers", "preserve_visual_layers", "bind_parent",
+            "reveal_entity",
         }
-        universal_size_override = set(policy) == {"independent_size"}
+        if "reveal_entity" in policy and not all(
+            isinstance(policy.get(key), str) and policy[key].strip()
+            for key in ("reveal_entity", "gate_relay")
+        ):
+            raise ValueError(f"Pickup reveal requires a show entity and gate relay: {entity_name}")
+        universal_size_override = set(policy) - {"permanent_resource_budget"} == {"independent_size"}
         unused_independent = sorted(
             set(policy) & independent_only
             if not policy.get("independent_ap_trigger") and not universal_size_override
@@ -1219,8 +1234,8 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
             "\t\t\t}"
         )
     else:
-        position_match = re.search(r'(spawnPosition\s*=\s*\{\s*x\s*=\s*[^;]+;\s*y\s*=\s*[^;]+;\s*z\s*=\s*[^;]+;\s*\})', block)
-        if not position_match:
+        position_match = re.search(r'(spawnPosition\s*=\s*\{[^}]*\})', block)
+        if not position_match or _spawn_position_from_block(block) is None:
             raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
         position = position_match.group(1)
     hitbox_size = policy.get(
@@ -1242,6 +1257,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
     target_lines = "\n".join(
         f'\t\t\t\titem[{index}] = "{target}";' for index, target in enumerate(targets)
     )
+    trigger_first = "\t\t\ttriggerFirst = true;\n" if policy.get("gate_relay") and not is_sentinel_crystal_source(block) else ""
     return f'''entity {{
 {layers}\tentityDef {independent_name} {{
 \t\tinherit = "trigger/trigger";
@@ -1252,7 +1268,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-\t\t\ttriggerOnce = true;
+{trigger_first}\t\t\ttriggerOnce = true;
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
 \t\t\t}}
@@ -1325,6 +1341,12 @@ def generate_inert_location_visual(block, policy):
         if bind_parent else ""
     )
     cleanup_name = visual.get("cleanup_entity")
+    reveal_flags = ""
+    if policy.get("reveal_entity"):
+        reveal_flags = "\t\t\tflags = { hide = true; }\n"
+        save_match = re.search(r'\bwhenToSave\s*=\s*"[^"]+";', block)
+        if save_match:
+            reveal_flags += f"\t\t\t{save_match.group(0)}\n"
     reconciliation_name = visual.get("reconciliation_entity")
     if cleanup_name and not reconciliation_name:
         location_match = re.fullmatch(
@@ -1338,10 +1360,13 @@ def generate_inert_location_visual(block, policy):
         raise ValueError(
             f"AP visual reconciliation entity is missing: {visual['entity_name']}"
         )
+    helper_position = "\n".join(
+        f"\t\t\t\t{axis} = {value};" for axis, value in zip(("x", "y", "z"), position)
+    )
     cleanup = ""
     if cleanup_name:
         cleanup = f'''entity {{
-{layers}\tentityDef {cleanup_name} {{
+\tentityDef {cleanup_name} {{
 \t\tinherit = "target/remove";
 \t\tclass = "idTarget_Remove";
 \t\texpandInheritance = false;
@@ -1352,7 +1377,11 @@ def generate_inert_location_visual(block, policy):
 \t\tedit = {{
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
-{bind_info_line}
+\t\t\t\tcanBecomeDormant = false;
+\t\t\t}}
+{bind_info_line}\t\t\tdormancy = {{ allowPvsDormancy = false; }}
+\t\t\tspawnPosition = {{
+{helper_position}
 \t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
@@ -1365,7 +1394,7 @@ def generate_inert_location_visual(block, policy):
     reconciliation = ""
     if reconciliation_name:
         reconciliation = f'''entity {{
-{layers}\tentityDef {reconciliation_name} {{
+\tentityDef {reconciliation_name} {{
 \t\tinherit = "target/hide";
 \t\tclass = "idTarget_Hide";
 \t\texpandInheritance = false;
@@ -1377,7 +1406,12 @@ def generate_inert_location_visual(block, policy):
 \t\t\treuseable = true;
 \t\t\tflags = {{
 \t\t\t\tnoFlood = true;
-{bind_info_line}\t\t\t\t}}
+\t\t\t\tcanBecomeDormant = false;
+\t\t\t}}
+{bind_info_line}\t\t\tdormancy = {{ allowPvsDormancy = false; }}
+\t\t\tspawnPosition = {{
+{helper_position}
+\t\t\t}}
 \t\t\ttargets = {{
 \t\t\t\tnum = 1;
 \t\t\t\titem[0] = "{visual["entity_name"]}";
@@ -1395,7 +1429,7 @@ def generate_inert_location_visual(block, policy):
 \t\tnetworkReplicated = false;
 \t\tdisableAIPooling = false;
 \t\tedit = {{
-{automap_line}{think_line}\t\t\tisStatic = false;
+{automap_line}{think_line}{reveal_flags}\t\t\tisStatic = false;
 {bind_info_line}\t\t\tspawnPosition = {{
 \t\t\t\tx = {position[0]};
 \t\t\t\ty = {position[1]};
@@ -1627,6 +1661,27 @@ def append_target_to_named_entity(content, entity_name, target_name):
                     entity_block = replace_targets_block(entity_block, [*targets, target_name])
                 return content[:start] + entity_block + content[end + 1:]
     raise ValueError(f"unterminated gated AP target relay: {entity_name}")
+
+
+def replace_pickup_reveal_target(content, entity_name, location_id, policy):
+    source_bounds = find_entity_block_bounds(content, entity_name)
+    source = content[slice(*source_bounds)] if source_bounds else ""
+    if not re.search(r'\bhide\s*=\s*true;', source):
+        raise ValueError(f"Pickup reveal source must start hidden: {entity_name}")
+    reveal_name = policy["reveal_entity"]
+    bounds = find_entity_block_bounds(content, reveal_name)
+    if bounds is None:
+        raise ValueError(f"Pickup reveal entity missing: {reveal_name}")
+    block = content[slice(*bounds)]
+    targets = extract_target_names(block)
+    if not re.search(r'class\s*=\s*"idTarget_Show";', block) or targets.count(entity_name) != 1:
+        raise ValueError(f"Pickup reveal source target drift: {reveal_name}")
+    gate_bounds = find_entity_block_bounds(content, policy["gate_relay"])
+    if gate_bounds is None or reveal_name not in extract_target_names(content[slice(*gate_bounds)]):
+        raise ValueError(f"Pickup reveal gate does not target its show entity: {reveal_name}")
+    block = replace_targets_block(block, [f"ap_location_visual_{location_id}" if target == entity_name else target
+                                          for target in targets])
+    return content[:bounds[0]] + block + content[bounds[1]:]
 
 
 def build_universal_physical_policy(
@@ -2009,6 +2064,7 @@ def inject_secret_encounter_completion(
     manager_name,
     ap_check_id,
     expected_last_event_index,
+    original_content=None,
 ):
     bounds = find_entity_block_bounds(content, manager_name)
     if bounds is None:
@@ -2034,11 +2090,22 @@ def inject_secret_encounter_completion(
         raise ValueError(f"Events block not found for manager {manager_name}")
 
     events_num = int(events_match.group(1))
-    if events_num == expected_last_event_index + 1:
+    source_events_num = events_num
+    if original_content is not None:
+        original_bounds = find_entity_block_bounds(original_content, manager_name)
+        if original_bounds is None:
+            raise ValueError(f"Secret encounter source manager not found: {manager_name}")
+        original_block = original_content[original_bounds[0]:original_bounds[1]]
+        original_marker = original_block.find(manager_marker)
+        original_events = re.search(r"events\s*=\s*\{\s*num\s*=\s*(\d+);", original_block[original_marker:]) if original_marker >= 0 else None
+        if original_events is None:
+            raise ValueError(f"Secret encounter source events not found: {manager_name}")
+        source_events_num = int(original_events.group(1))
+    if source_events_num == expected_last_event_index + 1:
         pass
     else:
         raise ValueError(
-            f"Manager {manager_name} has {events_num} events, expected "
+            f"Manager {manager_name} has {source_events_num} source events, expected "
             f"{expected_last_event_index + 1} before AP hook insertion"
         )
 
@@ -2155,12 +2222,15 @@ def progressive_effect_command(effect):
 
 
 def generate_physical_pickup_spawn(item_id, command_value):
-    """Emit one repeatable native spawner and one concrete Berserk pickup template."""
-    if command_value != {
-        "type": "physical_pickup_spawn",
-        "entity_def": "pickup/powerup/berserk",
+    """Emit a repeatable spawner for one native powerup pickup."""
+    effect = command_value.get("entity_def", "").removeprefix("pickup/powerup/")
+    if effect not in {"berserk", "onslaught", "overdrive"} or command_value != {
+        "type": "physical_pickup_spawn", "entity_def": f"pickup/powerup/{effect}",
     }:
         raise ValueError(f"Unsupported physical pickup definition for item {item_id}")
+    model = "berserker" if effect == "berserk" else effect
+    sound = "haste" if effect == "overdrive" else effect
+    play, stop = ("play", "stop") if effect == "berserk" else ("Play", "Stop")
     spawner_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
     pickup_name = f"{spawner_name}_pickup"
     spawner = build_primitive(
@@ -2169,8 +2239,9 @@ def generate_physical_pickup_spawn(item_id, command_value):
         {"pickup_entity": pickup_name, "spawn_at": "player1"},
     )
     pickup = f'''entity {{
+	layers {{ "spawn_target_layer" }}
 	entityDef {pickup_name} {{
-		inherit = "pickup/powerup/berserk";
+		inherit = "pickup/powerup/{effect}";
 		class = "idProp2";
 		expandInheritance = false;
 		poolCount = 0;
@@ -2181,7 +2252,8 @@ def generate_physical_pickup_spawn(item_id, command_value):
 			whenToSave = "SGT_CHECKPOINT";
 			removeFlag = "RMV_CHECKPOINT_ALLOW_MS";
 			flags = {{
-				canBecomeDormant = true;
+				canBecomeDormant = false;
+				hide = false;
 			}}
 			renderModelInfo = {{
 				contributesToLightProbeGen = false;
@@ -2192,11 +2264,12 @@ def generate_physical_pickup_spawn(item_id, command_value):
 					y = 2;
 					z = 2;
 				}}
-				model = "art/pickups/powerup/berserker_powerup.lwo";
+				model = "art/pickups/powerup/{model}_powerup.lwo";
 			}}
 			dormancy = {{
 				delay = 5;
 				distance = 2048;
+				allowPvsDormancy = false;
 			}}
 			spawn_statIncreases = {{
 				num = 1;
@@ -2219,11 +2292,11 @@ def generate_physical_pickup_spawn(item_id, command_value):
 					monsterClip = false;
 				}}
 			}}
-			fxDecl = "gameplay/powerups/berserk";
-			useableComponentDecl = "propstatuseffect/berserk";
+			fxDecl = "gameplay/powerups/{effect}";
+			useableComponentDecl = "propstatuseffect/{effect}";
 			thinkComponentDecl = "bobthink";
-			sound_spawn = "play_berserk_pickup_loop";
-			sound_stop = "stop_berserk_pickup_loop";
+			sound_spawn = "{play}_{sound}_pickup_loop";
+			sound_stop = "{stop}_{sound}_pickup_loop";
 			pickup_statIncreases = {{
 				num = 2;
 				item[0] = {{
@@ -2677,6 +2750,7 @@ def generate_map(
     receipt_feedback=None,
     enable_notifications=True,
     placement_metadata=None,
+    encounter_source=None,
 ):
     with open(config_file, encoding="utf-8") as f:
         level_config = json.load(f)
@@ -2777,7 +2851,14 @@ def generate_map(
             )
         )
         if gate_relay and not sentinel_source:
-            content = append_target_to_named_entity(content, gate_relay, entity_name)
+            gate_target = entity_name
+            if policy.get("independent_ap_trigger"):
+                gate_target = policy.get("independent_entity_name", f"ap_independent_{entity_name}")
+                if policy.get("reveal_entity"):
+                    content = replace_pickup_reveal_target(
+                        content, entity_name, config_entities[f"AP_CHECK_{entity_name.upper()}"], policy
+                    )
+            content = append_target_to_named_entity(content, gate_relay, gate_target)
     assert_no_weapon_mastery_token_currency(content, f"Registered vanilla map {map_key}")
 
     for entity_name in neutralize_pickups:
@@ -2883,6 +2964,7 @@ def generate_map(
             if "edit = {" in block:
                 location_id = config_entities[ap_check_id]
                 target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
+                target_policy.pop("permanent_resource_budget", None)
                 feedback_policy = resolve_location_feedback_policy(
                     location_feedback, ap_check_id, target_policy
                 )
@@ -2898,8 +2980,8 @@ def generate_map(
                             "preserve_visual_layers": preserve_visual_layers,
                         },
                     )
-                elif set(target_policy) == {"independent_size"}:
-                    size_override = target_policy["independent_size"]
+                elif set(target_policy) == {"independent_size"} or target_policy.get("reveal_entity"):
+                    overrides = target_policy
                     target_policy = build_universal_physical_policy(
                         ap_check_id,
                         location_id,
@@ -2910,7 +2992,7 @@ def generate_map(
                             "preserve_visual_layers": preserve_visual_layers,
                         },
                     )
-                    target_policy["independent_size"] = size_override
+                    target_policy.update(overrides)
                 elif is_sentinel_crystal_source(block) and not target_policy.get(
                     "independent_ap_trigger"
                 ):
@@ -3125,29 +3207,8 @@ def generate_map(
                                 )
                             )
                         new_blocks.append(generate_check_event(secondary_location_id))
-                        secondary_policy = copy.deepcopy(target_policy)
-                        secondary_position = list(
-                            target_policy.get("independent_position") or _spawn_position_from_block(block)
-                        )
-                        secondary_position[0] += 1.5
-                        secondary_policy["independent_position"] = secondary_position
-                        if not target_policy.get("no_auto_automap_helper"):
-                            new_blocks.append(generate_automap_location_helper(
-                                block, secondary_location_id, policy=secondary_policy
-                            ))
-                        secondary_universal = build_universal_physical_policy(
-                            secondary_ap_check_id,
-                            secondary_location_id,
-                            block,
-                            default_visual_model,
-                            policy=secondary_policy,
-                        )
-                        secondary_visual = generate_inert_location_visual(block, secondary_universal)
-                        if secondary_visual:
-                            new_blocks.append(secondary_visual)
                         new_blocks.append(generate_target_relay(
                             secondary_ap_check_id, secondary_location_id, "",
-                            completion_targets=[secondary_universal["independent_visual"]["cleanup_entity"]],
                             include_notification=include_ap_feedback,
                         ))
                     new_blocks.append(generate_target_relay(
@@ -3216,6 +3277,7 @@ def generate_map(
             manager_name,
             ap_check_id,
             expected_last_event_index,
+            original_content=encounter_source,
         )
         manifest_data[ap_check_id] = location_id
         feedback_policy = location_feedback_policy(
@@ -3282,7 +3344,7 @@ def generate_map(
             encoding="utf-8",
         )
 
-    print(f"Successfully generated {modified_count} GLOBAL AP Targets using idTrigger mutation!")
+    print(f"Generated {modified_count} Archipelago reward triggers")
     print(f"Manifest saved to {manifest_file}")
 
 if __name__ == "__main__":

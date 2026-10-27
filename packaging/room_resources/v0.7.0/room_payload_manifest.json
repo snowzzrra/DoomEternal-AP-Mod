@@ -1,0 +1,666 @@
+{
+  "base_members": [
+    "e1m1_intro/art/pickups/codex.lwo",
+    "e1m1_intro/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e1m1_intro/generated/decls/material2/art/pickups/codex.decl",
+    "e1m1_intro/generated/decls/propitem/propitem/collectible/toys/doom_slayer.decl",
+    "e1m1_intro/swf/hud/hud_score.swf",
+    "e1m1_intro_patch1/swf/hud/hud_score.swf",
+    "e1m1_intro_patch2/swf/hud/hud_score.swf",
+    "e1m1_intro_patch3/generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl",
+    "e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_intro_game/intro_game_info_logic.decl",
+    "e1m1_intro_patch3/generated/decls/logicentity/maps/game/sp/e1m1_intro/e1m1_intro_cinematic_khan_maykr_priest_meeting/khan_maykr_priest_meeting_info_logic.decl",
+    "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities",
+    "e1m2_battle/art/pickups/codex.lwo",
+    "e1m2_battle/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e1m2_battle/generated/decls/material2/art/pickups/codex.decl",
+    "e1m2_battle/swf/hud/hud_score.swf",
+    "e1m2_battle_patch1/swf/hud/hud_score.swf",
+    "e1m2_battle_patch2/swf/hud/hud_score.swf",
+    "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities",
+    "e1m3_cult/art/pickups/codex.lwo",
+    "e1m3_cult/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e1m3_cult/generated/decls/material2/art/pickups/codex.decl",
+    "e1m3_cult_patch3/generated/decls/logicentity/maps/game/sp/e1m3_cult/e1m3_cult_cinematic/cinematic_info_logic_revenant_gives_shotgun.decl",
+    "e1m3_cult_patch3/maps/game/sp/e1m3_cult/e1m3_cult.entities",
+    "e1m3_cult_patch3/swf/hud/hud_score.swf",
+    "e1m4_boss/art/pickups/codex.lwo",
+    "e1m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e1m4_boss/generated/decls/material2/art/pickups/codex.decl",
+    "e1m4_boss_patch2/maps/game/sp/e1m4_boss/e1m4_boss.entities",
+    "e1m4_boss_patch2/swf/hud/hud_score.swf",
+    "e2m1_nest/art/pickups/codex.lwo",
+    "e2m1_nest/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e2m1_nest/generated/decls/material2/art/pickups/codex.decl",
+    "e2m1_nest_patch1/swf/hud/hud_score.swf",
+    "e2m1_nest_patch2/maps/game/sp/e2m1_nest/e2m1_nest.entities",
+    "e2m2_base/art/pickups/codex.lwo",
+    "e2m2_base/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e2m2_base/generated/decls/material2/art/pickups/codex.decl",
+    "e2m2_base_patch2/swf/hud/hud_score.swf",
+    "e2m2_base_patch3/maps/game/sp/e2m2_base/e2m2_base.entities",
+    "e2m3_core/art/pickups/codex.lwo",
+    "e2m3_core/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e2m3_core/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+    "e2m3_core/generated/decls/material2/art/pickups/codex.decl",
+    "e2m3_core_patch2/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic/cinematic_info_logic_bfg10k_firing.decl",
+    "e2m3_core_patch2/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+    "e2m3_core_patch2/maps/game/sp/e2m3_core/e2m3_core.entities",
+    "e2m3_core_patch3/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic/cinematic_info_logic_bfg10k_firing.decl",
+    "e2m3_core_patch3/generated/decls/logicentity/maps/game/sp/e2m3_core/e2m3_core_cinematic_observation_deck_intro/observation_deck_intro_info_logic.decl",
+    "e2m3_core_patch3/swf/hud/hud_score.swf",
+    "e2m4_boss/art/pickups/codex.lwo",
+    "e2m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e2m4_boss/generated/decls/material2/art/pickups/codex.decl",
+    "e2m4_boss_patch2/maps/game/sp/e2m4_boss/e2m4_boss.entities",
+    "e2m4_boss_patch2/swf/hud/hud_score.swf",
+    "e3m1_slayer/art/pickups/codex.lwo",
+    "e3m1_slayer/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e3m1_slayer/generated/decls/material2/art/pickups/codex.decl",
+    "e3m1_slayer_patch2/generated/decls/logicentity/maps/game/sp/e3m1_slayer/e3m1_slayer_cinematic_crucible/cinematic_crucible_info_logic.decl",
+    "e3m1_slayer_patch2/maps/game/sp/e3m1_slayer/e3m1_slayer.entities",
+    "e3m1_slayer_patch2/swf/hud/hud_score.swf",
+    "e3m2_hell/art/pickups/codex.lwo",
+    "e3m2_hell/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e3m2_hell/generated/decls/material2/art/pickups/codex.decl",
+    "e3m2_hell_b/art/pickups/codex.lwo",
+    "e3m2_hell_b/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e3m2_hell_b/generated/decls/material2/art/pickups/codex.decl",
+    "e3m2_hell_b_patch2/maps/game/sp/e3m2_hell_b/e3m2_hell_b.entities",
+    "e3m2_hell_b_patch2/swf/hud/hud_score.swf",
+    "e3m2_hell_patch2/maps/game/sp/e3m2_hell/e3m2_hell.entities",
+    "e3m2_hell_patch2/swf/hud/hud_score.swf",
+    "e3m3_maykr/art/pickups/codex.lwo",
+    "e3m3_maykr/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e3m3_maykr/generated/decls/material2/art/pickups/codex.decl",
+    "e3m3_maykr_patch2/swf/hud/hud_score.swf",
+    "e3m3_maykr_patch3/maps/game/sp/e3m3_maykr/e3m3_maykr.entities",
+    "e3m4_boss/art/pickups/codex.lwo",
+    "e3m4_boss/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e3m4_boss/generated/decls/material2/art/pickups/codex.decl",
+    "e3m4_boss_patch2/swf/hud/hud_score.swf",
+    "e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_destroyer/icon_destroyer_info_logic.decl",
+    "e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_of_sin_death/icon_of_sin_death_cinematic_info_logic.decl",
+    "e3m4_boss_patch3/maps/game/sp/e3m4_boss/e3m4_boss.entities",
+    "e4m1_rig/art/pickups/codex.lwo",
+    "e4m1_rig/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e4m1_rig/generated/decls/material2/art/pickups/codex.decl",
+    "e4m1_rig_patch2/generated/decls/logicentity/maps/game/dlc/e4m1_rig/e4m1_rig_cinematic_intro/intro_info_logic.decl",
+    "e4m1_rig_patch2/maps/game/dlc/e4m1_rig/e4m1_rig.entities",
+    "e4m1_rig_patch2/swf/hud/hud_score.swf",
+    "e4m2_swamp/art/pickups/codex.lwo",
+    "e4m2_swamp/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e4m2_swamp/generated/decls/material2/art/pickups/codex.decl",
+    "e4m2_swamp_patch1/swf/hud/hud_score.swf",
+    "e4m2_swamp_patch2/maps/game/dlc/e4m2_swamp/e4m2_swamp.entities",
+    "e4m3_mcity/art/pickups/codex.lwo",
+    "e4m3_mcity/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e4m3_mcity/generated/decls/material2/art/pickups/codex.decl",
+    "e4m3_mcity_patch1/swf/hud/hud_score.swf",
+    "e4m3_mcity_patch2/maps/game/dlc/e4m3_mcity/e4m3_mcity.entities",
+    "e5m1_spear/art/pickups/codex.lwo",
+    "e5m1_spear/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e5m1_spear/generated/decls/material2/art/pickups/codex.decl",
+    "e5m1_spear_patch1/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_valen_gifts_hammer/valen_gifts_hammer_info_logic.decl",
+    "e5m1_spear_patch1/maps/game/dlc2/e5m1_spear/e5m1_spear.entities",
+    "e5m1_spear_patch1/swf/hud/hud_score.swf",
+    "e5m1_spear_patch2/generated/decls/logicentity/maps/game/dlc2/e5m1_spear/e5m1_spear_cinematics_intro/cinematic_intro_info_logic.decl",
+    "e5m2_earth/art/pickups/codex.lwo",
+    "e5m2_earth/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e5m2_earth/generated/decls/material2/art/pickups/codex.decl",
+    "e5m2_earth_patch1/swf/hud/hud_score.swf",
+    "e5m2_earth_patch2/maps/game/dlc2/e5m2_earth/e5m2_earth.entities",
+    "e5m3_hell/art/pickups/codex.lwo",
+    "e5m3_hell/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "e5m3_hell/generated/decls/material2/art/pickups/codex.decl",
+    "e5m3_hell_patch1/maps/game/dlc2/e5m3_hell/e5m3_hell.entities",
+    "e5m3_hell_patch1/swf/hud/hud_score.swf",
+    "e5m4_boss_patch1/generated/decls/logicentity/maps/game/dlc2/e5m4_boss/e5m4_boss_cinematics_death_of_the_darklord/death_of_the_darklord_info_logic.decl",
+    "e5m4_boss_patch1/maps/game/dlc2/e5m4_boss/e5m4_boss.entities",
+    "gameresources/generated/decls/perks/perk/player/weapons/chaingun/energy_shell_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/chaingun/turret_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/double_barrel/meat_hook_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/gauss_cannon/ballista_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/gauss_cannon/destroyer_charge_levels.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/heavy_cannon/bolt_action_mastery_upgrades.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/heavy_cannon/burst_detonate_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/plasma_rifle/secondary_aoe_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/plasma_rifle/secondary_microwave_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/rocket_launcher/detonate_explosive_array_horizontal.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/rocket_launcher/lockon_mastery.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl",
+    "gameresources/generated/decls/perks/perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m3/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m3/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m3/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m4/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m4/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e1m4/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m1/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m1/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m1/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m2/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m2/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m2/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m3/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m3/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e2m3/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m1/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m1/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m1/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2_b/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2_b/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m2_b/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m3/challenge_1.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m3/challenge_2.decl",
+    "gameresources/generated/decls/unlockable/mission_challenge/e3m3/challenge_3.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/ballista/arbalest.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/ballista/destroyer.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/chaingun/energy_shield.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/chaingun/mobile_turret.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/double_barrel/meat_hook.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/heavy_cannon/micro_missiles.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/heavy_cannon/piercing_bolt.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/plasma_rifle/heat_blast.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/plasma_rifle/microwave.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/rocket_launcher/detonate.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/rocket_launcher/lock_on.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/shotgun/full_auto.decl",
+    "gameresources/generated/decls/unlockable/weapon_mastery/shotgun/sticky_bomb.decl",
+    "gameresources/generated/decls/violenceevent/violenceevent/weapon_mastery/shotgun/full_auto_kill_pinky.decl",
+    "gameresources/generated/decls/weapon/weapon/player/double_barrel.decl",
+    "gameresources/swf/hud/menus/dossier/dossier_challenges.swf",
+    "gameresources/textures/swf_images/start_screen/doom_logo_base.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/doom_outer_glow.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/doom_scan_lines.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_backplate_base.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_backplate_inner_glow.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_backplate_outer_glow.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_backplate_scanlines.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_font_base.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/eternal_font_glow.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/logo_base_glow.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/logo_base_gradient.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/logo_base_scanline_a.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/logo_base_scanline_b.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/logo_base_white.png$bc7$streamed$mtlkind=ui",
+    "gameresources/textures/swf_images/start_screen/scanline_a.png$bc7$streamed$mtlkind=ui",
+    "gameresources_patch1/EternalMod/strings/english.json",
+    "gameresources_patch1/EternalMod/strings/portuguese.json",
+    "gameresources_patch1/generated/decls/damage/damage/triggerhurt/triggerhurt1000_instagib.decl",
+    "gameresources_patch1/generated/decls/entitydef/player.decl",
+    "gameresources_patch1/generated/decls/menuelement/hud/dossier/runes.decl",
+    "gameresources_patch1/swf/hud/hud_score.swf",
+    "gameresources_patch1/swf/hud/menus/dossier/dossier_challenges.swf",
+    "gameresources_patch1/swf/hud/menus/dossier/dossier_map.swf",
+    "gameresources_patch1/swf/hud/menus/end_of_level/eol_challenges.swf",
+    "gameresources_patch1/swf/main_menu/screens/mission_select.swf",
+    "gameresources_patch1/swf/main_menu/screens/start.swf",
+    "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl",
+    "gameresources_patch2/generated/decls/missionchallengelist/missionchallenge/main.decl",
+    "gameresources_patch2/swf/hud/menus/dossier/dossier_challenges.swf",
+    "gameresources_patch2/swf/main_menu/screens/root.swf",
+    "hub/art/pickups/codex.lwo",
+    "hub/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "hub/generated/decls/material2/art/pickups/codex.decl",
+    "hub/swf/hud/hud_score.swf",
+    "hub_patch1/swf/hud/hud_score.swf",
+    "hub_patch2/EternalMod/assetsinfo/hub.json",
+    "hub_patch2/generated/decls/logicentity/maps/game/hub/hub/info_logic_hub_from_e1m2.decl",
+    "hub_patch2/maps/game/dlc/hub/hub.entities",
+    "hub_patch2/maps/game/hub/hub.entities",
+    "shell/EternalMod/assetsinfo/shell.json",
+    "shell/art/pickups/codex.lwo",
+    "shell/art/pickups/codex.tga$streamed$mtlkind=albedo",
+    "shell/generated/decls/material2/art/pickups/codex.decl",
+    "shell/maps/game/shell/shell.entities",
+    "streamdb/art/pickups/codex_id#13626551837332538432.lwo"
+  ],
+  "context_targets": {
+    "arc/hub": "hub_patch2/maps/game/dlc/hub/hub.entities",
+    "dark_lord/e5m4_boss": "e5m4_boss_patch1/maps/game/dlc2/e5m4_boss/e5m4_boss.entities",
+    "tag1/e4m1_rig": "e4m1_rig_patch2/maps/game/dlc/e4m1_rig/e4m1_rig.entities",
+    "tag1/e4m2_swamp": "e4m2_swamp_patch2/maps/game/dlc/e4m2_swamp/e4m2_swamp.entities",
+    "tag1/e4m3_mcity": "e4m3_mcity_patch2/maps/game/dlc/e4m3_mcity/e4m3_mcity.entities",
+    "tag2/e5m1_spear": "e5m1_spear_patch1/maps/game/dlc2/e5m1_spear/e5m1_spear.entities",
+    "tag2/e5m2_earth": "e5m2_earth_patch2/maps/game/dlc2/e5m2_earth/e5m2_earth.entities",
+    "tag2/e5m3_hell": "e5m3_hell_patch1/maps/game/dlc2/e5m3_hell/e5m3_hell.entities"
+  },
+  "maps": {
+    "e1m1_intro": {
+      "option_keys": [
+        "randomize_chainsaw"
+      ],
+      "state_policy": "cartesian",
+      "states": [
+        {
+          "member": null,
+          "options": {
+            "randomize_chainsaw": false
+          },
+          "sha256": "7f2063c63721637d79c42a055d8ea35a90e07eec4767440b6419e362893b7c9c",
+          "source": "base"
+        },
+        {
+          "member": "replacements/e1m1_intro/chainsaw.entities",
+          "options": {
+            "randomize_chainsaw": true
+          },
+          "sha256": "df72168b1a1b8be290281827c96e0f0d1587e90ac0d6c21eab31685005b8b33b",
+          "source": "replacement"
+        }
+      ],
+      "target_member": "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
+    },
+    "e1m2_war": {
+      "option_keys": [
+        "randomize_dash",
+        "randomize_first_battery"
+      ],
+      "state_policy": "cartesian",
+      "states": [
+        {
+          "member": null,
+          "options": {
+            "randomize_dash": false,
+            "randomize_first_battery": false
+          },
+          "sha256": "52fdc4fb7586bf9cdcb5220f942dff03025c40a7386c0e26c4eecd08cb868ac5",
+          "source": "base"
+        },
+        {
+          "member": "replacements/e1m2_war/first_battery.entities",
+          "options": {
+            "randomize_dash": false,
+            "randomize_first_battery": true
+          },
+          "sha256": "1b3a4944b1b1737e53ab7d587d973ed7df781ad6d8277e1b7618405a2bd662df",
+          "source": "replacement"
+        },
+        {
+          "member": "replacements/e1m2_war/dash.entities",
+          "options": {
+            "randomize_dash": true,
+            "randomize_first_battery": false
+          },
+          "sha256": "0ac434a0cd538aee9fc97933a46981559132658331de6a55909530d3aca2e317",
+          "source": "replacement"
+        },
+        {
+          "member": "replacements/e1m2_war/dash-first_battery.entities",
+          "options": {
+            "randomize_dash": true,
+            "randomize_first_battery": true
+          },
+          "sha256": "c1b2fc5f6fe44bb55d355c71de1d893ec6ffb3be434c792897c489c1a16658ab",
+          "source": "replacement"
+        }
+      ],
+      "target_member": "e1m2_battle_patch3/maps/game/sp/e1m2_battle/e1m2_battle.entities"
+    },
+    "e1m3_cult": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "eb36ba8d96f5c1fd9cae38608c819929b13b0cd33f3bb34c980e8bc98aca2fee",
+          "source": "base"
+        }
+      ],
+      "target_member": "e1m3_cult_patch3/maps/game/sp/e1m3_cult/e1m3_cult.entities"
+    },
+    "e1m4_boss": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "7f584a09126d47b7314ff9227e020420f9b2e971c89b85bfb70d5d48f8d8499f",
+          "source": "base"
+        }
+      ],
+      "target_member": "e1m4_boss_patch2/maps/game/sp/e1m4_boss/e1m4_boss.entities"
+    },
+    "e2m1_nest": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "70ff46d60cc73ef3dfc7d86758391c9e24fa2a29ec2bb957b02229a83259a1f0",
+          "source": "base"
+        }
+      ],
+      "target_member": "e2m1_nest_patch2/maps/game/sp/e2m1_nest/e2m1_nest.entities"
+    },
+    "e2m2_base": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "1975c3ad47bcb0297f98676f02fb7ab509c2e2f8b5b700ac2d50b84c546cfa67",
+          "source": "base"
+        }
+      ],
+      "target_member": "e2m2_base_patch3/maps/game/sp/e2m2_base/e2m2_base.entities"
+    },
+    "e2m3_core": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "7c8417863debc8c639e7ed88952f7a1771d42f4e650159467751a27e0a9c2307",
+          "source": "base"
+        }
+      ],
+      "target_member": "e2m3_core_patch2/maps/game/sp/e2m3_core/e2m3_core.entities"
+    },
+    "e2m4_boss": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "e2262085373f0371cd579ffa8d1c86f9d0bd8bb39bf208fe355d310712aa52fd",
+          "source": "base"
+        }
+      ],
+      "target_member": "e2m4_boss_patch2/maps/game/sp/e2m4_boss/e2m4_boss.entities"
+    },
+    "e3m1_slayer": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "01d8368862321e6a6614124455336e9b584f1c743d043e4e4e548b7e9ffefbb3",
+          "source": "base"
+        }
+      ],
+      "target_member": "e3m1_slayer_patch2/maps/game/sp/e3m1_slayer/e3m1_slayer.entities"
+    },
+    "e3m2_hell": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "82de335008528d5bd0a0de3ebfd18ed74d611851b2e3fb8f46e26caa24d1b6c1",
+          "source": "base"
+        }
+      ],
+      "target_member": "e3m2_hell_patch2/maps/game/sp/e3m2_hell/e3m2_hell.entities"
+    },
+    "e3m2_hell_b": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "0e1a8a3530e87606fb11e977d8e316c742a0cafdc69d6fa05f33a57ac973a6f2",
+          "source": "base"
+        }
+      ],
+      "target_member": "e3m2_hell_b_patch2/maps/game/sp/e3m2_hell_b/e3m2_hell_b.entities"
+    },
+    "e3m3_maykr": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "4b3b6ba87d14199d4baac52ab586ba3ff872ad944d37ca70ac91ec9dfdec9853",
+          "source": "base"
+        }
+      ],
+      "target_member": "e3m3_maykr_patch3/maps/game/sp/e3m3_maykr/e3m3_maykr.entities"
+    },
+    "e3m4_boss": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "753d90570e21058da7199a4bcb3da80d7b5ecd5803d7d095838c2f59fcc92095",
+          "source": "base"
+        }
+      ],
+      "target_member": "e3m4_boss_patch3/maps/game/sp/e3m4_boss/e3m4_boss.entities"
+    },
+    "e4m1_rig": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "f14110f8ce7ee335788815d6c665e679902f60832263248639a031c5150b6c6c",
+          "source": "base"
+        }
+      ],
+      "target_member": "e4m1_rig_patch2/maps/game/dlc/e4m1_rig/e4m1_rig.entities"
+    },
+    "e4m2_swamp": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "cc674c978b68baf07cd620837e108611ccad20304a74b196f0c914af15bf7c50",
+          "source": "base"
+        }
+      ],
+      "target_member": "e4m2_swamp_patch2/maps/game/dlc/e4m2_swamp/e4m2_swamp.entities"
+    },
+    "e4m3_mcity": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "eb08a659a27c5d8bbf5aadee59505c03a85a0fc9129ec0c4f292ed5d9a56f4c4",
+          "source": "base"
+        }
+      ],
+      "target_member": "e4m3_mcity_patch2/maps/game/dlc/e4m3_mcity/e4m3_mcity.entities"
+    },
+    "e5m1_spear": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "c537485d26a582e233ffa4884afbd2de04e8be4831341281f78dbe5e74841003",
+          "source": "base"
+        }
+      ],
+      "target_member": "e5m1_spear_patch1/maps/game/dlc2/e5m1_spear/e5m1_spear.entities"
+    },
+    "e5m2_earth": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "616b130afb623d2e6b589f1925d9f96974a8ce89bb4ee2fec211cc85cdb5a70d",
+          "source": "base"
+        }
+      ],
+      "target_member": "e5m2_earth_patch2/maps/game/dlc2/e5m2_earth/e5m2_earth.entities"
+    },
+    "e5m3_hell": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "6233582fe72cfded6663ac83777e8ff7c3a2176ebc575183c2eab3970659b600",
+          "source": "base"
+        }
+      ],
+      "target_member": "e5m3_hell_patch1/maps/game/dlc2/e5m3_hell/e5m3_hell.entities"
+    },
+    "e5m4_boss": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "bd641da5d441e85d453a9d76f545c2409eb6250f479a999e2f90ec5349aa1c64",
+          "source": "base"
+        }
+      ],
+      "target_member": "e5m4_boss_patch1/maps/game/dlc2/e5m4_boss/e5m4_boss.entities"
+    },
+    "hub": {
+      "option_keys": [],
+      "state_policy": "off_only",
+      "states": [
+        {
+          "member": null,
+          "options": {},
+          "sha256": "33a77df9a4085210e75bff36626429a158d0306371fa115c3607475693fdc28a",
+          "source": "base"
+        }
+      ],
+      "target_member": "hub_patch2/maps/game/hub/hub.entities"
+    }
+  },
+  "model": "dependent_map_payloads",
+  "physical_option_keys": [
+    "randomize_chainsaw",
+    "randomize_dash",
+    "randomize_first_battery"
+  ],
+  "schema_version": 2,
+  "source_snapshots": {
+    "e1m1_intro": {
+      "member": "sources/e1m1_intro.entities",
+      "sha256": "5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6",
+      "size": 11693058
+    },
+    "e1m2_war": {
+      "member": "sources/e1m2_war.entities",
+      "sha256": "c83069ae8c2094ec4aee99ed331f1c30568e6b71cda12b81ce7e5933837dfe65",
+      "size": 11567962
+    },
+    "e1m3_cult": {
+      "member": "sources/e1m3_cult.entities",
+      "sha256": "ca83b98a7a533ec608b3ea3a4207814eb56bdb283a3d0c27b7a5ad744efa7866",
+      "size": 18900226
+    },
+    "e1m4_boss": {
+      "member": "sources/e1m4_boss.entities",
+      "sha256": "d5579ccb320228eaca9a18f44513ccae297d9371cc7138e0c8ef2acc0088c0f8",
+      "size": 10400573
+    },
+    "e2m1_nest": {
+      "member": "sources/e2m1_nest.entities",
+      "sha256": "80f60fc5ae45d7e9ae51940d79a1427e4936ab647dc29b530c400c0f6a89a8c7",
+      "size": 13461473
+    },
+    "e2m2_base": {
+      "member": "sources/e2m2_base.entities",
+      "sha256": "984c863bc97105a998b3b8bb06022df698811852bec895658b22140d5713f71f",
+      "size": 28529305
+    },
+    "e2m3_core": {
+      "member": "sources/e2m3_core.entities",
+      "sha256": "43d074988387e710c75b2f5368c8c554fbd30e62595bb384fa18dfa34f246dff",
+      "size": 15991600
+    },
+    "e2m4_boss": {
+      "member": "sources/e2m4_boss.entities",
+      "sha256": "a2ad83c240a8bc929b40f059f7f11aff5337c36999e773d0e045c132823ad390",
+      "size": 2452889
+    },
+    "e3m1_slayer": {
+      "member": "sources/e3m1_slayer.entities",
+      "sha256": "4ff0dd156f1680670b7a9c092bd6c3795e0e9b3ef82947ad18c5c2dfda0ae705",
+      "size": 11694102
+    },
+    "e3m2_hell": {
+      "member": "sources/e3m2_hell.entities",
+      "sha256": "279676cbe9781f5c569d275ca3044f040a395a79735ce555a8e029ccff7f20f8",
+      "size": 6742072
+    },
+    "e3m2_hell_b": {
+      "member": "sources/e3m2_hell_b.entities",
+      "sha256": "2f08c1fc45e925563b509a2d8465850f0b83e7efc11cac9bff705d0b4e108adb",
+      "size": 6577895
+    },
+    "e3m3_maykr": {
+      "member": "sources/e3m3_maykr.entities",
+      "sha256": "29cdee76e07ecdce1cc3b38d47d311c50d06b3b5e8f14ea9e74512a95e577ffb",
+      "size": 9512155
+    },
+    "e3m4_boss": {
+      "member": "sources/e3m4_boss.entities",
+      "sha256": "ec8a59ec4a240eb5f4535a01a98896d618f1724a1e669a946c8f0202c9f4d398",
+      "size": 15044764
+    },
+    "e4m1_rig": {
+      "member": "sources/e4m1_rig.entities",
+      "sha256": "ca13a5d99a305aa7ba1ed7eee87e56a868289275a7f5c2604ad5042b48d05d62",
+      "size": 13054609
+    },
+    "e4m2_swamp": {
+      "member": "sources/e4m2_swamp.entities",
+      "sha256": "2211ff15c44a8bdd1174c477dc46d9942dbc16951cec4c0d55cf884c3c17a690",
+      "size": 14864619
+    },
+    "e4m3_mcity": {
+      "member": "sources/e4m3_mcity.entities",
+      "sha256": "fc3174b2306cd889d17eee49cefe5537661f02eaa7c852a001eea826125d0904",
+      "size": 11650133
+    },
+    "e5m1_spear": {
+      "member": "sources/e5m1_spear.entities",
+      "sha256": "c4f1c3aaffea62a164860fee001254888696f7585cb18878e872175864418eb6",
+      "size": 13628342
+    },
+    "e5m2_earth": {
+      "member": "sources/e5m2_earth.entities",
+      "sha256": "623fc517c295fe183b57e90eac35c75f505ee4a913fc19c674c8ecc8944a18c1",
+      "size": 4432256
+    },
+    "e5m3_hell": {
+      "member": "sources/e5m3_hell.entities",
+      "sha256": "8f647f91f79d5ba94b3d50417e48615694a8340d1bac787e6bbe4a35337b0c44",
+      "size": 6722570
+    },
+    "e5m4_boss": {
+      "member": "sources/e5m4_boss.entities",
+      "sha256": "7138e321f100dfb16162d3b220d103e4969f11080d5b923ed1b7be7dc812cf87",
+      "size": 1309237
+    },
+    "hub": {
+      "member": "sources/hub.entities",
+      "sha256": "364a547b6b2239d576e5122af9faa413bd85ffb1ebcaa97773ba708d99585e1b",
+      "size": 3854586
+    }
+  }
+}

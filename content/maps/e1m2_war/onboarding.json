@@ -10,5 +10,79 @@
   "owner": {
     "resource": "game/sp/e1m2_battle/e1m2_battle_patch3.resources",
     "priority": 20
+  },
+  "source_evidence": {
+    "physical_pickup_sources": [
+      {
+        "location_id": 7770493,
+        "source_entity": "pickups_pickup_armor_large_2",
+        "source_inherit": "pickup/armor/large",
+        "source_class": "idProp2",
+        "spawn_position": {
+          "x": -98.2999344,
+          "y": 281.999969,
+          "z": 12.9187717
+        },
+        "region": "Exultia - Exultia - Mourning Spire",
+        "qualification": "The armor is behind capitol_destructible_e3m1_slayer_secret_stone_wall_2; that wall activates capitol_target_secret_1_e1m2.",
+        "reference": "https://www.tomshw.it/videogioco/doom-eternal-guida-completa/doom-eternal-exultia-guida-collezionabili",
+        "native_interaction_retained": false
+      },
+      {
+        "location_id": 7770494,
+        "source_entity": "capitol_pickup_mega_health_1",
+        "source_inherit": "pickup/mega_health",
+        "source_class": "idProp2",
+        "spawn_position": {
+          "z": -30.2300873,
+          "x": -34.1000214,
+          "y": 219.499908
+        },
+        "region": "Exultia - Exultia - Mourning Spire",
+        "qualification": "The source pickup activates capitol_target_secret_5_e1m2 in the opening capitol hall; it has no Dash bind parent or mission-select layer.",
+        "reference": "vanillamaps/e1m2_war.map#capitol_pickup_mega_health_1",
+        "native_interaction_retained": false
+      },
+      {
+        "location_id": 7770495,
+        "source_entity": "pickups_interact_automap_1_e1m2",
+        "source_inherit": "interact/automap",
+        "source_class": "idInteractable_Automap",
+        "spawn_position": {
+          "x": -72.9000092,
+          "y": -509.100006,
+          "z": -10.5999985
+        },
+        "region": "Exultia - Exultia - Belphegor's Gate",
+        "qualification": "The station is in native AUTOMAP_GROUP_B (HELL) on the first purple-goo route, before the sortOrder 3 anchor. The existing logical region for the sortOrder 2 route is Belphegor's Gate.",
+        "reference": "vanillamaps/e1m2_war.map#info_fast_travel_3",
+        "native_interaction_retained": true,
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e1m2_battle/e1m2_battle.decl",
+          "sha256": "9819312254bb4e7a7dc3ed69c03ab10616ad6ca2a9c68f64c6b91cba71827ed8",
+          "station_groups": [
+            "AUTOMAP_GROUP_B"
+          ]
+        }
+      },
+      {
+        "entity": "trenches_pickup_mega_health_1",
+        "location_id": 7770514,
+        "inherit": "pickup/mega_health",
+        "class": "idProp2",
+        "position": {
+          "z": -14.4701118,
+          "x": 12.8000011,
+          "y": -643.699829
+        },
+        "region": "Exultia - Exultia - Belphegor's Gate",
+        "qualification": "The native trenches secret alcove is behind the destructible wall that records Secret2, before the Dour Slough route. The authored dorm_hell_trenches layer is retained.",
+        "source_entities": [
+          "trenches_destructible_e3m1_slayer_secret_stone_wall_1",
+          "trenches_target_secret_2_e1m2"
+        ],
+        "reference": "vanillamaps/e1m2_war.map"
+      }
+    ]
   }
 }

@@ -108,6 +108,8 @@ CORE_MAP_INPUTS = (
     "doom_eap/contracts/publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
+    "doom_eap/content/secret_encounter_timers.py",
+    "doom_eap/content/mastery_requirements.py",
     "doom_eap/contracts/save_observation.py",
     "doom_eap/runtime/save_files.py",
     "doom_eap/runtime/save_records.py",
@@ -154,7 +156,6 @@ PREFLIGHT_PYTHON = (
     "doom_eap/content/content_catalog.py",
     "doom_eap/contracts/publisher_contracts.py",
     "doom_eap/launcher/launcher_app.py",
-    "doom_eap/launcher/launcher_cli.py",
     "doom_eap/launcher/launcher_controller.py",
     "doom_eap/launcher/launcher_workers.py",
     "doom_eap/launcher/launcher_interactions.py",
@@ -1011,6 +1012,8 @@ class Pipeline:
             if path.is_file() and "__pycache__" not in path.parts
         }
         for relative in (
+            "doom_eap/content/secret_encounter_timers.py",
+            "doom_eap/content/mastery_requirements.py",
             "doom_eap/contracts/tag_prerequisites.py",
             "doom_eap/contracts/runtime_context.py",
             "doom_eap/contracts/save_observation.py",
@@ -1070,7 +1073,6 @@ class Pipeline:
             "doom_eap/runtime/observer_lifecycle.py",
             "doom_eap/contracts/publisher_contracts.py",
             "doom_eap/launcher/launcher_app.py",
-            "doom_eap/launcher/launcher_cli.py",
             "doom_eap/launcher/launcher_controller.py",
             "doom_eap/launcher/launcher_workers.py",
             "doom_eap/launcher/launcher_interactions.py",

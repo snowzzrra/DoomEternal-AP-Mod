@@ -91,7 +91,7 @@ class DoctorReport:
 
     @property
     def ok(self) -> bool:
-        return all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
+        return self.summary_status == "ready" and all(item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"} for item in self.diagnostics)
 
     def document(self) -> dict[str, object]:
         return {
@@ -1404,6 +1404,44 @@ def _native_startup_diagnostics(config, session):
             "errors": errors, "reason": None if records else "no_matching_native_diagnostic"}
 
 
+def _darklord_diagnostics(session):
+    root = os.environ.get("LOCALAPPDATA")
+    if not root:
+        return {}, {"status": "unavailable", "reason": "native_log_location_unavailable"}
+    directory = Path(root) / "SentinelCore" / "diagnostics"
+    records, errors, logs = [], [], {}
+    limit = 16 * 1024 * 1024
+    try:
+        candidates = sorted(
+            (path for path in directory.glob("*.darklord.log")
+             if re.fullmatch(r"\d+-\d+\.darklord\.log", path.name) and not path.is_symlink()),
+            key=lambda path: path.stat().st_mtime, reverse=True,
+        )
+        for path in candidates[:4]:
+            size = path.stat().st_size
+            with path.open("rb") as stream:
+                if size > limit:
+                    stream.seek(size - limit)
+                    stream.readline()
+                raw = stream.read(limit)
+            lines = [line for line in raw.decode("utf-8", errors="replace").splitlines()
+                     if line.startswith("AP_DARKLORD ")]
+            if not lines:
+                continue
+            identity = path.name.removesuffix(".darklord.log").split("-")
+            current = identity == [str(session.get("pid")), str(session.get("process_created"))]
+            name = "darklord/" + path.name
+            logs[name] = _sanitize_support_text("\n".join(lines)) + "\n"
+            records.append({"archive_member": name, "pid": int(identity[0]),
+                            "process_created": int(identity[1]), "line_count": len(lines),
+                            "source_size": size, "truncated": size > limit,
+                            "evidence": "current_process" if current else "last_known"})
+    except OSError as error:
+        errors.append(type(error).__name__)
+    return logs, {"status": "available" if logs else "unavailable", "records": records,
+                  "errors": errors, "reason": None if logs else "no_darklord_telemetry"}
+
+
 def write_support_bundle(
     destination: Path,
     report: DoctorReport,
@@ -1488,6 +1526,9 @@ def write_support_bundle(
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     support = payload.get("support_diagnostics", {})
     session = support.get("ap_session") or support.get("campaign_inspection", {}).get("session", {})
+    darklord_logs, darklord = _darklord_diagnostics(session)
+    tails.update(darklord_logs)
+    payload["darklord_telemetry"] = sanitize_support_value(darklord)
     native_startup = _native_startup_diagnostics(config, session)
     payload["native_startup"] = sanitize_support_value(native_startup)
     safe_logs = _bound_support_text(
@@ -1563,7 +1604,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.6.7"
+    VERSION = "0.7.0"
 
     def __init__(
         self,
@@ -1723,6 +1764,16 @@ class LauncherDoctor:
                     "Installer keeps file backups and verifies installed hash.",
                 ))
                 return tuple(actions)
+            if os.name == "nt" and adapter_state == "applied" and root is not None:
+                try:
+                    from .campaign_resources import verify_installed_resources
+                    verify_installed_resources(root, receipt)
+                except (OSError, ValueError) as error:
+                    actions.append(RepairAction(
+                        "reinstall_room_mod", "Repair changed game resources",
+                        (f"Reapply room package: {staged.name}",), True, str(error),
+                    ))
+                    return tuple(actions)
             if os.name != "nt" and adapter_state == "applied":
                 try:
                     _verify_linux_receipt(receipt, self.config, application_dir=self._application_dir())
@@ -1872,9 +1923,18 @@ class LauncherDoctor:
                             checks.append(Diagnostic("mod_injection", "ok", "Linux mod installation applied and verified", details))
                             room_receipt_applied = True
                     else:
-                        checks.append(Diagnostic("mod_injection", "ok", "Mod installation applied successfully", {"adapter_state": adapter_state, "installation_mode": mode}))
-                        checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
-                        room_receipt_applied = True
+                        from .campaign_resources import verify_installed_resources
+                        try:
+                            if root is None:
+                                raise ValueError("Installed game resource directory is unavailable")
+                            verify_installed_resources(root, receipt)
+                        except (OSError, ValueError) as error:
+                            for key in ("mod_injection", "windows_mod_installer"):
+                                checks.append(Diagnostic(key, "failed", str(error), {"adapter_state": adapter_state}))
+                        else:
+                            checks.append(Diagnostic("mod_injection", "ok", "Installed game resource hashes verified", {"adapter_state": adapter_state, "installation_mode": mode}))
+                            checks.append(Diagnostic("windows_mod_installer", "ok", f"Windows mod installation verified ({mode or 'applied'})", {"installation_mode": mode, "adapter_state": adapter_state}))
+                            room_receipt_applied = True
                 elif adapter_state in UNINSTALL_OWNED_STATES:
                     details = {"adapter_state": adapter_state, "installation_mode": mode}
                     if adapter_state == "uninstalled":
@@ -1962,11 +2022,22 @@ class LauncherDoctor:
         else:
             domain = ""
             recovery_action = ""
-            summary_status = "ready" if all(
+            overall = support_diagnostics.get("game_link", {}).get("overall", {})
+            overall_status = str(overall.get("status", "ready")) if isinstance(overall, Mapping) else "ready"
+            overall_reason = str(overall.get("reason", "")) if isinstance(overall, Mapping) else ""
+            checks_ok = all(
                 item.status not in {"error", "invalid", "missing", "incompatible", "failed", "attention"}
                 for item in checks
-            ) else "needs_attention"
-            summary_message = ""
+            )
+            if not checks_ok or overall_status == "attention":
+                summary_status = "needs_attention"
+                summary_message = overall_reason if checks_ok else ""
+            elif overall_status == "degraded":
+                summary_status = "degraded"
+                summary_message = overall_reason
+            else:
+                summary_status = "ready"
+                summary_message = ""
         return DoctorReport(
             self.VERSION,
             tuple(checks),

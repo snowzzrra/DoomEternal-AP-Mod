@@ -20,7 +20,6 @@ from doom_eap.launcher.launcher_core import (
     ModCompiler,
     RoomCompiler,
     RoomSnapshot,
-    release_identity,
 )
 from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
 from doom_eap.launcher.launcher_platform import (
@@ -45,8 +44,10 @@ def _install_core_fixture(game_root: Path) -> Path:
 
 
 def _snapshot() -> RoomSnapshot:
-    ids = ModCompiler().active_location_ids(False)
-    identity = release_identity()
+    ids = ModCompiler().active_location_ids({"randomize_dash": False})
+    slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_bytes())
+    from doom_eap.content.enemy_options import normalize_enemy_options
+    slot_data['enemies'] = normalize_enemy_options(slot_data)
     placements = [
         {
             "location_id": location_id,
@@ -66,16 +67,7 @@ def _snapshot() -> RoomSnapshot:
         {
             "team": 1,
             "slot": 2,
-            "slot_data": {
-                "randomize_chainsaw": False,
-                "randomize_dash": False,
-                "randomize_first_battery": False,
-                "reveal_ap_locations_on_automap": False,
-                "bridge_protocol": 4,
-                "content_revision": identity["content_revision"],
-                "campaign_plan": {},
-                "native_generation_fingerprint": "a" * 64,
-            },
+            "slot_data": slot_data,
             "missing_locations": ids[::2],
             "checked_locations": ids[1::2],
             "placements": placements,
@@ -171,9 +163,16 @@ class TestCorePrerequisiteGate(unittest.TestCase):
         with zipfile.ZipFile(resources / "base_mod.zip", "w") as zf:
             zf.writestr("base.txt", "base")
         with zipfile.ZipFile(resources / "room_payloads.zip", "w") as zf:
-            zf.writestr("payload.txt", "payload")
+            zf.writestr("sources/fixture.entities", b"source\r\n")
         (resources / "room_payload_manifest.json").write_text(
-            json.dumps({"schema_version": 1, "payload_format": "zip", "maps": {}}),
+            json.dumps({"schema_version": 2, "model": "dependent_map_payloads",
+                "physical_option_keys": ["randomize_chainsaw", "randomize_dash", "randomize_first_battery"],
+                "base_members": ["base.txt"], "context_targets": {"fixture": "base.txt"},
+                "maps": {"fixture": {"option_keys": [], "state_policy": "off_only", "target_member": "base.txt",
+                    "states": [{"options": {}, "source": "base", "member": None,
+                                "sha256": hashlib.sha256(b"base").hexdigest()}]}},
+                "source_snapshots": {"fixture": {"member": "sources/fixture.entities",
+                    "sha256": hashlib.sha256(b"source\r\n").hexdigest(), "size": 8}}}),
             encoding="utf-8",
         )
         (client_dir / "bridge_client.py").write_text("# bridge client stub\n", encoding="utf-8")
@@ -220,13 +219,13 @@ class TestCorePrerequisiteGate(unittest.TestCase):
             old_runtime = Path(directory) / "old-runtime"
             old_runtime.mkdir()
             old = core_distribution_fixture(old_runtime)
-            old.update(version="1.0.2", base_version="1.0.2", channel="stable", rc_number=0)
+            old.update(version="1.1.2", base_version="1.1.2", channel="stable", rc_number=0)
             old_manifest = old_runtime / "distribution.json"
             old_manifest.write_text(json.dumps(old), encoding="utf-8")
             new_runtime = Path(directory) / "new-runtime"
             new_runtime.mkdir()
-            incoming = core_distribution_fixture(new_runtime)
-            incoming.update(version="1.0.2", base_version="1.0.2", channel="stable", rc_number=0,
+            incoming = core_distribution_fixture(new_runtime, build_id="c" * 64)
+            incoming.update(version="1.1.2", base_version="1.1.2", channel="stable", rc_number=0,
                             build_id="c" * 64, pair_id="c" * 64)
             new_manifest = new_runtime / "distribution.json"
             new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
@@ -242,13 +241,13 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 for name in before:
                     (backup / name).replace(root / name)
                 self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
-                incoming.update(version="1.0.3", base_version="1.0.3")
+                incoming.update(version="1.1.3", base_version="1.1.3")
                 new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
                 result = install_meathook(root, None, consent=lambda _: False, local_artifact=new_manifest)
                 self.assertEqual(result.state, "installed")
                 verified = launcher_platform_mod.probe_meathook(root)
                 self.assertTrue(verified.ok)
-                self.assertEqual(verified.details["version"], "1.0.3")
+                self.assertEqual(verified.details["version"], "1.1.3")
                 self.assertEqual(verified.details["build_id"], "c" * 64)
                 from doom_eap.launcher.launcher_core_install import rollback_core
                 rollback_core(root, None)

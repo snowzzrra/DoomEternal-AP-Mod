@@ -13,6 +13,8 @@ from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, Roo
 from test_install_workflow import _snapshot
 
 
+
+
 def test_serialization_cancelled_queue_and_same_key_replacement():
     errors, calls = [], []
     entered, release, completed = threading.Event(), threading.Event(), threading.Event()

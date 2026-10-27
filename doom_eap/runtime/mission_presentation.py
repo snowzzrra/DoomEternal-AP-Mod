@@ -56,6 +56,13 @@ class MissionPresentations:
         if catalog["schema"] != 1:
             raise ValueError("unsupported physical presentation catalog")
         self.pickups = {key: frozenset(ids) for key, ids in catalog["maps"].items()}
+        names = json.loads((root / 'data/location_names.json').read_bytes())['locations']
+        stages = json.loads((root / 'data/campaign_stages.json').read_bytes())
+        self.encounters = {stage['map']: tuple({'location_id': int(code), 'name': name,
+            'signal': {'unlockable': f'encounter/{code}'}} for code, name in sorted(names.items())
+            if name.startswith(stage['name'] + ' - ') and
+            (' - Secret Encounter - ' in name or ' - Escalation Encounter Wave ' in name))
+            for stage in stages if stage['map'].startswith(('game/dlc/', 'game/dlc2/'))}
         self.authored = tuple(sorted(challenges, key=lambda entry: entry["order"]))
         self.challenges = tuple(entry for entry in challenges
                                 if entry["signal"].get("kind") == "physical_event_equivalent")
@@ -91,6 +98,14 @@ class MissionPresentations:
     def mastery_snapshot(self, facts, placements, masteries):
         return tuple(replace(self.reward(entry, facts, placements), unlockable=entry["gameplay_perk"]) for entry in masteries
                      if entry["location_id"] in facts.server_locations)
+
+    def encounter_snapshot(self, runtime_map, *, revealed, facts, placements, pending):
+        if not revealed or not facts.checked_ready:
+            return ()
+        return tuple(replace(self.reward(entry, facts, placements),
+                     checked=entry['location_id'] in facts.checked | pending)
+                     for entry in self.encounters.get(runtime_map, ())
+                     if entry['location_id'] in facts.server_locations)
 
     def snapshot(self, namespace, generation, runtime_map, *, revealed, facts, pending):
         """Unknown and unrevealed fields have no denominator or challenge metadata."""

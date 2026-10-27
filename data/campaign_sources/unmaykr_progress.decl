@@ -1,0 +1,2461 @@
+{
+	edit = {
+		subGraphs = {
+			num = 10;
+			item[0] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "equipment";
+					nodes = {
+						num = 2;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_equipment";
+								position = {
+									y = -16;
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_equipment";
+								position = {
+									y = 48;
+								}
+								internalOnly = true;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = {
+						x = 368;
+						y = 144;
+					}
+				}
+			}
+			item[1] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "argent_cell";
+					nodes = {
+						num = 5;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_argent";
+								position = {
+									y = 48;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/argent_cell/argent_cell.md6";
+										animWebPath = "animweb/interact/argent_cell/argent_cell_interact/argent_cell/idle";
+									}
+								}
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+								startsoundOnEnter = "play_argentcell_idle";
+								startFXCondition = "FX_CINEMATIC_10";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_argent";
+								position = {
+									y = 272;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/argent_cell/argent_cell.md6";
+										animWebPath = "animweb/interact/argent_cell/argent_cell_interact/argent_cell/idle_used";
+									}
+								}
+								useTargetListOnEnter = false;
+								stopsoundOnEnter = "play_argentcell_idle";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "activate_argent";
+								position = {
+									y = -16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/argent_cell/argent_cell.md6";
+										animWebPath = "animweb/interact/argent_cell/argent_cell_interact/argent_cell/idle";
+									}
+								}
+								useTargetListOnEnter = false;
+								startFXCondition = "FX_CINEMATIC_10";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "usable_argent";
+								position = {
+									y = 128;
+								}
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "selection_argent";
+								position = {
+									y = 208;
+								}
+								internalOnly = true;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = {
+						x = 160;
+						y = -80;
+					}
+				}
+			}
+			item[2] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "mod_bot";
+					nodes = {
+						num = 5;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_mod";
+								position = {
+									x = 16;
+									y = 64;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/mod_bot/mod_bot.md6";
+										animWebPath = "animweb/interact/mod_bot/mod_bot_interact/mod_bot_interact/idle";
+									}
+								}
+								startsoundOnEnter = "play_pickup_upgrade_bot_loop";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_mod";
+								position = {
+									x = 80;
+									y = 208;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/mod_bot/mod_bot.md6";
+										animWebPath = "animweb/interact/mod_bot/mod_bot_interact/mod_bot_interact/used";
+									}
+								}
+								useTargetListOnEnter = false;
+								startsoundOnEnter = "stop_pickup_upgrade_bot_loop";
+								startFXCondition = "FX_PROP_BREAK";
+								stopFXCondition = "FX_PROP_STOP_USE";
+								GUICommands = {
+									num = 1;
+									item[0] = {
+										frameLabel = "used";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "activate_to_use";
+								position = {
+									x = 16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/mod_bot/mod_bot.md6";
+										animWebPath = "animweb/interact/mod_bot/mod_bot_interact/mod_bot_interact/idle";
+									}
+								}
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "selection_mod";
+								position = {
+									x = -48;
+									y = 208;
+								}
+								internalOnly = true;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "usable_mod";
+								position = {
+									x = 16;
+									y = 128;
+								}
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = {
+						x = -320;
+						y = -96;
+					}
+				}
+			}
+			item[3] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "battery_station";
+					nodes = {
+						num = 14;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_socket";
+								position = {
+									y = 16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_battery_set/hub_battery_set.md6";
+										animWebPath = "animweb/interact/hub_battery_socket/hub_battery_socket_interact/interact/idle";
+									}
+								}
+								useTargetListOnEnter = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_socket";
+								position = {
+									y = 160;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_battery_set/hub_battery_set.md6";
+										animWebPath = "animweb/interact/hub_battery_socket/hub_battery_socket_interact/interact/used";
+									}
+								}
+								signalEnterAfterAnim = true;
+								useTargetListOnEnter = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "unlock_battery";
+								position = {
+									x = 288;
+									y = 160;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/opened";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "1_battery_required";
+								position = {
+									x = 128;
+									y = 16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "2_battery_required";
+								position = {
+									x = 288;
+									y = 16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[5] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_battery_required";
+								position = {
+									x = 480;
+									y = 16;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[6] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "2_required_one_inserted";
+								position = {
+									x = 288;
+									y = 64;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[7] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_required_one_inserted";
+								position = {
+									x = 480;
+									y = 64;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[8] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_required_two_inserted";
+								position = {
+									x = 480;
+									y = 112;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/doors/hub_door_b/hub_door_b.md6";
+										animWebPath = "animweb/interact/doors/hub_door_b/door/closed";
+									}
+								}
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[9] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_socket_for_engine";
+								position = {
+									x = 912;
+									y = 32;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_battery_set/hub_battery_set.md6";
+										animWebPath = "animweb/interact/hub_battery_socket/hub_battery_socket_interact/interact/idle";
+									}
+								}
+								useTargetListOnEnter = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[10] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_socked_for_engine";
+								position = {
+									x = 688;
+									y = 96;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_battery_set/hub_battery_set.md6";
+										animWebPath = "animweb/interact/hub_battery_socket/hub_battery_socket_interact/interact/used";
+									}
+								}
+								signalEnterAfterAnim = true;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[11] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "activate_socket_for_engine";
+								position = {
+									x = 688;
+									y = 32;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_battery_set/hub_battery_set.md6";
+										animWebPath = "animweb/interact/hub_battery_socket/hub_battery_socket_interact/interact/idle";
+									}
+								}
+								useTargetListOnEnter = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[12] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "usable_socket";
+								position = {
+									y = 80;
+								}
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[13] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "usable_socket_for_engine";
+								position = {
+									x = 912;
+									y = 96;
+								}
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = {
+						x = -368;
+						y = 272;
+					}
+				}
+			}
+			item[4] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "rune";
+					nodes = {
+						num = 7;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_rune";
+								position = {
+									x = 48;
+									y = -64;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/idle";
+									}
+								}
+								animateAfterSync = true;
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								startsoundOnEnter = "play_runeinteract_idle_loop";
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "open_rune";
+								position = {
+									x = -16;
+									y = 48;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/cycle_open";
+									}
+								}
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_rune";
+								position = {
+									x = 48;
+									y = 224;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/used";
+									}
+								}
+								startFXCondition = "FX_PROP_STOP_USE";
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "selection_rune";
+								position = {
+									x = 48;
+									y = 160;
+								}
+								internalOnly = true;
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "closed_rune";
+								position = {
+									x = 112;
+									y = 48;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/cycle_close";
+									}
+								}
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								sendActionsOnEnter = {
+									num = 1;
+									item[0] = "IA_DEACTIVATE";
+								}
+							}
+						}
+						item[5] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "ready_rune";
+								position = {
+									x = 48;
+									y = 96;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/cycle_idle";
+									}
+								}
+								animateAfterSync = true;
+								signalEnterAfterAnim = true;
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								sendActionsOnEnter = {
+									num = 1;
+									item[0] = "IA_ACTIVATE";
+								}
+							}
+						}
+						item[6] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "waiting_rune";
+								position = {
+									x = 48;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/idle";
+									}
+								}
+								animateAfterSync = true;
+								signalEnterAfterAnim = true;
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+					}
+					position = {
+						x = -96;
+						y = -32;
+					}
+				}
+			}
+			item[5] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "rune_e3";
+					nodes = {
+						num = 3;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_rune_e3";
+								position = {
+									x = -64;
+									y = -96;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/used";
+									}
+								}
+								animateAfterSync = true;
+								startFXCondition = "FX_PROP_BREAK";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "deactivate_rune_e3";
+								position = {
+									x = -64;
+									y = -160;
+								}
+								internalOnly = true;
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/interact_used";
+									}
+								}
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_rune_e3";
+								position = {
+									x = -64;
+									y = -224;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/props/maykr_rune_interact/maykr_rune_interact.md6";
+										animWebPath = "animweb/interact/rune/rune_interact/rune_interact/cycle_idle";
+									}
+								}
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								startsoundOnEnter = "play_runeinteract_idle_loop";
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+					}
+					position = {
+						x = 656;
+						y = 128;
+					}
+				}
+			}
+			item[6] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "argent_cell_e3";
+					nodes = {
+						num = 3;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_argent_e3";
+								position = {
+									x = -32;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/argent_cell/argent_cell.md6";
+										animWebPath = "animweb/interact/argent_cell/argent_cell_interact/argent_cell/idle_used";
+									}
+								}
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "break_argent_e3";
+								position = {
+									x = -32;
+									y = -80;
+								}
+								internalOnly = true;
+								animateAfterSync = true;
+								scanActionsOnEnter = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_argent_e3";
+								position = {
+									x = -32;
+									y = -160;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/interact/argent_cell/argent_cell.md6";
+										animWebPath = "animweb/interact/argent_cell/argent_cell_interact/argent_cell/idle";
+									}
+								}
+								animateAfterSync = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+							}
+						}
+					}
+					position = {
+						x = 800;
+						y = 64;
+					}
+				}
+			}
+			item[7] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "praetor";
+					nodes = {
+						num = 4;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "idle_praetor";
+								position = {
+									y = 48;
+								}
+								animWebPath = "animweb/interact/preator_suit_token/preator_suit_token_interact/interact/idle";
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								startFXCondition = "FX_PROP_SPAWN";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "used_praetor";
+								position = {
+									x = 112;
+									y = 48;
+								}
+								internalOnly = true;
+								animWebPath = "animweb/interact/preator_suit_token/preator_suit_token_interact/interact/used";
+								stopFXCondition = "FX_PROP_STOP_USE";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "activate_praetor";
+								position = {
+									x = 64;
+									y = -16;
+								}
+								animWebPath = "animweb/interact/preator_suit_token/preator_suit_token_interact/interact/idle";
+								startFXCondition = "FX_PROP_SPAWN";
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "usable_praetor";
+								position = {
+									x = 64;
+									y = 112;
+								}
+								internalOnly = true;
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								activateUpdateFlags = "";
+								deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+							}
+						}
+					}
+					position = {
+						x = 304;
+						y = -80;
+					}
+				}
+			}
+			item[8] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "unmaykr_case";
+					nodes = {
+						num = 8;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "unmaykr_idle";
+								position = {
+									x = 112;
+									y = -64;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "unmaykr_unlocked";
+								position = {
+									x = 208;
+									y = 336;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 6;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+									item[1] = "IA_SCRIPT_CUSTOM2";
+									item[2] = "IA_SCRIPT_CUSTOM3";
+									item[3] = "IA_SCRIPT_CUSTOM4";
+									item[4] = "IA_SCRIPT_CUSTOM5";
+									item[5] = "IA_UNLOCKED";
+								}
+								startFXCondition = "FX_PROP_ACTIVATE";
+								stopFXCondition = "FX_CINEMATIC_6";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "1_shard_inserted";
+								position = {
+									y = 64;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 1;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+								}
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "2_shards_inserted";
+								position = {
+									x = 224;
+									y = 64;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 2;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+									item[1] = "IA_SCRIPT_CUSTOM2";
+								}
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_shards_inserted";
+								position = {
+									x = -144;
+									y = 144;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 3;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+									item[1] = "IA_SCRIPT_CUSTOM2";
+									item[2] = "IA_SCRIPT_CUSTOM3";
+								}
+							}
+						}
+						item[5] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "4_shards_inserted";
+								position = {
+									x = 368;
+									y = 144;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 4;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+									item[1] = "IA_SCRIPT_CUSTOM2";
+									item[2] = "IA_SCRIPT_CUSTOM3";
+									item[3] = "IA_SCRIPT_CUSTOM4";
+								}
+							}
+						}
+						item[6] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "5_shards_inserted";
+								position = {
+									x = 32;
+									y = 336;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Locked";
+									}
+								}
+								sendActionsOnEnter = {
+									num = 5;
+									item[0] = "IA_SCRIPT_CUSTOM1";
+									item[1] = "IA_SCRIPT_CUSTOM2";
+									item[2] = "IA_SCRIPT_CUSTOM3";
+									item[3] = "IA_SCRIPT_CUSTOM4";
+									item[4] = "IA_SCRIPT_CUSTOM5";
+								}
+							}
+						}
+						item[7] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "unnmaykr_acquired";
+								position = {
+									x = 368;
+									y = 336;
+								}
+								animation = {
+									num = 1;
+									item[0] = {
+										md6 = "md6def/objects/hub/hub_unmaykr_case/hub_unmaykr_case.md6";
+										animWebPath = "animweb/interact/hub/unmakyr_case_interact/Interact/Unlocked";
+									}
+								}
+								stopFXCondition = "FX_CINEMATIC_6";
+							}
+						}
+					}
+					position = {
+						x = 128;
+						y = 592;
+					}
+				}
+			}
+			item[9] = {
+				className = "idDeclInteractionSubGraph";
+				object = {
+					name = "unmaykr_fx";
+					nodes = {
+						num = 12;
+						item[0] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "1_shard_fx_on";
+								position = {
+									x = -16;
+									y = 16;
+								}
+								useTargetListOnEnter = false;
+								saveStateAllowed = false;
+								sendTheseActionsToSelf = true;
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[1] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "6_shards_fx_off";
+								position = {
+									x = 160;
+									y = 416;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_6";
+								stopFXCondition = "FX_CINEMATIC_6";
+							}
+						}
+						item[2] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "1_shard_fx_off";
+								position = {
+									x = -16;
+									y = 80;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_1";
+								stopFXCondition = "FX_CINEMATIC_1";
+							}
+						}
+						item[3] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "2_shards_fx_on";
+								position = {
+									x = 160;
+									y = 16;
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[4] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_shards_fx_on";
+								position = {
+									x = -16;
+									y = 192;
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[5] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "4_shards_fx_on";
+								position = {
+									x = 160;
+									y = 192;
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[6] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "5_shards_fx_on";
+								position = {
+									x = -16;
+									y = 352;
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[7] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "6_shards_fx_on";
+								position = {
+									x = 160;
+									y = 352;
+								}
+								startFXCondition = "FX_PROP_SPAWN";
+							}
+						}
+						item[8] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "5_shards_fx_off";
+								position = {
+									x = -16;
+									y = 416;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_5";
+								stopFXCondition = "FX_CINEMATIC_5";
+							}
+						}
+						item[9] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "4_shards_fx_off";
+								position = {
+									x = 160;
+									y = 256;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_4";
+								stopFXCondition = "FX_CINEMATIC_4";
+							}
+						}
+						item[10] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "2_shards_fx_off";
+								position = {
+									x = 160;
+									y = 80;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_2";
+								stopFXCondition = "FX_CINEMATIC_2";
+							}
+						}
+						item[11] = {
+							className = "idDeclInteractionNode";
+							object = {
+								name = "3_shards_fx_off";
+								position = {
+									x = -16;
+									y = 256;
+								}
+								internalOnly = true;
+								startsoundOnEnter = "play_metal_gore_01";
+								startFXCondition = "FX_CINEMATIC_MP_3";
+								stopFXCondition = "FX_CINEMATIC_3";
+							}
+						}
+					}
+					position = {
+						x = -352;
+						y = 512;
+					}
+				}
+			}
+		}
+		links = {
+			num = 75;
+			item[0] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_equipment_To_used_equipment";
+					startNode = "idle_equipment";
+					endNode = "used_equipment";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+					startsoundOnLink = "play_sfx_mod_pickup_s";
+					hudNotifications = {
+						num = 1;
+						item[0] = "HUD_NOTIFY_EQUIPMENT_ACQUIRED";
+					}
+				}
+			}
+			item[1] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_to_use_To_idle_mod";
+					startNode = "activate_to_use";
+					endNode = "idle_mod";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE_ANY";
+						}
+					}
+				}
+			}
+			item[2] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_mod_To_used_mod";
+					startNode = "selection_mod";
+					endNode = "used_mod";
+					syncEntityDef = "interact/mod_bot/mod_bot_sync";
+					syncAnimPath = "animweb/interact/mod_bot/mod_bot_syncanimweb/autoSyncAnim/mod_bot";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+				}
+			}
+			item[3] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_battery_required_To_unlock_battery";
+					startNode = "1_battery_required";
+					endNode = "unlock_battery";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+					useTargetListOnExit = false;
+				}
+			}
+			item[4] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_battery_required_To_2_required_one_inserted";
+					startNode = "2_battery_required";
+					endNode = "2_required_one_inserted";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+				}
+			}
+			item[5] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_required_one_inserted_To_unlock_battery";
+					startNode = "2_required_one_inserted";
+					endNode = "unlock_battery";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+				}
+			}
+			item[6] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_battery_required_To_3_required_one_inserted";
+					startNode = "3_battery_required";
+					endNode = "3_required_one_inserted";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+				}
+			}
+			item[7] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_required_one_inserted_To_3_required_two_inserted";
+					startNode = "3_required_one_inserted";
+					endNode = "3_required_two_inserted";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+				}
+			}
+			item[8] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_required_two_inserted_To_unlock_battery";
+					startNode = "3_required_two_inserted";
+					endNode = "unlock_battery";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ALL";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE";
+						}
+					}
+				}
+			}
+			item[9] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "open_rune_To_ready_rune";
+					startNode = "open_rune";
+					endNode = "ready_rune";
+				}
+			}
+			item[10] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "ready_rune_To_selection_rune";
+					startNode = "ready_rune";
+					endNode = "selection_rune";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[11] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_rune_To_ready_rune";
+					startNode = "selection_rune";
+					endNode = "ready_rune";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_RESET";
+						}
+					}
+				}
+			}
+			item[12] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "ready_rune_To_closed_rune";
+					startNode = "ready_rune";
+					endNode = "closed_rune";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+				}
+			}
+			item[13] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "deactivate_rune_e3_To_used_rune_e3";
+					startNode = "deactivate_rune_e3";
+					endNode = "used_rune_e3";
+				}
+			}
+			item[14] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "break_argent_e3_To_used_argent_e3";
+					startNode = "break_argent_e3";
+					endNode = "used_argent_e3";
+					useTargetListOnExit = false;
+					hudNotifications = {
+						num = 1;
+						item[0] = "HUD_NOTIFY_EQUIPMENT_ACQUIRED";
+					}
+				}
+			}
+			item[15] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_argent_e3_To_break_argent_e3";
+					startNode = "idle_argent_e3";
+					endNode = "break_argent_e3";
+					syncEntityDef = "interact/argent_cell/use_sync_e3";
+					syncAnimPath = "animweb/interact/argent_cell/use_sync/use_sync/interact";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+					useTargetListOnExit = false;
+				}
+			}
+			item[16] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_rune_e3_To_deactivate_rune_e3";
+					startNode = "idle_rune_e3";
+					endNode = "deactivate_rune_e3";
+					syncEntityDef = "interact/rune/use_sync_e3";
+					syncAnimPath = "animweb/interact/rune/use_sync/use_sync/interact";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[17] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "closed_rune_To_waiting_rune";
+					startNode = "closed_rune";
+					endNode = "waiting_rune";
+				}
+			}
+			item[18] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "waiting_rune_To_open_rune";
+					startNode = "waiting_rune";
+					endNode = "open_rune";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_TOUCH";
+						}
+					}
+				}
+			}
+			item[19] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_rune_To_waiting_rune";
+					startNode = "idle_rune";
+					endNode = "waiting_rune";
+				}
+			}
+			item[20] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "closed_rune_To_open_rune";
+					startNode = "closed_rune";
+					endNode = "open_rune";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_TOUCH";
+						}
+					}
+				}
+			}
+			item[21] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_argent_To_idle_argent";
+					startNode = "activate_argent";
+					endNode = "idle_argent";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE_ANY";
+						}
+					}
+				}
+			}
+			item[22] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_praetor_To_idle_praetor";
+					startNode = "activate_praetor";
+					endNode = "idle_praetor";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE_ANY";
+						}
+					}
+				}
+			}
+			item[23] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "5_shards_inserted_To_unmaykr_unlocked";
+					startNode = "5_shards_inserted";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[24] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_fx_on_To_1_shard_fx_off";
+					startNode = "1_shard_fx_on";
+					endNode = "1_shard_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM1";
+						}
+					}
+				}
+			}
+			item[25] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_shards_fx_on_To_2_shards_fx_off";
+					startNode = "2_shards_fx_on";
+					endNode = "2_shards_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM2";
+						}
+					}
+				}
+			}
+			item[26] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_shards_fx_on_To_3_shards_fx_off";
+					startNode = "3_shards_fx_on";
+					endNode = "3_shards_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM3";
+						}
+					}
+				}
+			}
+			item[27] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "4_shards_fx_on_To_4_shards_fx_off";
+					startNode = "4_shards_fx_on";
+					endNode = "4_shards_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM4";
+						}
+					}
+				}
+			}
+			item[28] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "5_shards_fx_on_To_5_shards_fx_off";
+					startNode = "5_shards_fx_on";
+					endNode = "5_shards_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM5";
+						}
+					}
+				}
+			}
+			item[29] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "6_shards_fx_on_To_6_shards_fx_off";
+					startNode = "6_shards_fx_on";
+					endNode = "6_shards_fx_off";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNLOCKED";
+						}
+					}
+				}
+			}
+			item[30] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_unmaykr_unlocked";
+					startNode = "unmaykr_idle";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[31] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_5_shards_inserted";
+					startNode = "unmaykr_idle";
+					endNode = "5_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[32] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_4_shards_inserted";
+					startNode = "unmaykr_idle";
+					endNode = "4_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[33] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_3_shards_inserted";
+					startNode = "unmaykr_idle";
+					endNode = "3_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[34] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_2_shards_inserted";
+					startNode = "unmaykr_idle";
+					endNode = "2_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[35] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_idle_To_1_shard_inserted";
+					startNode = "unmaykr_idle";
+					endNode = "1_shard_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[36] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_inserted_To_unmaykr_unlocked";
+					startNode = "1_shard_inserted";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[37] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_inserted_To_5_shards_inserted";
+					startNode = "1_shard_inserted";
+					endNode = "5_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[38] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_inserted_To_4_shards_inserted";
+					startNode = "1_shard_inserted";
+					endNode = "4_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[39] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_inserted_To_3_shards_inserted";
+					startNode = "1_shard_inserted";
+					endNode = "3_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[40] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "1_shard_inserted_To_2_shards_inserted";
+					startNode = "1_shard_inserted";
+					endNode = "2_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[41] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_shards_inserted_To_unmaykr_unlocked";
+					startNode = "2_shards_inserted";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[42] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_shards_inserted_To_5_shards_inserted";
+					startNode = "2_shards_inserted";
+					endNode = "5_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[43] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_shards_inserted_To_4_shards_inserted";
+					startNode = "2_shards_inserted";
+					endNode = "4_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[44] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "2_shards_inserted_To_3_shards_inserted";
+					startNode = "2_shards_inserted";
+					endNode = "3_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[45] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_shards_inserted_To_unmaykr_unlocked";
+					startNode = "3_shards_inserted";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[46] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_shards_inserted_To_5_shards_inserted";
+					startNode = "3_shards_inserted";
+					endNode = "5_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[47] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "3_shards_inserted_To_4_shards_inserted";
+					startNode = "3_shards_inserted";
+					endNode = "4_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[48] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "4_shards_inserted_To_unmaykr_unlocked";
+					startNode = "4_shards_inserted";
+					endNode = "unmaykr_unlocked";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[49] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "4_shards_inserted_To_5_shards_inserted";
+					startNode = "4_shards_inserted";
+					endNode = "5_shards_inserted";
+					syncEntityDef = "interact/hub/unmakyr_case_part_a_deposit_shards_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_a_deposit_shards_syncanimweb/autoSyncAnim/unmakyr_case_part_a_deposit_shards";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[50] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "unmaykr_unlocked_To_unnmaykr_acquired";
+					startNode = "unmaykr_unlocked";
+					endNode = "unnmaykr_acquired";
+					syncEntityDef = "interact/hub/unmakyr_case_part_b_unlock_case_sync";
+					syncAnimPath = "animweb/interact/hub/unmakyr_case_part_b_unlock_case_syncanimweb/autoSyncAnim/unmakyr_case_part_b_unlock_case";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[51] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_socket_for_engine_To_idle_socket_for_engine";
+					startNode = "activate_socket_for_engine";
+					endNode = "idle_socket_for_engine";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_ACTIVATE_ANY";
+						}
+					}
+				}
+			}
+			item[52] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "activate_socket_for_engine_To_used_socket_for_engine";
+					startNode = "activate_socket_for_engine";
+					endNode = "used_socked_for_engine";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+				}
+			}
+			item[53] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_praetor_To_used_praetor";
+					startNode = "usable_praetor";
+					endNode = "used_praetor";
+					syncEntityDef = "interact/preator_suit_token/preator_suit_token_sync";
+					syncAnimPath = "animweb/interact/preator_suit_token/preator_suit_token_syncanimweb/autoSyncAnim/preator_suit_token";
+					syncEntityDefThirdPerson = "interact/preator_suit_token/preator_suit_token_sync_3p";
+					syncAnimPathThirdPerson = "animweb/interact/preator_suit_token/preator_suit_token_3p_syncanimweb/autoSyncAnim/preator_suit_token";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[54] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_praetor_To_usable_praetor";
+					startNode = "idle_praetor";
+					endNode = "usable_praetor";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_TOUCH";
+							item[1] = "IA_TOUCHING";
+						}
+					}
+				}
+			}
+			item[55] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_praetor_To_idle_praetor";
+					startNode = "usable_praetor";
+					endNode = "idle_praetor";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+				}
+			}
+			item[56] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_praetor_To_activate_praetor";
+					startNode = "idle_praetor";
+					endNode = "activate_praetor";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+				}
+			}
+			item[57] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_rune_To_used_rune";
+					startNode = "selection_rune";
+					endNode = "used_rune";
+					syncEntityDef = "interact/rune/use_sync";
+					syncAnimPath = "animweb/interact/rune/use_sync/use_sync/interact";
+					syncEntityDefThirdPerson = "interact/rune/use_sync_3p";
+					syncAnimPathThirdPerson = "animweb/interact/rune/use_sync_3p/use_sync/interact";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+					stopFXCondition = "FX_PROP_ACTIVATE";
+				}
+			}
+			item[58] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_mod_To_selection_mod";
+					startNode = "usable_mod";
+					endNode = "selection_mod";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+				}
+			}
+			item[59] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_mod_To_usable_mod";
+					startNode = "selection_mod";
+					endNode = "usable_mod";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_RESET";
+						}
+					}
+				}
+			}
+			item[60] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_mod_To_usable_mod";
+					startNode = "idle_mod";
+					endNode = "usable_mod";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_TOUCH";
+							item[1] = "IA_TOUCHING";
+						}
+					}
+				}
+			}
+			item[61] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_mod_To_idle_mod";
+					startNode = "usable_mod";
+					endNode = "idle_mod";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+				}
+			}
+			item[62] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_mod_To_activate_to_use";
+					startNode = "idle_mod";
+					endNode = "activate_to_use";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+				}
+			}
+			item[63] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_argent_To_usable_argent";
+					startNode = "idle_argent";
+					endNode = "usable_argent";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_TOUCH";
+							item[1] = "IA_TOUCHING";
+						}
+					}
+				}
+			}
+			item[64] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_argent_To_idle_argent";
+					startNode = "usable_argent";
+					endNode = "idle_argent";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+				}
+			}
+			item[65] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_socket_To_used_socket";
+					startNode = "usable_socket";
+					endNode = "used_socket";
+					syncEntityDef = "interact/hub_battery_socket/hub_battery_socket_sync";
+					syncAnimPath = "animweb/interact/hub_battery_socket/hub_battery_socket_syncanimweb/autoSyncAnim/hub_battery_socket";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+					sendActionsOnLink = {
+						num = 1;
+						item[0] = "IA_ACTIVATE";
+					}
+					useTargetListOnExit = false;
+					ignorePostponeNodeEntry = true;
+				}
+			}
+			item[66] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_socket_To_usable_socket";
+					startNode = "idle_socket";
+					endNode = "usable_socket";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_TOUCH";
+							item[1] = "IA_TOUCHING";
+						}
+					}
+				}
+			}
+			item[67] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_socket_To_idle_socket";
+					startNode = "usable_socket";
+					endNode = "idle_socket";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+				}
+			}
+			item[68] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_socket_for_engine_To_used_socket_for_engine";
+					startNode = "usable_socket_for_engine";
+					endNode = "used_socked_for_engine";
+					syncEntityDef = "interact/hub_battery_socket/hub_battery_socket_for_engine_sync";
+					syncAnimPath = "animweb/interact/hub_battery_socket/hub_battery_socket_syncanimweb/autoSyncAnim/hub_battery_socket";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_USE_SUCCEED";
+							item[1] = "IA_DEACTIVATE";
+						}
+					}
+					sendActionsOnLink = {
+						num = 1;
+						item[0] = "IA_ACTIVATE";
+					}
+					useTargetListOnExit = false;
+					ignorePostponeNodeEntry = true;
+				}
+			}
+			item[69] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_socket_for_engine_To_usable_socket_for_engine";
+					startNode = "idle_socket_for_engine";
+					endNode = "usable_socket_for_engine";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 2;
+							item[0] = "IA_TOUCH";
+							item[1] = "IA_TOUCHING";
+						}
+					}
+				}
+			}
+			item[70] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_socket_for_engine_To_idle_socket_for_engine";
+					startNode = "usable_socket_for_engine";
+					endNode = "idle_socket_for_engine";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_UNTOUCH";
+						}
+					}
+					deactivateUpdateFlags = "UPDATE_THINK UPDATE_PHYSICS";
+				}
+			}
+			item[71] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "idle_socket_for_engine_To_used_socked_for_engine";
+					startNode = "idle_socket_for_engine";
+					endNode = "used_socked_for_engine";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_SCRIPT_CUSTOM1";
+						}
+					}
+				}
+			}
+			item[72] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_argent_To_used_argent";
+					startNode = "selection_argent";
+					endNode = "used_argent";
+					syncEntityDef = "interact/argent_cell/use_sync";
+					syncAnimPath = "animweb/interact/argent_cell/use_sync/use_sync/interact";
+					syncEntityDefThirdPerson = "interact/argent_cell/argent_cell_sync_3p";
+					syncAnimPathThirdPerson = "animweb/interact/argent_cell/argent_cell_3p/use_sync/interact";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_DEACTIVATE";
+						}
+					}
+					useTargetListOnExit = false;
+					syncThirdPersonRegisterInstigator = true;
+				}
+			}
+			item[73] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "usable_argent_To_selection_argent";
+					startNode = "usable_argent";
+					endNode = "selection_argent";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_SUCCEED";
+						}
+					}
+					useTargetListOnExit = false;
+				}
+			}
+			item[74] = {
+				className = "idDeclInteractionLink";
+				object = {
+					name = "selection_argent_To_usable_argent";
+					startNode = "selection_argent";
+					endNode = "usable_argent";
+					requiredActions = {
+						requirementType = "RE_REQUIRE_ONE";
+						actionsRequiredList = {
+							num = 1;
+							item[0] = "IA_USE_RESET";
+						}
+					}
+					useTargetListOnExit = false;
+				}
+			}
+		}
+	}
+}

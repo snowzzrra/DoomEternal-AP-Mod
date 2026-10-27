@@ -1575,7 +1575,8 @@
       7770018
     ],
     "Hell on Earth - City - Ravaged Cathedral": [
-      7770002
+      7770002,
+      7770492
     ],
     "Hell on Earth - City - Downtown": [
       7770004,
@@ -1610,7 +1611,9 @@
       7770038,
       7770039,
       7770040,
-      7770041
+      7770041,
+      7770493,
+      7770494
     ],
     "Exultia - Exultia - Central Rotunda": [
       7770021,
@@ -1620,7 +1623,9 @@
     ],
     "Exultia - Exultia - Belphegor's Gate": [
       7770024,
-      7770043
+      7770043,
+      7770495,
+      7770514
     ],
     "Exultia - Exultia - Dour Slough": [
       7770025,
@@ -1635,7 +1640,8 @@
       7770045,
       7770089,
       7770090,
-      7770486
+      7770486,
+      7770518
     ],
     "Exultia - Hell - Isle of Torment": [
       7770042,
@@ -1683,7 +1689,9 @@
     "Cultist Base - Basilica of Adjuration": [
       7770063,
       7770064,
-      7770065
+      7770065,
+      7770497,
+      7770517
     ],
     "Cultist Base - Forge of Transfiguration": [
       7770067
@@ -1712,7 +1720,8 @@
       7770146,
       7770147,
       7770148,
-      7770149
+      7770149,
+      7770496
     ],
     "Doom Hunter Base - Lazarus Generators": [
       7770150,
@@ -1778,13 +1787,15 @@
       7770201,
       7770205,
       7770203,
-      7770488
+      7770488,
+      7770513
     ],
     "Super Gore Nest - Upper Area - Vorus Medical Plaza": [],
     "Super Gore Nest - Lower Area - Pumping Station C": [],
     "Super Gore Nest - Lower Area - Toxin Refinery": [],
     "Super Gore Nest - Lower Area - Argent Energy Station": [
-      7770210
+      7770210,
+      7770498
     ],
     "Super Gore Nest - Challenges - Mission Challenges": [
       7770206,
@@ -1817,7 +1828,8 @@
       7770236,
       7770240,
       7770242,
-      7770243
+      7770243,
+      7770499
     ],
     "ARC Complex - Atrium Offices": [],
     "ARC Complex - Moring Aeronautics": [
@@ -1852,7 +1864,8 @@
       7770256
     ],
     "Mars Core - UAC - BFG-10000 Ventilation": [
-      7770265
+      7770265,
+      7770500
     ],
     "Mars Core - UAC - UAC Outpost LD": [
       7770257,
@@ -1909,7 +1922,9 @@
       7770299
     ],
     "Sentinel Prime - Altar": [],
-    "Sentinel Prime - Training Hall": [],
+    "Sentinel Prime - Training Hall": [
+      7770501
+    ],
     "Sentinel Prime - Dungeons": [
       7770300,
       7770301,
@@ -1945,7 +1960,9 @@
       7770330,
       7770491
     ],
-    "Taras Nabad - Atrium Plaza": [],
+    "Taras Nabad - Atrium Plaza": [
+      7770502
+    ],
     "Taras Nabad - Slayer Creation Chamber": [],
     "Taras Nabad - Catacombs": [
       7770318,
@@ -1974,7 +1991,8 @@
     "Nekravol - The Mill": [
       7770342,
       7770343,
-      7770350
+      7770350,
+      7770503
     ],
     "Nekravol - Passage of the Damned": [
       7770344,
@@ -2019,7 +2037,9 @@
       7770376,
       7770377
     ],
-    "Nekravol Part II - Demon Foundry": [],
+    "Nekravol Part II - Demon Foundry": [
+      7770504
+    ],
     "Nekravol Part II - Soul Ascent": [
       7770378,
       7770379,
@@ -2052,7 +2072,9 @@
       7770399,
       7770400
     ],
-    "Urdak - The Sanctuary": [],
+    "Urdak - The Sanctuary": [
+      7770505
+    ],
     "Urdak - Guardians of Sanctuary": [],
     "Urdak - Abyss of Sanctuary": [],
     "Urdak - Dimensional Lacerator": [],
@@ -2074,7 +2096,8 @@
       7770410
     ],
     "Final Sin - Starstruct Industries": [
-      7770412
+      7770412,
+      7770506
     ],
     "Final Sin - Viris West": [
       7770413,
@@ -2109,17 +2132,20 @@
     "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab": [
       7770427,
       7770428,
-      7770429
+      7770429,
+      7770507
     ],
     "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard": [
       7770430,
       7770431
     ],
     "UAC Atlantica Facility - Underwater Facility": [
-      7770432
+      7770432,
+      7770516
     ],
     "The Blood Swamps - Swamp Entrance": [
-      7770433
+      7770433,
+      7770508
     ],
     "The Blood Swamps - Underworld Crossroad": [],
     "The Blood Swamps - Sunken Courtyard": [
@@ -2148,7 +2174,9 @@
     ],
     "The Holt - Crimson Forest": [
       7770446,
-      7770447
+      7770447,
+      7770509,
+      7770515
     ],
     "The Holt - Maykr Pillars": [
       7770448,
@@ -2178,7 +2206,9 @@
     "The World Spear - Sentinel Village - Ancient Bridge": [
       7770462
     ],
-    "The World Spear - Sentinel Mountain - Mountain Forest": [],
+    "The World Spear - Sentinel Mountain - Mountain Forest": [
+      7770510
+    ],
     "The World Spear - Sentinel Mountain - Mountain Cliffs": [
       7770459,
       7770460
@@ -2201,7 +2231,8 @@
     "Reclaimed Earth - Reclaimed Train Stop": [
       7770467,
       7770473,
-      7770474
+      7770474,
+      7770511
     ],
     "Reclaimed Earth - Overgrown Offices": [
       7770468
@@ -2223,7 +2254,8 @@
     "Immora - Immora Assault - Plateau Battle": [
       7770482,
       7770483,
-      7770484
+      7770484,
+      7770512
     ],
     "Immora - Immora Assault - Walls of Immora": [
       7770480

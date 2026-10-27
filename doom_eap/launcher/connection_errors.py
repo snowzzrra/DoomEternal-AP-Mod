@@ -66,7 +66,7 @@ _BY_CODE = {
     ),
     "dns_failed": ConnectionFailure(
         "dns", "Server name not found",
-        "Windows could not resolve the server name.",
+        "The server name could not be found.",
         "Check the hostname or use the room's numeric address.",
     ),
     "connection_timeout": ConnectionFailure(

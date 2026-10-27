@@ -11,7 +11,7 @@ import threading
 import time
 import zipfile
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
@@ -247,6 +247,7 @@ class IntegratedSetupRecord:
     required_resources: tuple[dict[str, object], ...] = ()
     post_install_verification: str = ""
     static_content_digest: str = ""
+    installed_resources: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -561,10 +562,16 @@ class IntegratedLaunchWorkflow:
                 reason="generated cache embedded content identity does not match current room",
             )
 
-        # Room package is verified installed. Now check live runtime prerequisites.
         try:
             config = self._config()
             game_root = self._game_root(config)
+            if self.platform_name == "windows":
+                from .campaign_resources import verify_installed_resources
+                try:
+                    verify_installed_resources(game_root, receipt)
+                except (OSError, ValueError) as error:
+                    return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option,
+                                        reason=str(error))
             if self.platform_name == "linux":
                 raw_command = receipt.get("injector_command", receipt.get("adapter_command", ()))
                 raw_resources = receipt.get("required_resources", ())
@@ -610,6 +617,12 @@ class IntegratedLaunchWorkflow:
 
     def mark_windows_installation(self, succeeded: bool) -> None:
         return
+
+    def _installed_resources(self, game_root: Path, state: str) -> dict[str, str]:
+        if self.platform_name != "windows" or state != "applied":
+            return {}
+        from .campaign_resources import installed_resource_fingerprints
+        return installed_resource_fingerprints(game_root)
 
     def _adapter(
         self,
@@ -818,6 +831,7 @@ class IntegratedLaunchWorkflow:
             required_resources=required_resources,
             post_install_verification=str(receipt.get("post_install_verification", "")),
             static_content_digest=str(receipt.get("static_content_digest", manifest.static_content_digest)),
+            installed_resources=receipt.get("installed_resources", {}),
         )
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
@@ -985,6 +999,7 @@ class IntegratedLaunchWorkflow:
                 adapter.details.get("post_install_verification", "") if adapter.details else ""
             ),
             static_content_digest=manifest.static_content_digest,
+            installed_resources=self._installed_resources(game_root, adapter.state),
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != record.staged_sha256:
@@ -1278,6 +1293,9 @@ class IntegratedLaunchWorkflow:
         verification: dict[str, object] = {}
         if self.platform_name == "linux":
             verification = verify_linux_mod_installation(game_root, staged_mod_path)
+        elif self.platform_name == "windows":
+            from .campaign_resources import enable_campaign_resources
+            enable_campaign_resources(game_root, staged_mod_path)
         steam_plan = self._steam_plan(config) if self.platform_name == "linux" else None
         steam_option = steam_plan.proposed if steam_plan else ""
         steam_diff = steam_plan.diff if steam_plan else ""
@@ -1308,6 +1326,7 @@ class IntegratedLaunchWorkflow:
             required_resources=required_resources,
             post_install_verification=str(verification.get("state", "")),
             static_content_digest=manifest.static_content_digest,
+            installed_resources=self._installed_resources(game_root, "applied"),
         )
 
         payload = {

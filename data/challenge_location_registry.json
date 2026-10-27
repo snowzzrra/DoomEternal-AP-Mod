@@ -14,6 +14,7 @@
           7770140
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770124,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -32,6 +33,7 @@
           7770174
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770162,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -50,6 +52,7 @@
           7770208
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770210,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -68,6 +71,7 @@
           7770246
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770248,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -86,6 +90,7 @@
           7770287
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770289,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -104,6 +109,7 @@
           7770335
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770337,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -121,10 +127,8 @@
           7770359,
           7770360
         ],
-        "conditional_children": [
-          7770358
-        ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770362,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -143,6 +147,7 @@
           7770385
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770387,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -161,6 +166,7 @@
           7770409
         ],
         "kind": "aggregate",
+        "mission_complete_location_id": 7770411,
         "required_count": 3
       },
       "strategy": "aggregate"
@@ -236,6 +242,12 @@
         "path": "unlockable/mission_challenge/e1m3/challenge_3.decl",
         "sha256": "fae5e067cbc5d3534fa3624cc538c47aa70aac1e7e71cf951c3d0f11c5b3e38e"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "arachnotron"
+        ]
+      },
       "location_id": 7770140,
       "mission_key": "e1m3",
       "name": "Cultist Base - Mission Challenge - Master of Turrets",
@@ -276,16 +288,20 @@
       },
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "numUnlockableRules": 1,
+        "physical_location_ids": [
+          7770157
+        ],
+        "required_count": 1,
         "rule_0_satisfied": true,
         "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_COLLECTIBLE_ALBUM_FOUND",
         "unlockable": "mission_challenge/e1m4/challenge_1",
         "unlockableIsUnlocked": true
       },
-      "strategy": "unlockable_record"
+      "strategy": "physical_event_equivalent"
     },
     {
       "category": "mission_challenges",
@@ -305,16 +321,20 @@
       },
       "runtime_map": "game/sp/e1m4_boss/e1m4_boss",
       "signal": {
-        "kind": "unlockable_record",
+        "kind": "physical_event_equivalent",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
         "numUnlockableRules": 1,
+        "physical_location_ids": [
+          7770496
+        ],
+        "required_count": 1,
         "rule_0_satisfied": true,
         "rule_0_statDuration": 5,
         "rule_0_statname": "STAT_AUTOMAP",
         "unlockable": "mission_challenge/e1m4/challenge_2",
         "unlockableIsUnlocked": true
       },
-      "strategy": "unlockable_record"
+      "strategy": "physical_event_equivalent"
     },
     {
       "category": "mission_challenges",
@@ -413,6 +433,12 @@
         "completion_stat": "STAT_COMPLETED_E2M1_CHALLENGE_3",
         "path": "unlockable/mission_challenge/e2m1/challenge_3.decl",
         "sha256": "9fb09b0c87245f748b7c87ebf625e16ecc58f5a5942c00d9a95b05c01e4bbb0d"
+      },
+      "enemy_targets": {
+        "minimum": 3,
+        "species": [
+          "pinky"
+        ]
       },
       "location_id": 7770208,
       "mission_key": "e2m1",
@@ -701,6 +727,12 @@
         "path": "unlockable/mission_challenge/e3m1/challenge_3.decl",
         "sha256": "95a907b1a4389c8c0248a4686f614efacb4f1e9e1304a90394e07b164ee3929a"
       },
+      "enemy_targets": {
+        "minimum": 3,
+        "species": [
+          "pain_elemental"
+        ]
+      },
       "location_id": 7770335,
       "mission_key": "e3m1_slayer",
       "name": "Taras Nabad - Mission Challenge - Painkiller",
@@ -791,6 +823,12 @@
         "path": "unlockable/mission_challenge/e3m2/challenge_3.decl",
         "sha256": "14b2af1fcfa3e8badec8e2ededec8af27d496a662c5bcc6ff34054856669e243"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "doom_hunter"
+        ]
+      },
       "location_id": 7770360,
       "mission_key": "e3m2_hell",
       "name": "Nekravol - Mission Challenge - Doom Hunt",
@@ -851,6 +889,12 @@
         "path": "unlockable/mission_challenge/e3m2_b/challenge_2.decl",
         "sha256": "aba9bcf6a7cc34059c43282b4f653f2a6a61baf37ace3413b5834cfd57b3a910"
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "tyrant"
+        ]
+      },
       "location_id": 7770384,
       "mission_key": "e3m2_hell_b",
       "name": "Nekravol Part II - Mission Challenge - Cut Down to Size",
@@ -880,6 +924,12 @@
         "completion_stat": "STAT_COMPLETED_E3M2_B_CHALLENGE_3",
         "path": "unlockable/mission_challenge/e3m2_b/challenge_3.decl",
         "sha256": "6bb60491c0ca048f8f5e13e48705c3c26ee15f13ef0d8951f7c5cd20b6a3b03b"
+      },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "archvile"
+        ]
       },
       "location_id": 7770385,
       "mission_key": "e3m2_hell_b",
@@ -980,6 +1030,12 @@
         "sha256": "fd33753de57fca3538eec565954c3a298a2e1d02c0885aa0f5b135385c7c20be"
       },
       "description": "Kill 5 Maykr Drones with Precision Bolt headshots",
+      "enemy_targets": {
+        "minimum": 5,
+        "species": [
+          "zombie_maykr"
+        ]
+      },
       "location_id": 7770409,
       "mission_key": "e3m3_maykr",
       "name": "Urdak - Mission Challenge - Angel of Death",
@@ -1276,12 +1332,22 @@
           "sha256": "defc4a16c7eb29e92d641f69e501e71480c8b4c7dc55885ebcb9c9bc0097b40b"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "arachnotron"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/shotgun/pop_rocket_more_bombs",
       "item_id": 7770070,
       "location_id": 7770125,
       "mission_key": "shotgun",
       "name": "Sticky Bombs - Weapon Mastery Challenge",
       "order": 8,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 25
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1308,12 +1374,23 @@
           "sha256": "2a68cf6461653c94d1a3a302997d23e16da72e8b0a66e640e639a620bdca5097"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "pinky",
+          "spectre"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/shotgun/secondary_full_auto_ammo_giveback",
       "item_id": 7770069,
       "location_id": 7770126,
       "mission_key": "shotgun",
       "name": "Full Auto - Weapon Mastery Challenge",
       "order": 9,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1346,6 +1423,10 @@
       "mission_key": "heavy_cannon",
       "name": "Precision Bolt - Weapon Mastery Challenge",
       "order": 10,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 75
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1378,6 +1459,10 @@
       "mission_key": "heavy_cannon",
       "name": "Micro Missiles - Weapon Mastery Challenge",
       "order": 11,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1410,6 +1495,10 @@
       "mission_key": "plasma_rifle",
       "name": "Heat Blast - Weapon Mastery Challenge",
       "order": 12,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 30
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1442,6 +1531,10 @@
       "mission_key": "plasma_rifle",
       "name": "Microwave Beam - Weapon Mastery Challenge",
       "order": 13,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1468,12 +1561,22 @@
           "sha256": "b1ee0ba9ddeb2ee2b702f076f9f4707bfba28bb75a0b8392efef0b6371c40817"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "prowler"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/rocket_launcher/lockon_mastery",
       "item_id": 7770074,
       "location_id": 7770131,
       "mission_key": "rocket_launcher",
       "name": "Lock-on Burst - Weapon Mastery Challenge",
       "order": 14,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1506,6 +1609,10 @@
       "mission_key": "rocket_launcher",
       "name": "Remote Detonate - Weapon Mastery Challenge",
       "order": 15,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 60
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1538,6 +1645,10 @@
       "mission_key": "ballista",
       "name": "Destroyer Blade - Weapon Mastery Challenge",
       "order": 16,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 15
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1564,12 +1675,22 @@
           "sha256": "19b250926cb4d2a61dfebbea8e161a07c109347d4f51f1f187712e302063d4e0"
         }
       },
+      "enemy_targets": {
+        "minimum": 1,
+        "species": [
+          "cacodemon"
+        ]
+      },
       "gameplay_perk": "perk/player/weapons/gauss_cannon/ballista_mastery",
       "item_id": 7770076,
       "location_id": 7770134,
       "mission_key": "ballista",
       "name": "Arbalest - Weapon Mastery Challenge",
       "order": 17,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 20
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1602,6 +1723,10 @@
       "mission_key": "chaingun",
       "name": "Mobile Turret - Weapon Mastery Challenge",
       "order": 18,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 10
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1634,6 +1759,10 @@
       "mission_key": "chaingun",
       "name": "Energy Shield - Weapon Mastery Challenge",
       "order": 19,
+      "requirement": {
+        "kind": "damage",
+        "original_count": 20000
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",
@@ -1666,6 +1795,10 @@
       "mission_key": "double_barrel",
       "name": "Meat Hook - Weapon Mastery Challenge",
       "order": 20,
+      "requirement": {
+        "kind": "repetitions",
+        "original_count": 50
+      },
       "signal": {
         "kind": "unlockable_record",
         "manager": "UnlockableManager_0_1_2/idUnlockableManager_2",

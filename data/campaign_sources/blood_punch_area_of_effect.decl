@@ -1,0 +1,12 @@
+{
+	inherit = "perk/player/blood_punch/base";
+	edit = {
+		displayName = "#str_decl_ability_bloodpunch_aoe_GHOST62743";
+		pickupName = "#str_decl_callout_encounter_hell_priest_GHOST82853";
+		notificationSubtext = "#str_decl_callout_encounter_hell_priest_eliminated_GHOST82857";
+		description = "#str_decl_ability_bloodpunch_upgrade_aoe_desc_GHOST62744";
+		upgrades = {
+			item[0] = "upgrade/blood_punch/area_of_effect";
+		}
+	}
+}

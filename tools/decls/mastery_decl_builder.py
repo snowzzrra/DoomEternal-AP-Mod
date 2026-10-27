@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from doom_eap.contracts.challenge_registry import load_challenge_registry
+from doom_eap.content.mastery_requirements import mastery_entries_for_profile, patch_mastery_decl
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
@@ -100,12 +101,13 @@ def _reward_free_override(entry: dict) -> tuple[str, str]:
     return unlockable, perk
 
 
-def build_mastery_overrides(mod_root: Path) -> dict:
-    masteries = _masteries()
+def build_mastery_overrides(mod_root: Path, requirements: str = "Original") -> dict:
+    masteries = mastery_entries_for_profile(_masteries(), requirements)
     _assert_proven_observer(masteries)
     written_paths = []
     for entry in masteries:
         unlockable, perk = _reward_free_override(entry)
+        unlockable = patch_mastery_decl(unlockable, entry)
         outputs = {
             _locked_decl(entry, "unlockable")["path"]: unlockable,
             _locked_decl(entry, "perk")["path"]: perk,
@@ -120,6 +122,7 @@ def build_mastery_overrides(mod_root: Path) -> dict:
     return {
         "owner": OWNER,
         "mastery_count": len(masteries),
+        "requirements": requirements,
         "location_ids": [entry["location_id"] for entry in masteries],
         "item_ids": [entry["item_id"] for entry in masteries],
         "written_paths": written_paths,
@@ -134,8 +137,9 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mod-root", type=Path, required=True)
     parser.add_argument("--audit-output", type=Path, required=True)
+    parser.add_argument("--mastery-requirements", choices=("Original", "Half", "Quarter"), default="Original")
     args = parser.parse_args()
-    audit = build_mastery_overrides(args.mod_root)
+    audit = build_mastery_overrides(args.mod_root, args.mastery_requirements)
     args.audit_output.write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8", newline="\n")
     return 0
 

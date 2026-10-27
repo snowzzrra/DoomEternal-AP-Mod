@@ -405,15 +405,12 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "automap station"
-    ],
+    "forbidden_ap_terms": [],
     "required_source_edge": {
       "from": "temp_all_scripting_target_level_transition_1",
       "to": "maps/game/sp/e3m4_boss/e3m4_boss.map"
     },
     "excluded_entities": [
-      "temple_interior_interact_automap_1_e3m3",
       "cine_light_slayer_key1",
       "temp_all_scripting_trigger_level_transition",
       "temp_all_scripting_target_relay_65"
@@ -430,5 +427,29 @@
     "Mission Complete location effect precedes the separate campaign goal effect",
     "Mission Challenge rewards use the existing scoped currency neutralizer",
     "All Mission Challenges aggregate reward uses the generic data-driven suppressor"
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "temple_interior_interact_automap_1_e3m3": {
+        "location_id": 7770505,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": 84.7400055,
+          "y": -124.989998,
+          "z": -124.320023
+        },
+        "region": "Urdak - The Sanctuary",
+        "qualification": "Lower level of the first machinery chamber, before Icon of Sin revival and the first combat arena.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e3m3_maykr/e3m3_maykr.decl",
+          "sha256": "ab765f7ad2edfe2d14d2342f7930f597478683755cddd212bdce01688c114750",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }

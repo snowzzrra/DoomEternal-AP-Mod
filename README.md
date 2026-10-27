@@ -10,21 +10,38 @@ Found a bug? Use **Report a Problem** in the launcher or [open a GitHub issue](h
 
 ## 1. What gets randomized
 
-DOOM Eternal Archipelago turns DOOM Eternal into an [Archipelago](https://archipelago.gg/) progression randomizer. Campaign objectives can contain items for any player in a multiworld, while checks from other supported games can send weapons, abilities, upgrades, and resources to the Slayer. One-player rooms use the same systems for solo seeds.
+Play DOOM Eternal in an [Archipelago](https://archipelago.gg/) multiworld.
+Collectibles, fights and campaign objectives give items to players across the room;
+their discoveries can send weapons, abilities and upgrades back to you. You can
+also generate a solo room.
 
-The randomizer supports **13 Base Campaign missions** or the **19-mission Full Saga**, with **437 locations** and **132 item types**. Locations include secrets, collectibles, Slayer Gates, Secret Encounters, Mission Challenges, Weapon Masteries, mission milestones, Fortress objectives, and selected The Ancient Gods content.
+Choose a campaign from the base game and The Ancient Gods, shuffle mission order
+or unlock missions with Access items. Enemy Randomizer changes the enemies you
+fight. Killsanity adds rewards as your kill counter reaches each target.
 
-Randomized progression includes:
+## Start playing
 
-- weapons, weapon mods, runes, equipment, Sentinel Crystals, Praetor Suit upgrades, Sentinel Batteries, Support Runes, and Sentinel Hammer;
-- configurable Chainsaw, Dash, first Sentinel Battery, starting weapon, starting inventory, and Automap reveal;
-- four victory goals with optional mission, Slayer Gate, Escalation Encounter, Secret Encounter, Mission Challenge, Weapon Mastery, and Unmaykr requirements;
-- Base Campaign, Base Campaign with DLC gear, and Full Saga campaign scopes;
-- physical campaign checks, combat encounters, challenges, masteries, mission completion, and Fortress progression;
-- Ammo Refill charges, temporary combat effects, enemy traps, resource-drain traps, and DeathLink;
-- reconnect-safe permanent inventory, checked-location cleanup, native Fast Travel on completed mission replays, and room-specific map packages.
+You need a Steam copy of DOOM Eternal, the DLC used by your room, and the matching
+DOOM Eternal Archipelago release. Keep the launcher and its `client` folder together.
 
-Launcher creates player YAML files, connects to rooms, prepares matching room package, manages supported dependencies, displays session activity, and provides setup checks, repair actions, logs, and support reports. After setup, start DOOM Eternal normally through Steam and keep launcher open.
+1. Download and extract the release for your operating system.
+2. If you are generating the room, install its `doometernal.apworld` in Archipelago
+   and use **CREATE PLAYER** in the DOOM launcher to save your player YAML.
+3. In the DOOM launcher, choose **JOIN ROOM** and enter the server and player name.
+4. Install the room mod when prompted, then start DOOM Eternal through Steam.
+   Keep the launcher open while playing.
+
+Follow [Install and connect](docs/INSTALL.md) for the complete Windows or Linux/Proton
+instructions. Joining an existing room does not require a YAML file.
+
+## Choose your game
+
+Set mission selection, starting equipment, victory objectives and enemy settings
+before generating the room. The launcher shows those choices under **CREATE PLAYER**.
+Once connected, **VIEW ALL SETTINGS** shows the room's choices.
+
+See [Gameplay and options](docs/GAMEPLAY.md) for mission access, enemy settings,
+kill rewards, DeathLink and inventory recovery. The options table below might help too.
 
 ## 2. Player options
 
@@ -65,210 +82,8 @@ See the [Windows and Linux/Proton installation guide](docs/INSTALL.md).
 
 ## 4. How it works
 
-### Room generation
-
-Archipelago reads each player's YAML and creates a room containing options,
-access rules, locations, and item placements. The DOOM Eternal APWorld models
-100 regions and evaluates which objectives are reachable with the player's
-current inventory. Fill logic accounts for weapon progression, Fortress of Doom
-Battery costs, challenge requirements, the mission weapon curve, starting
-inventory, and selected physical options.
-
-Generation produces `slot_data`, the room-authoritative description of the
-player's options and identity. The launcher uses it to prepare the exact map
-package needed by that slot. Starting inventory is also compiled into the
-mission `DevInvLoadout`, making starting ownership available as the campaign
-loads.
-
-### Authoring campaign content
-
-DOOM Eternal missions store gameplay objects in `.entities` data. These objects
-include pickups, doors, triggers, relays, encounters, objectives, checkpoints,
-Automap stations, mission-completion targets, and the links that connect them.
-The mod works with those native objects and their mission relationships.
-
-Every supported map has an authorial content package under:
-
-```text
-content/maps/<map_key>/
-├── descriptor.json
-├── locations.json
-├── runtime.json
-├── publishers.json
-├── assets.json
-└── onboarding.json
-```
-
-Together, these files describe source-map identity, public location IDs,
-physical owners, runtime checks, event publishers, required assets, target
-chains, transforms, and mission-specific contracts. This is the readable source
-used by the map compiler. Catalogs, registries, manifests, and generated map
-files are projections of that content.
-
-Each physical location identifies a native mission entity and its functional
-context. The compiler preserves the pieces that make the objective behave like
-part of the mission: visual presentation, collision, interaction volume,
-Automap presentation, doors, encounter managers, objective relays, checkpoint
-continuity, and other mission scripting. It then gives that objective an
-Archipelago publisher with the location's public ID.
-
-Different check families retain their natural campaign behavior:
-
-- collectible pickups remain physical objects in their original spaces;
-- secrets retain their doors, markers, and exploration flow;
-- combat encounters publish through their native completion path;
-- mission challenges and weapon masteries use persistent game state;
-- Mission Complete follows the native mission transition;
-- Fortress rooms keep Battery access requirements and room interactions;
-- campaign objectives keep the relays and checkpoints that drive mission flow.
-
-### Map compilation
-
-The map generator reads the supported retail source map, verifies its identity,
-and applies deterministic transformations from the authorial content package.
-It creates location publishers, item-command targets, notification entities,
-physical-option writers, Mission Complete support, Fast Travel support, and
-room-specific starting state.
-
-Generated maps receive semantic validation before packaging. A baseline records
-the accepted structure of each mission: entity counts, public checks, runtime
-checks, regions, important target chains, and content hashes. This makes a map
-edit reviewable at the level of gameplay structure rather than only as a large
-text diff.
-
-Physical options are projected while the room package is prepared.
-**Reveal AP Locations on Automap** defaults to OFF. When enabled, AP precollects
-**Reveal Automap Progression Items**.
-### Location checks
-
-A completed physical objective activates its `AP_CHECK_*` publisher. The
-publisher writes a durable event named with the public location ID. The Python
-bridge reads that event and submits a standard Archipelago `LocationChecks`
-message. The event remains durable while delivery is in progress, allowing the
-check flow to survive reconnects and short network interruptions.
-
-```text
-native mission objective
-  -> AP_CHECK_* publisher
-  -> ap_event_<location_id>.txt
-  -> bridge_client.py
-  -> Archipelago LocationChecks
-  -> server acknowledgement
-```
-
-Runtime locations use the same public check protocol with another native source
-of truth. Mission challenges, weapon masteries, mission completion, campaign
-goal, and other persistent states are reconciled from native events or
-structured save data. Each observer is tied to the current room, slot, save,
-map, and load epoch.
-
-### Item delivery
-
-The APWorld item table and game-side runtime contracts share 132 public
-item IDs. When the server sends an item, the bridge resolves its command and
-activates a map-owned `ap_rpc_v3_*` entity:
-
-```text
-ai_ScriptCmdEnt ap_rpc_v3_<item_id> activate
-```
-
-These entities use native game commands for weapons, weapon mods, perks, runes,
-equipment, currencies, resources, traps, and other effects. Replay policy is
-defined per item. Permanent ownership is reconciled after reconnect, while
-consumable and one-shot effects follow their delivery receipt state.
-
-The external `ap_client.exe` carries commands between the bridge and Sentinel Core's
-in-game RPC server. Command dispatch is gated by supported executable identity,
-native memory safety, active map, gameplay state, room identity, and load epoch.
-This keeps delivery synchronized with the mission that owns the command
-entities.
-
-### Native map systems
-
-The implementation uses native DOOM Eternal systems wherever the campaign
-already has a suitable owner or writer:
-
-- replay Fast Travel uses `idTarget_FastTravelUnlock`;
-- Mission Complete uses mission transition publishers;
-- equipment, perks, weapons, mods, runes, and currencies use their supported
-  command or target forms;
-- challenge and mastery state comes from the game's persistent save model;
-- map checks use durable AP publishers attached to the objective's native flow.
-
-The 79 Fast Travel anchors remain destinations owned by the native system. One
-AP-owned unlock target per mission enables that system during eligible replays.
-Eligibility is captured at the beginning of a load epoch from the mission's
-checked Mission Complete state, then held stable for that load.
-
-### Save, reconnect, and session identity
-
-The bridge maintains a room-bound snapshot containing checked locations,
-received items, delivery receipts, observer fingerprints, current map state,
-and load epochs. Archipelago is authoritative for received items and completed
-locations. Reconnect compares local state with the server and resumes pending
-work from that shared history.
-
-Room identity also protects generated content. The launcher, installed package,
-bridge, APWorld, slot data, and save association are checked together. Setup check
-reports identity or installation drift. Repair/Fix presents a concrete plan, backs
-up owned content, applies confirmed actions, and validates installed files.
-
-### Campaign systems
-
-- **Starting Weapon** selects one configured weapon or samples one eligible
-  weapon when Random is chosen. Combat Shotgun participates as an opt-in choice.
-- **Sentinel Batteries** form an economy of 28 units: two individual Batteries
-  and thirteen bundles worth two each. The thirteen Fortress consumers each
-  require a balance of two.
-- **Reveal AP Locations on Automap** defaults to OFF. ON precollects exactly one
-  **Reveal Automap Progression Items**. AP progression-item markers become visible
-  through each mission's transformed native Automap station.
-- **Trap Percentage** replaces that percentage of filler padding with traps. It
-  does not replace progression items or other pool items. **Enabled Traps** selects
-  trap types eligible for those filler slots; with no enabled types, no traps are
-  placed.
-- **Fast Travel** activates the mission's native Fast Travel unlock during a
-  replay whose Mission Complete state was already checked at load start.
-- **DeathLink** applies a short two-hit lethal burst to the Slayer
-  during safe gameplay; native Extra Life and Saving Throw protections are preserved.
-- **Marker cleanup** reconciles server-confirmed locations with their map and
-  Automap presentation across reloads and revisits.
-
-### Repository and runtime architecture
-
-Implementation is split across two repositories:
-
-- `Archipelago/worlds/doometernal/` owns APWorld options, items, locations,
-  regions, logic, fill, slot data, and generation output;
-- this repository owns authorial game content, map compilation, runtime
-  observers, item delivery, native client, launcher, validation, and packaging.
-
-Source modules are organized under `doom_eap/`: `runtime/` owns bridge and game
-observers, `launcher/` owns launcher commands and UI, `content/` owns catalog
-and option definitions, and `contracts/` owns shared content contracts.
-
-### Developer build modes
-
-`scripts/pipeline.sh playtest` creates a candidate through cheap preflight,
-digest-backed materialization, package assembly and structural artifact smoke.
-`scripts/pipeline.sh audit`/`full` run explicit semantic map validation.
-`scripts/pipeline.sh release --build` is formal package validation. `affected`
-is diagnostic only; it does not determine build correctness. Seed compilation uses project-controlled `vanillamaps` source. Enemizer uses
-that seed-time compiler and bounded payload construction.
-
-The active runtime has three cooperating layers:
-
-1. **Generated mission content** publishes checks and exposes native command
-   entities.
-2. **`doom_eap.runtime.bridge_client`** speaks the Archipelago protocol, owns
-   durable session state, and coordinates observers and item delivery.
-3. **`ap_client.exe` and Sentinel Core** provide external RPC and native telemetry for
-   the running game.
-
-The launcher surrounds those layers. It reads the room schema, creates player
-YAML, discovers supported installations, prepares the room package, supervises
-the bridge while the player runs DOOM Eternal through Steam, and provides Help, setup check,
-Repair/Fix, and a sanitized support report.
+For development, read [Content and builds](docs/DEVELOPMENT.md) and
+[Build a release](docs/RELEASING.md).
 
 ## 5. Version scope
 
@@ -317,16 +132,17 @@ Repair/Fix, and a sanitized support report.
 - Windows pins EternalModInjector `2026-09-17` (GameBanana download `1819101`)
   with direct sandbox support and no sandbox hold workaround.
 
-### 0.6.x Beta — Random Mission Order + Sentinel Core — CURRENT
+### 0.6.x Beta — Random Mission Order + Sentinel Core — DONE
 
 - Develop Sentinel Core as an independent open-source native integration project for Archipelago.
 - Use Sentinel Core for native RPC and telemetry, with a separate distribution containing the verified Windows Core/bootstrap pair. Broader platform integration requires validation.
 - Turn mission access into Archipelago progression items.
 - Generate a valid starting mission and reachable randomized mission order.
 
-### 0.7.x Beta — Enemizer
+### 0.7.x Beta — Enemizer — Current
 
 - Randomize enemy placements and encounters while keeping the CR formula.
+- Add Killsanity, which gives checks per each X configurable demons killed.
 
 ### 0.8.x–0.9.x — Content freeze and polish
 

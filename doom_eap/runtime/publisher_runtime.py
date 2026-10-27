@@ -9,10 +9,7 @@ import time
 from pathlib import Path
 
 def read_map_event(path: Path, marker: str) -> tuple[bool, str, str]:
-    try:
-        contents = path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        contents = ""
+    contents = path.read_text(encoding="utf-8", errors="replace")
     digest = hashlib.sha256(contents.encode("utf-8")).hexdigest()
     return marker in contents, contents, digest
 

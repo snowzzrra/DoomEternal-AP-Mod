@@ -8,14 +8,15 @@ from pathlib import Path, PurePosixPath
 
 ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
-       "campaign_menu": 1, "inventory": 7, "arsenal": 1, "runes": 1,
-       "special": 1, "deathlink": 1, "automap": 1, "commands": 1}
+       "campaign_menu": 1, "inventory": 8, "arsenal": 1, "runes": 1,
+       "special": 1, "deathlink": 1, "automap": 1, "commands": 1,
+       "combat": 2, "combat_presentation": 1, "enemy_movement": 2, "enemy_supply": 1, "enemy_limits": 2, "enemy_tracking": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
 from doom_eap import __version__ as MOD_VERSION
-SUPPORTED_CAPABILITIES = {2097152}
-REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "commands"}
+SUPPORTED_CAPABILITIES = {2097152, 4194304, 8388608}
+REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "commands", "combat", "combat_presentation", "enemy_movement", "enemy_supply", "enemy_limits", "enemy_tracking"}
 
 def version_key(value):
     match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc-([1-9]\d*))?(?:\+[0-9A-Za-z.-]+)?", value)
@@ -30,7 +31,7 @@ def mod_compatible(value):
         return False
     if "mod_version_range" not in value:
         versions = value["mod_versions"]
-        return isinstance(versions, list) and any(version in versions for version in ("0.6.0", MOD_VERSION))
+        return isinstance(versions, list) and MOD_VERSION in versions
     terms = value["mod_version_range"].split(",")
     if not terms:
         return False
@@ -67,10 +68,10 @@ def validate_manifest(value):
     channel = "stable" if key[3] else "rc"
     if value["base_version"] != base or value["channel"] != channel or type(value["rc_number"]) is not int or value["rc_number"] != key[4]:
         raise ValueError("Inconsistent version fields")
-    if not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
+    if key[:2] != (1, 1) or not mod_compatible(value) or value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
     if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list) or any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
-           ((4, 5, 6, 7) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
+           ((7, 8) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES:
         raise ValueError("Incompatible ABI or capability")
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")
@@ -103,6 +104,11 @@ def verify_bytes(name, data, item):
         if offset + 6 > len(data) or data[offset:offset+4] != b"PE\0\0" or struct.unpack_from("<H", data, offset+4)[0] != 0x8664:
             raise ValueError("Artifact is not Windows x64")
 
+def verify_build_identity(name, data, build_id):
+    if build_id.encode() + b"\0" not in data:
+        raise ValueError(f"Runtime binary build identity differs: {name}")
+
+
 def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
     path = Path(manifest_path)
     value = read_manifest(path)
@@ -119,6 +125,8 @@ def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
         for name in names:
             data = archive.read(name)
             verify_bytes(name, data, items[name])
+            if name in {"sentinel_core.dll", "msimg32.dll"}:
+                verify_build_identity(name, data, value["build_id"])
             contents[name] = data
         for name, data in contents.items():
             if bootstrap_from_archive and name == "msimg32.dll":

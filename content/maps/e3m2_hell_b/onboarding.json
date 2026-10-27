@@ -375,16 +375,12 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "automap station"
-    ],
+    "forbidden_ap_terms": [],
     "required_source_edge": {
       "from": "game_target_level_transition_1",
       "to": "game/sp/e3m3_maykr/e3m3_maykr.map"
     },
-    "excluded_entities": [
-      "game_interact_automap_1_e3m2b"
-    ]
+    "excluded_entities": []
   },
   "checks": [
     "source hash locked and byte-identical to decompressed patch2 owner payload",
@@ -394,5 +390,29 @@
     "Urdak remains an unimplemented native boundary",
     "Mission Complete is isolated from the unchanged Taras Nabad campaign goal",
     "Mission Challenge rewards use the existing scoped currency neutralizer"
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "game_interact_automap_1_e3m2b": {
+        "location_id": 7770504,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -845.509827,
+          "y": -9.53019714,
+          "z": -2.00126076
+        },
+        "region": "Nekravol Part II - Demon Foundry",
+        "qualification": "After the three rotating spiked pillars, before the skull-switch elevator into Soul Ascent.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e3m2_hellb/e3m2_hellb.decl",
+          "sha256": "a2f7abbdd51ff99cbb5d658a31efb8630d039682f89f2571913d0056d954d7a5",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }

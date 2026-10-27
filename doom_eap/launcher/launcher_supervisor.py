@@ -120,6 +120,7 @@ class BridgeSupervisor:
                 bufsize=1,
                 cwd=self.application_dir,
                 env=environment,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
             )
         except Exception:
             with self._profiles_lock:

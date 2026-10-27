@@ -80,6 +80,33 @@ def test_support_retains_native_failure_after_game_exit(tmp_path, monkeypatch):
         assert b"private-address" not in raw and len(exported["errors"]) == 2
 
 
+def test_support_preserves_darklord_sessions_without_console_or_secrets(tmp_path, monkeypatch):
+    import json
+    import zipfile
+    from doom_eap.launcher import launcher_doctor as doctor
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    directory = tmp_path / "local/SentinelCore/diagnostics"
+    directory.mkdir(parents=True)
+    previous = "AP_DARKLORD event=actor pid=42 seq=3 at_ms=100 map=e5m4_boss handle=0x123 actor=0x456"
+    current = "AP_DARKLORD event=summary pid=43 seq=1 at_ms=12100 map=e5m4_boss frozen_ms=3000 recovered_at_ms=3000"
+    (directory / "42-99.darklord.log").write_text(previous + " password=private-password\nnot telemetry token=private-token\n")
+    (directory / "43-100.darklord.log").write_text(current + " token=private-token\n")
+    (directory / "untrusted.darklord.log").write_text("AP_DARKLORD password=filename-secret\n")
+    monkeypatch.setattr(doctor, "_support_log_tails", lambda *args, **kwargs: ({}, {}))
+    result = doctor.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
+        support_diagnostics={"ap_session": {"pid": 43, "process_created": 100}})
+    with zipfile.ZipFile(result) as archive:
+        assert previous in archive.read("darklord/42-99.darklord.log").decode()
+        assert current in archive.read("darklord/43-100.darklord.log").decode()
+        records = json.loads(archive.read("doctor.json"))["darklord_telemetry"]["records"]
+        assert {row["evidence"] for row in records} == {"current_process", "last_known"}
+        assert all(row["line_count"] == 1 and not row["truncated"] for row in records)
+        for name in archive.namelist():
+            data = archive.read(name)
+            assert all(secret not in data for secret in (b"private-password", b"private-token", b"filename-secret"))
+
+
 @pytest.mark.parametrize("fields,headers", [
     ({"execution_class": "MAP_ENTITY_SAFE", "operation": "FAST_TRAVEL_UNLOCK",
       "materialization_lease": "1:2"},

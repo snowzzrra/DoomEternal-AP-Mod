@@ -32,6 +32,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.mastery_requirements import MASTERY_REQUIREMENT_DIVISORS
 from tools.release.release_manifest import (
     MANIFEST_FILENAME,
     build_release_manifest,
@@ -39,6 +40,8 @@ from tools.release.release_manifest import (
     write_release_manifest,
 )
 from tools.release.room_payloads import (
+    _decode_source_snapshot,
+    _payload_archive_members,
     assemble_room_files,
     load_room_payload_manifest,
     read_zip,
@@ -112,6 +115,9 @@ def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dic
     except Exception as e:
         raise ValueError(f"Failed to parse BUILD-MANIFEST.json: {e}") from e
 
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("version_label"), str) or not manifest["version_label"].strip():
+        raise ValueError("Handoff manifest version_label is missing or invalid")
+
     sums_path = handoff_dir / "SHA256SUMS.txt"
     if sums_path.is_file():
         for line in sums_path.read_text(encoding="utf-8").splitlines():
@@ -178,20 +184,15 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
 
     manifest_doc = load_room_payload_manifest(room_manifest)
     base_members = read_zip(base_mod)
-    payload_members = read_zip(room_payloads)
+    with zipfile.ZipFile(room_payloads) as archive:
+        payload_members = {name: archive.read(info)
+                           for name, info in _payload_archive_members(archive, manifest_doc).items()}
 
     if set(base_members) != set(manifest_doc.get("base_members", [])):
         raise ValueError("base_mod.zip archive members disagree with room_payload_manifest.json")
 
-    expected_payload_members = {
-        state["member"]
-        for record in manifest_doc.get("maps", {}).values()
-        for state in record.get("states", [])
-        if state.get("source") == "replacement"
-    }
-    if set(payload_members) != expected_payload_members:
-        raise ValueError("room_payloads.zip archive members disagree with room_payload_manifest.json")
-
+    for map_key, snapshot in manifest_doc["source_snapshots"].items():
+        _decode_source_snapshot(payload_members[snapshot["member"]], snapshot, map_key)
     for map_key, record in manifest_doc.get("maps", {}).items():
         for state in record.get("states", []):
             if state.get("source") == "base":
@@ -209,17 +210,22 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
 
     if repo_root is not None:
         catalog = load_content_catalog(repo_root)
-        enabled_map_keys = {spec.key for spec in catalog.enabled_maps()}
+        enabled_map_keys = {spec.key for spec in catalog.compiler_maps()}
         if set(manifest_doc.get("maps", {})) != enabled_map_keys:
             raise ValueError(
-                f"Room payload map set disagrees with enabled maps: "
+                f"Room payload map set disagrees with compiler maps: "
                 f"missing={sorted(enabled_map_keys - set(manifest_doc.get('maps', {})))}, "
                 f"extra={sorted(set(manifest_doc.get('maps', {})) - enabled_map_keys)}"
             )
+        for map_key, snapshot in manifest_doc["source_snapshots"].items():
+            if snapshot["sha256"] != catalog.maps[map_key].source_sha256:
+                raise ValueError(f"Room source snapshot disagrees with its descriptor: {map_key}")
 
     keys = manifest_doc.get("physical_option_keys", [])
-    for values in product((False, True), repeat=len(keys)):
-        opts = dict(zip(keys, values))
+    for values, mastery_profile in product(
+        product((False, True), repeat=len(keys)), MASTERY_REQUIREMENT_DIVISORS
+    ):
+        opts = dict(zip(keys, values), mastery_requirements=mastery_profile)
         assembled, selected = assemble_room_files(base_mod, room_payloads, manifest_doc, opts)
         if len(selected) != len(manifest_doc.get("maps", {})):
             raise ValueError(f"Room selection non-deterministic for options {opts}")
@@ -259,21 +265,30 @@ def assemble_platform_release(
     dst_apworld = out_root / "doometernal.apworld"
     shutil.copy2(src_apworld, dst_apworld)
 
-    # 3. Copy docs & license
-    for doc in ["README.md", "INSTALL.md", "LICENSE"]:
-        src_doc = repo_root / "docs" / doc if (repo_root / "docs" / doc).is_file() else repo_root / doc
-        if src_doc.is_file():
-            shutil.copy2(src_doc, out_root / doc)
+    for doc in ("README.md", "LICENSE"):
+        source = repo_root / doc if (repo_root / doc).is_file() else repo_root / "docs" / doc
+        if source.is_file():
+            shutil.copy2(source, out_root / doc)
+    docs = out_root / "docs"
+    docs.mkdir(exist_ok=True)
+    for name in ("INSTALL.md", "GAMEPLAY.md", "DEVELOPMENT.md", "RELEASING.md", "LICENSE"):
+        source = repo_root / "docs" / name
+        if source.is_file():
+            shutil.copy2(source, docs / name)
 
     # copy client runtime, resources & templates
     client_dir = out_root / "client"
     client_dir.mkdir(parents=True, exist_ok=True)
 
-    # shared client binaries from handoff
     shared_client_dir = handoff_dir / "shared" / "client"
     if shared_client_dir.is_dir():
         for item in shared_client_dir.iterdir():
-            if item.is_file():
+            if item.name in FORBIDDEN_DIR_NAMES:
+                continue
+            if item.is_dir():
+                shutil.copytree(item, client_dir / item.name,
+                                ignore=shutil.ignore_patterns(*FORBIDDEN_DIR_NAMES))
+            elif item.is_file():
                 shutil.copy2(item, client_dir / item.name)
 
     # copy the prebuilt room resources
@@ -388,7 +403,7 @@ def assemble_platform_release(
 
     # Save handoff build provenance metadata in client directory
     provenance_doc = {
-        "version_label": manifest.get("version_label", "v0.6.0"),
+        "version_label": manifest["version_label"],
         "architecture": "x86_64",
         "mod_commit_sha": manifest.get("mod", {}).get("resolved_sha", "unknown"),
         "apworld_commit_sha": manifest.get("apworld", {}).get("resolved_sha", "unknown"),
@@ -409,7 +424,7 @@ def assemble_platform_release(
     canonical_manifest = build_release_manifest(
         repo_root,
         room_resources=room_resources_dir,
-        release_version=manifest.get("version_label", "v0.6.0"),
+        release_version=manifest["version_label"],
         public_files=declared_public_files,
         apworld=manifest.get("apworld"),
     )
@@ -580,7 +595,7 @@ def main() -> int:
 
         print("--> Validating handoff artifact...")
         manifest = validate_handoff_structure(extracted_handoff, args.platform)
-        version_label = manifest.get("version_label", "v0.6.0")
+        version_label = manifest["version_label"]
 
         if args.version and args.version != version_label:
             raise ValueError(f"Version mismatch: handoff says {version_label}, expected {args.version}")

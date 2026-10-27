@@ -10,6 +10,7 @@ import struct
 import subprocess
 import time
 from pathlib import Path
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
 
 ITEM_ID = 7770903
 AMOUNT = 3
@@ -53,7 +54,7 @@ class SentinelWeaponPoints:
                     return {key: (item not in (0, "0", None) if key == "event_gap_count" else semantic(item)) for key, item in value.items()
                             if key not in {"sequence", "timestamp_ms", "at_monotonic", "sampled_at_ms",
                                 "event_sequence", "callback_sequence", "callback_at_ms", "context_sampled_at_ms",
-                                "history_oldest", "history_overwritten", "events", "at_ms"}}
+                                "history_oldest", "history_overwritten", "events", "qualified_kills", "at_ms"}}
                 if isinstance(value, list):
                     return [semantic(item) for item in value]
                 return value
@@ -77,6 +78,7 @@ class SentinelWeaponPoints:
                         **{field: previous[field] for field in ("first_seen", "last_seen", "count")}})
                     previous["emitted_at"] = now
 
+    @timed_sync_call
     def _run(self, args, payload=None):
         evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
                     "cwd": os.getcwd(), "stage": args[2] if args[0] == "--pid" else args[0],
@@ -90,7 +92,8 @@ class SentinelWeaponPoints:
                 from doom_eap.runtime.proton import windows_path
                 executable = windows_path(self.probe)
             process = subprocess.run([*self.command_prefix, executable, *args], input=payload,
-                                     capture_output=True, timeout=4, check=False, env=self.environment)
+                                     capture_output=True, timeout=4, check=False, env=self.environment,
+                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             evidence.update(returncode=process.returncode,
                             stdout=process.stdout.decode("utf-8", errors="replace"),
                             stderr=process.stderr.decode("utf-8", errors="replace"))
@@ -112,6 +115,7 @@ class SentinelWeaponPoints:
         body = struct.pack("<III", int(amount != 0), amount, expected)
         return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
 
+    @timed_sync_call
     def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None):
         scope = self._run(["--pid", str(self.pid), "--native", "--json"])
         if trace is not None:
@@ -170,11 +174,85 @@ class SentinelWeaponPoints:
             if result["state"] == 3:
                 return result
             if result["state"] not in (1, 2) or time.monotonic() >= deadline:
-                # Never resubmit on an uncertain result. A future pass observes
-                # saved/native gained against the already durable receipt intent.
-                raise WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
+                # Uncertain results must be checked against the persisted receipt before resubmission.
+                error = WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
+                error.native_result = result
+                raise error
             operation = result_operation
             time.sleep(0.025)
+
+    def observe_combat(self, mission_maps):
+        if not re.fullmatch(r"[0-9a-f]{64}", self.namespace):
+            raise WeaponPointsBlocked("Invalid combat namespace")
+        if (not isinstance(mission_maps, (list, tuple, set, frozenset)) or not 1 <= len(mission_maps) <= 64
+                or any(not isinstance(name, str) or not 1 <= len(name) <= 255
+                       or not name.isascii() or "\0" in name for name in mission_maps)):
+            raise WeaponPointsBlocked("Invalid combat mission maps")
+        maps = sorted(set(mission_maps))
+        body = struct.pack("<QIIH", 4194304, 2, self.pid, 64) + self.namespace.encode("ascii")
+        body += struct.pack("<I", len(maps))
+        for name in maps:
+            encoded = name.encode("ascii")
+            body += struct.pack("<H", len(encoded)) + encoded
+        reply = self._run(["--combat"], struct.pack("<4sHHII", b"SCIP", 1, 50, len(body), 0) + body)
+        try:
+            def uint(value, bits=64):
+                if type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value)):
+                    raise ValueError("invalid integer")
+                number = int(value)
+                if not 0 <= number < 2**bits:
+                    raise ValueError("integer outside wire range")
+                return number
+
+            if uint(reply["combat_abi"], 32) != 2 or uint(reply["pid"], 32) != self.pid:
+                raise ValueError("combat ABI or process mismatch")
+            created = uint(reply["process_created"])
+            instance = reply["instance_id"]
+            build = reply["build_id"]
+            if (not created or not isinstance(instance, str) or not re.fullmatch(r"[0-9a-f]{32}", instance)
+                    or not isinstance(build, str) or not build or len(build) > 128):
+                raise ValueError("invalid producer identity")
+            if reply["namespace_id"] != self.namespace:
+                raise ValueError("combat namespace mismatch")
+            return {"producer": [str(self.pid), str(created), instance, build], "namespace_id": self.namespace,
+                    "qualified_kills": uint(reply["qualified_kills"]),
+                    "observation_gaps": uint(reply["observation_gaps"])}
+        except (KeyError, TypeError, ValueError) as error:
+            raise WeaponPointsBlocked(f"Invalid native combat observation: {error}") from error
+
+    def publish_combat_progress(self, total, target, first_milestone=0, milestone=0,
+                                milestone_step=0, visible=True):
+        values = (total, target, first_milestone, milestone, milestone_step)
+        if any(type(value) is not int or not 0 <= value < 2**64 for value in values) or type(visible) is not bool:
+            raise WeaponPointsBlocked("Invalid combat presentation values")
+        notices = (first_milestone, milestone, milestone_step)
+        if (target and target <= total or any(notices) and not (
+                0 < first_milestone <= milestone <= total and milestone_step > 0
+                and (milestone - first_milestone) % milestone_step == 0)):
+            raise WeaponPointsBlocked("Invalid combat presentation targets")
+        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
+        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
+            raise WeaponPointsBlocked("Native gameplay context is not active")
+        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
+        try:
+            payload = struct.pack("<QIQ16sQQ16sI", 8388608, self.pid,
+                                  int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
+                                  int(scope["lifecycle_generation"]), request_id, nonce, 1000)
+            payload += struct.pack("<I65sQQQQQI", 1, self.namespace.encode("ascii"), *values, int(visible))
+            message = struct.pack("<4sHHII", b"SCIP", 1, 51, len(payload), 0) + payload
+            result = self._run(["--combat-presentation"], message)
+            expected = (self.pid, int(scope["process_created"]), scope["instance_id"],
+                        int(scope["lifecycle_generation"]), scope["build_id"], request_id, nonce.hex())
+            actual = (int(result["pid"]), int(result["process_created"]), result["instance_id"],
+                      int(result["lifecycle_generation"]), result["build_id"],
+                      int(result["request_id"]), result["nonce"])
+            if (actual != expected or result["combat_presentation_abi"] != 1 or result["status"] != 0
+                    or tuple(int(result[key]) for key in ("total", "target", "milestone", "visible"))
+                    != (total, target, milestone, int(visible))):
+                raise ValueError("native acknowledgement does not match presentation")
+        except (KeyError, TypeError, ValueError, OverflowError, struct.error) as error:
+            raise WeaponPointsBlocked(f"Native combat presentation refused: {error}") from error
+        return result
 
     def deathlink_request(self, kind, *, enabled=False, mode="soft", event_id=0,
                           event_hash=bytes(16), ack_sequence=0):
@@ -266,27 +344,68 @@ class SentinelWeaponPoints:
     def observe_blood_punch(self):
         body = struct.pack("<5I4B", *([0] * 9))
         result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
-        if (result.get("inventory_abi") not in (4, 5, 6, 7) or result.get("outcome") != 1
+        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("outcome") != 1
                 or result.get("flags", 0) & 3 != 3 or result.get("upgrades_after") == 0xffffffff):
             raise WeaponPointsBlocked(f"Blood Punch native observation is unknown or incompatible: {result}")
         return (result["upgrades_after"] >> 11) & 15
 
     def observe_inventory(self):
         body = struct.pack("<5I4B", *([0] * 9))
-        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
+        trace = []
+        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body, trace=trace)
+        if trace:
+            scope = trace[0]["response"]
+            result["_observation_scope"] = tuple(str(scope[key]) for key in
+                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
+            result["_observation_map"] = scope.get("current_map")
         if result.get("inventory_abi") == 4:
             result["dash_before"] = result["dash_after"] = 255
         if result.get("inventory_abi") in (4, 5):
             result["slayer_key_before"] = result["slayer_key_after"] = 255
         if result.get("inventory_abi") in (4, 5, 6):
             result["frag_grenade_before"] = result["frag_grenade_after"] = 255
-        if (result.get("inventory_abi") not in (4, 5, 6, 7) or result.get("kind") != 0
+        if result.get("inventory_abi") in (4, 5, 6, 7):
+            result["perks_known"] = result["perks_owned"] = 0
+            result["flame_belch_after"] = result["blood_punch_after"] = 255
+        if result.get("inventory_abi") == 8:
+            try:
+                values = tuple(result[name] for name in ("perks_known", "perks_owned"))
+                if any(type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value))
+                       for value in values):
+                    raise ValueError("invalid integer")
+                known, owned = map(int, values)
+            except (KeyError, ValueError, TypeError) as error:
+                raise WeaponPointsBlocked("Native permanent-perk observation is malformed") from error
+            if not (0 <= owned <= known < 1 << 64) or owned & ~known:
+                raise WeaponPointsBlocked("Native permanent-perk observation is malformed")
+            result["perks_known"], result["perks_owned"] = known, owned
+        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("kind") != 0
                 or result.get("outcome") != 1 or result.get("flags", 0) & 3 != 3
                 or result.get("ice_bomb_after") not in (0, 1, 255)
                 or result.get("dash_after") not in (0, 1, 255)
                 or result.get("slayer_key_after") not in (0, 1, 255)
-                or result.get("frag_grenade_after") not in (0, 1, 255)):
+                or result.get("frag_grenade_after") not in (0, 1, 255)
+                or result.get("flame_belch_after") not in (0, 1, 255)
+                or result.get("blood_punch_after") not in (0, 1, 255)):
             raise WeaponPointsBlocked(f"Native inventory observation is unknown or incompatible: {result}")
+        return result
+
+    def observe_special_inventory(self):
+        body = struct.pack("<IIIIIIIQII", *([0] * 10))
+        trace = []
+        result = self._execute_typed(65536, "--special", 37, 38, 40, body, trace=trace)
+        if trace:
+            scope = trace[0]["response"]
+            result["_observation_scope"] = tuple(str(scope[key]) for key in
+                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
+            result["_observation_map"] = scope.get("current_map")
+        known = result.get("native_state_known")
+        if (result.get("outcome") not in (0, 1) or result.get("kind") != 0
+                or result.get("flags", 0) & 3 != 3 or type(known) is not int or not 0 <= known <= 31
+                or any(known & bit and (type(result.get(field)) is not int or not 0 <= result[field] <= maximum)
+                       for bit, field, maximum in ((1, "native_crucible", 1), (2, "native_hammer", 1),
+                                                   (4, "native_hammer_perks", 3)))):
+            raise WeaponPointsBlocked(f"Native Special observation is unavailable: {result}")
         return result
 
     def ensure_masteries(self, mask):
@@ -309,6 +428,17 @@ class SentinelWeaponPoints:
                 or result["owned_normal_after"] & mask != mask
                 or result["selected_slots_after"] != result["selected_slots_before"]):
             raise WeaponPointsBlocked(f"Native normal Rune registration unconfirmed: {result}")
+        return result
+
+    def ensure_support_runes(self, mask):
+        if type(mask) is not int or not 0 < mask <= 7:
+            raise WeaponPointsBlocked("Invalid support Rune mask")
+        body = struct.pack("<IIIBb2s", 2, 0, mask, 0, -1, b"\0\0")
+        result = self._execute_typed(32768, "--runes", 33, 34, 36, body)
+        if (result["outcome"] not in (0, 1) or result["flags"] & 11 != 11
+                or result["owned_support_after"] & mask != mask
+                or result["selected_support_after"] != result["selected_support_before"]):
+            raise WeaponPointsBlocked(f"Native support Rune registration unconfirmed: {result}")
         return result
 
     def publish_checked_locations(self, checked_locations, revision):

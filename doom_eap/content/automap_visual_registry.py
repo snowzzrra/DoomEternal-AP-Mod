@@ -119,6 +119,8 @@ def _authoritative_fingerprint(root: Path, catalog: Any) -> str:
 
 
 def _resolved_visual_policy(location_id: int, policy: dict[str, Any]) -> dict[str, Any]:
+    if policy.get('legacy_alias_of'):
+        return {'classification': 'event_only', 'policy': 'legacy_alias'}
     from tools.maps.ap_map_generator import resolved_automap_visual_policy
 
     return resolved_automap_visual_policy(location_id, policy)

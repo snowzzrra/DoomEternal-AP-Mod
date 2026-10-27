@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from collections.abc import Callable, Hashable
 import threading
 import time
+from contextlib import nullcontext
 
 
 class LauncherWorkCancelled(Exception):
@@ -41,7 +42,7 @@ class LauncherWorkers:
     def __init__(self, error_sink: Callable[[LauncherJob, Exception], None]):
         self._error_sink = error_sink
         self._lock = threading.Lock()
-        self._serial = threading.Lock()
+        self._serial = threading.RLock()
         self._publication_lock = threading.Lock()
         self._generation = 0
         self._closed = False
@@ -62,13 +63,22 @@ class LauncherWorkers:
         with self._lock:
             return not self._closed and generation == self._generation
 
+    def try_serialized(self, operation: Callable):
+        if not self._serial.acquire(blocking=False):
+            return None
+        try:
+            return operation()
+        finally:
+            self._serial.release()
+
     def invalidate(self) -> None:
         with self._publication_lock, self._lock:
             self._generation += 1
             for job in self._jobs.values():
                 job._cancelled.set()
 
-    def submit(self, key: Hashable, operation: Callable[[LauncherJob], None], *, generation: int | None = None) -> bool:
+    def submit(self, key: Hashable, operation: Callable[[LauncherJob], None], *, generation: int | None = None,
+               serialized: bool = True) -> bool:
         with self._lock:
             prior = self._jobs.get(key)
             if self._closed or (generation is not None and generation != self._generation):
@@ -79,7 +89,7 @@ class LauncherWorkers:
 
             def run() -> None:
                 try:
-                    with self._serial:
+                    with self._serial if serialized else nullcontext():
                         job.check()
                         operation(job)
                 except LauncherWorkCancelled:

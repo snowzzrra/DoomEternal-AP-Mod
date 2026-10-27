@@ -31,11 +31,15 @@
     {
       "content_revision": "0.5.0",
       "reason": "Synchronize scripted-contract digest with unchanged committed level config; physical IDs, manifest and asset contract unchanged"
+    },
+    {
+      "content_revision": "0.7.0",
+      "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
     }
   ],
   "asset_package_contract_sha256": "ea45016b71eec3ade3e8b530ce34628823d561d2193bcc8b6da85a586bfc0d20",
-  "content_revision": "0.5.0",
-  "manifest_sha256": "3e874b331cbbb558ada89d7855a8c984132d1dca3d0fb461765cbcd5cdcec0d9",
+  "content_revision": "0.7.0",
+  "manifest_sha256": "03fe847c615c9f1cdb7060c678f2be52c24b52172b25b8081f519840c4cbd4d5",
   "map_key": "e4m1_rig",
   "physical_ap_ids": [
     7770420,
@@ -49,11 +53,13 @@
     7770428,
     7770429,
     7770430,
-    7770431
+    7770431,
+    7770507,
+    7770516
   ],
   "runtime_location_ids": [
     7770432
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "bf98c066d99fd6bec74639f5c867a293734b1b85cb1c2deff83e41f5f89cedbb"
+  "scripted_contract_sha256": "c32e6b1c010ae4c68392488796eaadb12772de48a9ba65e296863745de16991e"
 }

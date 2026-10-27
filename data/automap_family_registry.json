@@ -18,6 +18,20 @@
     ]
   },
   "families": {
+    "secret_resources": {
+      "match": {
+        "inherit_prefixes": ["pickup/armor/large", "pickup/mega_health"]
+      },
+      "vanilla_class": "idProp2",
+      "automap_marker_source": "generated AP marker helper",
+      "automap_properties": [],
+      "dossier_total_owner": null,
+      "collected_state_writer": "native idProp2 pickup transaction",
+      "reward_edge": "armor/sp_armor_50 or mega_health useableComponentDecl",
+      "safe_cut": null,
+      "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
     "toys_collectibles": {
       "match": {
         "inherit_prefixes": [

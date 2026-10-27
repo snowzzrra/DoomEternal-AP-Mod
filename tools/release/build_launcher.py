@@ -7,6 +7,7 @@ import importlib.util
 import importlib.metadata
 import os
 import platform
+import ssl
 import subprocess
 import sys
 from pathlib import Path
@@ -66,6 +67,9 @@ def _launcher_inputs(archipelago_source: Path) -> list[tuple[str, Path]]:
     inputs.extend(_source_inputs("content", REPO_ROOT / "content"))
     inputs.extend(_source_inputs("requirements-launcher.txt", REPO_ROOT / "requirements-launcher.txt"))
     inputs.extend(_source_inputs("archipelago", archipelago_source))
+    ssl_policy = Path(ssl.__file__).with_name("codex-rejected-cas.pem")
+    if ssl_policy.is_file():
+        inputs.extend(_source_inputs("python/ssl_policy", ssl_policy))
     return inputs
 
 
@@ -135,7 +139,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
             "pyinstaller": _dependency_version("pyinstaller"),
             "pyside6": _dependency_version("PySide6"),
             "command": [
-                "onefile", "console", "standalone_runtime", "data", "manifests", "content",
+                "onefile", "windowed" if os.name == 'nt' else "console", "standalone_runtime", "data", "manifests", "content",
                 *PYINSTALLER_EXCLUDES,
             ],
         },
@@ -155,7 +159,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
             "PySide6 is missing; install requirements-launcher.txt in launcher build Python"
         )
 
-    build_root = RELEASE_ROOT / "build/launcher"
+    build_root = RELEASE_ROOT / "build/launcher" / sys.platform / output_dir.relative_to(RELEASE_ROOT)
     build_root.mkdir(parents=True, exist_ok=True)
     from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
     import json
@@ -170,7 +174,7 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         "--noconfirm",
         "--clean",
         "--onefile",
-        "--console",
+        "--windowed" if os.name == 'nt' else "--console",
         "--name",
         name,
         "--distpath",
@@ -195,6 +199,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'manifests'}{data_separator}manifests",
         "--add-data",
         f"{REPO_ROOT / 'content'}{data_separator}content",
+        "--collect-data",
+        "doom_eap.content",
         "--add-data",
         f"{source_identity}{data_separator}data",
         "--collect-data",
@@ -205,10 +211,14 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
     ]
     for excluded_module in PYINSTALLER_EXCLUDES:
         command[-1:-1] = ["--exclude-module", excluded_module]
+    ssl_policy = Path(ssl.__file__).with_name("codex-rejected-cas.pem")
+    if ssl_policy.is_file():
+        # this Python runtime loads its certificate policy beside ssl.py
+        command[-1:-1] = ["--add-data", f"{ssl_policy}{data_separator}."]
     for path in xcb_libraries.values():
         command[-1:-1] = ["--add-binary", f"{path}{data_separator}."]
     if os.name == "nt":
-        command[-1:-1] = ["--hide-console", "hide-early", "--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
+        command[-1:-1] = ["--icon", str(REPO_ROOT / "assets/launcher/EternalAP.ico")]
     build_environment = os.environ.copy()
     if os.name == "nt":
         system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))

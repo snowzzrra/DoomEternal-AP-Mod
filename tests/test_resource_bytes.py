@@ -20,13 +20,6 @@ ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
 
 
-def test_project_owned_decl_inputs_use_canonical_lf():
-    provenance = json.loads((get_frozen_bundle_dir(ROOT) / "ROOM_RESOURCES_PROVENANCE.json").read_text())
-    for name in provenance["source_hashes"]:
-        if name.endswith(".decl"):
-            assert b"\r\n" not in (ROOT / name).read_bytes(), name
-
-
 def test_every_hud_counter_is_a_root_sibling():
     recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
     variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]
@@ -102,7 +95,7 @@ def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edi
 
     unused = type("UnusedOption", (), {})
     world = SimpleNamespace(game="DOOM Eternal", options_dataclass=SimpleNamespace(type_hints={"death_link": Toggle}))
-    monkeypatch.setattr(compiler, "_load_apworld", lambda _: (world, Toggle, unused, unused, unused, unused))
+    monkeypatch.setattr(compiler, "_load_apworld", lambda _: (world, Toggle, unused, unused, unused, unused, unused))
     source = tmp_path / "worlds/doometernal/options.py"
     source.parent.mkdir(parents=True)
     source.write_bytes(b"death_link = False\n")

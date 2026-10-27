@@ -43,9 +43,11 @@ def _load_libcrypto():
     )
 
 
-def _aes_gcm_decrypt(
-    key: bytes, nonce: bytes, ciphertext: bytes, tag: bytes, aad: bytes
+def _aes_gcm(
+    key: bytes, nonce: bytes, ciphertext: bytes, tag: bytes, aad: bytes, *, encrypt=False
 ) -> bytes:
+    if len(key) != 16 or len(nonce) != 12 or (not encrypt and len(tag) != 16):
+        raise ValueError("Invalid AES-128-GCM key, nonce or tag length")
     crypto = _load_libcrypto()
     void_p = ctypes.c_void_p
     int_p = ctypes.POINTER(ctypes.c_int)
@@ -53,20 +55,23 @@ def _aes_gcm_decrypt(
     crypto.EVP_CIPHER_CTX_new.restype = void_p
     crypto.EVP_CIPHER_CTX_free.argtypes = [void_p]
     crypto.EVP_aes_128_gcm.restype = void_p
-    crypto.EVP_DecryptInit_ex.argtypes = [
+    init = getattr(crypto, "EVP_EncryptInit_ex" if encrypt else "EVP_DecryptInit_ex")
+    update = getattr(crypto, "EVP_EncryptUpdate" if encrypt else "EVP_DecryptUpdate")
+    final = getattr(crypto, "EVP_EncryptFinal_ex" if encrypt else "EVP_DecryptFinal_ex")
+    init.argtypes = [
         void_p, void_p, void_p, void_p, void_p
     ]
-    crypto.EVP_DecryptInit_ex.restype = ctypes.c_int
+    init.restype = ctypes.c_int
     crypto.EVP_CIPHER_CTX_ctrl.argtypes = [
         void_p, ctypes.c_int, ctypes.c_int, void_p
     ]
     crypto.EVP_CIPHER_CTX_ctrl.restype = ctypes.c_int
-    crypto.EVP_DecryptUpdate.argtypes = [
+    update.argtypes = [
         void_p, void_p, int_p, void_p, ctypes.c_int
     ]
-    crypto.EVP_DecryptUpdate.restype = ctypes.c_int
-    crypto.EVP_DecryptFinal_ex.argtypes = [void_p, void_p, int_p]
-    crypto.EVP_DecryptFinal_ex.restype = ctypes.c_int
+    update.restype = ctypes.c_int
+    final.argtypes = [void_p, void_p, int_p]
+    final.restype = ctypes.c_int
 
     context = crypto.EVP_CIPHER_CTX_new()
     if not context:
@@ -79,14 +84,14 @@ def _aes_gcm_decrypt(
     nonce_buffer = buffer(nonce)
     aad_buffer = buffer(aad)
     ciphertext_buffer = buffer(ciphertext)
-    tag_buffer = buffer(tag)
+    tag_buffer = buffer(b"\0" * 16 if encrypt else tag)
     output = (ctypes.c_ubyte * (len(ciphertext) + 16))()
     output_length = ctypes.c_int()
     final_length = ctypes.c_int()
 
     try:
         cipher = crypto.EVP_aes_128_gcm()
-        if not cipher or crypto.EVP_DecryptInit_ex(
+        if not cipher or init(
             context, cipher, None, None, None
         ) != 1:
             raise RuntimeError("EVP AES-128-GCM initialization failed")
@@ -94,7 +99,7 @@ def _aes_gcm_decrypt(
             context, EVP_CTRL_GCM_SET_IVLEN, len(nonce), None
         ) != 1:
             raise RuntimeError("EVP GCM nonce setup failed")
-        if crypto.EVP_DecryptInit_ex(
+        if init(
             context,
             None,
             None,
@@ -102,7 +107,7 @@ def _aes_gcm_decrypt(
             ctypes.cast(nonce_buffer, void_p),
         ) != 1:
             raise RuntimeError("EVP GCM key setup failed")
-        if aad and crypto.EVP_DecryptUpdate(
+        if aad and update(
             context,
             None,
             ctypes.byref(output_length),
@@ -110,7 +115,7 @@ def _aes_gcm_decrypt(
             len(aad),
         ) != 1:
             raise RuntimeError("EVP GCM AAD setup failed")
-        if crypto.EVP_DecryptUpdate(
+        if update(
             context,
             ctypes.cast(output, void_p),
             ctypes.byref(output_length),
@@ -118,7 +123,7 @@ def _aes_gcm_decrypt(
             len(ciphertext),
         ) != 1:
             raise RuntimeError("EVP GCM decrypt failed")
-        if crypto.EVP_CIPHER_CTX_ctrl(
+        if not encrypt and crypto.EVP_CIPHER_CTX_ctrl(
             context,
             EVP_CTRL_GCM_SET_TAG,
             len(tag),
@@ -128,14 +133,26 @@ def _aes_gcm_decrypt(
         final_pointer = ctypes.cast(
             ctypes.byref(output, output_length.value), void_p
         )
-        if crypto.EVP_DecryptFinal_ex(
+        if final(
             context, final_pointer, ctypes.byref(final_length)
         ) != 1:
             raise ValueError("Encrypted save authentication failed")
         total = output_length.value + final_length.value
+        if encrypt:
+            if crypto.EVP_CIPHER_CTX_ctrl(context, 0x10, 16, ctypes.cast(tag_buffer, void_p)) != 1:
+                raise RuntimeError("EVP GCM tag extraction failed")
+            return bytes(output[:total]) + bytes(tag_buffer)
         return bytes(output[:total])
     finally:
         crypto.EVP_CIPHER_CTX_free(context)
+
+
+def _aes_gcm_decrypt(key, nonce, ciphertext, tag, aad):
+    return _aes_gcm(key, nonce, ciphertext, tag, aad)
+
+
+def _aes_gcm_encrypt(key, nonce, plaintext, aad):
+    return _aes_gcm(key, nonce, plaintext, b"", aad, encrypt=True)
 
 
 def discover_default_remote() -> Path | None:

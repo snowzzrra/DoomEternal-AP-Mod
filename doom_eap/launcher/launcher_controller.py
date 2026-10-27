@@ -145,6 +145,7 @@ class LauncherController:
         self.diagnostic_history: deque[str] = deque(maxlen=500)
         self.config = self._load_config()
         self.config.setdefault("core_auto_update", True)
+        self.config.setdefault("death_link_grace", 0)
         if not self.config.get("client_state_file"):
             receipt_root = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) if os.name == "nt" else Path(os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local/state")))
             self.config["client_state_file"] = str(receipt_root / "doom-eternal-ap/client_state.json")
@@ -915,16 +916,18 @@ class LauncherController:
     def request_support_bundle(self, destination: Path, *, logs: list[str]) -> bool:
         generation = self.workers.generation
         logs = list(logs)
+        requested = time.monotonic()
 
         def operation(job):
             try:
+                self._setup_event("support_bundle_started", job.event({"queue_wait_ms": round((time.monotonic() - requested) * 1000)}))
                 self.create_support_bundle(destination, logs=logs, job=job)
             except LauncherWorkCancelled:
                 raise
             except Exception as error:
                 self._setup_event("support_bundle_failed", job.event({"message": str(error)}))
 
-        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation)
+        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation, serialized=False)
 
     def request_problem_report(self, *, logs: list[str]) -> bool:
         generation = self.workers.generation
@@ -978,6 +981,8 @@ class LauncherController:
         degrade to an unavailable marker while the bundle still records logs,
         configuration evidence, and the last setup failure.
         """
+        started = time.monotonic()
+        timings = {}
         try:
             support_condump: dict[str, object] | None = (
                 self._request_support_condump() if job is None else self._request_support_condump(job=job)
@@ -989,6 +994,8 @@ class LauncherController:
                 "status": "unavailable",
                 "reason": f"{type(error).__name__}: {error}",
             }
+        timings["condump_ms"] = round((time.monotonic() - started) * 1000)
+        stage = time.monotonic()
         try:
             report = self.run_doctor() if job is None else self.run_doctor(job=job)
         except LauncherWorkCancelled:
@@ -1007,6 +1014,7 @@ class LauncherController:
                 f"Support bundle collected without a doctor report: {error}",
                 {},
             )
+        timings["doctor_ms"] = round((time.monotonic() - stage) * 1000)
         diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
         with self._lifecycle_lock:
             room = self.setup.last_event or {}
@@ -1019,6 +1027,7 @@ class LauncherController:
         }
         support_diagnostics = {
             **report.support_diagnostics,
+            "collection_timings": timings,
             "session": {
                 "connected": connected,
                 "identity_source": "connected" if connected else "last_known" if room else "unavailable",
@@ -1047,6 +1056,7 @@ class LauncherController:
             support_diagnostics["release"] = {"status": "unavailable"}
         if job is not None:
             job.check()
+        stage = time.monotonic()
         bundle = write_support_bundle(
                 destination,
                 report,
@@ -1061,10 +1071,13 @@ class LauncherController:
                 support_diagnostics=support_diagnostics,
                 archive_directory=self.user_paths.data_dir / "support-bundles",
         )
+        timing = {"archive_ms": round((time.monotonic() - stage) * 1000),
+                  "total_ms": round((time.monotonic() - started) * 1000), **timings}
         if support_condump and support_condump.get("owned_capture"):
             capture = Path(str(support_condump["path"]))
             if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
                 capture.unlink(missing_ok=True)
+        self._setup_event("support_bundle_timing", job.event(timing) if job is not None else timing)
         if job is None:
             self.emit("support_bundle_ready", path=str(bundle))
         else:
@@ -1073,6 +1086,14 @@ class LauncherController:
 
     def _request_support_condump(self, *, job=None) -> dict[str, object]:
         """Attempt one diagnostic condump, recording closed-game availability."""
+        if job is None:
+            return self._capture_support_condump()
+        job.check()
+        result = self.workers.try_serialized(lambda: self._capture_support_condump(job=job))
+        return result if result is not None else {
+            'status': 'unavailable', 'reason': 'launcher_busy', 'requested_at': time.time()}
+
+    def _capture_support_condump(self, *, job=None) -> dict[str, object]:
         if job is not None:
             job.check()
         requested_at = time.time()
@@ -1681,6 +1702,33 @@ class LauncherController:
             write_ap_hotkey_states(doom_base_dir_from_config(self.config), str(previous[AMMO_REFILL_KEYBIND_CONFIG]), str(previous["special_toggle_keybind"]))
             raise
         self.emit("ammo_refill_keybind_status", state="configured", keybind=refill)
+
+    def set_killsanity_counter_visible(self, visible: bool) -> None:
+        if type(visible) is not bool:
+            raise ValueError("Killsanity counter visibility must be a boolean")
+        previous = self.config.get("killsanity_counter_visible", True)
+        try:
+            self.save_config({"killsanity_counter_visible": visible})
+        except OSError:
+            self.config["killsanity_counter_visible"] = previous
+            raise
+        supervisor = self.supervisor
+        if supervisor is not None and supervisor.running:
+            control = json.dumps({"type": "killsanity_counter_visibility", "visible": visible})
+            try:
+                supervisor.send_command(f"AP_CONTROL {control}")
+            except (OSError, RuntimeError) as error:
+                self.emit("killsanity_counter_status", state="pending", message=str(error))
+
+    def set_death_link_grace(self, deaths: int) -> None:
+        if type(deaths) is not int or not 0 <= deaths <= 2147483647:
+            raise ValueError("DeathLink Grace must be a whole number from 0 to 2147483647")
+        previous = self.config.get("death_link_grace", 0)
+        try:
+            self.save_config({"death_link_grace": deaths})
+        except OSError:
+            self.config["death_link_grace"] = previous
+            raise
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:

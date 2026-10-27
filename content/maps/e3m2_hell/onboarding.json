@@ -350,16 +350,12 @@
     }
   ],
   "vanilla_guards": {
-    "forbidden_ap_terms": [
-      "automap station"
-    ],
+    "forbidden_ap_terms": [],
     "required_source_edge": {
       "from": "game_target_relay_28",
       "to": "game_target_level_transition_1"
     },
-    "excluded_entities": [
-      "game_interact_automap_1_e3m2"
-    ]
+    "excluded_entities": []
   },
   "checks": [
     "source hash locked and byte-identical to decompressed patch2 owner payload",
@@ -368,5 +364,29 @@
     "Automap remains vanilla and non-public",
     "Part I transition to Part II preserved",
     "Mission Challenge rewards use the existing scoped currency neutralizer"
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "game_interact_automap_1_e3m2": {
+        "location_id": 7770503,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -301.050049,
+          "y": 10,
+          "z": -31.8630638
+        },
+        "region": "Nekravol - The Mill",
+        "qualification": "Hallway returning from the Gladiator Toy secret before the next crushing-floor arena.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e3m2_hell/e3m2_hell.decl",
+          "sha256": "b397eb97b98364cc8b43491a6270782fa92b94a05127de33ac3c9eb4faf11a59",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }

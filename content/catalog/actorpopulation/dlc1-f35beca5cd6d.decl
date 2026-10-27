@@ -1,0 +1,28 @@
+{
+	inherit = "actorpopulation/default/campaign";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 33;
+			item[29] = {
+				entityDef = "ai/heavy/bloodangel";
+				aiType = "POPULATION_TYPE_BLOOD_ANGEL";
+				defaultSensorySettings = "common";
+			}
+			item[30] = {
+				entityDef = "ai/ambient/spirit";
+				aiType = "POPULATION_TYPE_SPIRIT";
+				defaultSensorySettings = "common";
+			}
+			item[31] = {
+				entityDef = "ai/ambient/turret";
+				aiType = "POPULATION_TYPE_TURRET";
+				defaultSensorySettings = "common";
+			}
+			item[32] = {
+				entityDef = "ai/ambient/super_tentacle";
+				aiType = "POPULATION_TYPE_SUPER_TENTACLE";
+				defaultSensorySettings = "common";
+			}
+		}
+	}
+}

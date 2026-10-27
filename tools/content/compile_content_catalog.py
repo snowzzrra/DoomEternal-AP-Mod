@@ -10,18 +10,20 @@ from pathlib import Path
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
 from doom_eap.content.campaign_stages import campaign_stages
 from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.killsanity_plan import build_campaign_kill_budget
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
 
 
 def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
-    physical = [item for item in catalog.physical_locations if selected_map in (None, item.map_key)]
+    physical = [item for item in catalog.physical_locations
+                if not item.policy.get('legacy_alias_of') and selected_map in (None, item.map_key)]
     if selected_map is not None and selected_map not in catalog.maps:
         raise ValueError(f"unknown map key: {selected_map}")
     # --map narrows catalog discovery while output remains a complete APWorld table.
     if selected_map is not None:
-        physical = list(catalog.physical_locations)
+        physical = [item for item in catalog.physical_locations if not item.policy.get('legacy_alias_of')]
     rows: list[tuple[str, int | None, str]] = [
         (item.name, item.location_id, item.region) for item in physical
     ]
@@ -125,7 +127,100 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     lines.append(f"FORTRESS_POLICY = {fortress!r}")
     lines.append("FORTRESS_SPEND_GROUPS = tuple(FORTRESS_POLICY['spend_groups'])")
     lines.append("")
+    from doom_eap.content.mastery_requirements import MASTERY_REQUIREMENT_DIVISORS, mastery_entries_for_profile
+    from doom_eap.contracts.challenge_registry import challenge_registry_document
+    masteries = challenge_registry_document(catalog)["weapon_masteries"]
+    counts = {profile: {entry["signal"]["unlockable"]: entry["signal"]["rule_0_statCount"]
+                        for entry in mastery_entries_for_profile(masteries, profile)}
+              for profile in MASTERY_REQUIREMENT_DIVISORS}
+    lines.append(f"MASTERY_REQUIREMENT_COUNTS = {counts!r}")
+    lines.append("")
+    targets = []
+    for item in catalog.runtime_locations:
+        target = item.data.get("enemy_targets")
+        if target is None:
+            continue
+        species = list(target["species"])
+        minimum = target["minimum"]
+        from doom_eap.content.enemy_options import SPECIES_IDS
+        if (not species or len(set(species)) != len(species) or not set(species) <= set(SPECIES_IDS)
+                or type(minimum) is not int or minimum < 1):
+            raise ValueError(f"{item.name}: invalid enemy targets")
+        targets.append(dict(name=item.name, map_key=None if item.category == "weapon_masteries" else item.mission_key,
+                            species=species, minimum=minimum))
+    lines.append(f"CHALLENGE_ENEMY_TARGETS = {targets!r}")
+    lines.append("")
+    neutral = {item.name for item in catalog.physical_locations
+               if item.policy.get("permanent_resource_budget") is False
+               and (selected_map is None or item.map_key == selected_map)}
+    neutral.update(item.name for item in catalog.runtime_locations
+                   if item.data.get("permanent_resource_budget") is False
+                   and (selected_map is None or item.mission_key == selected_map))
+    lines.append(f"RESOURCE_NEUTRAL_LOCATION_NAMES = frozenset({tuple(sorted(neutral))!r})")
+    lines.append("")
     return "\n".join(lines)
+
+
+def compile_kill_sources(catalog, native):
+    reference = json.loads((catalog.root / 'content/catalog/killsanity_estimates.json').read_bytes())
+    if reference.get('schema_version') != 1 or reference.get('quantity') != 'conservative_estimate':
+        raise ValueError('Unsupported campaign kill estimate reference')
+    stage_ids = [stage['id'] for stage in campaign_stages(catalog)]
+    if set(reference.get('maps', {})) != set(stage_ids):
+        raise ValueError('Campaign kill estimates must cover the supported mission list')
+    kill_sources = {}
+    for key, estimate in reference['maps'].items():
+        descriptor = json.loads((catalog.root / 'content/maps' / key / 'descriptor.json').read_bytes())
+        if (estimate['source_sha256'] != descriptor['source_sha256']
+                or estimate.get('coverage') not in {'partial', 'protected_boss_only', 'unreviewed'}
+                or not isinstance(estimate.get('basis'), str) or not estimate['basis']):
+            raise ValueError(f'Campaign kill estimate has invalid provenance: {key}')
+        kill_sources[key] = dict(source_sha256=estimate['source_sha256'], estimated_kills=estimate['estimated_kills'],
+            coverage=estimate['coverage'], basis=estimate['basis'], sources=estimate.get('guaranteed_sources', []),
+            progression_source_ids=[row['source_id'] for row in estimate.get('guaranteed_sources', [])])
+        if estimate.get('source_alternatives'):
+            kill_sources[key]['source_alternatives'] = estimate['source_alternatives']
+    from doom_eap.content.native_enemy_plan import native_event_identity
+    secret_locations = {(item.map_key, item.policy.get("manager", item.policy.get("manager_entity"))): item.name
+                        for item in catalog.physical_locations if item.strategy == "secret_encounter"}
+    for key, estimate in reference["maps"].items():
+        original = kill_sources[key]
+        by_id = {row["source_id"]: row for row in original["sources"]}
+        alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
+                        for branch in group['branches'] for member in branch}
+        native_sources = {native_event_identity(row): row for row in native["maps"][key]["origins"] if "binding" in row}
+        seen_events = set()
+        for location, events in estimate.get("event_sources", {}).items():
+            for identity, count in events.items():
+                if identity in seen_events:
+                    raise ValueError(f"Kill estimate repeats an event: {key}/{identity}")
+                seen_events.add(identity)
+                source = native_sources.get(identity)
+                if source is None or source.get("protected_reason"):
+                    raise ValueError(f"Kill estimate refers to an absent or protected native event: {key}/{identity}")
+                secret = secret_locations.get((key, identity.split('/')[0]))
+                if secret is not None and location != secret:
+                    raise ValueError(f"Kill estimate uses the wrong Secret Encounter: {key}/{identity}")
+                if type(count) is not int or count < 1:
+                    raise ValueError(f"Kill estimate has an invalid event count: {key}/{identity}")
+                if identity in estimate.get('alternative_source_ids', []) and identity not in alternatives:
+                    raise ValueError(f'Kill estimate needs an alternative-source plan: {key}/{identity}')
+                if identity not in by_id:
+                    by_id[identity] = {"source_id": identity, "map_key": key, "count": count, "repeatable": True}
+                    if identity in alternatives:
+                        by_id[identity].update({field: value for field, value in by_id[alternatives[identity]].items()
+                                               if field not in {'source_id', 'count'}})
+                row = by_id[identity]
+                if row["count"] != count:
+                    raise ValueError(f"Guaranteed source and event counts differ: {key}/{identity}")
+                if not {"location", "region"}.intersection(row):
+                    row["location"] = location
+        original["sources"] = list(by_id.values())
+        if estimate.get("conditional_managers"):
+            original["conditional_managers"] = estimate["conditional_managers"]
+    kill_catalog = dict(schema_version=2, quantity='conservative_estimate', maps=kill_sources)
+    build_campaign_kill_budget(dict(stage_ids=stage_ids), None, catalog=kill_catalog)
+    return kill_catalog
 
 
 def _compile_catalog(
@@ -163,6 +258,51 @@ def _compile_catalog(
             changed_paths.append(path)
 
     write_artifact(output, rendered)
+    setup_guide = (catalog.root / "docs/INSTALL.md").read_text(encoding="utf-8")
+    setup_guide = setup_guide.replace("(GAMEPLAY.md)", "(https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/GAMEPLAY.md)")
+    write_artifact(output.parent / "docs/setup_en.md", setup_guide)
+    write_bytes_artifact(output.with_name("enemy_options.py"),
+                         (catalog.root / "doom_eap/content/enemy_options.py").read_bytes())
+    write_bytes_artifact(output.with_name("enemy_plan.py"),
+                         (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_plan.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_plan.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_balance.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_balance.py").read_bytes())
+    write_bytes_artifact(output.with_name("native_enemy_safety.py"),
+                         (catalog.root / "doom_eap/content/native_enemy_safety.py").read_bytes())
+    write_bytes_artifact(output.with_name("vanilla_enemy_profiles.py"),
+                         (catalog.root / "doom_eap/content/vanilla_enemy_profiles.py").read_bytes())
+    from tools.maps.native_enemy_inventory import build_native_recipe_catalog
+
+    native = build_native_recipe_catalog(catalog.root)
+    native_catalog = json.dumps(native, sort_keys=True, separators=(",", ":")) + "\n"
+    write_artifact(output.with_name("native_enemy_catalog.json"), native_catalog)
+    write_artifact(catalog.root / "doom_eap/content/native_enemy_catalog.json", native_catalog)
+    from tools.maps.vanilla_enemy_profiles import build_vanilla_profiles
+
+    vanilla_profiles = json.dumps(build_vanilla_profiles(catalog.root, native),
+                                 sort_keys=True, separators=(",", ":")) + "\n"
+    write_artifact(output.with_name("vanilla_enemy_profiles.json"), vanilla_profiles)
+    write_artifact(catalog.root / "doom_eap/content/vanilla_enemy_profiles.json", vanilla_profiles)
+    write_bytes_artifact(output.with_name("enemy_species.py"),
+                         (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
+    write_bytes_artifact(output.with_name("enemy_species.json"),
+                         (catalog.root / "content/catalog/enemy_species.json").read_bytes())
+    write_bytes_artifact(catalog.root / "doom_eap/content/enemy_species.json",
+                         (catalog.root / "content/catalog/enemy_species.json").read_bytes())
+    write_bytes_artifact(output.with_name("secret_encounter_timers.py"),
+                         (catalog.root / "doom_eap/content/secret_encounter_timers.py").read_bytes())
+    write_bytes_artifact(output.with_name("secret_encounter_timers.json"),
+                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
+    write_bytes_artifact(catalog.root / "doom_eap/content/secret_encounter_timers.json",
+                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
+    write_bytes_artifact(output.with_name("killsanity_plan.py"),
+                         (catalog.root / "doom_eap/content/killsanity_plan.py").read_bytes())
+    kill_catalog = compile_kill_sources(catalog, native)
+    kill_sources_payload = json.dumps(kill_catalog, indent=2) + "\n"
+    write_artifact(output.with_name("campaign_kill_sources.json"), kill_sources_payload)
+    write_artifact(catalog.root / "doom_eap/content/campaign_kill_sources.json", kill_sources_payload)
     write_artifact(catalog.root / "data" / "campaign_stages.json",
                    json.dumps(campaign_stages(catalog), indent=2) + "\n")
     from tools.validation.validate_data import extract_item_classifications, extract_namedtuple_table
@@ -205,7 +345,8 @@ def _compile_catalog(
             "schema": 1,
             "maps": {
                 spec.runtime_map: sorted(item.location_id for item in catalog.physical_locations
-                                         if item.map_key == spec.key and item.strategy != "secret_encounter")
+                                         if item.map_key == spec.key and item.strategy != "secret_encounter"
+                                         and not item.policy.get('legacy_alias_of'))
                 for spec in catalog.maps.values() if spec.enabled
             },
         },
@@ -221,7 +362,6 @@ def _compile_catalog(
         "challenge_location_registry.json": challenge_registry_document(catalog),
         "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
         "campaign_goal_contract.json": dict(catalog.campaign_goal),
-        "checked_location_visuals.json": build_authorial_registry(catalog.root),
     }
     for name, value in generated_data.items():
         rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"
@@ -240,6 +380,10 @@ def _compile_catalog(
             catalog.root / "manifests" / f"{spec.key}.json",
             json.dumps(manifest, indent=4) + "\n",
         )
+
+    visuals_rendered = json.dumps(build_authorial_registry(catalog.root), indent=2, sort_keys=True) + "\n"
+    for path in (catalog.root / "data" / "checked_location_visuals.json", output_root / "checked_location_visuals.json"):
+        write_artifact(path, visuals_rendered)
 
     from doom_eap.contracts.foundation import load_foundation_contracts
 

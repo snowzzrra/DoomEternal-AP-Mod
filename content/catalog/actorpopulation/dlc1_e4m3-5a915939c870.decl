@@ -1,0 +1,61 @@
+{
+	inherit = "actorpopulation/default/campaign";
+	edit = {
+		aiTypeDefAssignments = {
+			num = 33;
+			item[24] = {
+				entityDef = "ai/superheavy/tyrant";
+				aiType = "POPULATION_TYPE_TYRANT";
+				pointValue = 100;
+				spawnWeight = 0.00999999978;
+				factionName = "tyrant";
+				defaultSensorySettings = "ai/tyrant";
+			}
+			item[25] = {
+				entityDef = "ai/ambient/zombie_cueball";
+				aiType = "POPULATION_TYPE_CUEBALL";
+				pointValue = 1;
+				spawnWeight = 0.899999976;
+				factionName = "cueball";
+				defaultSensorySettings = "ai/cueball";
+			}
+			item[26] = {
+				entityDef = "ai/ambient/buffpod";
+				aiType = "POPULATION_TYPE_BUFF_POD";
+				factionName = "buff_pod";
+				defaultSensorySettings = "common";
+			}
+			item[27] = {
+				entityDef = "ai/ambient/tentacle";
+				aiType = "POPULATION_TYPE_TENTACLE";
+				factionName = "tentacle";
+			}
+			item[28] = {
+				entityDef = "ai/heavy/bloodangel";
+				aiType = "POPULATION_TYPE_BLOOD_ANGEL";
+				pointValue = 0;
+				spawnWeight = 0;
+				factionName = "";
+			}
+			item[29] = {
+				entityDef = "ai/ambient/spirit";
+				aiType = "POPULATION_TYPE_SPIRIT";
+				defaultSensorySettings = "common";
+			}
+			item[30] = {
+				entityDef = "ai/ambient/turret";
+				aiType = "POPULATION_TYPE_TURRET";
+				defaultSensorySettings = "common";
+			}
+			item[31] = {
+				entityDef = "ai/superheavy/baron_armored";
+				aiType = "POPULATION_TYPE_ARMORED_BARON";
+				defaultSensorySettings = "common";
+			}
+			item[32] = {
+				entityDef = "ai/boss/samuel";
+				aiType = "POPULATION_TYPE_ARCHVILE";
+			}
+		}
+	}
+}

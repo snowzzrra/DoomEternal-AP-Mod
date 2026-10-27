@@ -13,6 +13,19 @@ class DeathObservation:
         self._last_event = {}
         self._warning = None
         self._details_dead = self._details_mtime = self._details_path = None
+        self._namespace = None
+
+    def bind(self, namespace):
+        if self._namespace == namespace:
+            return False
+        self.__init__(self._logger)
+        self._namespace = namespace
+        return True
+
+    def start_empty_slot(self, slot):
+        self._initialized.add(slot)
+        self._checkpoints[slot] = False
+        self._respawn_carryover[slot] = False
 
     @property
     def checkpoints(self):

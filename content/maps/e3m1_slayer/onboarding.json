@@ -45,9 +45,7 @@
       "from": "game_target_relay_getcrucible",
       "to": "game_target_give_item_1"
     },
-    "excluded_entities": [
-      "interact_automap_1_e3m1"
-    ]
+    "excluded_entities": []
   },
   "challenge_notes": {
     "excluded_codex": 7770326,
@@ -60,5 +58,29 @@
     "Crucible pickup publishes an AP check while mission scripting stays active",
     "Automap remains vanilla",
     "package-scoped cache input verified"
-  ]
+  ],
+  "source_evidence": {
+    "physical_pickup_sources": {
+      "interact_automap_1_e3m1": {
+        "location_id": 7770502,
+        "inherit": "interact/automap",
+        "class": "idInteractable_Automap",
+        "position": {
+          "x": -178.300018,
+          "y": 139.900009,
+          "z": -30.8000011
+        },
+        "region": "Taras Nabad - Atrium Plaza",
+        "qualification": "The native dorm_zone_5 courtyard route follows the first Archvile arena and precedes the Slayer Creation Chamber.",
+        "reference": "https://www.trueachievements.com/game/Doom-Eternal/walkthrough/3",
+        "native_route_evidence": {
+          "automap_decl": "generated/decls/automap/game/sp/e3m1_slayer/e3m1_slayer.decl",
+          "sha256": "d28c20a6d960e911e42ff8bb6e8879b139c1e5a8dd5915014d0b1a2a2132379d",
+          "station_groups": [
+            "default(A)"
+          ]
+        }
+      }
+    }
+  }
 }

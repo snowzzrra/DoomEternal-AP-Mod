@@ -19,7 +19,8 @@
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_ALBUMS_ALBUM_12_1": 7770352,
     "AP_CHECK_PICKUPS_PICKUP_COLLECTIBLE_TOYS_DOOM_HUNTER_1": 7770353,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_1_E3M3": 7770354,
-    "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1984538249": 7770355
+    "AP_CHECK_PICKUPS_PROGRESS_ARGENT_CELL_1_1984538249": 7770355,
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_1_E3M2": 7770503
   },
   "names": {
     "7770340": "Nekravol - Cheat Code - Famine Mode",
@@ -39,10 +40,14 @@
     "7770354": "Nekravol - Extra Life - Final Arena Rear Platform",
     "7770355": "Nekravol - Sentinel Crystal - Opening Wall-Cannon Fork",
     "7770356": "Nekravol - Secret Encounter - Prison-Cage Gap",
-    "7770357": "Nekravol - Secret Encounter - Green-Skull Gate Return"
+    "7770357": "Nekravol - Secret Encounter - Green-Skull Gate Return",
+    "7770503": "Nekravol - Automap Station"
   },
   "location_feedback": {
-    "default_policy": "ap_only"
+    "default_policy": "ap_only",
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_1_E3M2": {
+      "policy": "ap_only"
+    }
   },
   "target_policies": {
     "pickups_progress_cheats_no_health_armor_drops_1": {
@@ -56,6 +61,9 @@
       "remove_original": true,
       "preserve_targets": [],
       "drop_targets": []
+    },
+    "game_interact_automap_1_e3m2": {
+      "permanent_resource_budget": false
     }
   },
   "remove_entities": [],

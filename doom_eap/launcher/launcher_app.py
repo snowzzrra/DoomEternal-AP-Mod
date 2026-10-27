@@ -34,7 +34,8 @@ def _run_self_test(arguments: list[str]) -> int:
             manifest = Path(arguments[arguments.index("--core-runtime") + 1])
             value, _ = verify_runtime(manifest, bootstrap_from_archive=True)
             print(json.dumps({"product": value["product"], "version": value["version"],
-                              "build_id": value["build_id"], "mod_versions": value["mod_versions"],
+                              "build_id": value["build_id"], "mod_versions": value.get("mod_versions"),
+                              "mod_version_range": value.get("mod_version_range"),
                               "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))
             return 0
         except Exception as error:
@@ -55,6 +56,19 @@ def _run_self_test(arguments: list[str]) -> int:
         print(f"  [OK] certifi CA bundle verified ({ca_bundle.stat().st_size} bytes)")
     except Exception as e:
         print(f"  [FAIL] SSL / certifi check failed: {e}", file=sys.stderr)
+        return 1
+
+    try:
+        from doom_eap.launcher.build_manifest import _KEYS, decode_manifest
+        from doom_eap.runtime.save_decrypt import _aes_gcm_encrypt
+        nonce = bytes(12)
+        document = {"files": {}}
+        encoded = nonce + _aes_gcm_encrypt(_KEYS[0], nonce, json.dumps(document).encode(), b"build-manifest") + bytes(64)
+        if decode_manifest(encoded)[0] != document:
+            raise RuntimeError("Build manifest round trip differs")
+        print("  [OK] Build manifest authenticated encryption verified")
+    except Exception as e:
+        print(f"  [FAIL] Build manifest crypto check failed: {e}", file=sys.stderr)
         return 1
 
     # 2. Check bundled resource root (sys._MEIPASS in frozen mode, repo root in source mode)
@@ -158,6 +172,8 @@ def _run_self_test(arguments: list[str]) -> int:
                 if app is None:
                     app = QApplication(["launcher_selftest", "-platform", "offscreen"])
                 ui = LauncherUI(controller)
+                if ui.windowIcon().pixmap(32).isNull():
+                    raise RuntimeError('Launcher window icon could not be loaded')
                 if ui.pages.count() < 5:
                     raise RuntimeError(f"Expected at least 5 UI pages, found {ui.pages.count()}")
                 ui.timer.stop()
@@ -336,6 +352,15 @@ def _run_ui() -> int:
 
 def main(arguments: list[str] | None = None) -> int:
     parsed = list(sys.argv[1:] if arguments is None else arguments)
+    from doom_eap.launcher.launcher_platform import restore_standard_streams
+    restore_standard_streams(require_pipes='--bridge-worker' in parsed)
+    from doom_eap.launcher.launcher_platform import launcher_user_paths
+    from doom_eap.content.compiler_identity import load_compiler_source_identity
+    from doom_eap.content.native_enemy_plan import configure_native_validation_cache
+    frozen = bool(getattr(sys, 'frozen', False))
+    root = Path(sys._MEIPASS) if frozen else Path(__file__).resolve().parents[2]
+    identity = load_compiler_source_identity(root, frozen=frozen)
+    configure_native_validation_cache(launcher_user_paths().state_dir / 'native_enemy_validation', identity['fingerprint'])
     if "--bridge-worker" in parsed:
         return _run_bridge_worker(parsed)
     if "--self-test" in parsed or "--smoke-test" in parsed:

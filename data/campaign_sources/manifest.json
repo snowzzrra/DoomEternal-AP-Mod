@@ -33,5 +33,21 @@
     "source_archive": "gameresources_patch2_decl_analysis_20260710_210928.zip",
     "source_member": "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/campaign/campaign/main.decl",
     "sha256": "b2517b402ff13c2c4c2939918c31e027df390820d49ecab570fd14bd5d008e61"
+  },
+  "blood_punch_area_of_effect": {
+    "sha256": "9903dd723f785f44bb794a9a8d4b88de6cf08368fbe850d9ddd600e9b61331cf",
+    "source": "Tools\\gameresources_decl_analysis_20260710_201519\\files\\generated\\decls\\perks\\perk\\player\\blood_punch\\area_of_effect.decl"
+  },
+  "blood_punch_ai_charge_rate": {
+    "sha256": "af4d4439dba8d55bee27a51cf9c967729bd296a7aacf2541b3d054ab927fceeb",
+    "source": "DoomEternal-AP-Mod\\vanilla_decls\\owners\\gameresources_patch2\\generated\\decls\\perks\\perk\\player\\blood_punch\\ai_charge_rate.decl"
+  },
+  "blood_punch_max_charges": {
+    "sha256": "dd40730279ab161d7133a0c21899205dbb8ceba0b60af1ca32ef4244d4b50e6b",
+    "source": "DoomEternal-AP-Mod\\vanilla_decls\\owners\\gameresources_patch2\\generated\\decls\\perks\\perk\\player\\blood_punch\\max_charges.decl"
+  },
+  "unmaykr_progress": {
+    "sha256": "45f16256aa32ebea9534612320bd90c5c1fc8f398596cdc44307b361424cf7e2",
+    "source": "sp_hub_decl_analysis_20260719_140903\\decls\\game\\hub\\hub\\generated\\decls\\interaction\\interactables\\progress.decl"
   }
 }

@@ -62,7 +62,9 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
             raise failure from cause
     with patch.object(owner, "_prepare", side_effect=refuse):
         with pytest.raises(RuntimeError) as refused:
-            owner.prepare(None, {})
+            from pathlib import Path
+            slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+            owner.prepare(SimpleNamespace(seed_name="fixture", team=0, slot=1, slot_data=slot_data), {})
     assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
     assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
     diagnostic = json.loads((tmp_path / "session_prepare_failure.json").read_text())
@@ -79,6 +81,8 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
     assert support["source"] == "last_preparation_failure"
     assert "fixture-user" not in json.dumps(support)
     assert "game.details" in json.dumps(support)
+
+
 
 
 def test_proton_supervisor_preserves_structured_preparation_failure(tmp_path):
@@ -119,6 +123,8 @@ def test_support_condump_uses_workflow_session_owner(tmp_path):
     assert Path(result["path"]).read_bytes() == b"fixture condump"
     assert source.read_bytes() == b"fixture condump"
     assert owner.observe.call_count >= 2 and controller._condump_pending is None
+
+
 
 
 def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeypatch):
@@ -239,9 +245,10 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
     selected = os.environ.get("SENTINEL_CORE_RUNTIME")
     if os.name != "nt" or not selected:
         pytest.skip("requires an explicitly selected Windows Core distribution")
-    if detect_doom_processes():
+    if any(process['name'].casefold() == 'doometernalx64vk.exe' for process in detect_doom_processes()):
         pytest.skip("requires DOOM closed for the distribution's vanilla protection helper")
     monkeypatch.setattr("doom_eap.launcher.launcher_session.windows_game_processes", lambda: ())
+    monkeypatch.setattr("doom_eap.launcher.launcher_platform.detect_doom_processes", lambda: ())
     runtime = Path(selected).resolve()
     with tempfile.TemporaryDirectory(prefix="ap-") as temporary:
         expanded = ctypes.create_unicode_buffer(32768)
@@ -261,10 +268,13 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         installed = install_meathook(game, DependencyManager(state / "deps"), state_dir=state,
                                     consent=lambda _: True, local_artifact=runtime / "distribution.json")
         assert installed.state == "installed"
-        snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data={
+        slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+        slot_data.update({
+            "slot_data_revision": "0.7.0", "slot_data_schema_version": 6,
             "native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 1},
             "starting_inventory": {"Frag Grenade": 1}, "starting_weapon": "Combat Shotgun",
         })
+        snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data=slot_data)
         owner = APSessionOwner(root, data, state)
         config = {"game_root": str(game), "save_games_dir": str(local),
                   "client_state_file": str(data / "client_state.json"),

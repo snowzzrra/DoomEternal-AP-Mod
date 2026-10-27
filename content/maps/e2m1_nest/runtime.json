@@ -99,7 +99,13 @@
       "order": 29,
       "strategy": "unlockable_record",
       "category": "mission_challenges",
-      "mission_key": "e2m1"
+      "mission_key": "e2m1",
+      "enemy_targets": {
+        "species": [
+          "pinky"
+        ],
+        "minimum": 3
+      }
     },
     {
       "name": "Super Gore Nest - All Mission Challenges Completed",
@@ -113,7 +119,8 @@
           7770208
         ],
         "required_count": 3,
-        "authority": "server_checked_locations"
+        "authority": "server_checked_locations",
+        "mission_complete_location_id": 7770210
       },
       "order": 38,
       "strategy": "aggregate",

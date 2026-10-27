@@ -13,11 +13,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from doom_eap.content.physical_options import map_physical_option_keys
+from doom_eap.content.mastery_requirements import mastery_entries_for_profile, patch_mastery_decl
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 BASE_RESOURCE_NAME = "base_mod.zip"
 ROOM_PAYLOAD_RESOURCE_NAME = "room_payloads.zip"
 ROOM_PAYLOAD_MANIFEST_NAME = "room_payload_manifest.json"
-ROOM_PAYLOAD_SCHEMA_VERSION = 1
+ROOM_PAYLOAD_SCHEMA_VERSION = 2
 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
 
 
@@ -41,7 +43,7 @@ class MapLocalStatePlan:
 def plan_map_local_states(
     map_keys: tuple[str, ...],
 ) -> tuple[MapLocalStatePlan, ...]:
-    """Plan finite 0.4.x map-local states without compiling map content."""
+    """Plan finite map-local states without compiling map content."""
     plans = []
     for map_key in map_keys:
         physical_keys = map_physical_option_keys(map_key)
@@ -75,7 +77,7 @@ def sha256_path(path: Path) -> str:
 
 def _safe_member(name: str) -> str:
     normalized = PurePosixPath(name.replace("\\", "/"))
-    if normalized.is_absolute() or ".." in normalized.parts or not normalized.parts:
+    if normalized.is_absolute() or ".." in normalized.parts or not normalized.parts or any(":" in part for part in normalized.parts):
         raise ValueError(f"unsafe room resource member: {name}")
     return normalized.as_posix()
 
@@ -107,15 +109,19 @@ def zip_directory(source: Path, destination: Path) -> dict[str, str]:
     return {name: sha256_bytes(value) for name, value in sorted(files.items())}
 
 
+def _archive_members(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
+    members = {}
+    for info in archive.infolist():
+        name = _safe_member(info.filename)
+        if info.is_dir() or name != info.filename or name in members:
+            raise ValueError(f"invalid room resource archive member: {info.filename}")
+        members[name] = info
+    return members
+
+
 def read_zip(path: Path) -> dict[str, bytes]:
     with zipfile.ZipFile(path) as archive:
-        members: dict[str, bytes] = {}
-        for info in archive.infolist():
-            name = _safe_member(info.filename)
-            if info.is_dir() or name in members:
-                raise ValueError(f"invalid room resource archive member: {info.filename}")
-            members[name] = archive.read(info)
-    return members
+        return {name: archive.read(info) for name, info in _archive_members(archive).items()}
 
 
 def _state_key(options: Mapping[str, Any]) -> tuple[tuple[str, bool], ...]:
@@ -141,6 +147,21 @@ def validate_room_payload_manifest(
     maps = document.get("maps")
     if not isinstance(maps, Mapping) or not maps:
         raise ValueError("room payload manifest maps are missing")
+    snapshots = document.get("source_snapshots")
+    if not isinstance(snapshots, Mapping) or set(snapshots) != set(maps):
+        raise ValueError("room payload source snapshots differ from the map set")
+    for map_key, snapshot in snapshots.items():
+        if not isinstance(map_key, str) or not map_key or _safe_member(map_key) != map_key or "/" in map_key:
+            raise ValueError("room payload snapshot map key is invalid")
+        if not isinstance(snapshot, Mapping) or set(snapshot) != {"member", "sha256", "size"}:
+            raise ValueError(f"room payload source snapshot fields are invalid: {map_key}")
+        if snapshot["member"] != f"sources/{map_key}.entities":
+            raise ValueError(f"room payload source snapshot member is invalid: {map_key}")
+        if (not isinstance(snapshot["sha256"], str) or len(snapshot["sha256"]) != 64
+                or any(char not in "0123456789abcdef" for char in snapshot["sha256"])):
+            raise ValueError(f"room payload source snapshot hash is invalid: {map_key}")
+        if type(snapshot["size"]) is not int or snapshot["size"] < 0:
+            raise ValueError(f"room payload source snapshot size is invalid: {map_key}")
     context_targets = document.get("context_targets")
     if not isinstance(context_targets, Mapping) or not context_targets:
         raise ValueError("room payload manifest context targets are missing")
@@ -152,13 +173,17 @@ def validate_room_payload_manifest(
             or _safe_member(target_member) != target_member
         ):
             raise ValueError("room payload context target is invalid")
-    seen_members: set[str] = set()
+    seen_members = {snapshot["member"] for snapshot in snapshots.values()}
+    if document.get("enemy_resources"):
+        raise ValueError("Unsupported enemy resource imports. Rebuild room resources for native recipes.")
     base_members = document.get("base_members")
     if not isinstance(base_members, list) or any(not isinstance(name, str) for name in base_members):
         raise ValueError("room payload base member list is invalid")
     normalized_base_members = [_safe_member(name) for name in base_members]
-    if len(set(normalized_base_members)) != len(normalized_base_members):
+    if len(set(normalized_base_members)) != len(normalized_base_members) or normalized_base_members != base_members:
         raise ValueError("room payload base member list contains duplicates")
+    if seen_members.intersection(normalized_base_members):
+        raise ValueError("compiler source snapshots cannot be base room members")
     seen_targets: set[str] = set()
     for map_key, record in maps.items():
         if not isinstance(map_key, str) or not isinstance(record, Mapping):
@@ -210,8 +235,8 @@ def validate_room_payload_manifest(
             if source not in {"base", "replacement"}:
                 raise ValueError(f"room payload state source is invalid: {map_key}")
             if member is not None:
-                member = _safe_member(str(member))
-                if source != "replacement" or member in seen_members:
+                if (not isinstance(member, str) or _safe_member(member) != member
+                        or source != "replacement" or member in seen_members):
                     raise ValueError(f"room payload replacement member is invalid: {map_key}")
                 seen_members.add(member)
             elif source != "base":
@@ -262,7 +287,7 @@ def dlc_mission_map_keys() -> set[str]:
 def select_room_payloads(document: Mapping[str, Any], options: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     selected: dict[str, dict[str, Any]] = {}
     dlc_map_keys: set[str] = set()
-    if not options.get("use_dlc_content", True) or not options.get("include_dlc_missions", True):
+    if not options.get("include_dlc_missions", True):
         dlc_map_keys = dlc_mission_map_keys()
     for map_key, record in document["maps"].items():
         if map_key in dlc_map_keys:
@@ -275,25 +300,56 @@ def select_room_payloads(document: Mapping[str, Any], options: Mapping[str, Any]
     return selected
 
 
+def _payload_archive_members(archive: zipfile.ZipFile, document: Mapping[str, Any]) -> dict[str, zipfile.ZipInfo]:
+    members = _archive_members(archive)
+    expected = {
+        state["member"] for record in document["maps"].values()
+        for state in record["states"] if state["source"] == "replacement"
+    } | {snapshot["member"] for snapshot in document["source_snapshots"].values()}
+    if set(members) != expected:
+        raise ValueError("room payload archive member set drifted")
+    for map_key, snapshot in document["source_snapshots"].items():
+        if members[snapshot["member"]].file_size != snapshot["size"]:
+            raise ValueError(f"room payload source snapshot size drifted: {map_key}")
+    return members
+
+
+def _decode_source_snapshot(data: bytes, snapshot: Mapping[str, Any], map_key: str) -> str:
+    if len(data) != snapshot["size"] or sha256_bytes(data) != snapshot["sha256"]:
+        raise ValueError(f"room payload source snapshot identity drifted: {map_key}")
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError(f"room payload source snapshot is not UTF-8: {map_key}") from error
+
+
+def read_source_snapshots(payload_resource: Path, manifest: Mapping[str, Any], map_keys) -> dict[str, str]:
+    """Read only requested compiler sources, preserving their UTF-8 bytes."""
+    validate_room_payload_manifest(manifest)
+    requested = set(map_keys)
+    if requested - set(manifest["source_snapshots"]):
+        raise ValueError("requested room source snapshot is absent")
+    result = {}
+    with zipfile.ZipFile(payload_resource) as archive:
+        members = _payload_archive_members(archive, manifest)
+        for map_key in sorted(requested):
+            snapshot = manifest["source_snapshots"][map_key]
+            data = archive.read(members[snapshot["member"]])
+            result[map_key] = _decode_source_snapshot(data, snapshot, map_key)
+    return result
+
+
 def assemble_room_files(
     base_resource: Path,
     payload_resource: Path,
     payload_manifest: Mapping[str, Any],
     options: Mapping[str, Any],
 ) -> tuple[dict[str, bytes], dict[str, dict[str, Any]]]:
+    validate_room_payload_manifest(payload_manifest)
     base = read_zip(base_resource)
-    payloads = read_zip(payload_resource)
     if set(base) != set(payload_manifest["base_members"]):
         raise ValueError("base room payload member set drifted")
     selected = select_room_payloads(payload_manifest, options)
-    expected_payload_members = {
-        state["member"]
-        for record in payload_manifest["maps"].values()
-        for state in record["states"]
-        if state["source"] == "replacement"
-    }
-    if set(payloads) != expected_payload_members:
-        raise ValueError("room payload archive member set drifted")
     assembled = dict(base)
     excluded_members = {
         str(payload_manifest["maps"][map_key]["target_member"])
@@ -302,23 +358,31 @@ def assemble_room_files(
     }
     for member in excluded_members:
         assembled.pop(member, None)
-    for map_key, state in selected.items():
-        target = str(payload_manifest["maps"][map_key]["target_member"])
-        if target not in assembled:
-            raise ValueError(f"base room payload target is missing: {map_key}/{target}")
-        if state["source"] == "base":
+    with zipfile.ZipFile(payload_resource) as archive:
+        payloads = _payload_archive_members(archive, payload_manifest)
+        for map_key, state in selected.items():
+            target = str(payload_manifest["maps"][map_key]["target_member"])
+            if target not in assembled:
+                raise ValueError(f"base room payload target is missing: {map_key}/{target}")
+            if state["source"] == "base":
+                if sha256_bytes(assembled[target]) != state["sha256"]:
+                    raise ValueError(f"base room payload identity drifted: {map_key}")
+                continue
+            member = str(state["member"])
+            assembled[target] = archive.read(payloads[member])
             if sha256_bytes(assembled[target]) != state["sha256"]:
-                raise ValueError(f"base room payload identity drifted: {map_key}")
-            continue
-        member = str(state["member"])
-        if member not in payloads:
-            raise ValueError(f"room payload member is missing: {map_key}/{member}")
-        assembled[target] = payloads[member]
-        if sha256_bytes(assembled[target]) != state["sha256"]:
-            raise ValueError(f"replacement room payload identity drifted: {map_key}")
+                raise ValueError(f"replacement room payload identity drifted: {map_key}")
     expected_base_members = set(payload_manifest.get("base_members", [])) - excluded_members
     if any(name not in assembled for name in expected_base_members):
         raise ValueError("base room payload member set is incomplete")
+    masteries = mastery_entries_for_profile(
+        load_challenge_registry()["weapon_masteries"], options["mastery_requirements"]
+    )
+    for entry in masteries:
+        member = "gameresources/generated/decls/" + entry["decls"]["unlockable"]["path"]
+        if member not in assembled:
+            raise ValueError(f"Mastery DECL is missing from room resources: {member}")
+        assembled[member] = patch_mastery_decl(assembled[member].decode("utf-8"), entry).encode("utf-8")
     return assembled, selected
 
 
