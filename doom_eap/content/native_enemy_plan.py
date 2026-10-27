@@ -606,8 +606,8 @@ def _wave_peak(bodies, *, mobile=False):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=18):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=19):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -685,7 +685,7 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=18):
         recipes, protected, inactive = [], [], []
         phases = {}
         origins = [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])]
-        if revision >= 14 and map_key == 'e5m4_boss':
+        if 14 <= revision < 19 and map_key == 'e5m4_boss':
             phantom_types = {catalog['species'][name]['spawn_type'] for name in
                              ('hell_knight', 'mancubus', 'baron', 'tyrant')}
             origins.extend({**source, 'id': source['id'].replace('/native_summons/', '/darklord_phantoms/'),

@@ -3,6 +3,7 @@ from pathlib import Path
 import os
 import json
 import subprocess
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
 
 
 class ProtonSelectionError(RuntimeError):
@@ -56,6 +57,7 @@ def runtime(configuration):
     return [str(proton), "runinprefix"], environment
 
 
+@timed_sync_call
 def windows_processes(configuration, helper):
     """Return qualified guest identities, an empty tuple, or UNKNOWN (None)."""
     try:

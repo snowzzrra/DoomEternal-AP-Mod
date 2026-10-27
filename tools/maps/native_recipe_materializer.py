@@ -433,6 +433,10 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             clone = materialize_enemy_attributes(block, name, base_properties=baseline,
                 **{key: value for key, value in attributes.items() if key != "speed_percent"})
             clone = _edit(clone, ('flags', 'hide'), False)
+            if recipe["binding"].get("entity") == "ap_darklord_phantoms":
+                # the boss spawns outside an encounter, so the body must declare its own awake state like vanilla summons.
+                clone = _edit(clone, ('aiEditable', 'spawnSettings', 'initialState'),
+                              'AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER')
             header = ENTITY_HEADER.search(clone)
             generated.append('entity {\n\tlayers { "spawn_target_layer" }\n\t' + clone[header.start():].rstrip())
             for source_name in source_names:

@@ -49,6 +49,7 @@ from doom_eap.runtime.fast_travel import FastTravel
 from doom_eap.runtime.materialization_coordinator import MaterializationCoordinator
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime import save_files
+from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
 from doom_eap.runtime.save_records import read_unlockable_record
 from doom_eap.content.mastery_requirements import mastery_entries_for_profile
 from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
@@ -3137,6 +3138,9 @@ class DoomEternalContext(CommonContext):
             self._report_launcher_connection_failure(msg, technical_message=msg)
 
     async def connection_closed(self):
+        diagnostics = getattr(self, "connection_diagnostics", None)
+        if diagnostics is not None:
+            diagnostics.disconnected()
         state_key = self.state_key
         self.reset_transient_effects("connection_closed")
         self.reset_queue_session_authority("connection_closed")
@@ -3668,6 +3672,9 @@ class DoomEternalContext(CommonContext):
                     item_index,
                     receipt_identity(network_item),
                 )
+                retry_key = (receipt_session_token, observation_key)
+                if getattr(self, "_rune_budget_retry", (None,))[0] != retry_key:
+                    self._rune_budget_retry = (retry_key, 0, 0.0)
                 pending = not duplicate and self.receipt_session.was_observed(observation_key)
                 log_delivery_event(
                     "ITEM_RECEIPT_CLASSIFIED",
@@ -3797,9 +3804,42 @@ class DoomEternalContext(CommonContext):
                     continue
 
                 if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS or item_id in NORMAL_RUNE_ITEM_BITS or item_id in SUPPORT_RUNE_IDS:
+                    if time.monotonic() < self._rune_budget_retry[2]:
+                        break
                     try:
                         result = self._apply_native_owner_receipt(item_index, network_item)
                     except (RuntimeError, OSError, ValueError) as error:
+                        native_result = getattr(error, "native_result", None)
+                        budget_refused = (
+                            (item_id in NORMAL_RUNE_ITEM_BITS or item_id in SUPPORT_RUNE_IDS)
+                            and isinstance(native_result, dict)
+                            and native_result.get("state") == 4
+                            and native_result.get("reason") == 25
+                            and native_result.get("kind") in (1, 2)
+                            and native_result.get("operations_applied") in (0, "0")
+                        )
+                        if budget_refused:
+                            attempts = self._rune_budget_retry[1] + 1
+                            self._rune_budget_retry = (retry_key, attempts, time.monotonic() + (5 if attempts == 1 else 10))
+                            if attempts >= 3:
+                                notified, notification_error = self.spool_deferred_receipt_notification(item_id, item_index)
+                                if not notified:
+                                    logger.warning("[NativeOwner] Receipt %s notification pending: %s", item_index, notification_error)
+                                    break
+                                self._record_processed_receipt(network_item)
+                                self.receipt_session.advance()
+                                self.persist_session_state()
+                                self._rune_budget_retry = (None, 0, 0.0)
+                                log_item_event(
+                                    "ITEM_RECEIPT_DEFERRED", receipt_index=item_index, item_id=item_id,
+                                    receipt_id=receipt_identity(network_item), reason="native_budget",
+                                    decision="ownership_recorded_native_pending", boundary=self.items_processed,
+                                    trigger=trigger, state_key=getattr(self, "state_key", None),
+                                )
+                                batch_count += 1
+                                continue
+                        else:
+                            self._rune_budget_retry = (retry_key, 0, 0.0)
                         reason = "native_gameplay_context_not_active" if "not active" in str(error) else "native_owner_not_confirmed"
                         log_item_event(
                             "ITEM_RECEIPT_DEFERRED",
@@ -3815,6 +3855,7 @@ class DoomEternalContext(CommonContext):
                         )
                         logger.info("[NativeOwner] Receipt %s held: %s", item_index, error)
                         break
+                    self._rune_budget_retry = (None, 0, 0.0)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,
@@ -7118,6 +7159,9 @@ async def amain(launch_args=None):
 
     ctx = DoomEternalContext(args.connect, args.password)
     ctx.auth = args.name
+    ctx.connection_diagnostics = ConnectionDiagnostics(APCommonClient.websockets, ctx)
+    APCommonClient.websockets = ctx.connection_diagnostics
+    loop_monitor = asyncio.create_task(ctx.connection_diagnostics.monitor_loop(), name="bridge loop diagnostics")
     try:
         set_rpc_execution(False)
     except Exception as error:
@@ -7186,7 +7230,7 @@ async def amain(launch_args=None):
     await ctx.exit_event.wait()
     emit_launcher_event("client_stopping")
     ctx.reset_queue_session_authority("bridge_shutdown")
-    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task]
+    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task, loop_monitor]
     item_delivery_task = ctx._item_delivery_task
     if item_delivery_task is not None:
         tasks.append(item_delivery_task)
@@ -7198,6 +7242,8 @@ async def amain(launch_args=None):
     await ctx.session_tasks.close()
     await asyncio.gather(*tasks, return_exceptions=True)
     await ctx.shutdown()
+    await ctx.connection_diagnostics.close()
+    APCommonClient.websockets = ctx.connection_diagnostics.websockets
 
 
 def launch(*launch_args):

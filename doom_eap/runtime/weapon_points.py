@@ -10,6 +10,7 @@ import struct
 import subprocess
 import time
 from pathlib import Path
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
 
 ITEM_ID = 7770903
 AMOUNT = 3
@@ -77,6 +78,7 @@ class SentinelWeaponPoints:
                         **{field: previous[field] for field in ("first_seen", "last_seen", "count")}})
                     previous["emitted_at"] = now
 
+    @timed_sync_call
     def _run(self, args, payload=None):
         evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
                     "cwd": os.getcwd(), "stage": args[2] if args[0] == "--pid" else args[0],
@@ -113,6 +115,7 @@ class SentinelWeaponPoints:
         body = struct.pack("<III", int(amount != 0), amount, expected)
         return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
 
+    @timed_sync_call
     def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None):
         scope = self._run(["--pid", str(self.pid), "--native", "--json"])
         if trace is not None:
@@ -172,7 +175,9 @@ class SentinelWeaponPoints:
                 return result
             if result["state"] not in (1, 2) or time.monotonic() >= deadline:
                 # Uncertain results must be checked against the persisted receipt before resubmission.
-                raise WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
+                error = WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
+                error.native_result = result
+                raise error
             operation = result_operation
             time.sleep(0.025)
 

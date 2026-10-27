@@ -1,5 +1,7 @@
 from copy import deepcopy
 import hashlib
+from importlib.resources import files
+import json
 from textwrap import dedent
 
 import pytest
@@ -69,7 +71,7 @@ def test_traversal_without_target_uses_only_an_unambiguous_colocated_marker(mark
     assert _entrance_landings([recipe], records).get('point') == ('ledge0' if marker_count == 1 else None)
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
+from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint, validate_native_recipes
 from tools.maps.encounter_catalog import entity_records, list_items
 from tools.maps.native_recipe_materializer import materialize_native_recipe_definitions, materialize_native_recipe_calls, _refill_limits, _functional_token
 
@@ -145,6 +147,33 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
 
 
 
+def test_darklord_plans_preserve_frozen_phantoms_and_compile_new_rooms_without_them():
+    key = 'e5m4_boss'
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    types = {catalog['species'][name]['spawn_type'] for name in ('hell_knight', 'mancubus', 'baron', 'tyrant')}
+    origins = [row for row in catalog['maps'][key]['runtime_origins'] if row['spawn_type'] in types]
+    catalog['maps'] = {key: dict(source_sha256=hashlib.sha256(SOURCE.encode()).hexdigest(),
+                               origins=[], runtime_origins=origins)}
+    catalog['species']['imp']['ai'] = dict(map_key=key, entity='original', sha256=next(entity_records(SOURCE))['sha256'])
+    options = normalize_enemy_options(dict(enemies={'revision': 5}, enemy_count_mode='multiplier',
+        enemy_count_multiplier=100, enemy_weights={name: int(name == 'imp') for name in SPECIES_IDS},
+        enemy_size_variation_chance=0,
+        **{f'enemy_{name}': dict(minimum=100, maximum=100) for name in ('health', 'damage', 'speed', 'size')}))
+    campaign = dict(sequence=[key])
+    frozen = build_native_recipes(options, campaign, seed=8, catalog=catalog, revision=18)
+    assert frozen['fingerprint'] == '9d7c86938f5e7a21c1f42c9246361cb78abc03a237586b4c27fc70791fbecb2a'
+    assert validate_native_recipes(frozen, options, campaign, catalog=catalog) == frozen
+    old_recipes = frozen['maps'][key]['recipes']
+    assert sum('/darklord_phantoms/' in row['id'] for row in old_recipes) == 4
+    compiled = materialize_native_recipe_calls(SOURCE, key, frozen, {key: SOURCE})
+    assert hashlib.sha256(compiled.encode()).hexdigest() == '448ccaf8e15a89fccab2722aebc5547940ecf6de4adbe24eb518f423c33c7ff6'
+    current = build_native_recipes(options, campaign, seed=8, catalog=catalog)
+    assert current['maps'][key]['recipes'] == [row for row in old_recipes if '/darklord_phantoms/' not in row['id']]
+    compiled = materialize_native_recipe_calls(SOURCE, key, current, {key: SOURCE})
+    rows = {row['name']: row for row in entity_records(compiled)}
+    assert all('ap_v070_bodies_r' + row['origin'] in rows for row in current['maps'][key]['recipes'])
+
+
 @pytest.mark.parametrize('entity', ['', 'ap_darklord_phantoms'])
 def test_runtime_summon_library_compiles_without_an_authorial_template(entity):
     plan = frozen_plan(binding={'mode': 'summon', 'entity': entity}, family='summon',
@@ -155,6 +184,9 @@ def test_runtime_summon_library_compiles_without_an_authorial_template(entity):
     library = rows['ap_v070_bodies_r' + recipe['origin']]['edit']['entityDefs']
     assert library['num'] == len(recipe['bodies']) > 0
     assert all(rows[item['name']]['class'] == 'idAI2' for item in list_items(library))
+    states = {rows[item['name']]['edit'].get('aiEditable', {}).get('spawnSettings', {}).get('initialState')
+              for item in list_items(library)}
+    assert states == {'AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER' if entity else None}
 
 
 def test_immora_group_keeps_its_canonical_spawn_available_after_checkpoint():

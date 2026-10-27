@@ -215,3 +215,101 @@ def test_mapping_repair_ledger_selects_one_unrepaired_occurrence_and_preserves_r
     assert service.next_mapping_repair((), 3, 5, revisions).action == "done"
     service.reset(5)
     assert state == {"item_mapping_revision": 5, "receipt_notifications": {}}
+
+
+@pytest.mark.parametrize("kind", (1, 2))
+def test_rune_budget_deferral_preserves_receipts_and_reconciles(tmp_path, monkeypatch, kind):
+    root = Path(__file__).resolve().parents[1]
+    configuration = tmp_path / "config.json"
+    configuration.write_text(json.dumps({
+        "doom_base_dir": str(tmp_path / "game/base"),
+        "save_games_dir": str(tmp_path / "local"),
+        "steam_remote_dir": str(tmp_path / "Steam/userdata/1/782330/remote"),
+        "client_state_file": str(tmp_path / "state.json"),
+        "bridge_log_path": str(tmp_path / "bridge.log"),
+    }))
+    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(configuration))
+    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
+    monkeypatch.syspath_prepend(str(root.parent / "Archipelago"))
+    monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
+    bridge = importlib.import_module("doom_eap.runtime.bridge_client")
+    from doom_eap.runtime.weapon_points import WeaponPointsBlocked
+
+    now = [100.0]
+    monkeypatch.setattr(bridge, "time", SimpleNamespace(**{**vars(bridge.time), "monotonic": lambda: now[0]}))
+    events = []
+    monkeypatch.setattr(bridge, "log_item_event", lambda event, **fields: events.append((event, fields)))
+
+    async def consume():
+        context = bridge.DoomEternalContext(None, None)
+        context.state_key = "rune-room"
+        context.item_state_ready = True
+        context.session_state = bridge.default_session_state()
+        bits = bridge.NORMAL_RUNE_ITEM_BITS if kind == 1 else bridge.SUPPORT_RUNE_ITEM_BITS
+        item_id, mask = next(iter(bits.items()))
+        item = SimpleNamespace(item=item_id, location=11, player=1, flags=1)
+        context.items_received = [item]
+        notifications, calls, native_grants = [], [], []
+        owned = [0]
+        fault = [{"state": 4, "reason": 25, "kind": kind, "operations_applied": "0"}]
+
+        def ensure(desired):
+            calls.append(desired)
+            if fault[0] is not None:
+                error = WeaponPointsBlocked("Native runes execution not confirmed")
+                error.native_result = fault[0]
+                raise error
+            if desired & ~owned[0]:
+                native_grants.append(desired & ~owned[0])
+                owned[0] |= desired
+            return {"outcome": 0}
+
+        monkeypatch.setattr(context, "native_game_link", lambda: SimpleNamespace(
+            ensure_normal_runes=ensure, ensure_support_runes=ensure))
+        monkeypatch.setattr(context, "spool_deferred_receipt_notification",
+                            lambda item, index: (notifications.append((item, index)) or True, ""))
+        monkeypatch.setattr(context, "_flush_deferred_frag_upgrades", lambda: None)
+        monkeypatch.setattr(context, "_reconcile_blood_punch", lambda _: None)
+        monkeypatch.setattr(context, "persist_session_state", lambda: (tmp_path / "state.json").write_text(
+            json.dumps({"boundary": context.items_processed, "session": context.session_state})))
+
+        for changes in ({"reason": 26}, {"state": 2}, {"state": 5}, {"kind": 3},
+                        {"operations_applied": 1}, {"operations_applied": None}):
+            fault[0] = {"state": 4, "reason": 25, "kind": kind, "operations_applied": 0, **changes}
+            for _ in range(3):
+                await context.process_pending_item_receipts("packet")
+                now[0] += 20
+            assert context.items_processed == 0 and not notifications
+
+        fault[0] = {"state": 4, "reason": 25, "kind": kind, "operations_applied": "0"}
+        calls.clear()
+        await context.process_pending_item_receipts("packet")
+        assert context.items_processed == 0 and len(calls) == 1
+        context.receipt_session.begin_rebind()
+        await context.process_pending_item_receipts("packet")
+        assert context.items_processed == 0 and len(calls) == 2
+        calls.clear()
+        for elapsed, expected_calls, boundary in ((4.999, 0, 0), (0.001, 1, 0),
+                                                   (9.999, 1, 0), (0.001, 2, 1)):
+            now[0] += elapsed
+            await context.process_pending_item_receipts("packet")
+            assert len(calls) == expected_calls and context.items_processed == boundary
+        assert notifications == [(item_id, 0)] and not native_grants
+        assert context._rune_budget_retry == (None, 0, 0.0)
+        saved = json.loads((tmp_path / "state.json").read_text())
+        assert saved["boundary"] == 1
+        assert saved["session"]["receipt_history"]["receipt_item_ids"] == [item_id]
+        assert any(fields.get("decision") == "ownership_recorded_native_pending" for _, fields in events)
+
+        fault[0] = None
+        await context.process_pending_item_receipts("tracker")
+        await context.process_pending_item_receipts("tracker")
+        assert native_grants == [mask] and notifications == [(item_id, 0)]
+        await context.process_pending_item_receipts("packet")
+        assert context.items_processed == 1
+        history = context.session_state["receipt_history"]
+        for field in ("receipt_item_ids", "receipt_ids", "receipt_counts"):
+            assert history[field] == saved["session"]["receipt_history"][field]
+        assert native_grants == [mask] and notifications == [(item_id, 0)]
+
+    asyncio.run(consume())

@@ -29,6 +29,12 @@ def test_provider_process_and_source_are_all_required(tmp_path):
     evidence = GameplaySaveEvidence("gameplay", 7, "GAME-AUTOSAVE0", "game/hub/hub", False, True,
         "a" * 64, root, 71, "101", "c" * 32, str(ap / "game.details"))
     assert admitted_evidence_matches(evidence, selected, "a" * 64, 71, facts)
+    proton = evidence._replace(source_file=str(tmp_path).replace("\\", "/") + "\\" + root
+        + "\\GAME-AUTOSAVE0\\game.details")
+    assert admitted_evidence_matches(proton, selected, "a" * 64, 71, facts)
+    for changes in (dict(pid=72), dict(slot_directory="GAME-AUTOSAVE2"),
+                    dict(source_file=proton.source_file.replace("GAME-AUTOSAVE0", "GAME-AUTOSAVE2"))):
+        assert not admitted_evidence_matches(proton._replace(**changes), selected, "a" * 64, 71, facts)
     for changes in [dict(namespace="d" * 64), dict(native_root="ap-" + "d" * 40), dict(pid=72),
             dict(process_created="102"), dict(instance_id="d" * 32), dict(slot_directory="GAME-AUTOSAVE2"),
             dict(source_file=str(vanilla / "game.details")), dict(state="menu")]:

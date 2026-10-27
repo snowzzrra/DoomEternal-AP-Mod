@@ -79,7 +79,7 @@ def admitted_evidence_matches(evidence, selection, namespace, pid, admission):
         and evidence.pid == pid and str(evidence.process_created) == str(admission.get("process_created"))
         and evidence.instance_id == admission.get("instance_id")
         and evidence.slot_directory == selection.slot_directory
-        and Path(evidence.source_file).resolve() == selection.path.with_name("game.details").resolve())
+        and Path(evidence.source_file.replace("\\", "/")).resolve() == selection.path.with_name("game.details").resolve())
 
 
 def expected_save_prefix_for_campaign(campaign: str | None) -> str | None:

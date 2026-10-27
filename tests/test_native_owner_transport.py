@@ -138,6 +138,18 @@ def test_normal_runes_register_cumulatively_without_slot_changes():
     assert struct.unpack_from("<IIIBb", messages[0][2], 16 + 72 + 65) == (1, mask, 0, 0, -1)
 
 
+def test_terminal_native_refusal_retains_result_after_release():
+    def refused(_flag, _operation, request_id):
+        return {"namespace": "a" * 64, "request_id": request_id, "build_id": "build",
+                "state": 4, "reason": 25, "kind": 1, "operations_applied": "0"}
+
+    link, messages = link_with(refused)
+    with pytest.raises(WeaponPointsBlocked, match="Native runes execution not confirmed") as caught:
+        link.ensure_normal_runes(1)
+    assert caught.value.native_result == refused("--runes", 33, caught.value.native_result["request_id"])
+    assert [(flag, operation) for flag, operation, _ in messages] == [("--runes", 33), ("--runes", 36)]
+
+
 
 
 def test_automap_publishes_exact_checked_bits_without_native_mutation():

@@ -1404,6 +1404,44 @@ def _native_startup_diagnostics(config, session):
             "errors": errors, "reason": None if records else "no_matching_native_diagnostic"}
 
 
+def _darklord_diagnostics(session):
+    root = os.environ.get("LOCALAPPDATA")
+    if not root:
+        return {}, {"status": "unavailable", "reason": "native_log_location_unavailable"}
+    directory = Path(root) / "SentinelCore" / "diagnostics"
+    records, errors, logs = [], [], {}
+    limit = 16 * 1024 * 1024
+    try:
+        candidates = sorted(
+            (path for path in directory.glob("*.darklord.log")
+             if re.fullmatch(r"\d+-\d+\.darklord\.log", path.name) and not path.is_symlink()),
+            key=lambda path: path.stat().st_mtime, reverse=True,
+        )
+        for path in candidates[:4]:
+            size = path.stat().st_size
+            with path.open("rb") as stream:
+                if size > limit:
+                    stream.seek(size - limit)
+                    stream.readline()
+                raw = stream.read(limit)
+            lines = [line for line in raw.decode("utf-8", errors="replace").splitlines()
+                     if line.startswith("AP_DARKLORD ")]
+            if not lines:
+                continue
+            identity = path.name.removesuffix(".darklord.log").split("-")
+            current = identity == [str(session.get("pid")), str(session.get("process_created"))]
+            name = "darklord/" + path.name
+            logs[name] = _sanitize_support_text("\n".join(lines)) + "\n"
+            records.append({"archive_member": name, "pid": int(identity[0]),
+                            "process_created": int(identity[1]), "line_count": len(lines),
+                            "source_size": size, "truncated": size > limit,
+                            "evidence": "current_process" if current else "last_known"})
+    except OSError as error:
+        errors.append(type(error).__name__)
+    return logs, {"status": "available" if logs else "unavailable", "records": records,
+                  "errors": errors, "reason": None if logs else "no_darklord_telemetry"}
+
+
 def write_support_bundle(
     destination: Path,
     report: DoctorReport,
@@ -1488,6 +1526,9 @@ def write_support_bundle(
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     support = payload.get("support_diagnostics", {})
     session = support.get("ap_session") or support.get("campaign_inspection", {}).get("session", {})
+    darklord_logs, darklord = _darklord_diagnostics(session)
+    tails.update(darklord_logs)
+    payload["darklord_telemetry"] = sanitize_support_value(darklord)
     native_startup = _native_startup_diagnostics(config, session)
     payload["native_startup"] = sanitize_support_value(native_startup)
     safe_logs = _bound_support_text(

@@ -574,6 +574,7 @@ class LauncherUI(QMainWindow):
         self._syncing_create_dependencies = False
         self.room_event: dict[str, object] = {}
         self._room_connected = False
+        self._inventory_evidence = ("waiting", self.COLORS["muted"])
         self._connection_pending = False
         self._shown_connection_error_attempts: set[int] = set()
         self._event_poll_scheduled = False
@@ -1861,8 +1862,20 @@ class LauncherUI(QMainWindow):
         self.connection_badge.setWordWrap(False)
 
     def _set_inventory_tile(self, detail: str, color: str) -> None:
-        if detail == "synced" and not self.controller.workflow.session_owner.status.get("ready"):
-            detail, color = "waiting for AP session", self.COLORS["ap"]
+        self._inventory_evidence = (detail, color)
+        self._render_inventory_tile(self.controller.workflow.session_owner.status)
+
+    def _render_inventory_tile(self, session: dict) -> None:
+        detail, color = self._inventory_evidence
+        if self._room_connected and not session.get("ready"):
+            admission = session.get("admission") if isinstance(session.get("admission"), dict) else {}
+            fault = str(admission.get("fault") or "none")
+            if session.get("state") == "admission_refused" and admission.get("state") in {"binding", "prepared", "starting"}:
+                detail, color = "preparing AP session", self.COLORS["ap"]
+            elif session.get("state") == "admission_refused" and fault != "none":
+                detail, color = f"AP session refused: {fault.replace('_', ' ')}", self.COLORS["warn"]
+            else:
+                detail, color = "waiting for AP session", self.COLORS["ap"]
         self._set_status("inventory", detail, color)
 
     def _fade_in(self, widget: QWidget) -> None:
@@ -2457,7 +2470,7 @@ class LauncherUI(QMainWindow):
         self.player_team.setText(f"Team {team}")
         self.player_slot.setText(f"Slot {slot} · {player}")
         self.player_inventory.setText("Inventory ready")
-        self._set_inventory_tile("history received; waiting for AP session", self.COLORS["ap"])
+        self._set_inventory_tile("history received", self.COLORS["ap"])
         self._set_ammo_refill_indicator(event.get("ammo_refills_available"))
         self.resync_inventory_button.setEnabled(self._room_connected and not self._connection_pending)
         history = self.controller.item_history_status
@@ -3138,8 +3151,7 @@ class LauncherUI(QMainWindow):
         if proton and self.proton_executable is not None:
             self.proton_executable.setPlaceholderText("Automatic: " + proton["executable"])
             self.proton_executable.setToolTip(f"Effective Proton: {proton['tool']}\n{proton['executable']}")
-        if not event.get("session", {}).get("ready") and self._room_connected:
-            self._set_inventory_tile("waiting for AP session", self.COLORS["ap"])
+        self._render_inventory_tile(event.get("session", {}))
         if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
             if event["meathook_ok"]:
                 self._set_status("rpc", "waiting", self.COLORS["ap"])

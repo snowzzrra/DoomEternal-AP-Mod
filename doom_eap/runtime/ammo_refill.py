@@ -7,6 +7,16 @@ from collections.abc import Mapping
 AMMO_REFILL_ITEM_ID = 7770024
 AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
 AMMO_REFILL_CAPACITY = 3
+AMMO_UNAVAILABLE_MESSAGES = {
+    "placement_connected": "Disconnected from Archipelago; reconnect before using Ammo Refill",
+    "item_state_ready": "Ammo Refill unavailable: waiting for items from Archipelago",
+    "connected": "Disconnected from Archipelago; reconnect before using Ammo Refill",
+    "namespace_match": "Ammo Refill unavailable: waiting for the current room's game session",
+    "marker_valid": "Ammo Refill unavailable: waiting for the current level to finish preparing",
+    "lease_match": "Ammo Refill unavailable: waiting for the current level to finish preparing",
+    "native_safe": "Ammo Refill unavailable: return to DOOM and unpause before trying again",
+    "runtime_effects_ready": "Ammo Refill unavailable: waiting for the active save and game session",
+}
 
 
 @dataclass(frozen=True)
@@ -348,7 +358,7 @@ class AmmoRefill:
                 "ammo_refill",
                 status="blocked",
                 available=self._available or 0,
-                message=f"Ammo Refill unavailable: {failing_predicate}",
+                message=AMMO_UNAVAILABLE_MESSAGES[failing_predicate],
             )
             return False
         available = self.refresh()
