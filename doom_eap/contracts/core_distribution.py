@@ -9,14 +9,14 @@ from pathlib import Path, PurePosixPath
 ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
        "campaign_menu": 1, "inventory": 8, "arsenal": 1, "runes": 1,
-       "special": 1, "deathlink": 1, "automap": 1, "commands": 1,
+       "special": 1, "deathlink": 1, "automap": 2, "commands": 1,
        "combat": 2, "combat_presentation": 1, "enemy_movement": 2, "enemy_supply": 1, "enemy_limits": 2, "enemy_tracking": 1}
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
 from doom_eap import __version__ as MOD_VERSION
 SUPPORTED_CAPABILITIES = {2097152, 4194304, 8388608}
-REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "commands", "combat", "combat_presentation", "enemy_movement", "enemy_supply", "enemy_limits", "enemy_tracking"}
+REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "automap", "commands", "combat", "combat_presentation", "enemy_movement", "enemy_supply", "enemy_limits", "enemy_tracking"}
 
 def version_key(value):
     match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-rc-([1-9]\d*))?(?:\+[0-9A-Za-z.-]+)?", value)

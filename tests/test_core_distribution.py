@@ -99,8 +99,9 @@ def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_
 
 @pytest.mark.parametrize("name,version", [("combat", 1), ("combat_presentation", 2),
     ("enemy_movement", 0), ("enemy_supply", 0), ("enemy_limits", None),
-    ("enemy_limits", 0), ("enemy_limits", 1), ("enemy_limits", 3), ("enemy_tracking", 0)])
-def test_distribution_refuses_incompatible_combat_before_reading_artifacts(tmp_path, name, version):
+    ("enemy_limits", 0), ("enemy_limits", 1), ("enemy_limits", 3), ("enemy_tracking", 0),
+    ("automap", None), ("automap", 1)])
+def test_distribution_refuses_incompatible_abi_before_reading_artifacts(tmp_path, name, version):
     manifest = fixture(tmp_path)
     if version is None:
         del manifest["abi"][name]

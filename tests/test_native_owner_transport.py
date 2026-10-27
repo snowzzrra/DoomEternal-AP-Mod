@@ -159,12 +159,13 @@ def test_automap_publishes_exact_checked_bits_without_native_mutation():
                 "lifecycle_generation": 7, "native_fault": 0}
 
     link, messages = link_with(result)
-    link.publish_checked_locations({7770001, 7770065, 8888888}, 99)
+    checked = {7770001, 7770065, 7770511, 7770514, 7770518}
+    link.publish_checked_locations(checked | {8888888}, 99)
     assert [(flag, operation) for flag, operation, _ in messages] == [("--automap", 45)]
     payload = messages[0][2]
     body = 16 + 72 + 65
-    kind, known, revision, *bits = struct.unpack_from("<IIQ8Q", payload, body)
+    assert len(payload) == body + struct.calcsize("<IIQ9Q")
+    kind, known, revision, *bits = struct.unpack_from("<IIQ9Q", payload, body)
     assert (kind, known, revision) == (1, 1, 99)
-    assert bits[0] == 1 << 1
-    assert bits[1] == 1 << 1
-    assert sum(bits) == 4
+    decoded = {7770000 + offset for offset in range(576) if bits[offset // 64] & (1 << (offset % 64))}
+    assert decoded == checked

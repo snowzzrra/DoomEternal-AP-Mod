@@ -447,16 +447,16 @@ class SentinelWeaponPoints:
         scope = self._run(["--pid", str(self.pid), "--native", "--json"])
         if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
             raise WeaponPointsBlocked("Native gameplay context is not active")
-        bits = [0] * 8
+        bits = [0] * 9
         for location_id in checked_locations:
             offset = int(location_id) - 7770000
-            if 0 <= offset < 512:
+            if 0 <= offset < len(bits) * 64:
                 bits[offset // 64] |= 1 << (offset % 64)
         request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
         payload = struct.pack("<QIQ16sQQ16sI", 262144, self.pid,
                               int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
                               int(scope["lifecycle_generation"]), request_id, nonce, 2000)
-        payload += self.namespace.encode("ascii") + b"\0" + struct.pack("<IIQ8Q", 1, 1, revision, *bits)
+        payload += self.namespace.encode("ascii") + b"\0" + struct.pack("<IIQ9Q", 1, 1, revision, *bits)
         message = struct.pack("<IHHII", 0x50494353, 1, 45, len(payload), 0) + payload
         result = self._run(["--automap"], message)
         if (result.get("namespace") != self.namespace or int(result.get("request_id", 0)) != request_id
