@@ -132,6 +132,12 @@ def test_process_detection_distinguishes_launch_targets_from_arguments(row, expe
         assert processes[0]["matched_by"] in {"process_name", "launch_target"}
 
 
+def game_files(root):
+    # flock needs a persistent inode so concurrent launchers share the same lock.
+    return {path: path.read_bytes() for path in root.rglob("*")
+            if path.is_file() and path != root / ".sentinel-game-write.lock"}
+
+
 @pytest.mark.parametrize("operation", ["core", "stage"])
 def test_process_refusal_retains_blocking_identity(room_files, monkeypatch, operation):
     from doom_eap.launcher.launcher_integration import setup_failure_payload
@@ -141,7 +147,7 @@ def test_process_refusal_retains_blocking_identity(room_files, monkeypatch, oper
                   "command_executable": "/games/DOOMEternalx64vk.exe", "matched_by": "process_name"},)
     monkeypatch.setattr(platform, "detect_doom_processes", lambda: processes)
     monkeypatch.setattr(platform, "probe_meathook", Mock(return_value=Mock(ok=False)))
-    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    before = game_files(root)
     with pytest.raises(RuntimeError, match="PID 123") as refused:
         if operation == "core":
             platform.install_meathook(root, None, consent=lambda _: False)
@@ -150,7 +156,7 @@ def test_process_refusal_retains_blocking_identity(room_files, monkeypatch, oper
     payload = setup_failure_payload(refused.value, phase="game_setup")
     assert payload["processes"] == processes
     assert payload["recovery_action"] == "repair_game_integration"
-    assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before
+    assert game_files(root) == before
 
 
 @pytest.mark.parametrize("query_failure", [OSError("tasklist unavailable"), subprocess.TimeoutExpired("tasklist", 3), 1])
@@ -161,7 +167,7 @@ def test_process_query_failure_refuses_mutation(room_files, monkeypatch, query_f
 
     root, source, old, legacy, foreign, receipt = room_files
     monkeypatch.undo()
-    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+    before = game_files(root)
     calls = {
         "core": lambda: platform.install_meathook(root, None, consent=lambda _: False),
         "replace": lambda: replace_pair(root, None, {}),
@@ -178,7 +184,7 @@ def test_process_query_failure_refuses_mutation(room_files, monkeypatch, query_f
         with pytest.raises(platform.ProcessInspectionError, match="Could not inspect.*Cannot safely"):
             calls[operation]()
     assert query.call_args.args[0][0] in {"tasklist", "ps"}
-    assert {path: path.read_bytes() for path in root.rglob("*") if path.is_file()} == before
+    assert game_files(root) == before
 
 
 @pytest.fixture

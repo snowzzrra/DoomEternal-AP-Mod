@@ -56,7 +56,8 @@ def test_support_retains_native_failure_after_game_exit(tmp_path, monkeypatch):
     build = "b" * 64
     (game / "sentinel-distribution.json").write_text(json.dumps({"build_id": build}))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    directory = tmp_path / "local/SentinelCore/diagnostics"
+    config = {"game_root": str(game), "proton_compat_data_dir": str(tmp_path / "compatdata/782330")}
+    directory = doctor.diagnostics_directory(config)
     directory.mkdir(parents=True)
     native = {"pid": 42, "process_created": 99, "build_id": build,
               "admission": {"namespace_id": "room", "state": 4, "fault": 7},
@@ -68,7 +69,7 @@ def test_support_retains_native_failure_after_game_exit(tmp_path, monkeypatch):
     (directory / "45-102.latest.json").write_text(json.dumps(native))
     monkeypatch.setattr(doctor, "_support_log_tails", lambda *args, **kwargs: ({}, {}))
     result = doctor.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
-                                       config={"game_root": str(game)},
+                                       config=config,
                                        support_diagnostics={"ap_session": {"namespace_id": "room", "state": "game_exited"}})
     with zipfile.ZipFile(result) as archive:
         raw = archive.read("native_startup.json")
@@ -86,7 +87,8 @@ def test_support_preserves_darklord_sessions_without_console_or_secrets(tmp_path
     from doom_eap.launcher import launcher_doctor as doctor
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    directory = tmp_path / "local/SentinelCore/diagnostics"
+    config = {"proton_compat_data_dir": str(tmp_path / "compatdata/782330")}
+    directory = doctor.diagnostics_directory(config)
     directory.mkdir(parents=True)
     previous = "AP_DARKLORD event=actor pid=42 seq=3 at_ms=100 map=e5m4_boss handle=0x123 actor=0x456"
     current = "AP_DARKLORD event=summary pid=43 seq=1 at_ms=12100 map=e5m4_boss frozen_ms=3000 recovered_at_ms=3000"
@@ -95,7 +97,7 @@ def test_support_preserves_darklord_sessions_without_console_or_secrets(tmp_path
     (directory / "untrusted.darklord.log").write_text("AP_DARKLORD password=filename-secret\n")
     monkeypatch.setattr(doctor, "_support_log_tails", lambda *args, **kwargs: ({}, {}))
     result = doctor.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
-        support_diagnostics={"ap_session": {"pid": 43, "process_created": 100}})
+        config=config, support_diagnostics={"ap_session": {"pid": 43, "process_created": 100}})
     with zipfile.ZipFile(result) as archive:
         assert previous in archive.read("darklord/42-99.darklord.log").decode()
         assert current in archive.read("darklord/43-100.darklord.log").decode()

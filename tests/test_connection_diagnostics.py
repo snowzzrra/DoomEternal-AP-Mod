@@ -8,7 +8,8 @@ import pytest
 from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
 
 
-def test_connection_failure_preserves_error_and_redacts_credentials(caplog):
+def test_connection_failure_preserves_error_and_redacts_credentials(caplog, monkeypatch):
+    monkeypatch.setattr(logging.getLogger("doom_eternal_ap.bridge"), "propagate", True)
     error = TimeoutError("wss://user:uri-secret@example.invalid/?token=query-secret room-secret")
     transport = SimpleNamespace(connect=AsyncMock(side_effect=error))
     diagnostics = ConnectionDiagnostics(transport, SimpleNamespace(password="room-secret"))
