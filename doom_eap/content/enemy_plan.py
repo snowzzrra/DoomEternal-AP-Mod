@@ -183,7 +183,7 @@ def validate_frozen_enemy_plan(plan, enemies):
         if enemies["enabled"]:
             raise ValueError("Enemy Randomizer requires the room's enemy plan. Generate the room with the matching APWorld.")
         return None
-    if not isinstance(plan, dict) or plan.get("kind") != "native_recipes":
+    if not isinstance(plan, dict) or plan.get("kind") not in {"native_recipes", "native_recipe_seed"}:
         raise ValueError("This enemy plan is incompatible. Generate the room with the v0.7 APWorld.")
     from .native_enemy_plan import validate_native_recipes
     return validate_native_recipes(plan, enemies)

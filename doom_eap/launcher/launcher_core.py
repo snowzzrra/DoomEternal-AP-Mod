@@ -50,6 +50,7 @@ SUPPORTED_CAPABILITIES = frozenset({
     "unified_campaign_v1",
     "fortress_economy_v1",
     "progressive_blood_punch_v1",
+    "enemy_recipe_seed_v1",
     "dlc_missions_v1",
     "goal_events_v1",
     "goal_endpoint_events_v1",
@@ -196,7 +197,7 @@ def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
     if slot_data.get("logic_difficulty") not in {"Relaxed", "Standard", "Expert"}:
         raise ValueError("Connected.slot_data.logic_difficulty is invalid")
     slot_data["killsanity"] = validate_killsanity_plan(slot_data.get("killsanity_options"), slot_data.get("killsanity"))
-    validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
+    slot_data["enemy_plan"] = validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
     if slot_data.get("mastery_requirements") not in {"Original", "Half", "Quarter"}:
         raise ValueError("Connected.slot_data.mastery_requirements is invalid")
     if slot_data.get("resource_profile") not in {"Balanced", "Generous", "Lean"}:

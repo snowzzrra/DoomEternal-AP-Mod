@@ -970,6 +970,13 @@ def configure_native_validation_cache(directory, compiler_fingerprint):
     _VALIDATION_CACHE = Path(directory) / compiler_fingerprint
 
 
+def native_recipe_seed(plan):
+    if plan is None:
+        return None
+    return {"kind": "native_recipe_seed", **{key: plan[key] for key in
+            ("revision", "seed", "campaign", "fingerprint")}}
+
+
 def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
     if plan is None:
         if enemies["enabled"]:
@@ -977,6 +984,11 @@ def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
         return None
     if not isinstance(plan, dict) or not isinstance(plan.get("seed"), str) or not plan["seed"]:
         raise ValueError("Native recipe seed is invalid")
+    compact = plan.get("kind") == "native_recipe_seed"
+    if compact and (set(plan) != {"kind", "revision", "seed", "campaign", "fingerprint"}
+                    or not isinstance(plan.get("fingerprint"), str)
+                    or re.fullmatch(r'[0-9a-f]{64}', plan["fingerprint"]) is None):
+        raise ValueError("Native recipe seed descriptor is invalid")
     campaign = plan.get("campaign") if campaign is None else campaign
     if not isinstance(campaign, dict) or not isinstance(campaign.get("sequence"), list):
         raise ValueError("Native recipe campaign is invalid")
@@ -988,14 +1000,14 @@ def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
         if key not in _VALIDATED_PLANS:
             cached = _VALIDATION_CACHE / key.hex() if _VALIDATION_CACHE is not None else None
             try:
-                verified = cached is not None and cached.stat().st_size == len(key) and cached.read_bytes() == key
+                verified = not compact and cached is not None and cached.stat().st_size == len(key) and cached.read_bytes() == key
             except OSError:
                 verified = False
             if not verified:
                 expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog, revision=plan.get('revision'))
-                if plan != expected:
+                if plan != (native_recipe_seed(expected) if compact else expected):
                     raise ValueError("Native recipes differ from the seed, options or source catalog")
-                if cached is not None:
+                if cached is not None and not compact:
                     pending = None
                     try:
                         cached.parent.mkdir(parents=True, exist_ok=True)
@@ -1011,8 +1023,12 @@ def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
                                 pending.unlink(missing_ok=True)
                             except OSError:
                                 pass
-            _VALIDATED_PLANS[key] = None
+            if compact:
+                for old_key, value in list(_VALIDATED_PLANS.items()):
+                    if value is not None:
+                        del _VALIDATED_PLANS[old_key]
+            _VALIDATED_PLANS[key] = expected if compact else None
             if len(_VALIDATED_PLANS) > 8:
                 _VALIDATED_PLANS.popitem(last=False)
         _VALIDATED_PLANS.move_to_end(key)
-    return plan
+        return _VALIDATED_PLANS[key] if compact else plan

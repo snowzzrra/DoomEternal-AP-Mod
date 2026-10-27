@@ -120,6 +120,7 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the generated room identity and exact option contract."""
+    slot_data = dict(slot_data)
     if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
         raise ValueError(
             "DoomEAP 0.7 requires a new 0.7 room and AP save. "
@@ -154,7 +155,7 @@ def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     if slot_data.get("logic_difficulty") not in {"Relaxed", "Standard", "Expert"}:
         raise ValueError("logic_difficulty is invalid")
     validate_killsanity_plan(slot_data.get("killsanity_options"), slot_data.get("killsanity"))
-    validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
+    slot_data["enemy_plan"] = validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
     if slot_data.get("mastery_requirements") not in {"Original", "Half", "Quarter"}:
         raise ValueError("mastery_requirements is invalid")
     if type(slot_data.get("easier_secret_encounters")) is not bool:
