@@ -178,6 +178,9 @@ For development, read [Content and builds](docs/DEVELOPMENT.md) and
 - FlavorfulGecko5 and the EntitySlayer contributors for
   [EntitySlayer](https://github.com/FlavorfulGecko5/EntitySlayer).
 - leveste for [Eternal Mod Injector Shell](https://github.com/leveste/EternalBasher/).
+- Kaiser_will and Friends for
+  [KaiserCampaign](https://www.nexusmods.com/doometernal/mods/69), consulted as a
+  research reference for pickup model rendering and map entity setup.
 - The DOOM Modding community for the wiki material, and general knowledge
   that made the map patches possible.
 - Meta (from the AP After Dark Discord server) for the Archipelago Logo model

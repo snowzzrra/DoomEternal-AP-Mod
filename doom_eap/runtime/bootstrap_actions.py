@@ -26,7 +26,7 @@ FORBIDDEN_EFFECT_TERMS = (
 
 # PlayerStatModifier shape proven by local map evidence.
 BOOTSTRAP_STAT_PRIMITIVE = {
-    "source": "Tools/kaizo/e3m2_hell_patch2/maps/game/sp/e3m2_hell/e3m2_hell.entities:8213",
+    "source": "KaiserCampaign 2.31 (Kaiser_will), research reference: e3m2_hell_patch2/maps/game/sp/e3m2_hell/e3m2_hell.entities:8213",
     "class": "idTarget_PlayerStatModifier",
     "inherit": None,
     "fields": ("gameStat", "value"),
