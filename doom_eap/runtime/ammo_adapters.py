@@ -40,9 +40,23 @@ class AmmoCommandPublication:
                 raise
 
     def confirm(self):
+        staged = self._staged
         self._staged = ()
-        self._restore_rpc = False
-        return self._set_rpc(True)
+        published = []
+        try:
+            for command, options in staged:
+                if not self._send(command, **options):
+                    raise RuntimeError("could not publish paid refill command")
+                published.append(options["coalesce_key"])
+        except Exception:
+            for command_key in published:
+                self._discard(command_key, self._state_key)
+            raise
+        finally:
+            self._restore_rpc = False
+            if not self._set_rpc(True):
+                raise RuntimeError("execution gate refused enable")
+        return True
 
     def command_plan(self, crucible_active):
         commands = ["give ammo"]
@@ -67,16 +81,16 @@ class AmmoCommandPublication:
         if commands != expected:
             self._logger.error("[Ammo Refill] Invalid raw console command plan: %r", commands)
             return False
-        command_keys = []
+        staged = []
         attempt_id = uuid4().hex
         for stage, command in enumerate(commands):
             command_key = f"ammo-refill-{namespace}-{attempt_id}-stage{stage}"
-            queued = self._send(
-                command,
+            staged.append((command, dict(
                 coalesce_key=command_key,
                 arm_rpc=False,
                 already_queued_ok=False,
                 state_key=scope.state_key,
+                materialization_lease=scope.materialization_lease,
                 delivery_fields={
                     "source": "ammo_refill",
                     "item_id": AMMO_REFILL_ITEM_ID,
@@ -85,23 +99,14 @@ class AmmoCommandPublication:
                     "active_map": scope.current_map,
                     "slot": scope.save_slot,
                 },
-            )
-            if not queued:
-                self._discard(command_key, scope.state_key)
-                for staged_key in command_keys:
-                    self._discard(staged_key, scope.state_key)
-                return False
-            command_keys.append(command_key)
-        self._staged = tuple(command_keys)
+            )))
+        self._staged = tuple(staged)
         self._state_key = scope.state_key
         return True
 
 
     def cancel(self, reason):
-        command_keys = self._staged
-        if command_keys:
-            for command_key in command_keys:
-                self._discard(command_key, self._state_key)
+        if self._staged:
             self._logger.info("[Ammo Refill] Cancelled staged commands: %s", reason)
         self._staged = ()
         if self._restore_rpc:

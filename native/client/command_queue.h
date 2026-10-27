@@ -109,7 +109,7 @@ private:
     bool IsMapEntitySafeJob(const CommandJob& job);
     bool IsTransientEffectJob(const CommandJob& job);
     bool IsValidTransientEffectCommand(const std::string& command);
-    bool MapEntitySafeLeaseMatchesCurrent(const CommandJob& job);
+    bool MaterializationLeaseMatchesCurrent(const CommandJob& job);
     bool CommandExecutionGateOpen(
     const CommandJob& job,
     bool rpcArmed,

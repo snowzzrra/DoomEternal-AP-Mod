@@ -126,7 +126,6 @@ class CommandSpool:
                         )
                     if already_queued_ok and arm_rpc:
                         self.arm_rpc(True)
-                    # Existence was observed, not a new durable publication or execution.
                     return PublicationResult(already_queued_ok, evidence, command_id)
 
             temporary_path = os.path.join(

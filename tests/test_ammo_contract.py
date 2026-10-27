@@ -48,7 +48,7 @@ def test_charge_confirmation_is_required_before_arming_and_refusals_cancel(tmp_p
     scope = AmmoCommandScope("room-A", "map", "GAME-AUTOSAVE0", True)
     assert asyncio.run(ammo.request(scope, (None, {})))
     assert ammo.pending and not gate["enabled"]
-    assert len(list(tmp_path.glob("*.cmd"))) == 2
+    assert not list(tmp_path.glob("*.cmd"))
     assert messages == [{"cmd": "Set", "key": "doom_eap:room-A:ammo_refill_consumed", "default": 0,
                          "operations": [{"operation": "add", "value": 1}], "want_reply": True}]
     ammo.consume_consumed(reply)
@@ -58,16 +58,19 @@ def test_charge_confirmation_is_required_before_arming_and_refusals_cancel(tmp_p
     assert not any(event[1].get("status") == "verified" for event in events)
 
 
-def test_partial_staging_refusal_does_not_spend_or_leave_the_first_command(tmp_path):
+def test_partial_publication_refusal_reports_paid_failure_without_retrying_debit(tmp_path):
     messages = []
 
     async def send(packets):
         messages.extend(packets)
 
-    ammo, _, gate, _ = setup_ammo(tmp_path, send, refuse_stage=1)
-    assert not asyncio.run(ammo.request(AmmoCommandScope("room-A", "map", "slot", True), (None, {})))
-    assert messages == [] and not list(tmp_path.glob("*.cmd"))
-    assert ammo.available == 3 and not ammo.pending and gate["enabled"]
+    ammo, _, gate, events = setup_ammo(tmp_path, send, refuse_stage=1)
+    assert asyncio.run(ammo.request(AmmoCommandScope("room-A", "map", "slot", True), (None, {})))
+    assert not list(tmp_path.glob("*.cmd"))
+    ammo.consume_consumed(1)
+    assert len(messages) == 1 and not list(tmp_path.glob("*.cmd"))
+    assert ammo.available == 2 and not ammo.pending and gate["enabled"]
+    assert "charged; command publication failed" in events[-1][1]["message"]
 
 
 def test_separate_f9_uses_keep_distinct_durable_command_ids(tmp_path):
@@ -79,14 +82,16 @@ def test_separate_f9_uses_keep_distinct_durable_command_ids(tmp_path):
     ammo, _, gate, events = setup_ammo(tmp_path, send)
     scope = AmmoCommandScope("room-A", "map", "slot", True)
     assert asyncio.run(ammo.request(scope, (None, {})))
-    first = {path.name for path in tmp_path.glob("*.cmd")}
-    assert len(first) == 2 and not gate["enabled"]
+    assert not list(tmp_path.glob("*.cmd")) and not gate["enabled"]
     ammo.consume_consumed(1)
+    first = {path.name for path in tmp_path.glob("*.cmd")}
+    assert len(first) == 2
     assert gate["enabled"] and ammo.available == 2
     assert asyncio.run(ammo.request(scope, (None, {})))
-    second = {path.name for path in tmp_path.glob("*.cmd")} - first
-    assert len(second) == 2 and not gate["enabled"]
+    assert {path.name for path in tmp_path.glob("*.cmd")} == first and not gate["enabled"]
     ammo.consume_consumed(2)
+    second = {path.name for path in tmp_path.glob("*.cmd")} - first
+    assert len(second) == 2
     assert gate["enabled"] and ammo.available == 1
     assert len(messages) == 2 and first.isdisjoint(second)
     assert not any(event[1].get("status") == "verified" for event in events)
@@ -103,6 +108,51 @@ def test_uncertain_storage_result_cancels_commands_without_replaying_debit(tmp_p
     assert events[-1][1]["status"] == "uncertain"
     ammo.consume_consumed(1)
     assert ammo.available == 2
+
+
+@pytest.mark.parametrize("send_hangs", [False, True])
+def test_confirmation_deadline_discards_effects_and_late_reply_only_updates_balance(tmp_path, monkeypatch, send_hangs):
+    async def run():
+        async def send(_packets):
+            if send_hangs:
+                await asyncio.Event().wait()
+
+        monkeypatch.setattr("doom_eap.runtime.ammo_refill.AMMO_REFILL_CONFIRMATION_TIMEOUT", 0.02)
+        ammo, _, gate, events = setup_ammo(tmp_path, send)
+        result = await ammo.request(AmmoCommandScope("room-A", "map", "slot", True), (None, {}))
+        assert result is not send_hangs
+        await asyncio.sleep(0.04)
+        assert not ammo.pending and gate["enabled"]
+        assert ammo.available is None
+        assert not list(tmp_path.glob("*.cmd"))
+        assert events[-1][1]["status"] == "uncertain"
+        ammo.consume_consumed(1)
+        assert ammo.available == 2 and not list(tmp_path.glob("*.cmd"))
+        ammo.invalidate("test shutdown")
+
+    asyncio.run(run())
+
+
+def test_invalid_plan_does_not_debit(tmp_path, monkeypatch):
+    async def send(_packets):
+        pytest.fail("invalid plan must not spend a charge")
+
+    monkeypatch.setattr(AmmoCommandPublication, "command_plan", lambda *_: ("invalid",))
+    ammo, _, gate, _ = setup_ammo(tmp_path, send)
+    assert not asyncio.run(ammo.request(AmmoCommandScope("room-A", "map", "slot", True), (None, {})))
+    assert not list(tmp_path.glob("*.cmd")) and gate["enabled"] and ammo.available == 3
+
+
+def test_confirmed_debit_survives_late_send_error(tmp_path):
+    async def send(_packets):
+        ammo.consume_consumed(1)
+        raise OSError("transport closed after reply")
+
+    ammo, _, gate, events = setup_ammo(tmp_path, send)
+    assert asyncio.run(ammo.request(AmmoCommandScope("room-A", "map", "slot", False), (None, {})))
+    assert not ammo.pending and gate["enabled"] and ammo.available == 2
+    assert len(list(tmp_path.glob("*.cmd"))) == 1
+    assert events[-1][1]["status"] == "ready"
 
 
 @pytest.mark.parametrize("fail", [False, True])

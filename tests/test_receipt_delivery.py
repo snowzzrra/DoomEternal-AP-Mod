@@ -217,6 +217,23 @@ def test_mapping_repair_ledger_selects_one_unrepaired_occurrence_and_preserves_r
     assert state == {"item_mapping_revision": 5, "receipt_notifications": {}}
 
 
+@pytest.mark.parametrize("failure_reason", ["item_command_group_progress", "item_command_group_complete"])
+def test_publication_checkpoint_failure_preserves_resume_cursor(failure_reason):
+    service, state = ReceiptDelivery(logging.getLogger("receipt-delivery")), {}
+    service.bind(state)
+    plan = ReceiptPlan(("give ammo",), "ammo")
+    scope = ReceiptPublicationScope("room:A", "map", "slot", "revision", 3)
+    calls = []
+    publication = ReceiptPublication(lambda command, **options: calls.append(command) or True)
+    def persist(reason):
+        if reason == failure_reason:
+            raise OSError("checkpoint denied")
+    with pytest.raises(OSError, match="checkpoint denied"):
+        service.spool(plan, 7770042, 3, "Ammo", scope, publication, persist)
+    assert state["item_command_groups"]["3"]["next_command"] == (0 if failure_reason.endswith("progress") else 1)
+    assert calls == ["give ammo"]
+
+
 @pytest.mark.parametrize("kind", (1, 2))
 def test_rune_budget_deferral_preserves_receipts_and_reconciles(tmp_path, monkeypatch, kind):
     root = Path(__file__).resolve().parents[1]

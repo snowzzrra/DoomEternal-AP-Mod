@@ -11,6 +11,7 @@ from doom_eap.runtime.location_names import resolve_placement_records
 from doom_eap.runtime.protocol_feed import ProtocolFeed, hints_key
 import asyncio
 import atexit
+import copy
 import glob
 import hashlib
 import json
@@ -70,7 +71,7 @@ from doom_eap.contracts.command_publication import (
     queue_session_namespace, stable_spool_id, valid_materialization_epoch,
 )
 from doom_eap.runtime.command_spool import CommandSpool, discard_unclaimed_command
-from doom_eap.runtime.client_state_store import ClientStateStore
+from doom_eap.runtime.client_state_store import ClientStateStore, ClientStateLoadError, atomic_write_json
 from doom_eap.contracts.challenge_registry import (
     canonical_map_name,
     load_challenge_registry,
@@ -377,9 +378,7 @@ def load_config():
 
 
 def save_config():
-    with CONFIG_FILE.open("w", encoding="utf-8", newline="\n") as file:
-        json.dump(config, file, indent=4)
-        file.write("\n")
+    atomic_write_json(CONFIG_FILE, config, indent=4, sort_keys=False)
 
 
 def parse_int(value, default=0):
@@ -3317,6 +3316,7 @@ class DoomEternalContext(CommonContext):
             self.state_key, self.runtime_lifecycle.map_identity.current_map, self.active_save_slot,
             active_crucible(self._connected_slot_data.get("special_weapon"),
                             receipt_item_ids(self.items_received[: self.items_processed])),
+            materialization_lease=identity[2],
         )
         return await self.ammo.request(scope, readiness)
 
@@ -3388,6 +3388,8 @@ class DoomEternalContext(CommonContext):
             self._connected_slot_data = slot_data
             previous_state_key = self.state_key
             self.initialize_item_state(slot_data)
+            if getattr(self, "_item_state_error", None):
+                return
             if previous_state_key and previous_state_key != self.state_key:
                 abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
                 discard_queued_coalesced_command(
@@ -3698,8 +3700,7 @@ class DoomEternalContext(CommonContext):
                         item_index,
                         item_id,
                     )
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt()
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,
@@ -3725,9 +3726,7 @@ class DoomEternalContext(CommonContext):
                         item_index,
                         item_id,
                     )
-                    self._record_processed_receipt(network_item)
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt(network_item)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,
@@ -3765,9 +3764,7 @@ class DoomEternalContext(CommonContext):
                     protocol_version=BRIDGE_PROTOCOL,
                 )
                 if item_id in ACCESS_IDS:
-                    self._record_processed_receipt(network_item)
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt(network_item)
                     logger.info("[Campaign] Access receipt acknowledged: index=%s stage=%s", item_index, ACCESS_IDS[item_id])
                     continue
 
@@ -3826,9 +3823,7 @@ class DoomEternalContext(CommonContext):
                                 if not notified:
                                     logger.warning("[NativeOwner] Receipt %s notification pending: %s", item_index, notification_error)
                                     break
-                                self._record_processed_receipt(network_item)
-                                self.receipt_session.advance()
-                                self.persist_session_state()
+                                self._acknowledge_receipt(network_item)
                                 self._rune_budget_retry = (None, 0, 0.0)
                                 log_item_event(
                                     "ITEM_RECEIPT_DEFERRED", receipt_index=item_index, item_id=item_id,
@@ -3899,9 +3894,7 @@ class DoomEternalContext(CommonContext):
                             "[To Game] Transient item %s skipped: %s",
                             item_id, description,
                         )
-                    self._record_processed_receipt(network_item)
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt(network_item)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
                         receipt_index=item_index,
@@ -3964,9 +3957,7 @@ class DoomEternalContext(CommonContext):
                         break
                     if item_id in {7770011, 7770111, 7770112, 7770113, 7770114}:
                         self.session_state.setdefault("deferred_frag_items", {})[str(item_index)] = item_id
-                    self._record_processed_receipt(network_item)
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt(network_item)
                     log_item_event(
                         "ITEM_RECEIPT_DEFERRED",
                         receipt_index=item_index,
@@ -4000,9 +3991,7 @@ class DoomEternalContext(CommonContext):
                     break
                 if isinstance(definition, dict) and definition.get("type") == "no_op":
                     logger.info(f"[To Game] Runtime-only item {item_id} acknowledged.")
-                    self._record_processed_receipt(network_item)
-                    self.receipt_session.advance()
-                    self.persist_session_state()
+                    self._acknowledge_receipt(network_item)
                     self._refresh_ammo_refill_receipt_projection(item_id)
                     log_item_event(
                         "ITEM_RECEIPT_ACK",
@@ -4103,9 +4092,7 @@ class DoomEternalContext(CommonContext):
                     self.item_delivery_blocked_info = None
 
                 logger.info(f"[To Game] Item received! {item_id} -> {description}")
-                self._record_processed_receipt(network_item)
-                self.receipt_session.advance()
-                self.persist_session_state()
+                self._acknowledge_receipt(network_item)
                 log_item_event(
                     "ITEM_RECEIPT_ACK",
                     receipt_index=item_index,
@@ -4993,10 +4980,18 @@ class DoomEternalContext(CommonContext):
 
     def initialize_item_state(self, slot_data):
         self.reset_queue_session_authority("initialize_item_state")
+        if getattr(self, "_item_state_error", None):
+            self._block_item_state(self._item_state_error)
+            return
+        self.item_state_ready = False
         initialization_boundary_before = getattr(self, "items_processed", 0)
         previous_state_key = self.state_key
+        try:
+            self.client_state = load_client_state()
+        except ClientStateLoadError as error:
+            self._block_item_state(error)
+            return
         self.receipt_session.begin_rebind()
-        self.client_state = load_client_state()
         effective_seed_name = self.room_seed_name or self.seed_name
         generation = slot_data.get("native_generation_fingerprint") if isinstance(slot_data, dict) else None
         if (
@@ -5113,8 +5108,6 @@ class DoomEternalContext(CommonContext):
         self.session_state.pop("fast_travel_delivered", None)
         sessions[self.state_key] = self.session_state
         self.receipt_session.restore_boundary(self.session_state["processed_items"])
-        # Process restarts preserve bounded event identities while lethal
-        # transport state begins fresh for the new connection.
         self.session_state.pop("deathlinked", None)
         self.deathlink.bind(self.state_key, self.session_state)
         if self.death_observer.bind(namespace_id(effective_seed_name, self.team, self.slot, generation)):
@@ -5135,6 +5128,7 @@ class DoomEternalContext(CommonContext):
                 boundary_before=initialization_boundary_before,
             )
         except Exception as error:
+            self._block_item_state(error)
             log_item_event(
                 "ITEM_STATE_SESSION_INIT",
                 state_key=self.state_key,
@@ -5147,7 +5141,7 @@ class DoomEternalContext(CommonContext):
                 processed_count=self.items_processed,
                 success=False,
             )
-            raise
+            return
         log_item_event(
             "ITEM_STATE_SESSION_INIT",
             state_key=self.state_key,
@@ -5393,9 +5387,7 @@ class DoomEternalContext(CommonContext):
             accepted, description = self.spool_deferred_receipt_notification(item.item, index)
             if not accepted:
                 raise RuntimeError(f"native ownership confirmed but notification pending: {description}")
-        self._record_processed_receipt(item)
-        self.receipt_session.advance()
-        self.persist_session_state()
+        self._acknowledge_receipt(item)
         return result
 
     def _apply_weapon_points_receipt(self, index, item):
@@ -5406,19 +5398,50 @@ class DoomEternalContext(CommonContext):
             accepted, description = self.spool_deferred_receipt_notification(7770903, index)
             if not accepted:
                 raise RuntimeError(description)
-        self._record_processed_receipt(item)
-        self.receipt_session.advance()
-        self.persist_session_state()
+        self._acknowledge_receipt(item)
+
+    def _block_item_state(self, error):
+        self._item_state_error = str(error)
+        self.item_state_ready = False
+        self.item_delivery_blocked = True
+        message = f"Item delivery blocked by local client state: {error}. Check the state file and restart the bridge."
+        self.item_delivery_blocked_info = {"reason": "client_state_error", "message": message}
+        logger.error("[State] %s", message)
+        emit_launcher_event("item_history_status", status="blocked", **self.item_delivery_blocked_info)
+        self.reset_queue_session_authority("client_state_error")
+
+    def _acknowledge_receipt(self, network_item=None):
+        boundary = self.items_processed
+        history = copy.deepcopy(self.session_state.get("receipt_history"))
+        try:
+            if network_item is not None:
+                self._record_processed_receipt(network_item)
+            self.receipt_session.advance()
+            self.persist_session_state()
+        except Exception as error:
+            self.receipt_session.restore_boundary(boundary)
+            if history is None:
+                self.session_state.pop("receipt_history", None)
+            else:
+                self.session_state["receipt_history"] = history
+            self._block_item_state(error)
+            raise
 
     def persist_session_state(self):
+        if getattr(self, "_item_state_error", None):
+            raise RuntimeError(self._item_state_error)
         if not self.item_state_ready:
             return
-        client_state_store().commit_session(
-            self.client_state, self.session_state, processed_items=self.items_processed,
-            cultist_autosave_path=self.cultist_autosave_path,
-            received_deathlink_event_ids=self.deathlink.seen_events,
-            save_slot_observations=self.save_observer.observation_document,
-        )
+        try:
+            client_state_store().commit_session(
+                self.client_state, self.session_state, processed_items=self.items_processed,
+                cultist_autosave_path=self.cultist_autosave_path,
+                received_deathlink_event_ids=self.deathlink.seen_events,
+                save_slot_observations=self.save_observer.observation_document,
+            )
+        except Exception as error:
+            self._block_item_state(error)
+            raise
 
 
     @property
@@ -5489,11 +5512,19 @@ class DoomEternalContext(CommonContext):
             self.items_processed,
             self._processed_receipt_ids(),
         )
+        history = copy.deepcopy(self.session_state.get("receipt_history"))
         changed = project_receipt_history(
             self.session_state, self.items_received, self.items_processed, observation,
         )
         if changed:
-            self.persist_session_state()
+            try:
+                self.persist_session_state()
+            except Exception:
+                if history is None:
+                    self.session_state.pop("receipt_history", None)
+                else:
+                    self.session_state["receipt_history"] = history
+                raise
         return observation
 
     def _reconciliation_eligibility(self, *, require_connection):
@@ -6078,7 +6109,13 @@ class DoomEternalContext(CommonContext):
         return lines
 
     def _persist_receipt_progress(self, reason):
-        save_client_state(self.client_state, reason=reason, boundary=self.items_processed)
+        if getattr(self, "_item_state_error", None):
+            raise RuntimeError(self._item_state_error)
+        try:
+            save_client_state(self.client_state, reason=reason, boundary=self.items_processed)
+        except Exception as error:
+            self._block_item_state(error)
+            raise
 
     def repair_item_mappings(self):
         repair = self.receipt_delivery.next_mapping_repair(receipt_item_ids(self.items_received), self.items_processed,

@@ -7,6 +7,7 @@ from collections.abc import Mapping
 AMMO_REFILL_ITEM_ID = 7770024
 AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
 AMMO_REFILL_CAPACITY = 3
+AMMO_REFILL_CONFIRMATION_TIMEOUT = 15
 AMMO_UNAVAILABLE_MESSAGES = {
     "placement_connected": "Disconnected from Archipelago; reconnect before using Ammo Refill",
     "item_state_ready": "Ammo Refill unavailable: waiting for items from Archipelago",
@@ -25,6 +26,7 @@ class AmmoCommandScope:
     current_map: str | None
     save_slot: str | None
     crucible_active: bool
+    materialization_lease: str | None = None
 
 
 class AmmoStoragePort(Protocol):
@@ -75,6 +77,7 @@ class AmmoRefill:
         self._generation = 0
         self._overflow_task = None
         self._received = 0
+        self._confirmation_timer = None
         self.bind("")
 
     def invalidate(self, reason):
@@ -84,7 +87,23 @@ class AmmoRefill:
             self._overflow_task = None
         self._commands.cancel(reason)
         self._pending = False
+        self._cancel_confirmation_timer()
         self._discard_pending = None
+
+    def _cancel_confirmation_timer(self):
+        if self._confirmation_timer is not None:
+            self._confirmation_timer.cancel()
+            self._confirmation_timer = None
+
+    def _confirmation_expired(self):
+        self._confirmation_timer = None
+        if not self._pending:
+            return
+        self._commands.cancel("storage confirmation timed out")
+        self._pending = False
+        self._storage_uncertain = True
+        self.emit_balance(status="uncertain", source="storage_timeout",
+                          message="Ammo Refill confirmation timed out; commands cancelled. Waiting for server balance.")
 
     def bind(self, state_key):
         self.invalidate("room rebind")
@@ -92,6 +111,7 @@ class AmmoRefill:
         self._storage_key = f"doom_eap:{state_key}:ammo_refill_consumed" if state_key else None
         self._discarded_key = f"doom_eap:{state_key}:ammo_refill_discarded" if state_key else None
         self._consumed = self._discarded = self._available = None
+        self._storage_uncertain = False
         self._received = 0
 
     @property
@@ -118,7 +138,8 @@ class AmmoRefill:
         consumed = getattr(self, "_consumed", None)
         discarded = getattr(self, "_discarded", None)
         pending_discarded = getattr(self, "_discard_pending", None)
-        if not isinstance(consumed, int) or consumed < 0 or not isinstance(discarded, int) or discarded < 0:
+        if (self._storage_uncertain or not isinstance(consumed, int) or consumed < 0
+                or not isinstance(discarded, int) or discarded < 0):
             self._available = None
             return None
         effective_discarded = discarded
@@ -151,7 +172,7 @@ class AmmoRefill:
             "discarded": discarded if isinstance(discarded, int) else None,
             "received": self._received,
             "capacity": AMMO_REFILL_CAPACITY,
-            "authoritative": isinstance(consumed, int) and isinstance(discarded, int),
+            "authoritative": not self._storage_uncertain and isinstance(consumed, int) and isinstance(discarded, int),
         }
 
 
@@ -261,6 +282,7 @@ class AmmoRefill:
 
 
     def consume_consumed(self, value):
+        self._cancel_confirmation_timer()
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             self._logger.warning("[Ammo Refill] Ignoring invalid server consumed count: %r", value)
             if self._pending:
@@ -312,6 +334,7 @@ class AmmoRefill:
                 )
                 return
         self._consumed = value
+        self._storage_uncertain = False
         available = self.refresh()
         if self._pending:
             self._pending = False
@@ -321,9 +344,9 @@ class AmmoRefill:
             except Exception as error:
                 self._logger.error("[Ammo Refill] Could not arm staged command: %s", error)
                 self.emit_balance(
-                    status="queued",
+                    status="error",
                     source="storage_update",
-                    message=f"Ammo Refill queued; execution gate unavailable: {error}",
+                    message=f"Ammo Refill charged; command publication failed: {error}",
                 )
                 return
         self.emit_balance(
@@ -394,12 +417,20 @@ class AmmoRefill:
             )
             return False
         try:
-            await self._storage.increment(key, consumed, 1)
+            self._confirmation_timer = asyncio.get_running_loop().call_later(
+                AMMO_REFILL_CONFIRMATION_TIMEOUT, self._confirmation_expired,
+            )
+            await asyncio.wait_for(self._storage.increment(key, consumed, 1),
+                                   timeout=AMMO_REFILL_CONFIRMATION_TIMEOUT)
         except Exception as error:
             if generation != self._generation:
                 return False
+            if not self._pending:
+                return self._consumed == consumed + 1
+            self._cancel_confirmation_timer()
             self._commands.cancel("storage outcome uncertain")
             self._pending = False
+            self._storage_uncertain = True
             self._emit(
                 "ammo_refill",
                 status="uncertain",
@@ -409,6 +440,8 @@ class AmmoRefill:
             return False
         if generation != self._generation:
             return False
+        if not self._pending:
+            return self._consumed == consumed + 1
         self._emit(
             "ammo_refill",
             status="pending",

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <vector>
 
 class FakeTransport : public CommandTransport {
@@ -41,12 +42,51 @@ static bool Dispatch(NativeCommandQueue& queue, FakeTransport& transport,
     return queue.Dispatch(GetTickCount(), queue.ArmIfPending(), true, safety, baseline, "ready", &transport);
 }
 
-int main() {
+int main(int argc, char** argv) {
     // The harness runs only in pytest's isolated cwd; it never discovers a game path.
     std::filesystem::create_directories("base/ap_queue");
     std::vector<std::string> logs;
     const auto log = [&](const std::string& line) { logs.push_back(line); };
     FakeTransport transport;
+    if (argc == 2) {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope(argv[1]); queue.Import();
+        for (int pass = 0; pass < 3; ++pass) {
+            Sleep(260);
+            Dispatch(queue, transport);
+        }
+        for (const auto& command : transport.commands) std::cout << command << '\n';
+        return 0;
+    }
+    {
+        NativeCommandQueue queue(log); queue.Initialize(); Scope();
+        const std::string key = "base/ap_queue/recv-0123456789abcdef-leased-player";
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 4:2\n");
+        Write(key + ".cmd", "AP_EXECUTION_CLASS_V1 PLAYER_RUNTIME\n"
+              "AP_MATERIALIZATION_LEASE_V1 4:2\ngive ammo\n");
+        queue.Import();
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 4:3\n");
+        queue.DiscardInvalidScopes(true); Dispatch(queue, transport);
+        assert(transport.commands.empty() && std::filesystem::exists(key + ".processing"));
+        assert(DeleteFileA(kMaterializationLeasePath));
+        Dispatch(queue, transport);
+        assert(transport.commands.empty());
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 4:2\n");
+        Sleep(260); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1 && transport.commands.back() == "give ammo");
+        transport.commands.clear();
+        Write(kTransientScopePath, "effectscope-0123456789abcdef");
+        Write(key + "-effect.cmd", "AP_EXECUTION_CLASS_V1 TRANSIENT_EFFECT\n"
+              "AP_TRANSIENT_SCOPE_V1 effectscope-0123456789abcdef\n"
+              "AP_MATERIALIZATION_LEASE_V1 4:2\ng_infiniteAmmo 1\n");
+        queue.Import();
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 5:1\n");
+        queue.DiscardInvalidScopes(true); Dispatch(queue, transport);
+        assert(transport.commands.empty());
+        Write(kMaterializationLeasePath, "AP_MATERIALIZATION_LEASE_V1 4:2\n");
+        Sleep(260); Dispatch(queue, transport);
+        assert(transport.commands.size() == 1 && transport.commands.back() == "g_infiniteAmmo 1");
+        transport.commands.clear();
+    }
     {
         NativeCommandQueue queue(log); queue.Initialize(); Scope();
         const std::string id = "base/ap_queue/recv-0123456789abcdef-fortress-open-reader";

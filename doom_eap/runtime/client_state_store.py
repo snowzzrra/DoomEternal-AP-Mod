@@ -1,11 +1,34 @@
 """Serialization and commit owner for the existing client-state document."""
 
+import copy
 import json
 import os
+import shutil
 import time
 import uuid
 
 from doom_eap.runtime.item_reconciliation import project_receipt_boundary
+
+
+class ClientStateLoadError(RuntimeError):
+    pass
+
+
+def atomic_write_json(path, state, *, indent=2, sort_keys=True):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("x", encoding="utf-8", newline="\n") as file:
+            json.dump(state, file, indent=indent, sort_keys=sort_keys)
+            file.write("\n")
+            file.flush()
+            os.fsync(file.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 def client_state_metrics(state):
@@ -39,18 +62,32 @@ class ClientStateStore:
         self.migrate = migrate
         self.log_event = log_event
         self.logger = logger
+        self._load_error = None
 
     def load(self):
+        if self._load_error is not None:
+            raise self._load_error
         empty_state = {"version": self.version, "sessions": {}}
-        if not self.path.is_file():
+        try:
+            raw_text = self.path.read_text(encoding="utf-8")
+        except FileNotFoundError:
             self.log_event(
                 "ITEM_STATE_LOAD", path=str(self.path.resolve()), status="missing",
                 boundary_before=0, boundary_after=0, success=True,
                 **client_state_metrics(empty_state),
             )
             return empty_state
+        except (OSError, UnicodeError) as error:
+            self._block_load(error)
         try:
-            raw_state = json.loads(self.path.read_text(encoding="utf-8"))
+            raw_state = json.loads(raw_text)
+            if isinstance(raw_state, dict) and isinstance(raw_state.get("sessions"), dict):
+                for session in raw_state["sessions"].values():
+                    if not isinstance(session, dict):
+                        raise ValueError("client state session must be an object")
+                    boundary = session.get("processed_items", 0)
+                    if isinstance(boundary, bool) or not isinstance(boundary, int) or boundary < 0:
+                        raise ValueError("client state receipt boundary is invalid")
             state, migrated = self.migrate(raw_state)
             metrics = client_state_metrics(state)
             self.log_event(
@@ -69,26 +106,29 @@ class ClientStateStore:
                     "[State] STATE_MIGRATED from=1 to=%s sessions=%s",
                     self.version, len(state["sessions"]),
                 )
-                try:
-                    self.commit(state, reason="state_migration")
-                except OSError as error:
-                    self.logger.warning("[State] Could not persist migrated state: %s", error)
+                self.commit(state, reason="state_migration")
             return state
-        except Exception as error:
-            quarantine = self.path.with_name(f"{self.path.name}.corrupt-{time.time_ns()}")
-            try:
-                os.replace(self.path, quarantine)
-            except OSError:
-                pass
-            self.logger.warning(f"[State] Invalid state file quarantined: {error}")
-            self.log_event(
-                "ITEM_STATE_LOAD", path=str(self.path.resolve()),
-                status="invalid_quarantined", reason=str(error), boundary_before=0,
-                boundary_after=0, success=False, **client_state_metrics(empty_state),
-            )
-            return empty_state
+        except (OSError, ValueError, TypeError) as error:
+            self._block_load(error)
+
+    def _block_load(self, error):
+        quarantine = self.path.with_name(f"{self.path.name}.corrupt-{time.time_ns()}")
+        try:
+            shutil.copy2(self.path, quarantine)
+            preservation = f"Original retained; quarantine copy: {quarantine}"
+        except OSError as copy_error:
+            preservation = f"Original retained at {self.path}; quarantine copy failed: {copy_error}"
+        message = (f"Item delivery blocked: cannot load client state {self.path}: {error}. "
+                   f"{preservation}. Restore readable state and restart the bridge.")
+        self._load_error = ClientStateLoadError(message)
+        self.logger.error("[State] %s", message)
+        self.log_event("ITEM_STATE_LOAD", path=str(self.path), status="blocked",
+                       reason=str(error), success=False, quarantine=str(quarantine))
+        raise self._load_error from error
 
     def commit(self, state, *, reason="state_update", boundary=None, boundary_before=None):
+        if self._load_error is not None:
+            raise self._load_error
         if isinstance(boundary, bool) or not isinstance(boundary, int) or boundary < 0:
             boundaries = []
             sessions = state.get("sessions", {}) if isinstance(state, dict) else {}
@@ -106,14 +146,7 @@ class ClientStateStore:
             boundary_before = boundary
         metrics = client_state_metrics(state)
         try:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.path.with_name(f".{self.path.name}.{uuid.uuid4().hex}.tmp")
-            with temporary.open("x", encoding="utf-8", newline="\n") as file:
-                json.dump(state, file, indent=2, sort_keys=True)
-                file.write("\n")
-                file.flush()
-                os.fsync(file.fileno())
-            os.replace(temporary, self.path)
+            atomic_write_json(self.path, state)
         except Exception as error:
             self.log_event(
                 "ITEM_STATE_SAVE", path=str(self.path.resolve()), reason=reason,
@@ -129,6 +162,9 @@ class ClientStateStore:
 
     def commit_session(self, document, session, *, processed_items, cultist_autosave_path,
                        received_deathlink_event_ids, save_slot_observations):
+        original_session = session
+        session = dict(session)
+        session["receipt_history"] = copy.deepcopy(session.get("receipt_history"))
         project_receipt_boundary(session, processed_items)
         session["cultist_autosave_path"] = cultist_autosave_path
         session.pop("deathlinked", None)
@@ -138,4 +174,11 @@ class ClientStateStore:
         session.pop("fast_travel_delivered", None)
         session.pop("sticky_mastery_observed", None)
         session.pop("weapon_masteries_observed", None)
-        self.commit(document, reason="session_persist", boundary=processed_items)
+        candidate = dict(document, sessions={
+            key: session if value is original_session else value
+            for key, value in document["sessions"].items()
+        })
+        self.commit(candidate, reason="session_persist", boundary=processed_items)
+        for key in original_session.keys() - session.keys():
+            original_session.pop(key)
+        original_session.update(session)

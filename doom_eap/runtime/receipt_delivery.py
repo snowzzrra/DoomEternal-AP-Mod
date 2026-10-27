@@ -137,11 +137,19 @@ class ReceiptDelivery:
                 return False, plan.description
             group["next_command"] = ordinal + 1
             group["total_commands"] = len(commands)
-            persist("item_command_group_progress")
+            try:
+                persist("item_command_group_progress")
+            except Exception:
+                group["next_command"] = ordinal
+                raise
         groups.pop(key, None)
         if not groups:
             self._state.pop("item_command_groups", None)
-        persist("item_command_group_complete")
+        try:
+            persist("item_command_group_complete")
+        except Exception:
+            self._state.setdefault("item_command_groups", {})[key] = group
+            raise
         return True, plan.description
 
 

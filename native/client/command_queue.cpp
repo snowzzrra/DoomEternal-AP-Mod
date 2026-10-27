@@ -684,9 +684,10 @@ bool NativeCommandQueue::IsValidTransientEffectCommand(const std::string& comman
 }
 
 
-bool NativeCommandQueue::MapEntitySafeLeaseMatchesCurrent(const CommandJob& job) {
-    if (!IsMapEntitySafeJob(job)) return true;
-    if (!MapEntityOperationMatchesCommand(job.mapEntityOperation, job.command)) return false;
+bool NativeCommandQueue::MaterializationLeaseMatchesCurrent(const CommandJob& job) {
+    if (IsMapEntitySafeJob(job)
+            && !MapEntityOperationMatchesCommand(job.mapEntityOperation, job.command)) return false;
+    if (!job.materializationLease) return !IsMapEntitySafeJob(job);
     const std::optional<std::string> currentLease = ActiveMaterializationLease();
     return job.materializationLease.has_value()
         && currentLease.has_value()
@@ -701,6 +702,7 @@ bool NativeCommandQueue::CommandExecutionGateOpen(
     const QueueSafetySnapshot& safety,
     bool transientBaselineReady
 ) {
+    if (!MaterializationLeaseMatchesCurrent(job)) return false;
     if (job.diagnosticCondump) {
         // Support condump bypasses gameplay/RPC safety gates, but still needs
         // live native transport, which is only healthy while game is open.
@@ -719,7 +721,7 @@ bool NativeCommandQueue::CommandExecutionGateOpen(
     if (!rpcArmed || !rpcTransportReady) return false;
     if (IsMapEntitySafeJob(job)) {
         return safety.mapEntitySafe
-            && MapEntitySafeLeaseMatchesCurrent(job);
+            && MaterializationLeaseMatchesCurrent(job);
     }
     return safety.playerSafe;
 }
@@ -745,6 +747,11 @@ std::string NativeCommandQueue::CommandExecutionGateReason(
     const QueueSafetySnapshot& safety,
     bool transientBaselineReady
 ) {
+    if (job.materializationLease) {
+        const auto currentLease = ActiveMaterializationLease();
+        if (!currentLease) return "materialization_lease_unavailable";
+        if (job.materializationLease != currentLease) return "materialization_lease_mismatch";
+    }
     if (job.diagnosticCondump) {
         return rpcTransportReady ? "ready" : "rpc_unavailable";
     }
@@ -1302,7 +1309,8 @@ bool NativeCommandQueue::Dispatch(DWORD now, bool rpcArmed, bool rpcTransportRea
                     return true;
                 }
             }
-            if (!MapEntitySafeLeaseMatchesCurrent(job)) {
+            if (!MaterializationLeaseMatchesCurrent(job)) {
+                if (!IsMapEntitySafeJob(job)) return true;
                 WriteFortressOutcome(job, "stale_lease");
                 LogDebug(
                     "QUEUE_STALE_DROP command_id=" + commandId
