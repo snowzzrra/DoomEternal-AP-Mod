@@ -15,6 +15,8 @@ jobs:
         run: python -m compileall -q doom_eap tools/content tools/validation
       - name: Validate authorial content
         run: python -m tools.validation.authorial --check-authorial
+      - name: Validate frozen room resources
+        run: python -m tools.release.prebuilt_room_resources --check
       - name: Validate packaged options schema
         run: python -c "from pathlib import Path; from doom_eap.content.options_foundation import load_options_schema; load_options_schema(Path('data/options_schema.json'))"
       - name: Behavioral contracts (isolated checkout)

@@ -14,21 +14,21 @@
     "sha256": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
     "size": 18713969
   },
-  "room_resource_input_fingerprint": "a5fe7c89a1603ab821ac7e8f25e117a845d705f319b34218a2f46f1f5569a8a9",
+  "room_resource_input_fingerprint": "82ba2e400b1e96b898c4560d81eeb88c619fa3ac8abfbf20d1234ef89fc60b43",
   "schema_version": 1,
   "source_hashes": {
-    "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
-    "content/catalog/actorpopulation/default_khan_maykr-4e2bb9c5bb22.decl": "4e2bb9c5bb22f668203c17c7db940329ef1c047f076dbc4c546fb22515764802",
-    "content/catalog/actorpopulation/default_no_bosses-74b2d0c01feb.decl": "74b2d0c01feb44145fde47087915a7f417b022005a421fda086e14ce44149c34",
-    "content/catalog/actorpopulation/dlc1-e7743b21e059.decl": "e7743b21e0592fe1b72fc539797fcb5999ae758b2ce55ec2262f12e44ccf0b31",
-    "content/catalog/actorpopulation/dlc1-f35beca5cd6d.decl": "f35beca5cd6d31e7b785ce0f83c9f0c5e759b947df177e73a3be6042c3da642f",
-    "content/catalog/actorpopulation/dlc1_e4m3-5a915939c870.decl": "5a915939c870a37b55262054d444a127881841c4cff8fbc89e767afe50ee8225",
-    "content/catalog/actorpopulation/dlc1_e4m3-7faca2724aa2.decl": "7faca2724aa2547aae723fee8ee3d5f500a0582fe217ff2ac92a5309a7d6399e",
-    "content/catalog/actorpopulation/dlc2-23b56794332f.decl": "23b56794332fdec01d359722105b6a52a99bcdd93954b09c543fc6b8d9b78afe",
-    "content/catalog/actorpopulation/dlc2_demonic_soldier-86c6c104fd56.decl": "86c6c104fd562fbd0438a463fc1c4376c610f9975954a7f8b670eb940fb75dcb",
-    "content/catalog/actorpopulation/e3m4-a96ac2ca8c2d.decl": "a96ac2ca8c2d2ec5a033d350580234a98ee2a33604d5dee3eb3b169e962ac8f4",
-    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_base.decl": "3d9bcc2a7090915c0327838f028e00058642ed05b1f01126d2d5cfbf4ebacfd8",
-    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_patch1.decl": "178488d5550219c0e50ac787d3cc684cb7e6d3516eb67024d25b934b20c82ade",
+    "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "77c53e5b6b92d5f242bc219957fab4860f6d7e57ddba35e0d202350859ad1903",
+    "content/catalog/actorpopulation/default_khan_maykr-4e2bb9c5bb22.decl": "e828dfd80aa96546bdad45f9dc06b91cefe778e9af1643aca1645899fd00886e",
+    "content/catalog/actorpopulation/default_no_bosses-74b2d0c01feb.decl": "0e3040db807e0b8b7eae9cd14e073dc874d6c4cbee2122c23a92c9a8d5425f74",
+    "content/catalog/actorpopulation/dlc1-e7743b21e059.decl": "73efdd8fb246eaff56ca2bcb482afbb7083268e9b07f0a7fdbf17ae647ea9522",
+    "content/catalog/actorpopulation/dlc1-f35beca5cd6d.decl": "6cb4e1111d5ba353f8b1a76bca76a32766dc17da32fc18b17e61bf00d2a732d4",
+    "content/catalog/actorpopulation/dlc1_e4m3-5a915939c870.decl": "f8d14872c8df721abd456be710a929921dec4593aaa261933ab79c1d63bba7f6",
+    "content/catalog/actorpopulation/dlc1_e4m3-7faca2724aa2.decl": "cd7aa0fed15f55463f0908ff45cff78c1729107ebf15264f293bd29a084c2efc",
+    "content/catalog/actorpopulation/dlc2-23b56794332f.decl": "568cc0e536a58d1a7d12eee70a395cb949e22cdfcddb2b37a3fea6300def40ad",
+    "content/catalog/actorpopulation/dlc2_demonic_soldier-86c6c104fd56.decl": "ae5a826affadf17b65dbd7ffca7a88111853ed482de9f2a0ce8d04f35ea49316",
+    "content/catalog/actorpopulation/e3m4-a96ac2ca8c2d.decl": "adc876bd00f24fa16fe6cb253debab51f7114525296f51150827166c6cee9455",
+    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_base.decl": "06d5b1c9d01ca381bcf21983e6e4b99dada7fb2ae98b78c51e9133f11dee355a",
+    "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_patch1.decl": "56c877b1ddf670e9e0237ee7f1455e29ecb3e518a8647ad1d5ce80ca15732f3a",
     "content/catalog/encounter_opportunity_segments.json": "f6b0644c20ba71ce80470be22a4f0f9b69722f247a9ab550bd5b5767b9c86420",
     "content/catalog/encounter_profiles.json": "ef038d9ea3a7c7be4e02cd89bd51063955fb987c9acb248fc9cf8dcc1ed1dc31",
     "content/catalog/enemy_attribute_baselines.json": "b20567e5e19fa92bcc64360699b4e63cd30832edb08077b2ac5c64ed10acbc87",
@@ -216,7 +216,7 @@
     "data/report_endpoint.json": "156af67e8895f050917c8d50493b4f88a699a9abcd7128b32f60240f4deed3f3",
     "data/runtime_contexts.json": "154593d920ef448b74b9c8dc5ea21af421ba82025114495038494d266960b440",
     "data/runtime_locations.json": "51c616fe66b9667c997d68eccb0f68695c90a6a8f6f0fad355257bd0004f0891",
-    "data/scripted_location_contracts.json": "1d1801f76c4378809f1cc9415a0555d32947142634c7e4a99831a8beda6f1636",
+    "data/scripted_location_contracts.json": "9c29f77d5267fd9be3718b05acc7078ec8f7f55019cf5f38c6f4b5f01c791ef2",
     "data/snapshots/ice_logic_decl_patch.json": "930096474b7e67c4011575c4e04d47ee8607adb09c8f7dc99113b4df69db5fb8",
     "data/start_inventory_catalog.json": "3feb6d6c4706c34d4309f0fcaf6edcac53d691cebed65ec3338aab64287049bb",
     "doom_eap/content/__init__.py": "b8dbf0cbfa7f820a23cbfb4f86902a7bacf21ed8ec714ccafd76391caff5c77a",
@@ -451,7 +451,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "1d239ef519c9397bcac53ae459856c5a35f17121",
+      "base_commit_sha": "80faebcd586de7f10d20a577ac162d32c9950949",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -647,6 +647,18 @@
             "sha256": "1c9ad790c595ebd09eac3caad42003ee4932710eb9f0f5f28f8706ee453b1d1c",
             "size": 1096
           },
+          "archipelago/.serena/.gitignore": {
+            "sha256": "441f89b8bba2252c9f7797ebc2fca741b760712e1c8261a7ad5c282175dd52f2",
+            "size": 28
+          },
+          "archipelago/.serena/project.local.yml": {
+            "sha256": "ef276846aadfe759d8c0bad4df62e49d0b4e5bd8a18a08238510ad7d3ba30416",
+            "size": 407
+          },
+          "archipelago/.serena/project.yml": {
+            "sha256": "143730d0ec37198d8973158b5d4e670d0794a9eb48cfb75e3849734d1a545ddf",
+            "size": 11207
+          },
           "archipelago/.vscode/settings.json": {
             "sha256": "91b4abcf7e91e2bfc2f289b2038dfd3ca6363931756fe2306e765657a785de45",
             "size": 68
@@ -760,8 +772,8 @@
             "size": 26934
           },
           "archipelago/Utils.py": {
-            "sha256": "3554909071af3ef0f64b74792cb869229ff5344590e7dd840ce82feef1d737b4",
-            "size": 58608
+            "sha256": "377640273e14daa201924f0ca784297ee5fd4d34cfd323d9f23d9faa1d8724a0",
+            "size": 58668
           },
           "archipelago/WebHost.py": {
             "sha256": "60a2f7f9c504aa76c29e939a79da14ea8e923f0268427352d03ef86b751617da",
@@ -4168,8 +4180,8 @@
             "size": 2454
           },
           "archipelago/worlds/doometernal/docs/setup_en.md": {
-            "sha256": "e5def760ac655a3763740eb6750b3e3ca16b447a4b4426bf4f4400693aacab06",
-            "size": 7760
+            "sha256": "9a85a968f2589f051fbbfe454fb2cf59e0272abd53039f52dfa53a5114020cea",
+            "size": 7896
           },
           "archipelago/worlds/doometernal/doom_logo.png": {
             "sha256": "fb6fd971c27abe314fa4c22f62df80ac007a918f474037f262b4486f156e240b",
@@ -4192,8 +4204,8 @@
             "size": 6999
           },
           "archipelago/worlds/doometernal/generated_content.py": {
-            "sha256": "c96a6bc5c7a3e41ca53214cc5bb1d93b2fc09cc79b8713da9150a2a516ad2946",
-            "size": 126665
+            "sha256": "03f1570426365dc88b3bef6e420cae41693d58dde3b8f8011984560a16b98a50",
+            "size": 128468
           },
           "archipelago/worlds/doometernal/identity.py": {
             "sha256": "435af67955b467714c2bc3dc6f5e3cb9a6d9084b193fce3abb7c8df6413dec37",
@@ -4220,12 +4232,12 @@
             "size": 32298
           },
           "archipelago/worlds/doometernal/native_enemy_balance.py": {
-            "sha256": "ea6cae418b0aef62f62015257a4e5e5b36522a6b6170b649865a621b087f00cf",
-            "size": 48302
+            "sha256": "0759dc0f3a75c6ad2f4024a3d9b11d21ccf3775f7cb344d80312780313b52c93",
+            "size": 49085
           },
           "archipelago/worlds/doometernal/native_enemy_catalog.json": {
-            "sha256": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
-            "size": 6544282
+            "sha256": "17563fd274fe9b39f4a94482d413c0eeb41e15c1a352bfa7b338d5b897c41149",
+            "size": 6544283
           },
           "archipelago/worlds/doometernal/native_enemy_plan.py": {
             "sha256": "a1240b950ee410c5bb03e5195b6823d48fd8a02bc3d531e3089b91658d6d4374",
@@ -4260,12 +4272,12 @@
             "size": 2256
           },
           "archipelago/worlds/doometernal/vanilla_enemy_profiles.json": {
-            "sha256": "fb5cd861b444fe2969f1aac5a7f9bdf9d0ee08a9d78fc06ef5749c2b73ea9548",
-            "size": 7078443
+            "sha256": "94bb007a3ba532f38f50b67cb4f29b55a2c393ef235865aef963cd557403b03e",
+            "size": 7078444
           },
           "archipelago/worlds/doometernal/vanilla_enemy_profiles.py": {
-            "sha256": "772671abe305149c719bed653ca7ced22f80eb47412e423b906bb6b784a6c18f",
-            "size": 12379
+            "sha256": "2c2b1e72e5a1e70a2123ccbb7bed36e64b8803f9bc524cc018ef034c5a4c1d0d",
+            "size": 12611
           },
           "archipelago/worlds/doometernal/version.py": {
             "sha256": "0c8507ec88a807078f75503ab5f4ba0a0ae7b6f0cd0e9fb669fa74ba75725e9b",
@@ -13100,18 +13112,18 @@
             "size": 136
           }
         },
-        "fingerprint": "fda112d3653ba5606446b2ba4f947bb872fe4a797f6400fb034b2d77b51d901c",
+        "fingerprint": "9456f1a6698789f9d9f2b118277cabc8d22d76d8babbb73d19c9ef1b32b776e6",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "956d647d45ad365e1143dd2eb70e54e6042eedf3",
+      "base_commit_sha": "63d4adc7002617934c6f00f67605b4743cde744d",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
           ".github/workflows/ci.yml": {
-            "sha256": "9b04cd0e3b1f104e7053be23b89e0834c24ddcf05dbad37e7d1ed2b566f42665",
-            "size": 1305
+            "sha256": "d3dcebe68a548dde07d3fe4bd4a5021be0738875c3a6652ae30053ee9ec23539",
+            "size": 1421
           },
           ".github/workflows/cross-platform-build.yml": {
             "sha256": "ab2793cd468de88d4af6076455cdebaa6ee6c0ae0481996ef69c5511e74bb3b7",
@@ -13150,52 +13162,52 @@
             "size": 21304
           },
           "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": {
-            "sha256": "282d6be564ae566c1acf336359fdf70b2aadea9fabc0bab697b1ad5acd8d0d6a",
-            "size": 358
+            "sha256": "77c53e5b6b92d5f242bc219957fab4860f6d7e57ddba35e0d202350859ad1903",
+            "size": 343
           },
           "content/catalog/actorpopulation/default_khan_maykr-4e2bb9c5bb22.decl": {
-            "sha256": "4e2bb9c5bb22f668203c17c7db940329ef1c047f076dbc4c546fb22515764802",
-            "size": 359
+            "sha256": "e828dfd80aa96546bdad45f9dc06b91cefe778e9af1643aca1645899fd00886e",
+            "size": 344
           },
           "content/catalog/actorpopulation/default_no_bosses-74b2d0c01feb.decl": {
-            "sha256": "74b2d0c01feb44145fde47087915a7f417b022005a421fda086e14ce44149c34",
-            "size": 6896
+            "sha256": "0e3040db807e0b8b7eae9cd14e073dc874d6c4cbee2122c23a92c9a8d5425f74",
+            "size": 6659
           },
           "content/catalog/actorpopulation/dlc1-e7743b21e059.decl": {
-            "sha256": "e7743b21e0592fe1b72fc539797fcb5999ae758b2ce55ec2262f12e44ccf0b31",
-            "size": 859
+            "sha256": "73efdd8fb246eaff56ca2bcb482afbb7083268e9b07f0a7fdbf17ae647ea9522",
+            "size": 827
           },
           "content/catalog/actorpopulation/dlc1-f35beca5cd6d.decl": {
-            "sha256": "f35beca5cd6d31e7b785ce0f83c9f0c5e759b947df177e73a3be6042c3da642f",
-            "size": 701
+            "sha256": "6cb4e1111d5ba353f8b1a76bca76a32766dc17da32fc18b17e61bf00d2a732d4",
+            "size": 674
           },
           "content/catalog/actorpopulation/dlc1_e4m3-5a915939c870.decl": {
-            "sha256": "5a915939c870a37b55262054d444a127881841c4cff8fbc89e767afe50ee8225",
-            "size": 1609
+            "sha256": "f8d14872c8df721abd456be710a929921dec4593aaa261933ab79c1d63bba7f6",
+            "size": 1549
           },
           "content/catalog/actorpopulation/dlc1_e4m3-7faca2724aa2.decl": {
-            "sha256": "7faca2724aa2547aae723fee8ee3d5f500a0582fe217ff2ac92a5309a7d6399e",
-            "size": 1451
+            "sha256": "cd7aa0fed15f55463f0908ff45cff78c1729107ebf15264f293bd29a084c2efc",
+            "size": 1396
           },
           "content/catalog/actorpopulation/dlc2-23b56794332f.decl": {
-            "sha256": "23b56794332fdec01d359722105b6a52a99bcdd93954b09c543fc6b8d9b78afe",
-            "size": 906
+            "sha256": "568cc0e536a58d1a7d12eee70a395cb949e22cdfcddb2b37a3fea6300def40ad",
+            "size": 874
           },
           "content/catalog/actorpopulation/dlc2_demonic_soldier-86c6c104fd56.decl": {
-            "sha256": "86c6c104fd562fbd0438a463fc1c4376c610f9975954a7f8b670eb940fb75dcb",
-            "size": 221
+            "sha256": "ae5a826affadf17b65dbd7ffca7a88111853ed482de9f2a0ce8d04f35ea49316",
+            "size": 210
           },
           "content/catalog/actorpopulation/e3m4-a96ac2ca8c2d.decl": {
-            "sha256": "a96ac2ca8c2d2ec5a033d350580234a98ee2a33604d5dee3eb3b169e962ac8f4",
-            "size": 349
+            "sha256": "adc876bd00f24fa16fe6cb253debab51f7114525296f51150827166c6cee9455",
+            "size": 334
           },
           "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_base.decl": {
-            "sha256": "3d9bcc2a7090915c0327838f028e00058642ed05b1f01126d2d5cfbf4ebacfd8",
-            "size": 6560
+            "sha256": "06d5b1c9d01ca381bcf21983e6e4b99dada7fb2ae98b78c51e9133f11dee355a",
+            "size": 6232
           },
           "content/catalog/encounter_opportunities/logicentity/hand_imp_condition_patch1.decl": {
-            "sha256": "178488d5550219c0e50ac787d3cc684cb7e6d3516eb67024d25b934b20c82ade",
-            "size": 6559
+            "sha256": "56c877b1ddf670e9e0237ee7f1455e29ecb3e518a8647ad1d5ce80ca15732f3a",
+            "size": 6231
           },
           "content/catalog/encounter_opportunity_segments.json": {
             "sha256": "7bacdf69938f04d444796371a0fb59801404308c3d996d1886940195bfb1f026",
@@ -13206,8 +13218,8 @@
             "size": 6794
           },
           "content/catalog/enemy_attribute_baselines.json": {
-            "sha256": "b20567e5e19fa92bcc64360699b4e63cd30832edb08077b2ac5c64ed10acbc87",
-            "size": 447122
+            "sha256": "879313b020d10c8f0a3ea0e7d883b0125ced230e0775367b535eb546f835f7f6",
+            "size": 459708
           },
           "content/catalog/enemy_species.json": {
             "sha256": "9006eecfc1dd641ef6d160d6e27c7ee4f700e15d637a793e5c4591169599af25",
@@ -13226,8 +13238,8 @@
             "size": 122263
           },
           "content/catalog/native_enemy_assets.json": {
-            "sha256": "1ad0cf08a8288e28c6ce5b29489380be07f514bc92b1dd029f5ea71c8f32d26f",
-            "size": 1224753
+            "sha256": "634e010bd2bb5b30e38c857c7fcac268666f34412ab3f2cfc7fa4fe8d03f2a5e",
+            "size": 1224754
           },
           "content/catalog/region_topology.json": {
             "sha256": "f8d70564e2a87cfc7bb55c680ecc977c7e691513c7cde50cd41af4bcee54c402",
@@ -13822,12 +13834,12 @@
             "size": 14227
           },
           "data/challenge_location_registry.json": {
-            "sha256": "20f48a5942a040b3545e34e98f2a8e959dd7ede668d08e93cc259b5b0417b38d",
-            "size": 64365
+            "sha256": "1991b26b1b9d608a699797f035461a2d2d58b686762c23bb99bf714722183c62",
+            "size": 66182
           },
           "data/checked_location_visuals.json": {
-            "sha256": "3fa5c4218583a6798f8c9d3ffcfe81beb0b1e56b00236622a094e8338d198792",
-            "size": 609710
+            "sha256": "83b0a2e3f0e3bd61ff03a65d76234e491d0365c71b6021cd6d883940c4d68c10",
+            "size": 621071
           },
           "data/content_identity.json": {
             "sha256": "f0fe94aa8ff7cc632c03452203a1270209af8ead7b4602dda7540a814f12806c",
@@ -13878,8 +13890,8 @@
             "size": 3163
           },
           "data/foundation_contracts.json": {
-            "sha256": "bedf66fbe60c4cd1b8b54b6238846223572e5178a5be0b450cd451e5d2ad9620",
-            "size": 2429
+            "sha256": "bd0137d638ccf35db8f6b256f882902f18bdd1f63e87643fdf35f6fef566a9f8",
+            "size": 2499
           },
           "data/item_classifications.json": {
             "sha256": "26a54099bacc0da96a2a88bf21d50ffc9e8df096e8071754ac859c8162bc94ff",
@@ -13902,8 +13914,8 @@
             "size": 8611
           },
           "data/location_names.json": {
-            "sha256": "2a82e87bce08030d72076f865373899976a03373707ac98cb024805fae055289",
-            "size": 30308
+            "sha256": "78308195bf9e1a4c27c4a66fedbde2cb5d6e116116846cab08b31aef809a4677",
+            "size": 30784
           },
           "data/map_sources.json": {
             "sha256": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
@@ -13918,16 +13930,16 @@
             "size": 1082
           },
           "data/options_schema.json": {
-            "sha256": "f4cb937f2bd0557fa0c42c810b53ff3f82af910a262b2936749da06322272bc9",
-            "size": 258831
+            "sha256": "74aa3c16d3a4a013dc0dc7fc2b6bfc79e4365c22e2a61fd089e4d0a0e8b65970",
+            "size": 268148
           },
           "data/perk_candidates.json": {
             "sha256": "0d989a009c6907a3930f874312caeaf377b14e6069f50a478961b2e316a7ba71",
             "size": 3173
           },
           "data/physical_pickups.json": {
-            "sha256": "82c3b31e1a3e889dd973f8b10cefc82e415bdd2e4dfffd202c9908171d69eebe",
-            "size": 6535
+            "sha256": "604759e827e697b7984c7590af1d71efcd5b7c1d84240968105e95ef023cc96b",
+            "size": 6955
           },
           "data/publisher_contracts.json": {
             "sha256": "b23ed958defb522ef193d0554293fc9eba4d947e833c953d81eebfc5a6bdbd70",
@@ -13946,8 +13958,8 @@
             "size": 3975
           },
           "data/scripted_location_contracts.json": {
-            "sha256": "1d1801f76c4378809f1cc9415a0555d32947142634c7e4a99831a8beda6f1636",
-            "size": 5477
+            "sha256": "9c29f77d5267fd9be3718b05acc7078ec8f7f55019cf5f38c6f4b5f01c791ef2",
+            "size": 5519
           },
           "data/snapshots/ice_logic_decl_patch.json": {
             "sha256": "930096474b7e67c4011575c4e04d47ee8607adb09c8f7dc99113b4df69db5fb8",
@@ -14018,12 +14030,12 @@
             "size": 1421
           },
           "doom_eap/content/native_enemy_balance.py": {
-            "sha256": "ea6cae418b0aef62f62015257a4e5e5b36522a6b6170b649865a621b087f00cf",
-            "size": 48302
+            "sha256": "0759dc0f3a75c6ad2f4024a3d9b11d21ccf3775f7cb344d80312780313b52c93",
+            "size": 49085
           },
           "doom_eap/content/native_enemy_catalog.json": {
-            "sha256": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
-            "size": 6544282
+            "sha256": "17563fd274fe9b39f4a94482d413c0eeb41e15c1a352bfa7b338d5b897c41149",
+            "size": 6544283
           },
           "doom_eap/content/native_enemy_plan.py": {
             "sha256": "a1240b950ee410c5bb03e5195b6823d48fd8a02bc3d531e3089b91658d6d4374",
@@ -14054,12 +14066,12 @@
             "size": 2183
           },
           "doom_eap/content/vanilla_enemy_profiles.json": {
-            "sha256": "fb5cd861b444fe2969f1aac5a7f9bdf9d0ee08a9d78fc06ef5749c2b73ea9548",
-            "size": 7078443
+            "sha256": "94bb007a3ba532f38f50b67cb4f29b55a2c393ef235865aef963cd557403b03e",
+            "size": 7078444
           },
           "doom_eap/content/vanilla_enemy_profiles.py": {
-            "sha256": "772671abe305149c719bed653ca7ced22f80eb47412e423b906bb6b784a6c18f",
-            "size": 12379
+            "sha256": "2c2b1e72e5a1e70a2123ccbb7bed36e64b8803f9bc524cc018ef034c5a4c1d0d",
+            "size": 12611
           },
           "doom_eap/contracts/__init__.py": {
             "sha256": "3f2ecdaed1b27d99205251aaab21d06eae0ce583f8cd7aecccb82e28cfe21256",
@@ -14126,8 +14138,8 @@
             "size": 2489
           },
           "doom_eap/contracts/save_observation.py": {
-            "sha256": "40979941ba3c7f82a105378ecf363f63081b251272162eab721cae6efa31e4ec",
-            "size": 3622
+            "sha256": "a7ce6a3723876b4b53948c6841ad572a3ea4b6af557ccd2da7d049a713b3ec4b",
+            "size": 3638
           },
           "doom_eap/contracts/source_bytes.py": {
             "sha256": "affdf5189f87c6ce953f5fd2e02a12f4dcff2a6f04f8916188bfa20183ab6aa8",
@@ -14254,8 +14266,8 @@
             "size": 7795
           },
           "doom_eap/runtime/bootstrap_actions.py": {
-            "sha256": "cf01963415420b5c87d7925b0803d322436b5239eba729c11f654caffb032b80",
-            "size": 7301
+            "sha256": "6c82d0e56aacf9ef65fa9dc5f944e50092ea7750af405d9e0a4aa6bfc60f1a17",
+            "size": 7180
           },
           "doom_eap/runtime/bridge_client.py": {
             "sha256": "e7936da0e98342e95b9682d4d1b38a5011fc83b937c7a0981f9ff237c0f9d33c",
@@ -14282,8 +14294,8 @@
             "size": 11109
           },
           "doom_eap/runtime/connection_diagnostics.py": {
-            "sha256": "23df07290f124e231107149b80bc3a1b479822909aac76c8e9600df14752a8e9",
-            "size": 11506
+            "sha256": "a064f1581bcc410cf3b00014794dd57f80a3aa7eb7596a074c62e229bc377db8",
+            "size": 11739
           },
           "doom_eap/runtime/context_registry.py": {
             "sha256": "1cdf6fc32eec2322bf5b39581f1602933a3cdd1a413e6724c11ca9f9edebd409",
@@ -14450,8 +14462,8 @@
             "size": 1329
           },
           "manifests/e1m2_war.json": {
-            "sha256": "da4df54ec87b8817f866d62adb55fc00edb67a99fe2a7320ffd117f0d695a687",
-            "size": 2037
+            "sha256": "90bd0e7001e0ee1378ff988d0cb5f4e138fba7d27ca2bafed15e94002a14e0fb",
+            "size": 2072
           },
           "manifests/e1m3_cult.json": {
             "sha256": "81c91fadd475cdea82cd3741b6dc5a3fcec409ab8e5772b7a77292e3cf6b9d26",
@@ -15218,8 +15230,8 @@
             "size": 8033
           },
           "tools/content/compile_content_catalog.py": {
-            "sha256": "fb54969b1b65862febdc1f19feb39c7c905d9415527336d2cc672c8f53936a85",
-            "size": 24307
+            "sha256": "ff1c568ad5238ddc7700bcba60bc848d8fc31c0ae0481af278594747c70426e1",
+            "size": 26298
           },
           "tools/content/compile_options_schema.py": {
             "sha256": "875c80faabe79c782db6e6e784b6b63474d80cb7fae83597467df6640568acda",
@@ -15366,8 +15378,8 @@
             "size": 3671
           },
           "tools/maps/vanilla_enemy_profiles.py": {
-            "sha256": "07973e367507720ea614bacf6aa0023eaa00c7065fd2b578b7ef50c82b01b32e",
-            "size": 17092
+            "sha256": "ba927bef4864dd74101e1788f3062ee260adfb27bfb31d462242429ba242c2f3",
+            "size": 17402
           },
           "tools/release/__init__.py": {
             "sha256": "1644f770870150db47a97640da7aaa7b6ea6ce2d30693b181691d02fa85bbd6a",
@@ -15522,7 +15534,7 @@
             "size": 19292
           }
         },
-        "fingerprint": "7ed646670ce282d8e16c1089d95e3b7f11762f44060a6af8cf460eb6ce743054",
+        "fingerprint": "ef11f0a3cf08e2dd1133118b28adb499cc00f8815c27879e79c898602e236182",
         "kind": "working_tree_snapshot"
       }
     }
