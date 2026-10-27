@@ -1540,13 +1540,18 @@ def _validated_catalog_maps(active_maps):
 KNOWN_CATALOG_MAPS = _validated_catalog_maps(
     load_foundation_contracts().get("active_maps")
 )
+MATERIALIZATION_MAPS = _validated_catalog_maps({
+    **{context.map_keys[0]: runtime_map for runtime_map, context in CONTEXT_BY_MAP.items()
+       if len(context.map_keys) == 1},
+    **KNOWN_CATALOG_MAPS,
+})
 
 
-def _catalog_map_key(runtime_map):
+def _materialization_map_key(runtime_map):
     runtime_map = canonical_map_name(runtime_map)
     matches = [
         map_key
-        for map_key, catalog_runtime_map in KNOWN_CATALOG_MAPS.items()
+        for map_key, catalog_runtime_map in MATERIALIZATION_MAPS.items()
         if catalog_runtime_map == runtime_map
     ]
     return matches[0] if len(matches) == 1 else None
@@ -2113,7 +2118,7 @@ def parse_active_map_marker(path, mtime_ns):
         return None
 
     return RuntimeLifecycle.parse_authored_marker(
-        content, path, mtime_ns, KNOWN_CATALOG_MAPS, CONTEXT_BY_MAP,
+        content, path, mtime_ns, MATERIALIZATION_MAPS, CONTEXT_BY_MAP,
     )
 
 
@@ -2945,7 +2950,7 @@ class DoomEternalContext(CommonContext):
             if generation <= 0 or int(scope["context_generation"]) != generation:
                 return None
             runtime_map = canonical_map_name(scope.get("current_map"))
-            if len([key for key, value in KNOWN_CATALOG_MAPS.items() if value == runtime_map]) != 1:
+            if len([key for key, value in MATERIALIZATION_MAPS.items() if value == runtime_map]) != 1:
                 return None
             return (link.namespace, admission["native_root"], link.pid, *identity, generation, runtime_map)
         except (RuntimeError, OSError, ValueError, KeyError, TypeError):
@@ -2968,7 +2973,7 @@ class DoomEternalContext(CommonContext):
         if epoch is None:
             return False
         marker = {**self.runtime_lifecycle.new_map_proposal(
-            _catalog_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
+            _materialization_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
             "native_scope": scope}
         self.invalidate_active_save_proof()
         self.accept_map_identity(marker, evidence.epoch)
@@ -4214,7 +4219,7 @@ class DoomEternalContext(CommonContext):
                 return True
             if cached and cached.get("native_scope"):
                 return False
-        decision = self.runtime_lifecycle.classify_native_load(evidence, KNOWN_CATALOG_MAPS)
+        decision = self.runtime_lifecycle.classify_native_load(evidence, MATERIALIZATION_MAPS)
         if decision is None:
             return False
         evidence_epoch = decision.evidence_epoch
@@ -4796,7 +4801,7 @@ class DoomEternalContext(CommonContext):
                 if lease is not None:
                     lease.observe_gameplay_loaded(evidence_mtime)
                 marker_data = self.runtime_lifecycle.new_map_proposal(
-                    _catalog_map_key(active_map), active_map, evidence_epoch,
+                    _materialization_map_key(active_map), active_map, evidence_epoch,
                     evidence_mtime, materialization_epoch,
                 )
                 self.accept_map_identity(marker_data, evidence_epoch)

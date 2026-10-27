@@ -1,10 +1,42 @@
 import asyncio
 import importlib
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 
 import pytest
+
+
+def test_boss_without_item_checks_can_recover_materialization(tmp_path, monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    monkeypatch.setenv('DOOM_AP_APPLICATION_DIR', str(tmp_path))
+    config = tmp_path / 'config.json'
+    config.write_text(json.dumps({'doom_base_dir': str(tmp_path / 'base'),
+        'save_games_dir': str(tmp_path / 'saves'), 'client_state_file': str(tmp_path / 'state.json'),
+        'bridge_log_path': str(tmp_path / 'bridge.log')}))
+    monkeypatch.setenv('DOOM_AP_CONFIG_FILE', str(config))
+    env = dict(os.environ, SKIP_REQUIREMENTS_UPDATE='1', PYTHONPATH=os.pathsep.join(map(str, (
+        root, root.parent / 'Archipelago', root / 'packaging/standalone_runtime'))))
+    script = '''
+from pathlib import Path
+from types import SimpleNamespace
+from doom_eap.runtime import bridge_client as bridge
+from doom_eap.runtime.lifecycle import RuntimeLifecycle
+runtime = 'game/dlc2/e5m4_boss/e5m4_boss'
+evidence = SimpleNamespace(state='gameplay', epoch=9, map_name=runtime, provisional=False)
+lifecycle = RuntimeLifecycle()
+decision = lifecycle.classify_native_load(evidence, bridge.MATERIALIZATION_MAPS)
+assert decision is not None and decision.map_key == 'e5m4_boss'
+marker = Path('marker.txt')
+marker.write_text(f'AP_ACTIVE_MAP_V1 map_key=e5m4_boss runtime_map={runtime} marker=AP_MAP_START_E5M4_BOSS')
+assert bridge.parse_active_map_marker(marker, 100)['runtime_map'] == runtime
+evidence.map_name = 'game/dlc2/unrecognized/unrecognized'
+assert lifecycle.classify_native_load(evidence, bridge.MATERIALIZATION_MAPS) is None
+'''
+    subprocess.run([sys.executable, '-c', script], cwd=tmp_path, env=env, check=True, timeout=30)
 
 
 def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):

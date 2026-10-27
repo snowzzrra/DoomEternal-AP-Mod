@@ -38,6 +38,36 @@ def test_ground_replacement_of_airborne_secret_uses_its_ground_spawn():
     )]
     assert _entrance_landings(recipes, records)['air'] == 'ground'
 
+
+def test_ground_replacement_prefers_its_encounters_jump_endpoint_to_another_floor():
+    from tools.maps.native_recipe_materializer import _entrance_landings
+
+    records = {name: {'class': 'idTarget_Spawn', 'edit': {
+        'spawnPosition': {'x': 0, 'y': 0, 'z': height}, 'spawnEditable': {}}}
+        for name, height in [('air', 5), ('ground', 0)]}
+    records['ground']['edit']['spawnEditable'] = {
+        'aiStateOverride': 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'spawnAnim': 'jump_forward_100'}
+    records['checkpoint'] = {'class': 'idPlayerStart', 'edit': {'spawnPosition': {'x': 0, 'y': 0, 'z': -10}}}
+    recipes = [{'binding': {'owner': 'fight', 'path': 'encounter.events.item[0]', 'reference': name},
+                'selected_spawn_type': species, 'bodies': [{'species': 'imp'}]}
+               for name, species in [('ground', 'ENCOUNTER_SPAWN_REVENANT'), ('air', 'ENCOUNTER_SPAWN_LOST_SOUL')]]
+    assert _entrance_landings(recipes, records)['air'] == 'ground'
+
+
+@pytest.mark.parametrize('marker_count', [1, 2])
+def test_traversal_without_target_uses_only_an_unambiguous_colocated_marker(marker_count):
+    from tools.maps.native_recipe_materializer import _entrance_landings
+
+    records = {'point': {'class': 'idTarget_Spawn', 'edit': {
+        'spawnPosition': {'x': 1, 'y': 2, 'z': 20},
+        'spawnEditable': {'aiStateOverride': 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}}}}
+    records.update({f'ledge{index}': {'class': 'idInfoTraversal', 'edit': {
+        'spawnPosition': {'x': 1, 'y': 2, 'z': 20}, 'traversalEndpoint': {'x': 5, 'z': -20}}}
+        for index in range(marker_count)})
+    recipe = {'binding': {'owner': 'fight', 'path': 'encounter.events.item[0]', 'reference': 'point'},
+              'selected_spawn_type': 'ENCOUNTER_SPAWN_SHOTGUN_SOLDIER', 'bodies': [{'species': 'imp'}]}
+    assert _entrance_landings([recipe], records).get('point') == ('ledge0' if marker_count == 1 else None)
+
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
 from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
 from tools.maps.encounter_catalog import entity_records, list_items

@@ -19,7 +19,9 @@ PURE_BOSS_MAPS = BOSS_MAPS - {'e1m4_boss'}
 
 
 def _category(species, mobile=False):
-    if mobile == 2:
+    if mobile == 3 and species == 'stone_imp':
+        return 'fodder'
+    if mobile >= 2:
         if species in {'marauder', 'archvile', 'armored_baron'}:
             return 'special_superheavy'
         if species in {'blood_angel', 'cursed_prowler'}:
@@ -539,6 +541,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         (1 - progress, progress))) if settings['progressive'] else ENEMY_RECIPES['slayers_path'].intensity[0]
     factor = sum(value * part for value, part in zip(settings['intensity'], (1 - progress, progress))) / expected
     for (owner, variant), sources in grouped.items():
+        mobile = 2 if recipe_revision >= 15 else recipe_revision >= 14
         own_row = next((row for row in own_encounters if row['id'] == variant), {})
         kind = own_row.get('kind', 'scripted_encounter')
         shape = own_row.get('spawn_shape')
@@ -625,6 +628,11 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
             chosen = {**chosen, 'slots': [{**slot, 'renewable': False, 'maximum_emissions': slot['count']}
                 if slot['renewable'] else slot for slot in chosen['slots']]}
         peak = chosen['peak']
+        mix_stone_imps = (recipe_revision >= 18 and kind == 'specialized_encounter' and
+                         all(set(slot['species']) <= {'stone_imp'} for slot in chosen['slots']))
+        if mix_stone_imps:
+            # the gauntlet keeps its native population while sharing the fodder roster.
+            mobile = 3
         opening = any(source['id'] in opening_sources for source in sources)
         native_stationary_peak = own_row.get('peak', {}).get('stationary', 0)
         reference_stationary_peak = peak.get('stationary', 0)
@@ -641,7 +649,7 @@ def build_vanilla_stage(origins, settings, campaign, catalog, *, seed, map_key, 
         counts, emitted = _allocate_counts(finite, target)
         desired = _modified_budget(random_wanted, factor, target)
         cost_budget = _cost_budget(chosen, desired, seed=seed, renewable=False, candidates=candidates, mobile=mobile)
-        encounter_settings = {**settings, 'protected_opening': opening,
+        encounter_settings = {**settings, 'protected_opening': opening, 'mobile_stationary': mobile,
             'limit_zombies': recipe_revision >= 17 and any(not set(slot['species']) <= ZOMBIES for slot in chosen['slots'])}
         made, actual = _draw_bodies(finite, counts, desired, seed=seed, key=[map_key, variant], settings=encounter_settings,
             catalog=catalog, candidates=candidates, supplies=supplies, population=population,

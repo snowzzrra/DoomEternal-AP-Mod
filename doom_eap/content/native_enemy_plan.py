@@ -606,8 +606,8 @@ def _wave_peak(bodies, *, mobile=False):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=17):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=18):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None

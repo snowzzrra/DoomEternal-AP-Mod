@@ -73,6 +73,21 @@ def recipes(stage):
     return {recipe['id']: recipe for recipe in stage['recipes']}
 
 
+def test_stone_imp_gauntlet_varies_without_expanding_population(native_catalog):
+    key = 'e5m3_hell'
+    owner = 'hangar_encounter_manager_dlc2_2'
+    options = effective(enemies={'revision': 8})
+    campaign = dict(sequence=[key])
+    before = build_native_recipes(options, campaign, seed=31, catalog=native_catalog, revision=17)['maps'][key]
+    after = build_native_recipes(options, campaign, seed=31, catalog=native_catalog)['maps'][key]
+    selected = lambda stage: [r for r in stage['recipes'] if r['binding'].get('owner') == owner]
+    assert sum(r['maximum_emissions'] for r in selected(after)) == 25
+    assert {b['species'] for r in selected(after) for b in r['bodies']} - {'stone_imp'}
+    assert {b['population_limits']['maximum'] for r in selected(after) for b in r['bodies']} == {10}
+    assert {r['id']: r for r in before['recipes'] if r not in selected(before)} == {
+        r['id']: r for r in after['recipes'] if r not in selected(after)}
+
+
 def test_contextual_balance_keeps_blood_swamps_arenas_separate_from_torches(native_catalog):
     campaign = dict(sequence=['e1m1_intro', 'e2m4_boss', 'e2m3_core', 'e3m2_hell_b',
                               'e4m2_swamp', 'e5m4_boss', 'e3m4_boss'], mode='random_mission_order')

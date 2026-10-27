@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from math import gcd
 
 
-ENEMY_OPTIONS_REVISION = 8
+ENEMY_OPTIONS_REVISION = 9
 SPECIES_GROUPS = {
     "fodder": ("chaingun_soldier", "demonic_trooper", "gargoyle", "hell_soldier", "imp", "lost_soul",
                "maykr_angel", "shotgun_soldier", "stone_imp", "zombie_maykr", "zombie_t1_screecher",
@@ -135,7 +135,7 @@ def _attribute(raw, name, automatic, progressive):
 
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, 4, 5, 6, 7, ENEMY_OPTIONS_REVISION):
+    if revision not in (2, 3, 4, 5, 6, 7, 8, ENEMY_OPTIONS_REVISION):
         raise ValueError("Unsupported enemy options revision")
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
@@ -172,6 +172,9 @@ def normalize_enemy_options(raw):
         weights.update(tentacle=recipe.group_weights[0] // 2,
                        super_tentacle=recipe.group_weights[1] // 4,
                        turret=recipe.group_weights[1] // 2)
+    if revision >= 9:
+        weights['super_tentacle'] = 0
+        weights['blood_angel'] = (weights['blood_angel'] * 5 + 3) // 4
     if preset == "oops_all_imps":
         weights.update(imp=900, stone_imp=100)
     elif preset == "pinata_party":

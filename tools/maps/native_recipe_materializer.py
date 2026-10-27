@@ -169,7 +169,7 @@ def _entrance_endpoint(edit):
     return result if all(map(math.isfinite, result.values())) else None
 
 
-def _entrance_landings(recipes, records):
+def _entrance_landings(recipes, records, *, map_key=None):
     points = {}
     positions = {name: {axis: row['edit']['spawnPosition'].get(axis, 0) for axis in ('x','y','z')}
                  for name,row in records.items() if 'spawnPosition' in row['edit']}
@@ -190,10 +190,13 @@ def _entrance_landings(recipes, records):
         return binding.get('owner', ''), binding.get('path', '').split('.events.item[')[0]
     def ground(name, verified=False):
         edit = records[name]['edit']; spawn = edit.get('spawnEditable', {})
+        entrance = (verified and spawn.get('aiStateOverride') in {
+            'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION', 'AIOVERRIDE_PLAY_ENTRANCE_ANIMATION_WITH_CORRECTION'}
+            and re.fullmatch(r'jump_forward_\d+(?:_(?:up|down)_\d+)?', spawn.get('spawnAnim', '').rsplit('/', 1)[-1]))
         templates = [records.get(value.get('name'), {}) for field,value in edit.get('entityDefs', {}).items()
                      if re.fullmatch(r'item\[\d+\]', field) and isinstance(value, dict)]
-        return (not spawn.get('spawnAnim') and spawn.get('aiStateOverride', 'AIOVERRIDE_DEFAULT') in
-                {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'}
+        return ((entrance or not spawn.get('spawnAnim') and spawn.get('aiStateOverride', 'AIOVERRIDE_DEFAULT') in
+                {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE'})
                 and all(template.get('edit', {}).get('aiEditable', {}).get('spawnSettings', {}).get('initialState', 'AIOVERRIDE_DEFAULT') in
                         {'AIOVERRIDE_DEFAULT', 'AIOVERRIDE_TELEPORT', 'AIOVERRIDE_TELEPORT_FORCE_SPAWN_ANGLE',
                          'AIOVERRIDE_FORCE_AWARENESS_OF_PLAYER'} for template in templates)
@@ -240,6 +243,8 @@ def _entrance_landings(recipes, records):
     choices = {}
     portal_floors = {'underwater_facility_arena_target_spawn_154': 'underwater_facility_arena_target_spawn_156',
                      'underwater_facility_arena_target_spawn_155': 'underwater_facility_arena_target_spawn_160'}
+    floor_overrides = {'game_target_spawn_950': 'game_target_spawn_735',
+                       'game_target_spawn_340': 'game_target_spawn_735'} if map_key == 'e1m3_cult' else {}
     for recipe in recipes:
         needs_floor = recipe['selected_spawn_type'] in {
             'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_LOST_SOUL',
@@ -249,8 +254,21 @@ def _entrance_landings(recipes, records):
         for name in points[recipe['binding'].get('reference', '')]:
             edit = records[name]['edit']
             spawn = edit.get('spawnEditable', {})
+            if name in floor_overrides:
+                target = floor_overrides[name]
+                if target not in records or not ground(target, True):
+                    raise ValueError('Cultist combat floor differs from the source')
+                choices.setdefault(name, []).append(((0, target), target))
+                continue
             if spawn.get('aiStateOverride') in {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}:
                 target = spawn.get('initialTargetOverride')
+                if not target and name in positions:
+                    colocated = [key for key, row in records.items() if row['class'] == 'idInfoTraversal'
+                        and key in positions and 'traversalEndpoint' in row['edit']
+                        and not row['edit'].get('bindInfo')
+                        and sum((positions[name][axis] - positions[key][axis]) ** 2 for axis in ('x', 'y', 'z')) <= .01]
+                    if len(colocated) == 1:
+                        target = colocated[0]
                 traversal = records.get(target, {})
                 if (traversal.get('class') == 'idInfoTraversal' and target in positions and
                         'traversalEndpoint' in traversal['edit']):
@@ -343,17 +361,16 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                     marker = 'ap_v070_optional_zombies_r' + recipe['origin']
                     generated.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
     functional, reachable, records = _functional_sources(source)
-    for point, landing in sorted(_entrance_landings(stage['recipes'], records).items()):
+    for point, landing in sorted(_entrance_landings(stage['recipes'], records, map_key=map_key).items()):
         helper = 'ap_v070_landing_' + _functional_token(point)
         if helper in names:
             raise ValueError('Duplicate native entrance landing')
         names.add(helper)
         anchor = records[landing]
         edit = {key: anchor['edit'][key] for key in ('spawnPosition', 'spawnOrientation') if key in anchor['edit']}
-        if point == landing:
-            endpoint = _entrance_endpoint(anchor['edit'])
-            if endpoint is not None:
-                edit['spawnPosition'] = endpoint
+        endpoint = _entrance_endpoint(anchor['edit'])
+        if endpoint is not None:
+            edit['spawnPosition'] = endpoint
         if ('traversalEndpoint' in anchor['edit'] and
                 records[point]['edit'].get('spawnEditable', {}).get('aiStateOverride') in
                 {'AIOVERRIDE_FORCE_MOVE_TO_TRAVERSAL', 'AIOVERRIDE_FORCE_TELEPORT_TO_TRAVERSAL'}):

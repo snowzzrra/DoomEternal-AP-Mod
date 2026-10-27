@@ -47,6 +47,10 @@ def validate_plan(slot_data):
     if (not isinstance(starts, list) or not 1 <= len(starts) <= (3 if access_mode else 1)
             or starts != sequence[:len(starts)] or goal in starts):
         raise ValueError("invalid Starting Stages")
+    unprepared = plan.get('unprepared_start_stages', [])
+    if (not isinstance(unprepared, list) or any(not isinstance(key, str) or key not in starts for key in unprepared)
+            or len(set(unprepared)) != len(unprepared)):
+        raise ValueError('Unprepared starting stages must belong to Starting Stages')
     bootstrap = {"Dash": 1} if (not slot_data["randomize_dash"] and
                  any(key not in {"e1m1_intro", "e1m2_war"} for key in starts)) else {}
     if not slot_data.get("randomize_chainsaw", False) and any(key != "e1m1_intro" for key in starts):
