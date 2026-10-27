@@ -43,12 +43,12 @@ snapshots before selecting them for release. Then update the local canonical
 bundle, replacing the commit placeholders with the source commits used:
 
 ```powershell
-../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --publish-from build/review-resources --repo-root . --version 0.7.0 --mod-commit <mod-commit> --apworld-commit <apworld-commit> --source-state build/review-inputs.json
+../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --publish-from build/review-resources --repo-root . --version 0.7.1 --mod-commit <mod-commit> --apworld-commit <apworld-commit> --source-state build/review-inputs.json
 ../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --check --repo-root .
 ```
 
 Despite its `--publish-from` name, this command only updates local
-`packaging/room_resources/v0.7.0/`. It writes checksums and
+`packaging/room_resources/v0.7.1/`. It writes checksums and
 `ROOM_RESOURCES_PROVENANCE.json`, the record of which inputs built the bundle.
 
 ## Assemble Windows
@@ -78,7 +78,7 @@ local shell build.
 To assemble existing build outputs, use:
 
 ```text
-python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.7.0 --repo-root . --output-dir <new-output>
+python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.7.1 --repo-root . --output-dir <new-output>
 ```
 
 Use `--platform linux` for Linux. Here `--handoff` means a directory containing
