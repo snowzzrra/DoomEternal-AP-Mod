@@ -120,7 +120,7 @@ def check_workflow_contract(repo_root: Path) -> None:
     # 7. Check launcher job step ordering (install < build < selftest < upload)
     for job_name, self_test_pattern in [
         ("build-linux-launcher", "DoomEternalArchipelagoLauncher --self-test"),
-        ("build-windows-launcher", "DoomEternalArchipelagoLauncher.exe --self-test"),
+        ("build-windows-launcher", "--self-test"),
     ]:
         steps = doc["jobs"][job_name].get("steps", [])
         step_runs = [s.get("run", "") for s in steps]

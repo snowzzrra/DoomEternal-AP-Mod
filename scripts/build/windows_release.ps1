@@ -129,8 +129,8 @@ try {
     Copy-Item -LiteralPath (Join-Path $clientBuild "APSessionOwner.exe") -Destination $clientHandoff -Force
     Invoke-Python @("-m", "tools.release.build_launcher", "--output-dir", $launcherHandoff, "--archipelago-source", $archipelago)
     $launcher = Join-Path $launcherHandoff "DoomEternalArchipelagoLauncher.exe"
-    & $launcher --self-test
-    if ($LASTEXITCODE -ne 0) { throw "Frozen Windows launcher self-test failed" }
+    $selfTest = Start-Process -FilePath $launcher -ArgumentList '--self-test' -WindowStyle Hidden -Wait -PassThru
+    if ($selfTest.ExitCode -ne 0) { throw "Frozen Windows launcher self-test failed with exit code $($selfTest.ExitCode)" }
 
     $modSha = (& git -c "safe.directory=$repoRoot" -C $repoRoot rev-parse HEAD).Trim()
     $apSha = (& git -c "safe.directory=$archipelago" -C $archipelago rev-parse HEAD).Trim()
