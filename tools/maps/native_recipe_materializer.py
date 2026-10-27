@@ -6,7 +6,7 @@ import re
 
 from doom_eap.content.enemy_species import validate_enemy_speed_percent
 from doom_eap.content.native_enemy_plan import native_body_name, native_recipe_metadata
-from tools.maps.ap_map_generator import find_entity_block_bounds
+from tools.maps.ap_map_generator import entity_definition_index, find_entity_block_bounds
 from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_records, list_items, walk_values
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
 from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
@@ -347,6 +347,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
         raise ValueError("Invalid native recipe fingerprint")
     names = {name for name, _, _ in ENTITY_HEADER.findall(source)}
     definitions, donors, generated = [], {}, []
+    donor_indexes = {}
     if plan.get('revision', 0) >= 17:
         groups = {}
         for recipe in stage['recipes']:
@@ -410,12 +411,17 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             key = tuple(reference[field] for field in ("map_key", "entity", "sha256"))
             if key not in donors:
                 donor_source = source_maps[reference["map_key"]]
-                start, end = find_entity_block_bounds(donor_source, reference["entity"])
+                if reference["map_key"] not in donor_indexes:
+                    donor_indexes[reference["map_key"]] = (
+                        entity_definition_index(donor_source),
+                        {name for name, _, _ in ENTITY_HEADER.findall(donor_source)},
+                    )
+                donor_index, donor_names = donor_indexes[reference["map_key"]]
+                start, end = find_entity_block_bounds(donor_source, reference["entity"], index=donor_index)
                 block = donor_source[start:end]
                 record, = entity_records(block)
                 if record["class"] != "idAI2" or record["sha256"] != reference["sha256"]:
                     raise ValueError(f"Native body donor differs: {reference['entity']}")
-                donor_names = {name for name, _, _ in ENTITY_HEADER.findall(donor_source)}
                 if any(isinstance(value, str) and value in donor_names for _, value in walk_values(record["edit"])):
                     raise ValueError(f"Native body donor has unresolved map entity references: {reference['entity']}")
                 donors[key] = block, record, None
@@ -557,6 +563,8 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
     prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
+    source_index = entity_definition_index(source)
+    owners = {}
     for origin, limit in _refill_limits(source, plan['maps'][map_key]['recipes']).items():
         alias = 'ap_v070_refill_r' + origin
         if alias in names or limit > 0x7fffffff:
@@ -569,14 +577,16 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
         if binding["mode"] == "direct_point":
             name, target = binding["entity"], binding["reference"]
             if name not in changes:
-                start, end = find_entity_block_bounds(source, name)
+                start, end = find_entity_block_bounds(source, name, index=source_index)
                 changes[name] = start, end, source[start:end]
             start, end, block = changes[name]
-            owner, = entity_records(block, include_names={name})
+            if name not in owners:
+                owners[name], = entity_records(block, include_names={name})
+            owner = owners[name]
             path = tuple(binding["path"].split("."))
             if _get(owner["edit"], path) != target:
                 raise ValueError("Native direct activation binding differs from the source")
-            first, last = find_entity_block_bounds(source, target)
+            first, last = find_entity_block_bounds(source, target, index=source_index)
             original, = entity_records(source[first:last])
             if original["class"] != "idTarget_Spawn":
                 raise ValueError("Native direct activation target is not a spawn point")
@@ -587,10 +597,11 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
             aliases.append(re.sub(r"(\bentityDef\s+)" + re.escape(target) + r"(?=\s*\{)",
                                   lambda match: match[1] + alias, source[first:last], count=1))
             changes[name] = start, end, _edit(block, path, alias)
+            _get(owner["edit"], path[:-1])[path[-1]] = alias
             continue
         if binding["mode"] == "independent_actor":
             name = binding["entity"]
-            first, last = find_entity_block_bounds(source, name)
+            first, last = find_entity_block_bounds(source, name, index=source_index)
             original, = entity_records(source[first:last])
             if original["class"] != "idAI2" or name in changes:
                 raise ValueError("Independent native binding differs from the source")
@@ -604,7 +615,7 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
             continue
         if binding["mode"] == "summon" and binding["entity"] not in {"", "ap_darklord_phantoms"}:
             name = binding["entity"]
-            first, last = find_entity_block_bounds(source, name)
+            first, last = find_entity_block_bounds(source, name, index=source_index)
             original, = entity_records(source[first:last])
             if original["class"] != "idArchvileTemplate":
                 raise ValueError("Native summon binding is not a template")
@@ -623,10 +634,12 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
             continue
         name, path = binding["entity"], binding["path"].split(".")
         if name not in changes:
-            start, end = find_entity_block_bounds(source, name)
+            start, end = find_entity_block_bounds(source, name, index=source_index)
             changes[name] = start, end, source[start:end]
         start, end, block = changes[name]
-        owner, = entity_records(block, include_names={name})
+        if name not in owners:
+            owners[name], = entity_records(block, include_names={name})
+        owner = owners[name]
         call = _get(owner["edit"], path)
         if call is _MISSING or call["eventDef"] != binding["event_def"]:
             raise ValueError("Native recipe event binding differs from the source")
@@ -640,7 +653,7 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
         if alias in names:
             raise ValueError("Duplicate native recipe request alias")
         names.add(alias)
-        bounds = find_entity_block_bounds(source, target) if target else None
+        bounds = find_entity_block_bounds(source, target, index=source_index) if target else None
         if bounds is not None:
             first, last = bounds
             original = source[first:last]
@@ -662,7 +675,7 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
             if bounds is None or kind != 'idTargetSpawnGroup':
                 raise ValueError('Immora breach source is not a spawn group')
             fallback_target = 'breach_wasteland_arena_target_spawn_60'
-            fallback_bounds = find_entity_block_bounds(source, fallback_target)
+            fallback_bounds = find_entity_block_bounds(source, fallback_target, index=source_index)
             if fallback_bounds is None:
                 raise ValueError('Immora breach fallback source is absent')
             first, last = fallback_bounds
@@ -677,11 +690,16 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
         aliases.append('entity { entityDef ' + alias + ' { inherit = ' + _render(inherit, 0) +
             '; class = ' + _render(kind, 0) + '; edit = ' + _render(settings, 2) + ' } }')
         block = _edit(block, (*path, "args", f"item[{argument}]", "entity"), alias)
+        call["args"][f"item[{argument}]"]["entity"] = alias
         changes[name] = start, end, block
     if map_key == 'e2m3_core' and 'phobos_encounter_manager_6' in changes:
         start, end, block = changes['phobos_encounter_manager_6']
         changes['phobos_encounter_manager_6'] = start, end, _post_bfg_awareness(block)
-    compiled = source
-    for start, end, block in sorted(changes.values(), reverse=True):
-        compiled = compiled[:start] + block + compiled[end:]
+    fragments = []
+    offset = 0
+    for start, end, block in sorted(changes.values()):
+        fragments.extend((source[offset:start], block))
+        offset = end
+    fragments.append(source[offset:])
+    compiled = "".join(fragments)
     return compiled + prepared[len(source):] + "\n\n".join(aliases) + ("\n" if aliases else "")

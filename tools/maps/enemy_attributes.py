@@ -48,6 +48,8 @@ def _render(value, level):
         return "{\n" + "\n".join(fields) + "\n" + "\t" * level + "}"
     if isinstance(value, float):
         return format(value, ".9g")
+    if isinstance(value, str):
+        return json.encoder.encode_basestring(value)
     return "NULL" if value is None else json.dumps(value, ensure_ascii=False)
 
 

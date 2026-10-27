@@ -132,7 +132,9 @@ def assert_no_weapon_mastery_token_currency(content, context):
 
 
 def remove_balanced_entity_blocks(content, name_prefix):
-    pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+' + re.escape(name_prefix) + r'\w*\s*\{', re.IGNORECASE)
+    prefixes = (name_prefix,) if isinstance(name_prefix, str) else name_prefix
+    names = "|".join(re.escape(prefix) for prefix in prefixes)
+    pattern = re.compile(r'entity\s*\{\s*(layers\s*\{\s*"[^"]+"\s*\}\s*)?entityDef\s+(?:' + names + r')\w*\s*\{', re.IGNORECASE)
     result = []
     pos = 0
     for m in pattern.finditer(content):
@@ -282,7 +284,7 @@ def suppress_vanilla_secret_found_ui(content):
     blocks = content.split("entity {")
     updated = [blocks[0]]
     for block in blocks[1:]:
-        if not SECRET_IDENTITY_HINT_RE.search(block):
+        if "secret" not in block.casefold() or not SECRET_IDENTITY_HINT_RE.search(block):
             updated.append("entity {" + block)
             continue
 
@@ -397,15 +399,37 @@ def find_matching_brace(content, open_brace_index):
     raise ValueError("Unbalanced braces while parsing entities content")
 
 
-def find_entity_block_bounds(content, entity_name):
-    entity_match = re.search(
-        r"entityDef\s+" + re.escape(entity_name) + r"\s*\{",
-        content,
-    )
-    if not entity_match:
-        return None
+_ENTITY_INDEXES = {}
 
-    block_start = content.rfind("entity {", 0, entity_match.start())
+
+def entity_definition_index(content):
+    digest = hashlib.sha256(content.encode("utf-8")).digest()
+    if digest in _ENTITY_INDEXES:
+        return _ENTITY_INDEXES[digest]
+    offsets = {}
+    for match in re.finditer(r"entityDef\s+([^\s{]+)\s*\{", content):
+        offsets.setdefault(match[1], match.start())
+    if len(_ENTITY_INDEXES) >= 32:
+        del _ENTITY_INDEXES[next(iter(_ENTITY_INDEXES))]
+    _ENTITY_INDEXES[digest] = offsets
+    return offsets
+
+
+def find_entity_block_bounds(content, entity_name, *, index=None):
+    if index is None:
+        entity_match = re.search(
+            r"entityDef\s+" + re.escape(entity_name) + r"\s*\{",
+            content,
+        )
+        if not entity_match:
+            return None
+        offset = entity_match.start()
+    else:
+        offset = index.get(entity_name)
+        if offset is None:
+            return None
+
+    block_start = content.rfind("entity {", 0, offset)
     if block_start == -1:
         raise ValueError(f"Could not locate enclosing entity block for {entity_name}")
 
@@ -930,6 +954,8 @@ SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS = (
 
 
 def is_sentinel_crystal_top(block):
+    if "destructible/interact/argent_cell" not in block:
+        return False
     return (
         re.findall(r'\binherit\s*=\s*"([^"]+)";', block)
         == ["destructible/interact/argent_cell"]
@@ -2905,20 +2931,12 @@ def generate_map(
                 f"found {replacements}"
             )
 
-    content = remove_balanced_entity_blocks(content, "ap_logic_")
-    content = remove_balanced_entity_blocks(content, "AP_CHECK_")
-    content = remove_balanced_entity_blocks(content, NOTIFICATION_ENTITY_PREFIX)
-    content = remove_balanced_entity_blocks(content, EVENT_ENTITY_PREFIX)
-    content = remove_balanced_entity_blocks(content, "ap_cmd_")
-    content = remove_balanced_entity_blocks(content, RPC_ENTITY_PREFIX)
-    for bootstrap_prefix in BOOTSTRAP_ENTITY_PREFIXES:
-        content = remove_balanced_entity_blocks(content, bootstrap_prefix)
-    for legacy_prefix in LEGACY_RPC_ENTITY_PREFIXES:
-        content = remove_balanced_entity_blocks(content, legacy_prefix)
-    content = remove_balanced_entity_blocks(content, "ap_deathlink")
-    content = remove_balanced_entity_blocks(content, "ap_rpc_auto_enable")
-    content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock_native")
-    content = remove_balanced_entity_blocks(content, "ap_fast_travel_unlock")
+    content = remove_balanced_entity_blocks(content, (
+        "ap_logic_", "AP_CHECK_", NOTIFICATION_ENTITY_PREFIX, EVENT_ENTITY_PREFIX,
+        "ap_cmd_", RPC_ENTITY_PREFIX, *BOOTSTRAP_ENTITY_PREFIXES,
+        *LEGACY_RPC_ENTITY_PREFIXES, "ap_deathlink", "ap_rpc_auto_enable",
+        "ap_fast_travel_unlock_native", "ap_fast_travel_unlock",
+    ))
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
     content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 

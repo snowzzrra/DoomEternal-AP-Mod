@@ -15,20 +15,31 @@ SPAWN_CLASSES = {"idTarget_Spawn", "idTarget_Spawn_Parent", "idTargetSpawnGroup"
 
 def parse_object(text):
     """Read ordered entity properties without flattening event or argument lists."""
+    endings, stack = {}, []
+    for match in re.finditer(r"[{}]", text):
+        if match[0] == "{":
+            stack.append(match.start())
+        elif stack:
+            endings[stack.pop()] = match.end()
+    return _parse_object(text, 0, len(text), endings)
+
+
+def _parse_object(text, offset, limit, endings):
     result = {}
-    offset = 0
-    while offset < len(text):
-        match = MEMBER.match(text, offset)
+    while offset < limit:
+        match = MEMBER.match(text, offset, limit)
         if not match:
-            if text[offset:].strip():
-                raise ValueError(f"Unsupported entity property near {text[offset:offset + 80]!r}")
+            if text[offset:limit].strip():
+                raise ValueError(f"Unsupported entity property near {text[offset:min(offset + 80, limit)]!r}")
             break
         name, value = match.groups()
         if name in result:
             raise ValueError(f"Duplicate entity property: {name}")
         if value == "{":
-            end = find_matching_brace(text, match.end() - 1)
-            result[name] = parse_object(text[match.end():end - 1])
+            end = endings.get(match.end() - 1)
+            if end is None or end > limit:
+                raise ValueError("Unbalanced braces while parsing entities content")
+            result[name] = _parse_object(text, match.end(), end - 1, endings)
             offset = end
         elif value.startswith('"'):
             result[name] = json.loads(value)
@@ -43,7 +54,7 @@ def parse_object(text):
                 except ValueError:
                     result[name] = float(value)
             offset = match.end()
-        while offset < len(text) and (text[offset].isspace() or text[offset] == ";"):
+        while offset < limit and (text[offset].isspace() or text[offset] == ";"):
             offset += 1
     return result
 

@@ -420,7 +420,7 @@ def _patch_declared_terminal_text(
     compiled = compile_publishers(publishers)
     native_owner = f"{owner}_ap_native_transition"
     native_owner_pattern = rf"\bentityDef\s+{re.escape(native_owner)}\s*\{{"
-    if re.search(native_owner_pattern, text):
+    if native_owner in text and re.search(native_owner_pattern, text):
         return text, {
             "owner": owner,
             "before_targets": before,
@@ -500,6 +500,9 @@ def patch_generated_map_text(map_key: str, text: str, mod_root: Path) -> tuple[s
 
 
 def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> int:
+    if before == after:
+        return 0
+
     def blocks(text: str) -> dict[str, str]:
         result = {}
         pattern = re.compile(r"\bentity\s*\{\s*entityDef\s+([^\s{]+)")
