@@ -1,0 +1,91 @@
+[
+  {
+    "name": "Sticky Bombs - Weapon Mastery Challenge",
+    "map_key": null,
+    "species": [
+      "arachnotron"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Full Auto - Weapon Mastery Challenge",
+    "map_key": null,
+    "species": [
+      "pinky",
+      "spectre"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Lock-on Burst - Weapon Mastery Challenge",
+    "map_key": null,
+    "species": [
+      "prowler"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Arbalest - Weapon Mastery Challenge",
+    "map_key": null,
+    "species": [
+      "cacodemon"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Cultist Base - Mission Challenge - Master of Turrets",
+    "map_key": "e1m3_cult",
+    "species": [
+      "arachnotron"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Super Gore Nest - Mission Challenge - War Pinkies",
+    "map_key": "e2m1_nest",
+    "species": [
+      "pinky"
+    ],
+    "minimum": 3
+  },
+  {
+    "name": "Taras Nabad - Mission Challenge - Painkiller",
+    "map_key": "e3m1_slayer",
+    "species": [
+      "pain_elemental"
+    ],
+    "minimum": 3
+  },
+  {
+    "name": "Nekravol - Mission Challenge - Doom Hunt",
+    "map_key": "e3m2_hell",
+    "species": [
+      "doom_hunter"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Nekravol Part II - Mission Challenge - Cut Down to Size",
+    "map_key": "e3m2_hell_b",
+    "species": [
+      "tyrant"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Nekravol Part II - Mission Challenge - Resurrect No More",
+    "map_key": "e3m2_hell_b",
+    "species": [
+      "archvile"
+    ],
+    "minimum": 1
+  },
+  {
+    "name": "Urdak - Mission Challenge - Angel of Death",
+    "map_key": "e3m3_maykr",
+    "species": [
+      "zombie_maykr"
+    ],
+    "minimum": 5
+  }
+]

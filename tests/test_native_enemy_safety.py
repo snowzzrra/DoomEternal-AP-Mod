@@ -9,6 +9,47 @@ from doom_eap.content.native_enemy_safety import FLYING_REPLACEMENTS, project_na
 from doom_eap.content.enemy_species import enemy_speed_capabilities
 
 
+@pytest.mark.parametrize('preset', ['slayers_path', 'oops_all_imps'])
+def test_mission_challenges_keep_finite_native_species_on_main_routes(preset):
+    from doom_eap.content.vanilla_enemy_profiles import load_vanilla_profiles
+
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    before = deepcopy(catalog)
+    targets = json.loads(files('doom_eap.content').joinpath('challenge_enemy_targets.json').read_bytes())
+    targets = [target for target in targets if target['map_key'] is not None]
+    sequence = sorted({target['map_key'] for target in targets})
+    options = normalize_enemy_options({'enemy_preset': preset})
+    plan = build_native_recipes(options, {'sequence': sequence}, seed=712, catalog=catalog)
+    for target in targets:
+        stage = plan['maps'][target['map_key']]
+        preserved = {row['id'] for row in stage['protected'] if row['reason'] == 'challenge enemy supply'}
+        profile = load_vanilla_profiles()['maps'][target['map_key']]
+        supplies = [slot for encounter in profile['encounters']
+                    if encounter['id'] in profile['primary_encounters']
+                    and encounter.get('combat_kind') not in {'secret_encounter', 'slayer_gate_encounter'}
+                    for slot in encounter['slots'] if slot['source_id'] in preserved
+                    and set(slot['species']) <= set(target['species'])]
+        assert sum(slot['count'] for slot in supplies if not slot['renewable']) >= target['minimum']
+        assert not preserved.intersection(recipe['id'] for recipe in stage['recipes'])
+    assert catalog == before
+
+
+def test_required_archvile_preservation_keeps_frozen_room_recipes_reconstructible():
+    from doom_eap.content.native_enemy_plan import native_recipe_seed, validate_native_recipes
+
+    key = 'e3m2_hell_b'
+    campaign = {'sequence': [key]}
+    options = normalize_enemy_options({'enemy_preset': 'oops_all_imps'})
+    old = build_native_recipes(options, campaign, seed=712, revision=19)
+    current = build_native_recipes(options, campaign, seed=712)
+    origin = key + '/ai_encounter_manager_demonpit_01a/encounterComponent.entityEvents.item[0].events.item[13].eventCall'
+    old_recipe = next(recipe for recipe in old['maps'][key]['recipes'] if recipe['id'] == origin)
+    assert old_recipe['bodies'] and all(body['species'] != 'archvile' for body in old_recipe['bodies'])
+    assert {'id': origin, 'reason': 'challenge enemy supply'} in current['maps'][key]['protected']
+    for plan in (old, current):
+        assert validate_native_recipes(native_recipe_seed(plan), options) == plan
+
+
 def frozen_plan(map_key, species, source_types):
     catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
     stage = catalog['maps'][map_key]

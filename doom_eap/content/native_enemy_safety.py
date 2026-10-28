@@ -16,6 +16,38 @@ GROUND_ENCOUNTERS = {
 }
 
 
+def preserve_challenge_sources(origins, map_key, catalog):
+    from .vanilla_enemy_profiles import load_vanilla_profiles
+
+    targets = json.loads(files(__package__).joinpath('challenge_enemy_targets.json').read_bytes())
+    targets = [target for target in targets if target['map_key'] == map_key]
+    if not targets:
+        return origins
+    profile = load_vanilla_profiles()['maps'].get(map_key)
+    # challenge requirements describe the qualified retail map.
+    if not profile or profile['source_sha256'] != catalog['maps'][map_key]['source_sha256']:
+        return origins
+    slots = {slot['source_id']: slot for encounter in profile.get('encounters', [])
+             if encounter.get('combat_kind') not in {'secret_encounter', 'slayer_gate_encounter'}
+             and encounter['id'] in profile['primary_encounters']
+             for slot in encounter['slots'] if not slot['renewable']}
+    preserved = set()
+    for target in targets:
+        minimum = target['minimum']
+        candidates = [source for source in origins if source['id'] in slots
+                      and not source.get('protected_reason') and not source.get('inactive_reason')
+                      and set(slots[source['id']]['species']) <= set(target['species'])]
+        for source in sorted(candidates, key=lambda row: (row['id'] not in preserved, row['id'])):
+            if minimum <= 0:
+                break
+            preserved.add(source['id'])
+            minimum -= min(source['logical_count'], slots[source['id']]['count'])
+        if minimum > 0:
+            raise ValueError(f"Challenge has no reachable native enemy supply: {target['name']}")
+    return [{**source, 'protected_reason': 'challenge enemy supply'} if source['id'] in preserved else source
+            for source in origins]
+
+
 def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_capabilities):
     from .native_enemy_plan import _body_hitpoints, native_body_name
 

@@ -16,6 +16,23 @@ MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT = MOD_ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "generated_content.py"
 
 
+def challenge_enemy_targets(catalog):
+    from doom_eap.content.enemy_options import SPECIES_IDS
+
+    targets = []
+    for item in catalog.runtime_locations:
+        target = item.data.get("enemy_targets")
+        if target is None:
+            continue
+        species, minimum = list(target["species"]), target["minimum"]
+        if (not species or len(set(species)) != len(species) or not set(species) <= set(SPECIES_IDS)
+                or type(minimum) is not int or minimum < 1):
+            raise ValueError(f"{item.name}: invalid enemy targets")
+        targets.append(dict(name=item.name, map_key=None if item.category == "weapon_masteries" else
+                            catalog.region_metadata[item.region]["mission_key"], species=species, minimum=minimum))
+    return targets
+
+
 def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     physical = [item for item in catalog.physical_locations
                 if not item.policy.get('legacy_alias_of') and selected_map in (None, item.map_key)]
@@ -135,19 +152,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
               for profile in MASTERY_REQUIREMENT_DIVISORS}
     lines.append(f"MASTERY_REQUIREMENT_COUNTS = {counts!r}")
     lines.append("")
-    targets = []
-    for item in catalog.runtime_locations:
-        target = item.data.get("enemy_targets")
-        if target is None:
-            continue
-        species = list(target["species"])
-        minimum = target["minimum"]
-        from doom_eap.content.enemy_options import SPECIES_IDS
-        if (not species or len(set(species)) != len(species) or not set(species) <= set(SPECIES_IDS)
-                or type(minimum) is not int or minimum < 1):
-            raise ValueError(f"{item.name}: invalid enemy targets")
-        targets.append(dict(name=item.name, map_key=None if item.category == "weapon_masteries" else item.mission_key,
-                            species=species, minimum=minimum))
+    targets = challenge_enemy_targets(catalog)
     lines.append(f"CHALLENGE_ENEMY_TARGETS = {targets!r}")
     lines.append("")
     neutral = {item.name for item in catalog.physical_locations
@@ -301,6 +306,9 @@ def _compile_catalog(
                          (catalog.root / "doom_eap/content/native_enemy_balance.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_safety.py"),
                          (catalog.root / "doom_eap/content/native_enemy_safety.py").read_bytes())
+    targets = json.dumps(challenge_enemy_targets(catalog), indent=2) + "\n"
+    write_artifact(output.with_name("challenge_enemy_targets.json"), targets)
+    write_artifact(catalog.root / "doom_eap/content/challenge_enemy_targets.json", targets)
     write_bytes_artifact(output.with_name("vanilla_enemy_profiles.py"),
                          (catalog.root / "doom_eap/content/vanilla_enemy_profiles.py").read_bytes())
     from tools.maps.native_enemy_inventory import build_native_recipe_catalog

@@ -21,11 +21,7 @@ def _functional_token(name):
 
 def _functional_properties(edit):
     result = {"targets": edit["targets"]} if list_items(edit.get("targets")) else {}
-    if edit.get("factionName"):
-        result["factionName"] = edit["factionName"]
     ai = edit.get("aiEditable", {})
-    if "tempMemoryData" in ai:
-        result.setdefault("aiEditable", {})["tempMemoryData"] = ai["tempMemoryData"]
     spawn = {key: ai["spawnSettings"][key] for key in ("initialState", "initialTarget", "timers_setOnSpawn")
              if key in ai.get("spawnSettings", {})}
     if spawn:
@@ -528,9 +524,47 @@ def _refill_limits(source, recipes):
             label = _get(call, ('args', 'item[6]', 'string')) if isinstance(call, dict) else _MISSING
             finite_stop = any(label == stop_label and 'ENCOUNTER_SPAWN_ANY' not in mask.split()
                               and not types.intersection(mask.split()) for stop_label, mask in stops)
-            if finite and finite_stop and not any('ENCOUNTER_SPAWN_ANY' in mask or mask & types for mask in kills):
+            barrier = False
+            active = False
+            script = binding.get('path', '').rsplit('.item[', 1)[0]
+            for sequence, event in calls:
+                if sequence != script:
+                    continue
+                if event is call:
+                    active = True
+                elif active and event['eventDef'] == 'stopMaintainingAICount':
+                    mask = event['args']['item[0]']['eEncounterSpawnType_t'].split()
+                    stop_label = next((arg['string'] for arg in list_items(event['args']) if 'string' in arg), '')
+                    if (not stop_label or stop_label == label) and ('ENCOUNTER_SPAWN_ANY' in mask or types.intersection(mask)):
+                        break
+                elif active and event['eventDef'] == 'waitAIRemaining':
+                    mask = event['args']['item[0]']['eEncounterSpawnType_t'].split()
+                    barrier |= 'ENCOUNTER_SPAWN_ANY' in mask or bool(types.intersection(mask))
+            if (barrier or finite and finite_stop) and not any('ENCOUNTER_SPAWN_ANY' in mask or mask & types for mask in kills):
                 limits[recipe['origin']] = max(recipe['physical_count'] * 2, finite + recipe['physical_count'])
     return limits
+
+
+def _neutralize_cleanup_damage(block, scripts):
+    owner, = entity_records(block)
+    previous = {}
+    for path, value in walk_values(owner['edit']):
+        if not path.endswith('.eventDef'):
+            continue
+        script = path.rsplit('.item[', 1)[0]
+        if script not in scripts:
+            continue
+        call_path = tuple(path.rsplit('.', 1)[0].split('.'))
+        call = _get(owner['edit'], call_path)
+        if (value == 'damageAI' and previous.get(script) == 'waitKillCount'
+                and _get(call, ('args', 'item[0]', 'decl', 'damage')) == 'damage/ai/kill_full_gib'
+                and _get(call, ('args', 'item[1]', 'eEncounterSpawnType_t')) == 'ENCOUNTER_SPAWN_ANY'
+                and _get(call, ('args', 'item[2]', 'string')) == ''):
+            block = _edit(block, call_path, {'eventDef': 'wait', 'args': {
+                'num': 2, 'item[0]': {'float': 0}, 'item[1]': {'bool': False}}})
+        if value != 'stopMaintainingAICount':
+            previous[script] = value
+    return block
 
 
 def _post_bfg_awareness(block):
@@ -692,6 +726,12 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
         block = _edit(block, (*path, "args", f"item[{argument}]", "entity"), alias)
         call["args"][f"item[{argument}]"]["entity"] = alias
         changes[name] = start, end, block
+    for name, (start, end, block) in changes.items():
+        scripts = {recipe['binding']['path'].rsplit('.item[', 1)[0]
+                   for recipe in plan['maps'][map_key]['recipes']
+                   if recipe['binding'].get('entity') == name and recipe['binding']['mode'] == 'event'}
+        if scripts:
+            changes[name] = start, end, _neutralize_cleanup_damage(block, scripts)
     if map_key == 'e2m3_core' and 'phobos_encounter_manager_6' in changes:
         start, end, block = changes['phobos_encounter_manager_6']
         changes['phobos_encounter_manager_6'] = start, end, _post_bfg_awareness(block)

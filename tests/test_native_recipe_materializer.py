@@ -115,6 +115,92 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
     return build_native_recipes(options, {"sequence": ["map"]}, seed=8, catalog=catalog, revision=revision)
 
 
+def test_shared_spawn_parent_keeps_map_bindings_without_foreign_species_state():
+    source = SOURCE.replace('name = "original";', 'name = "lostsoul";') + dedent('''
+    entity { entityDef lostsoul { inherit = "ai/fodder/lostsoul"; class = "idAI2"; edit = {
+        factionName = "lost_soul";
+        targets = { num = 1; item[0] = { name = "relay"; } }
+        aiEditable = {
+            tempMemoryData = { lostsoul_wait_charge = 1; }
+            death = { triggerOnDeath = "relay"; }
+            spawnSettings = { initialTarget = "player1"; }
+        }
+    } } }
+    entity { entityDef shared { inherit = "encounter/spawn_group/zone"; class = "idTargetSpawnGroup";
+        edit = { targetSpawnParent = "point"; spawners = { num = 1; item[0] = "child"; } } } }
+    entity { entityDef child { inherit = "target/spawn"; class = "idTarget_Spawn"; edit = {} } }
+    ''')
+    plan = frozen_plan(source, binding={'mode': 'event', 'owner': 'arena', 'reference': 'child'})
+    compiled = materialize_native_recipe_definitions(source, 'map', plan, {'map': source})
+    variants = [row for row in entity_records(compiled)
+                if row['name'].startswith('ap_v070_functional_' + _functional_token('lostsoul') + '_')]
+    assert variants
+    for row in variants:
+        assert row['inherit'] in {body['definition'] for recipe in plan['maps']['map']['recipes'] for body in recipe['bodies']}
+        assert 'factionName' not in row['edit']
+        assert 'tempMemoryData' not in row['edit']['aiEditable']
+        assert row['edit']['targets']['item[0]']['name'] == 'relay'
+        assert row['edit']['aiEditable']['death']['triggerOnDeath'] == 'relay'
+        assert row['edit']['aiEditable']['spawnSettings']['initialTarget'] == 'player1'
+
+
+@pytest.mark.parametrize('randomized,damage_type,label,expected', [
+    (True, 'ENCOUNTER_SPAWN_ANY', '', 'wait'),
+    (False, 'ENCOUNTER_SPAWN_ANY', '', 'damageAI'),
+    (True, 'ENCOUNTER_SPAWN_IMP', '', 'damageAI'),
+    (True, 'ENCOUNTER_SPAWN_ANY', 'cleanup', 'damageAI'),
+])
+def test_kill_objective_cleanup_keeps_randomized_survivors(randomized, damage_type, label, expected):
+    from tools.maps.native_recipe_materializer import _neutralize_cleanup_damage
+
+    source = '''entity { entityDef arena { inherit = "encounter/manager"; class = "idEncounterManager";
+        edit = { events = { num = 4;
+            item[0] = { eventCall = { eventDef = "waitKillCount"; args = { num = 1;
+                item[0] = { eEncounterSpawnType_t = "ENCOUNTER_SPAWN_DOOM_HUNTER"; } } } }
+            item[1] = { eventCall = { eventDef = "stopMaintainingAICount"; args = { num = 0; } } }
+            item[2] = { eventCall = { eventDef = "damageAI"; args = { num = 3;
+                item[0] = { decl = { damage = "damage/ai/kill_full_gib"; } }
+                item[1] = { eEncounterSpawnType_t = "''' + damage_type + '''"; }
+                item[2] = { string = "''' + label + '''"; } } } }
+            item[3] = { eventCall = { eventDef = "waitAIRemaining"; args = { num = 1;
+                item[0] = { eEncounterSpawnType_t = "ENCOUNTER_SPAWN_ANY"; } } } }
+        } } } }'''
+    before, = entity_records(source)
+    after, = entity_records(_neutralize_cleanup_damage(source, {'events'} if randomized else set()))
+    events = after['edit']['events']
+    assert events['item[2]']['eventCall']['eventDef'] == expected
+    for index in (0, 1, 3):
+        assert events[f'item[{index}]'] == before['edit']['events'][f'item[{index}]']
+    if expected == 'wait':
+        assert events['item[2]']['eventCall']['args']['item[0]'] == {'float': 0}
+
+
+@pytest.mark.parametrize('kill_type,stopped,expected', [
+    ('ENCOUNTER_SPAWN_ARCHVILE', False, {'refill': 10}),
+    ('ENCOUNTER_SPAWN_ZOMBIE_TIER_1', False, {}),
+    ('ENCOUNTER_SPAWN_ANY', False, {}),
+    ('ENCOUNTER_SPAWN_ARCHVILE', True, {}),
+])
+def test_initial_maintenance_is_finite_before_a_survivor_barrier(kill_type, stopped, expected):
+    source = '''entity { entityDef arena { inherit = "encounter/manager"; class = "idEncounterManager";
+        edit = { events = { num = 4;
+            item[0] = { eventCall = { eventDef = "maintainAICount"; args = { num = 7;
+                item[6] = { string = "zombies"; } } } }
+            item[1] = { eventCall = { eventDef = "waitKillCount"; args = { num = 1;
+                item[0] = { eEncounterSpawnType_t = "''' + kill_type + '''"; } } } }
+            item[2] = { eventCall = { eventDef = "''' + ('stopMaintainingAICount' if stopped else 'wait') + '''";
+                args = { num = 2; item[0] = { eEncounterSpawnType_t = "ENCOUNTER_SPAWN_ZOMBIE_TIER_1"; }
+                    item[1] = { string = "zombies"; } } } }
+            item[3] = { eventCall = { eventDef = "waitAIRemaining"; args = { num = 2;
+                item[0] = { eEncounterSpawnType_t = "ENCOUNTER_SPAWN_ANY"; } item[1] = { int = 4; } } } }
+        } } } }'''
+    recipes = [{'origin': 'refill', 'family': 'maintenance', 'maximum_emissions': 0, 'physical_count': 4,
+                'selected_spawn_type': 'ENCOUNTER_SPAWN_ZOMBIE_TIER_1',
+                'binding': {'owner': 'arena', 'path': 'events.item[0].eventCall'}},
+               {'family': 'immediate', 'maximum_emissions': 6, 'binding': {'owner': 'arena'}}]
+    assert _refill_limits(source, recipes) == expected
+
+
 
 
 

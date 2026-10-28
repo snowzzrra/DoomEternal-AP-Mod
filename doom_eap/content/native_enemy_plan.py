@@ -606,8 +606,8 @@ def _wave_peak(bodies, *, mobile=False):
                 superheavy_maximum=limits['superheavy'])
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=19):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20):
         raise ValueError('Unsupported native recipe revision')
     if not enemies["enabled"]:
         return None
@@ -734,6 +734,9 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=19):
         if vanilla_balance and revision >= 17:
             from .native_enemy_balance import prepare_encounter_sources
             origins = prepare_encounter_sources(origins, catalog, map_key)
+        if revision >= 20:
+            from .native_enemy_safety import preserve_challenge_sources
+            origins = preserve_challenge_sources(origins, map_key, catalog)
         supplies = ammunition_sources(origins, catalog, finite=revision >= 9) if revision >= 4 else frozenset()
         if vanilla_balance:
             ammo_types = {catalog['species'][species]['spawn_type'] for species in AMMO_FODDER
