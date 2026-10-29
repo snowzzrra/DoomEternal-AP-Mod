@@ -140,9 +140,7 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
     record = {"schema": "sentinel-startup-v1", "pid": 71, "process_created": "123",
               "build_id": manifest["build_id"], "session": {"namespace_id": "room"}, "admission": {"namespace_id": "room"},
               "private": {"pointer": "pointer-canary"}, "nested": [{"Ownership_Private": {"handle": "handle-canary"}}],
-              "password": "password-canary", "token": "token-canary",
-              "encounter_recovery_history": [{"request_id": "17", "origin": "console",
-                  "result": "Unsupported encounter", "producers_retired": 0, "kills_suppressed": 0}]}
+              "password": "password-canary", "token": "token-canary"}
     for suffix in (".jsonl.previous", ".jsonl", ".latest.json"):
         (directory / ("71-123" + suffix)).write_text(json.dumps(record))
     (directory / "71-123.darklord.log").write_text('AP_DARKLORD event=summary token=token-canary\n')
@@ -193,7 +191,6 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
         assert archive.read("install/injector.log").startswith(b"stdout:\n" + b"old-output\n" * 10000)
         native = json.loads(archive.read("native_startup.json"))
         assert native["status"] == "available"
-        assert native["records"][0]["diagnostic"]["encounter_recovery_history"] == record["encounter_recovery_history"]
         assert "darklord/71-123.darklord.log" in archive.namelist()
         for suffix in (".jsonl.previous", ".jsonl", ".latest.json"):
             assert b"sentinel-startup-v1" in archive.read("sentinel/71-123" + suffix)

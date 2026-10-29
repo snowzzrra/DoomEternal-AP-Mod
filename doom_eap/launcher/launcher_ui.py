@@ -1039,9 +1039,6 @@ class LauncherUI(QMainWindow):
         self.ammo_refill_button.setToolTip("Use one available Ammo Refill charge.")
         self.ammo_refill_button.clicked.connect(self._request_ammo_refill)
         ammo_block_layout.addWidget(self.ammo_refill_button)
-        self.finish_encounter_button = QPushButton("Finish current encounter")
-        self.finish_encounter_button.clicked.connect(self.controller.request_finish_encounter)
-        ammo_block_layout.addWidget(self.finish_encounter_button)
         self._set_ammo_refill_indicator(None)
         identity.addWidget(ammo_refill_block, 0, Qt.AlignmentFlag.AlignVCenter)
 
@@ -3375,11 +3372,6 @@ class LauncherUI(QMainWindow):
                 self.resync_inventory_button.setEnabled(enabled and self._room_connected)
                 if event.get("message"):
                     self._append_log(str(event["message"]))
-            return
-        if kind == "encounter_recovery":
-            self._append_log(event.get("message", "Recovery outcome unknown"))
-            if event.get("note"):
-                self._append_log(event["note"])
             return
         if kind == "ammo_refill":
             available = event.get("available")

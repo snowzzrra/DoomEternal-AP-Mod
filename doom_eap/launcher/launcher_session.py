@@ -28,6 +28,8 @@ from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_ga
 from doom_eap.runtime.weapon_points import namespace_id
 
 _UNSET = object()
+# the prepare request carries the room snapshot, whose expanded enemy plan is about 30 MiB for a full campaign
+SESSION_PIPE_LIMIT = 256 * 1024 * 1024
 _INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
 
 
@@ -159,7 +161,7 @@ class _ProtonSessionOwner:
             if not selector.select(timeout):
                 self.closable = False
                 raise RuntimeError("The Windows AP session supervisor did not respond")
-        raw = self.process.stdout.readline(1024 * 1024 + 1)
+        raw = self.process.stdout.readline(SESSION_PIPE_LIMIT + 1)
         response = json.loads(raw)
         if not isinstance(response, dict) or type(response.get("can_close")) is not bool:
             raise RuntimeError("Invalid Windows session supervisor response")
