@@ -6,6 +6,46 @@ Edit each system in its owning repository:
 - `DoomEternal-AP-Mod`: Python bridge, launcher, map compiler, native AP client and release packaging.
 - `Sentinel-Core`: native game API, hooks, save integration and its independent runtime distribution.
 
+Keep `DoomEternal-AP-Mod/`, `Archipelago/` and `Sentinel-Core/` as sibling directories.
+`Archipelago/` is the Archipelago fork that contains `worlds/doometernal/`. The content
+compiler defaults to that sibling; pass `--archipelago-source` for another location.
+`scripts/build/windows_release.ps1` takes `-ArchipelagoSource` and `-CoreSource`.
+
+## First contribution
+
+Use Python 3.10 or newer for development and CI. From the repository root,
+create a local environment and install the test dependencies:
+
+Windows (PowerShell):
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-ci.txt
+.\.venv\Scripts\python.exe -m pytest tests/test_launcher_setup.py::test_room_replacement_failure_preserves_previous -q
+```
+
+Linux:
+
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-ci.txt
+.venv/bin/python -m pytest tests/test_launcher_setup.py::test_room_replacement_failure_preserves_previous -q
+```
+
+Expect `5 passed`. These checks use temporary game folders. For the full fast
+suite, run the same Python with `-m pytest tests -q`; skips depend on installed
+tools and sibling checkouts. Qt tests skip without PySide6.
+
+For launcher or Qt work, also install `requirements-launcher.txt` with the venv's
+Python. The first test needs no native build. Building the Windows native client
+needs x64 MSVC, the Windows SDK and a configured sibling `Sentinel-Core` checkout;
+some native tests skip without a compiler or Core headers. Core builds and tests
+belong in `Sentinel-Core`; see [Build a release](RELEASING.md) for packaging.
+
+Format only changed files: `python -m ruff format path/to/changed.py` and
+`clang-format -i native/path/to/changed.cpp` (include changed headers).
+Hooks are optional: with pre-commit installed and the venv active, run `pre-commit install`.
+
 ## Content sources
 
 `content/maps/<map>/` describes map identity, locations, runtime events, publishers,
@@ -116,3 +156,73 @@ launcher requires a Core/probe distribution with that ABI before gameplay setup.
 Use [Build a release](RELEASING.md) for validation and packaging commands. Offline
 harnesses cover protocol and simulated lifecycle behavior. Full gameplay and real
 Linux/Proton checks require a separate test session with the supported game.
+
+## Writing code
+
+Data from outside the program — the AP server, files on disk, the named pipe to
+Core, game memory — is checked once, where it comes in, and turned into a typed
+value (usually a frozen dataclass or an enum). Code past that point can rely on it.
+Checking the same fields again deeper in the code makes changes harder, because
+every check has to be updated when the format changes.
+
+Decide with codes and enums, not with display text. A button's label or an
+exception message can change for a wording fix; that must not change behavior.
+
+Catch the specific exception you expect, near the call that raises it. Catching
+`Exception` is fine only at the edge of a worker thread or a game hook, where an
+uncaught error would kill the thread or the game. In native code, game-memory
+reads and writes stay inside SEH guards, every MinHook call's result is checked,
+and a hook install that fails halfway removes the hooks it already created.
+
+Give things the name of what they are (`MenuState`, `content_fingerprint`). Never
+rename persisted keys or public IDs: saves and rooms from players depend on them.
+
+A comment is worth writing when the code can't say it: a game quirk, a limit of
+Proton, a reason an order matters. Leave out comments that restate the code.
+
+Text shown to players says what went wrong and what to do next. When the fix isn't
+simple, point to Help → Save Support Report; the technical details go in the report.
+
+Tests go through the same entry points the program uses and check what a player
+would notice: saves kept, rooms kept apart, items delivered once, spending,
+recovery after a crash, progression, install and update. A test that checks a
+private attribute, an exact sentence or the order of internal calls breaks on every
+refactor without catching real bugs.
+
+### Generated files
+
+Most of the large JSON files in this repository are not written by hand. Edit the
+source and run the generator; a hand edit is overwritten on the next run and makes
+the provenance hashes disagree.
+
+| Files | Source | Command |
+|---|---|---|
+| `doom_eap/content/native_enemy_catalog.json`, `vanilla_enemy_profiles.json`, `campaign_kill_sources.json`; `data/checked_location_visuals.json`, `campaign_stages.json`, `foundation_contracts.json`; the APWorld's `generated_content.py` and its copies of these files | `content/maps/`, `content/catalog/` | `python -m tools.content.compile_content_catalog` |
+| `data/options_schema.json` | option classes in the APWorld | `python -m tools.content.compile_options_schema` |
+| `content/catalog/native_enemy_assets.json` | the installed game (Windows) | `python tools/content/capture_native_enemy_assets.py` |
+| `packaging/room_resources/<version>/` | compiled room resources | release tooling, see [Build a release](RELEASING.md) |
+
+The content compiler prints the paths it changed. Commit the source change and the
+regenerated files together.
+
+### Function complexity
+
+`python -m tools.validation.function_complexity` measures each Python function.
+A function may have cognitive complexity up to 15 and cyclomatic complexity up to
+10. Functions that were already above that are listed with their current numbers
+in `tools/validation/complexity_exceptions_mod.txt` (and `..._apworld.txt` for the
+APWorld, checked with `--apworld-root ../Archipelago/worlds/doometernal`). A listed
+function may get simpler but not more complex. When you simplify one below the
+limit, delete its line, or run with `--update`.
+
+## Glossary
+
+| Term | Meaning |
+|---|---|
+| Room | An Archipelago multiworld session; identified by seed, team and slot |
+| Room mod | The mod ZIP compiled for one room and player |
+| Receipt | One entry of the server's received-items list, identified by its index |
+| Check | A location the player completed, sent to the server |
+| Core | Sentinel Core, the native DLL loaded into the game |
+| Lease | Identifier of the game context (campaign, map, load) a command was planned for |
+| Spool | The on-disk queue of commands between the bridge and the native client |
