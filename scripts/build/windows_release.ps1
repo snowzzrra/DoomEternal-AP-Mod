@@ -1,5 +1,8 @@
-[CmdletBinding()]
+[CmdletBinding(PositionalBinding = $false)]
 param(
+    [Parameter(Position = 0)]
+    [ValidateSet("--help")]
+    [string]$HelpArgument,
     [switch]$Preflight,
     [switch]$SkipValidation,
     [switch]$RebuildRoomResources,
@@ -8,14 +11,27 @@ param(
     [string]$MapSources,
     [string]$Compressor,
     [string]$CoreSource,
+    [string]$ArchipelagoSource,
     [string]$Python,
-    [string]$PipelineReceipt
+    [string]$PipelineReceipt,
+    [Alias("h")]
+    [switch]$Help
 )
+
+if ($Help -or $HelpArgument) {
+    Write-Output @"
+Usage: windows_release.ps1 -CoreSource <Sentinel-Core> [-ArchipelagoSource <Archipelago>]
+    [-Python <python.exe>] [-Preflight] [-SkipValidation] [-PipelineReceipt <path>]
+    [-RebuildRoomResources] [-PublishRoomResources] [-StagedMod <path>] [-MapSources <path>] [-Compressor <path>]
+ArchipelagoSource defaults to the sibling Archipelago checkout containing worlds/doometernal.
+"@
+    return
+}
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $workspace = Split-Path -Parent $repoRoot
-$archipelago = Join-Path $workspace "Archipelago"
+$archipelago = if ($ArchipelagoSource) { $ArchipelagoSource } else { Join-Path $workspace "Archipelago" }
 
 function Resolve-CanonicalPython {
     $candidates = @()
@@ -51,9 +67,10 @@ function Invoke-Python([string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "Python command failed ($LASTEXITCODE): $($Arguments -join ' ')" }
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $archipelago "Launcher.py"))) {
-    throw "Archipelago checkout missing at $archipelago"
+if (-not (Test-Path -LiteralPath (Join-Path $archipelago "Launcher.py") -PathType Leaf)) {
+    throw "Archipelago checkout missing at $archipelago (expected Launcher.py); pass -ArchipelagoSource with the Archipelago fork root."
 }
+$archipelago = (Resolve-Path -LiteralPath $archipelago).Path
 $pythonExe = Resolve-CanonicalPython
 Write-Output "PYTHON canonical=$pythonExe"
 Push-Location $repoRoot

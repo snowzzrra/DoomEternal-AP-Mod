@@ -55,7 +55,6 @@ GENERATED_MAPS_DIR="$OUTPUT_DIR/build/generated-maps"
 GENERATED_MANIFESTS_DIR="$TEMP_DIR/manifests"
 BUILD_LOG="$OUTPUT_DIR/build/build.log"
 CLIENT_BUILD_DIR="$OUTPUT_DIR/build/client"
-PACKAGEMAPSPEC="${DOOM_PACKAGEMAPSPEC:-/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json}"
 
 mkdir -p "$TEMP_DIR"
 SKIP_REQUIREMENTS_UPDATE=1 "$ARCHIPELAGO_PYTHON" \

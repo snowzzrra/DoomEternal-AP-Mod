@@ -7,12 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-DEFAULT_PACKAGEMAPSPEC = Path(
-    "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
-)
 
-
-def load_packagemapspec(packagemapspec_path: Path | str = DEFAULT_PACKAGEMAPSPEC) -> dict[str, Any]:
+def load_packagemapspec(packagemapspec_path: Path | str) -> dict[str, Any]:
     path = Path(packagemapspec_path)
     if not path.is_file():
         raise FileNotFoundError(f"packagemapspec.json not found at {path}")
@@ -25,7 +21,7 @@ def load_packagemapspec(packagemapspec_path: Path | str = DEFAULT_PACKAGEMAPSPEC
 
 def resolve_owner(
     runtime_map: str,
-    packagemapspec_path: Path | str = DEFAULT_PACKAGEMAPSPEC,
+    packagemapspec_path: Path | str,
 ) -> tuple[str, int]:
     """Return first ordered resource reference and file index for one runtime map."""
     data = load_packagemapspec(packagemapspec_path)
@@ -56,7 +52,7 @@ def resolve_owner(
 
 def resolve_owner_evidence(
     runtime_map: str,
-    packagemapspec_path: Path | str = DEFAULT_PACKAGEMAPSPEC,
+    packagemapspec_path: Path | str,
 ) -> dict[str, Any]:
     path = Path(packagemapspec_path)
     winner, priority = resolve_owner(runtime_map, path)

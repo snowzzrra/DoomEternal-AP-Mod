@@ -94,7 +94,6 @@ def discover_save_base(explicit: str | None = None) -> Path:
     if configured:
         candidates.append(Path(configured).expanduser())
     candidates.extend(Path.home().glob(".local/share/Steam/userdata/*/782330/remote"))
-    candidates.extend(Path("/run/media/system/Eris/SteamLibrary/steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base").parent.glob("base"))
     existing = [path.resolve() for path in candidates if path.is_dir()]
     if not existing:
         raise RuntimeError("No DOOM save base found; pass --path explicitly")

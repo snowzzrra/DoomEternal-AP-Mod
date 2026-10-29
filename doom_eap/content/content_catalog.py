@@ -9,15 +9,19 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any
 
 from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
-from doom_eap.contracts.publisher_contracts import (EFFECT_STRATEGIES, TRIGGER_STRATEGIES,
-                                 PublisherContract, publisher_contracts_from_document)
-
+from doom_eap.contracts.publisher_contracts import (
+    EFFECT_STRATEGIES,
+    TRIGGER_STRATEGIES,
+    PublisherContract,
+    publisher_contracts_from_document,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT
@@ -694,13 +698,12 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             if effect["strategy"] not in EFFECT_STRATEGIES:
                 raise ValueError(f"unsupported publisher effect: {effect['strategy']}")
     import os
+
     from tools.maps.resource_priority import resolve_owner
 
     packagemapspec_env = os.environ.get("DOOM_PACKAGEMAPSPEC")
-    packagemapspec_path = Path(packagemapspec_env) if packagemapspec_env else Path(
-        "/run/media/system/Eris/SteamLibrary/steamapps/common/DOOMEternal/base/packagemapspec.json"
-    )
-    if packagemapspec_path.is_file():
+    if packagemapspec_env:
+        packagemapspec_path = Path(packagemapspec_env)
         for map_key, spec in catalog.maps.items():
             expected_owner, expected_priority = resolve_owner(
                 spec.runtime_map, packagemapspec_path

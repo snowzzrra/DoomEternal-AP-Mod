@@ -9,10 +9,6 @@ import math
 from collections import Counter
 from pathlib import Path
 
-DEFAULT_ROOT = Path(
-    "/var/home/guilherme/.local/share/Steam/userdata/160032537/782330/remote"
-)
-
 
 def entropy(data: bytes) -> float:
     if not data:
@@ -43,12 +39,15 @@ def inspect(path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
+    parser.add_argument("root", type=Path, help="Save directory to inspect")
     args = parser.parse_args()
+    if not args.root.is_dir():
+        parser.error(f"folder does not exist: {args.root}")
 
-    for path in sorted(args.root.glob("*/game.details")):
-        inspect(path)
-    for path in sorted(args.root.glob("*/game_duration.dat")):
+    paths = sorted(args.root.glob("*/game.details")) + sorted(args.root.glob("*/game_duration.dat"))
+    if not paths:
+        parser.error(f"no save found in: {args.root}")
+    for path in paths:
         inspect(path)
 
 
