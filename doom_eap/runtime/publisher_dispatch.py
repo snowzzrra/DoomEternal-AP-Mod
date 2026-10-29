@@ -1,12 +1,14 @@
 """Publisher effects own pending dispatch and server-confirmed acknowledgements."""
 from dataclasses import replace
+from doom_eap.runtime.ledger_shadow import ignore
 from doom_eap.contracts.check_observation import CheckObservation, CheckPublicationPort
 from doom_eap.contracts.publisher_contracts import publisher_acknowledged
 
 
 class PublisherDispatch:
-    def __init__(self, publishers, goals, logger):
+    def __init__(self, publishers, goals, logger, observer=lambda: ignore):
         self._publishers, self._goals, self._logger = tuple(publishers), goals, logger
+        self._observe = observer
         self._acknowledgements = {}
         self._in_flight = set()
         self._generation = 0
@@ -36,6 +38,8 @@ class PublisherDispatch:
     async def send_publisher_effect(
         self, publisher, effect_index, effect, source_description, publication, persist
     ):
+        observe = self._observe()
+        observe("publisher_effect", effect=effect, checked=self._facts.checked)
         strategy = effect["strategy"]
         effect_key = (publisher.key, effect_index)
         checked_locations = self._facts.checked
@@ -97,6 +101,7 @@ class PublisherDispatch:
         generation = self._generation
         try:
             await publication.location(location_id)
+            observe("publisher_sent", locations=(location_id,))
         except Exception:
             if generation != self._generation:
                 return False

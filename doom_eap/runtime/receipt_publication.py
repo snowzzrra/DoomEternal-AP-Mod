@@ -1,6 +1,7 @@
 """Preserve receipt spool identities, dispatch metadata and timing at the adapter."""
 from doom_eap.contracts.receipt_delivery import ReceiptPublicationScope
 import time
+from doom_eap.runtime.ledger_shadow import ignore
 from doom_eap.contracts.command_publication import queue_session_namespace
 from doom_eap.contracts.receipt_delivery import NEW_RECEIPT
 
@@ -16,8 +17,9 @@ def receipt_command_id(state_key, item_id, item_index, command_index, command):
 
 
 class ReceiptPublication:
-    def __init__(self, send):
+    def __init__(self, send, observer=ignore):
         self._send = send
+        self._observe = observer
 
     def publish(self, command, scope, item_id, item_index, ordinal, item_name, *, deferred=False):
         command_id = receipt_command_id(scope.state_key, item_id, item_index, ordinal, command)
@@ -36,4 +38,5 @@ class ReceiptPublication:
             options = {"materialization_lease": scope.materialization_lease}
         accepted = self._send(command, coalesce_key=command_id, already_queued_ok=True,
                               state_key=scope.state_key, delivery_fields=fields, **options)
+        self._observe("receipt_publication", state_key=scope.state_key, command_id=command_id, payload=command, item_index=item_index, ordinal=ordinal, accepted=bool(accepted), optional=deferred, scope=scope)
         return accepted, command_id

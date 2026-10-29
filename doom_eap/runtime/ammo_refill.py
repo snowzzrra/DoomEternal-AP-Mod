@@ -1,5 +1,6 @@
 """Ammo charge accounting and staged-spend policy, independent of CommonClient."""
 import asyncio
+from doom_eap.runtime.ledger_shadow import ignore
 from typing import Protocol
 from dataclasses import dataclass
 from collections.abc import Mapping
@@ -69,7 +70,8 @@ def ammo_readiness(*, placement_ready, item_ready, connected, namespace_match, m
 
 
 class AmmoRefill:
-    def __init__(self, commands: AmmoCommandsPort, storage: AmmoStoragePort, emit, logger):
+    def __init__(self, commands: AmmoCommandsPort, storage: AmmoStoragePort, emit, logger, observer=ignore):
+        self._observe = observer
         self._commands = commands
         self._storage = storage
         self._emit = emit
@@ -99,6 +101,7 @@ class AmmoRefill:
         self._confirmation_timer = None
         if not self._pending:
             return
+        self._observe("ammo_timeout", state_key=self._state_key, pending=self._pending)
         self._commands.cancel("storage confirmation timed out")
         self._pending = False
         self._storage_uncertain = True
@@ -223,6 +226,7 @@ class AmmoRefill:
 
 
     async def normalize_overflow(self, source):
+        state_key = self._state_key
         generation = self._generation
         try:
             target = self.overflow_target()
@@ -230,6 +234,7 @@ class AmmoRefill:
             if not isinstance(target, int) or not isinstance(current, int) or target <= current:
                 return
             delta = target - current
+            self._observe("ammo_discard_request", state_key=state_key, baseline=current, target=target, source=source)
             self._discard_pending = target
             self._logger.info(
                 "AMMO_REFILL_OVERFLOW received=%s consumed=%s discarded_before=%s "
@@ -255,6 +260,7 @@ class AmmoRefill:
 
 
     def consume_discarded(self, value):
+        self._observe("ammo_discarded", state_key=self._state_key, value=value, pending=self._discard_pending, baseline=self._discarded)
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             self._logger.warning("[Ammo Refill] Ignoring invalid server discarded count: %r", value)
             return
@@ -282,6 +288,7 @@ class AmmoRefill:
 
 
     def consume_consumed(self, value):
+        self._observe("ammo_consumed", state_key=self._state_key, value=value, pending=self._pending, baseline=self._consumed)
         self._cancel_confirmation_timer()
         if isinstance(value, bool) or not isinstance(value, int) or value < 0:
             self._logger.warning("[Ammo Refill] Ignoring invalid server consumed count: %r", value)
@@ -339,6 +346,7 @@ class AmmoRefill:
         if self._pending:
             self._pending = False
             try:
+                self._observe("ammo_legacy_authorization", state_key=self._state_key, value=value, correlated=False)
                 if not self._commands.confirm():
                     raise RuntimeError("execution gate refused enable")
             except Exception as error:
@@ -358,6 +366,7 @@ class AmmoRefill:
 
 
     async def request(self, scope, readiness_result):
+        self._observe("ammo_request", state_key=scope.state_key, scope=scope, readiness=readiness_result[0], pending=self._pending)
         generation = self._generation
         if scope.state_key != self._state_key:
             return False

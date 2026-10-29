@@ -1,5 +1,6 @@
 """Receipt feedback policy and the existing resumable publication ledgers."""
 from typing import Callable, Protocol
+from doom_eap.runtime.ledger_shadow import ignore
 from doom_eap.contracts.receipt_delivery import ReceiptIntent, ReceiptFeedbackFacts, ReceiptPlan, MappingRepair, ReceiptPublicationScope
 from doom_eap.contracts.foundation import compile_item_delivery_plan
 from doom_eap.contracts.receipt_delivery import NEW_RECEIPT, HISTORICAL_OWNERSHIP, RECONCILIATION_REPAIR, PRESENTATION_REPAIR
@@ -61,9 +62,10 @@ class ReceiptPublicationPort(Protocol):
 
 
 class ReceiptDelivery:
-    def __init__(self, logger):
+    def __init__(self, logger, observer=ignore):
         self._state = {}
         self._logger = logger
+        self._observe = observer
 
     def bind(self, state):
         self._state = state
@@ -122,6 +124,7 @@ class ReceiptDelivery:
               publication: ReceiptPublicationPort, persist: Callable[[str], None]):
         if plan.commands is None:
             return False, plan.description
+        self._observe("group_plan", state_key=scope.state_key, item_index=item_index, commands=plan.commands)
         commands = plan.commands
         groups = self._state.setdefault("item_command_groups", {})
         key = str(item_index)
@@ -133,12 +136,14 @@ class ReceiptDelivery:
             return False, "stored command group index is invalid"
         for ordinal in range(next_command, len(commands)):
             accepted, _command_id = publication.publish(commands[ordinal], scope, item_id, item_index, ordinal, item_name)
+            self._observe("group_publication", state_key=scope.state_key, item_index=item_index, ordinal=ordinal, command_id=_command_id, accepted=bool(accepted))
             if not accepted:
                 return False, plan.description
             group["next_command"] = ordinal + 1
             group["total_commands"] = len(commands)
             try:
                 persist("item_command_group_progress")
+                self._observe("group_progress", state_key=scope.state_key, item_index=item_index, next_command=ordinal + 1)
             except Exception:
                 group["next_command"] = ordinal
                 raise
@@ -147,6 +152,7 @@ class ReceiptDelivery:
             self._state.pop("item_command_groups", None)
         try:
             persist("item_command_group_complete")
+            self._observe("group_completion", state_key=scope.state_key, item_index=item_index)
         except Exception:
             self._state.setdefault("item_command_groups", {})[key] = group
             raise

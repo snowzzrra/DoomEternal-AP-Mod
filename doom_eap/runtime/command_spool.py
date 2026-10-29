@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import time
 import uuid
+from doom_eap.runtime.ledger_shadow import ignore, observed_publication
 
 from doom_eap.contracts.command_publication import (
     CommandEvidence, PublicationResult,
@@ -26,11 +27,12 @@ def discard_unclaimed_command(queue_dir, coalesce_key: str) -> bool:
 
 
 class CommandSpool:
-    def __init__(self, queue_dir, *, arm_rpc, log_delivery, logger):
+    def __init__(self, queue_dir, *, arm_rpc, log_delivery, logger, observer=ignore):
         self.queue_dir = queue_dir
         self.arm_rpc = arm_rpc
         self.log_delivery = log_delivery
         self.logger = logger
+        self._observe = observer
 
     def quarantine_bootstrap(self, action_names):
         for action_name in action_names:
@@ -86,6 +88,7 @@ class CommandSpool:
         facts = dict(line.split("=", 1) for line in lines if "=" in line)
         return facts.get("outcome") if facts.get("lease") == lease else None
 
+    @observed_publication
     def publish(
         self, cmd, coalesce_key=None, arm_rpc=True, already_queued_ok=False,
         delivery_fields=None, state_key=None, room_scoped=True,
@@ -148,6 +151,7 @@ class CommandSpool:
             if materialization_lease is not None:
                 payload += f"{MATERIALIZATION_LEASE_HEADER} {materialization_lease}\n"
             payload += cmd.strip() + "\n"
+            self._observe("spool_payload", state_key=state_key, command_id=command_id, payload=payload, execution_class=execution_class, lease=materialization_lease)
             if coalesce_key:
                 temporary_owned = False
                 try:

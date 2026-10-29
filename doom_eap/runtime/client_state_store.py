@@ -56,13 +56,14 @@ def client_state_metrics(state):
 
 
 class ClientStateStore:
-    def __init__(self, path, *, version, migrate, log_event, logger):
+    def __init__(self, path, *, version, migrate, log_event, logger, observer=lambda *args, **kwargs: None):
         self.path = path
         self.version = version
         self.migrate = migrate
         self.log_event = log_event
         self.logger = logger
         self._load_error = None
+        self._observe = observer
 
     def load(self):
         if self._load_error is not None:
@@ -148,12 +149,14 @@ class ClientStateStore:
         try:
             atomic_write_json(self.path, state)
         except Exception as error:
+            self._observe("legacy_commit", state=state, reason=reason, boundary=boundary, success=False)
             self.log_event(
                 "ITEM_STATE_SAVE", path=str(self.path.resolve()), reason=reason,
                 boundary_before=boundary_before, boundary_after=boundary,
                 success=False, error=str(error), **metrics,
             )
             raise
+        self._observe("legacy_commit", state=state, reason=reason, boundary=boundary, success=True)
         self.log_event(
             "ITEM_STATE_SAVE", path=str(self.path.resolve()), reason=reason,
             boundary_before=boundary_before, boundary_after=boundary, success=True,

@@ -1,5 +1,6 @@
 """Current AP storage/native-file adapters and request-file worker for Ammo Refill."""
 import asyncio
+from doom_eap.runtime.ledger_shadow import ignore
 from collections import deque
 import os
 from uuid import uuid4
@@ -9,22 +10,26 @@ from doom_eap.runtime.ammo_refill import AMMO_REFILL_ITEM_ID, AMMO_REFILL_PRIMIT
 
 
 class AmmoStorage:
-    def __init__(self, send):
+    def __init__(self, send, observer=ignore):
         self._send = send
+        self._observe = observer
 
     async def increment(self, key, default, delta):
+        self._observe("ammo_storage_request", storage_key=key, baseline=default, delta=delta)
         await self._send([{"cmd": "Set", "key": key, "default": default,
                            "operations": [{"operation": "add", "value": delta}], "want_reply": True}])
+        self._observe("ammo_storage_sent", storage_key=key, baseline=default, delta=delta)
 
     async def watch(self, keys):
         await self._send([{"cmd": "Get", "keys": list(keys)}, {"cmd": "SetNotify", "keys": list(keys)}])
 
 
 class AmmoCommandPublication:
-    def __init__(self, send, discard, rpc_enabled, set_rpc, logger):
+    def __init__(self, send, discard, rpc_enabled, set_rpc, logger, observer=ignore):
         self._send, self._discard = send, discard
         self._rpc_enabled, self._set_rpc = rpc_enabled, set_rpc
         self._logger = logger
+        self._observe = observer
         self._staged = ()
         self._state_key = ""
         self._restore_rpc = False
@@ -41,6 +46,7 @@ class AmmoCommandPublication:
 
     def confirm(self):
         staged = self._staged
+        self._observe("ammo_commands_authorized", state_key=self._state_key, commands=staged, correlated=False)
         self._staged = ()
         published = []
         try:
@@ -100,12 +106,14 @@ class AmmoCommandPublication:
                     "slot": scope.save_slot,
                 },
             )))
+        self._observe("ammo_commands_staged", state_key=scope.state_key, commands=staged, scope=scope)
         self._staged = tuple(staged)
         self._state_key = scope.state_key
         return True
 
 
     def cancel(self, reason):
+        self._observe("ammo_cancel", state_key=self._state_key, staged_count=len(self._staged), reason=reason)
         if self._staged:
             self._logger.info("[Ammo Refill] Cancelled staged commands: %s", reason)
         self._staged = ()
