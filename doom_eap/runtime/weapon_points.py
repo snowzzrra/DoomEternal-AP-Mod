@@ -101,7 +101,9 @@ class SentinelWeaponPoints:
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             evidence.update(predicate="transport_or_json", error=str(error))
             self._diagnose(evidence)
-            raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
+            blocked = WeaponPointsBlocked(f"Sentinel transport unavailable: {error}")
+            blocked.returncode = evidence.get("returncode")
+            raise blocked from error
         predicate = "exit_or_result" if process.returncode or result.get("result") != "ok" else None
         evidence["predicate"] = predicate
         self._diagnose(evidence)
@@ -115,9 +117,15 @@ class SentinelWeaponPoints:
         body = struct.pack("<III", int(amount != 0), amount, expected)
         return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
 
+    def _typed_payload(self, capability, scope, request_id, nonce, body):
+        return (struct.pack("<QIQ16sQQ16sI", capability, self.pid,
+                            int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
+                            int(scope["lifecycle_generation"]), request_id, nonce, 2000)
+                + self.namespace.encode("ascii") + b"\0" + body)
+
     @timed_sync_call
-    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None):
-        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
+    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None, prepared=None):
+        scope = prepared[0] if prepared else self._run(["--pid", str(self.pid), "--native", "--json"])
         if trace is not None:
             trace.append({"stage": "scope", "response": scope})
         if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
@@ -128,11 +136,8 @@ class SentinelWeaponPoints:
             self._diagnostic_signatures.clear()
         if capability in self._incompatible_capabilities:
             raise WeaponPointsBlocked("Native probe response incompatible with this runtime identity")
-        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
-        payload = struct.pack("<QIQ16sQQ16sI", capability, self.pid,
-                              int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
-                              int(scope["lifecycle_generation"]), request_id, nonce, 2000)
-        payload += self.namespace.encode("ascii") + b"\0" + body
+        request_id, nonce = prepared[1:] if prepared else (secrets.randbits(64) or 1, secrets.token_bytes(16))
+        payload = self._typed_payload(capability, scope, request_id, nonce, body)
         deadline = time.monotonic() + 5
         operation = submit
         while True:
@@ -159,8 +164,11 @@ class SentinelWeaponPoints:
                               "request_id": request_id, "nonce": nonce.hex(),
                               "response": result, "at_monotonic": time.monotonic()})
             if (result.get("namespace") != self.namespace or int(result["request_id"]) != request_id
-                    or result.get("build_id") != scope.get("build_id")):
-                raise WeaponPointsBlocked("Sentinel response identity changed")
+                    or result.get("build_id") != scope.get("build_id")
+                    or "nonce" in result and result["nonce"] != nonce.hex()):
+                error = WeaponPointsBlocked("Sentinel response identity changed")
+                error.probe_result = "process_mismatch"
+                raise error
             if result["state"] in (3, 4, 5, 6):
                 # Release the retained queue slot; durable receipt intent belongs to the caller.
                 release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
@@ -180,6 +188,10 @@ class SentinelWeaponPoints:
                 raise error
             operation = result_operation
             time.sleep(0.025)
+
+    def finish_encounter(self, *, trace=None):
+        from doom_eap.runtime.encounter_recovery import finish_encounter
+        return finish_encounter(self, trace=trace)
 
     def observe_combat(self, mission_maps):
         if not re.fullmatch(r"[0-9a-f]{64}", self.namespace):

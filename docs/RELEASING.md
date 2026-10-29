@@ -78,7 +78,7 @@ local shell build.
 To assemble existing build outputs, use:
 
 ```text
-python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.7.1 --repo-root . --output-dir <new-output>
+python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.7.2 --repo-root . --output-dir <new-output>
 ```
 
 Use `--platform linux` for Linux. Here `--handoff` means a directory containing

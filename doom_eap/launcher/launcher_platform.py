@@ -14,11 +14,13 @@ import shutil
 import http.client
 import socket
 import ssl
+import struct
 import subprocess
 import sys
 import tarfile
 import tempfile
 import time
+import traceback
 import urllib.error
 import urllib.request
 import webbrowser
@@ -1062,9 +1064,10 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         raise RuntimeError("XINPUT1_3.dll conflicts with DoomEAP. Uninstall the mod that installed it, then retry. If you do not know which mod installed it, select Help -> SAVE SUPPORT REPORT.")
     existing = root / "sentinel-distribution.json"
     owned_partial = False
-    if not installed.ok and existing.is_file():
+    if not installed.ok and (existing.is_file() or any((root / name).exists() for name in NAMES[:2])):
         try:
-            previous = {item["path"]: item for item in read_manifest(existing, require_compatible=False)["artifacts"]}
+            previous = {item["path"]: item for item in
+                        read_manifest(existing if existing.exists() else manifest, require_compatible=False)["artifacts"]}
             owned_partial = all(not (root / name).exists() or
                 (len((root / name).read_bytes()) == previous[name]["size"] and
                  hashlib.sha256((root / name).read_bytes()).hexdigest() == previous[name]["sha256"])
@@ -1622,11 +1625,159 @@ def _packagemapspec_owner(
             raise ValueError(f"runtime map {runtime_map!r} has invalid resource reference")
         record = files[file_index]
         name = record.get("name") if isinstance(record, dict) else None
-        if isinstance(name, str) and name.endswith(".resources"):
+        if (isinstance(name, str) and name.endswith(".resources")
+                and not name.replace("\\", "/").removeprefix("./").startswith("ap_enemy_resources/")):
             candidates.append((file_index, name))
     if not candidates:
         raise ValueError(f"runtime map {runtime_map!r} has no resource reference")
     return candidates[0][1], candidates[0][0], [name for _, name in candidates]
+
+
+def installation_error_details(error: Exception, step: str) -> dict:
+    return {
+        "required_resources": [],
+        **getattr(error, "details", {}),
+        "failure_step": getattr(error, "details", {}).get("failure_step", step),
+        "exception_type": type(error).__name__,
+        "verification_error": str(error),
+        "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__, limit=6)),
+    }
+
+
+@contextmanager
+def installation_step(step: str):
+    try:
+        yield
+    except Exception as error:
+        error.details = installation_error_details(error, step)
+        raise
+
+
+def _installation_failure(result: AdapterResult, error: Exception, step: str, event_sink,
+                          game_root: Path | None = None, staged_mod: Path | None = None) -> AdapterResult:
+    details = {**result.details, **installation_error_details(error, step), "post_install_verification": "failed"}
+    if not details["required_resources"] and game_root is not None and staged_mod is not None:
+        try:
+            details["required_resources"], _ = _required_linux_resource_specs(staged_mod, game_root / "base/packagemapspec.json")
+        except Exception as evidence_error:
+            details["resource_evidence_error"] = f"{type(evidence_error).__name__}: {evidence_error}"
+    message = f"Installation failed at {details['failure_step']}: {type(error).__name__}: {error}"
+    if event_sink is not None:
+        for line in json.dumps(details, indent=2).splitlines():
+            event_sink("log", message=line)
+        for line in details["traceback"].splitlines():
+            event_sink("log", message=line)
+    return AdapterResult(state="failed", message=message, command=result.command, stdout=result.stdout,
+                         stderr=result.stderr, returncode=result.returncode, details=details)
+
+
+def injector_state_summary(game_root: Path) -> dict:
+    from .campaign_resources import _records
+    base = game_root / "base"
+    settings = game_root / "EternalModInjector Settings.txt"
+    mapping = base / "idRehash.map"
+    spec = base / "packagemapspec.json"
+    text = settings.read_text(encoding="utf-8-sig", errors="replace") if settings.is_file() else ""
+    lines = mapping.read_text(encoding="utf-8-sig", errors="replace").splitlines() if mapping.is_file() else []
+    try:
+        row = _records(base / "meta.resources", {"generated/buildgame/container.mask"})["generated/buildgame/container.mask"]
+        decoded = row[4] == 0
+    except (OSError, ValueError, struct.error) as error:
+        decoded = f"unavailable: {type(error).__name__}: {error}"
+    return {
+        "settings": {key: next((line.split("=", 1)[1] for line in text.splitlines()
+                                if line.startswith(f":{key}=")), None)
+                     for key in ("HAS_CHECKED_RESOURCES", "RESET_BACKUPS", "ASSET_VERSION")},
+        "settings_backup_lines": sum(line.rstrip().endswith(".backup") for line in text.splitlines()),
+        "backup_files": sum(path.is_file() for path in base.rglob("*.backup")),
+        "rehash_lines": len(lines),
+        "rehash_bank_lines": sum("ap_enemy_resources/" in line.replace("\\", "/") for line in lines),
+        "bank_files": sorted(path.name for path in (base / "ap_enemy_resources").glob("*")),
+        "bank_marker": spec.is_file() and "doomEAPEnemyResourceBanks" in spec.read_text(encoding="utf-8-sig"),
+        "meta_decoded": decoded,
+    }
+
+
+def _log_injector_state(game_root: Path, phase: str, event_sink) -> dict:
+    try:
+        summary = injector_state_summary(game_root)
+    except (OSError, ValueError) as error:
+        summary = {"error": f"{type(error).__name__}: {error}"}
+    if event_sink is not None:
+        for key, value in summary.items():
+            for line in json.dumps(value, indent=2).splitlines():
+                event_sink("log", message=f"Injector {phase}: {key}={line}")
+    return summary
+
+
+def _sanitize_injector_mapping(game_root: Path) -> None:
+    from .campaign_resources import _records
+    from .resource_bank import mask_tables
+    base = game_root / "base"
+    mapping = base / "idRehash.map"
+    original = mapping.read_text(encoding="utf-8-sig", errors="replace") if mapping.is_file() else ""
+    try:
+        mask = _records(base / "meta.resources", {"generated/buildgame/container.mask"})["generated/buildgame/container.mask"][3]
+        offsets = set(mask_tables(mask))
+    except (OSError, ValueError, struct.error):
+        offsets = None
+    kept, names, seen_offsets, bank_offsets = [], set(), set(), set()
+    coherent = offsets is not None
+    for line in original.splitlines(keepends=True):
+        name, separator, offset = line.rpartition(";")
+        name = name.replace("\\", "/").removeprefix("./")
+        if name.startswith("ap_enemy_resources/"):
+            if offset.strip().isdigit():
+                bank_offsets.add(int(offset))
+            continue
+        if not separator or not offset.strip().isdigit() or not name.endswith(".resources"):
+            coherent = False
+            continue
+        value = int(offset)
+        if offsets is not None and value not in offsets:
+            coherent = False
+            continue
+        if name in names or value in seen_offsets:
+            coherent = False
+            continue
+        names.add(name)
+        seen_offsets.add(value)
+        kept.append(line)
+    if offsets is not None and seen_offsets != offsets - bank_offsets:
+        coherent = False
+    cleaned = "".join(kept)
+    if mapping.is_file() and cleaned != original:
+        _atomic_write_bytes(mapping, cleaned.encode("utf-8"))
+    if not kept or not coherent:
+        settings = game_root / "EternalModInjector Settings.txt"
+        content = settings.read_text(encoding="utf-8-sig") if settings.is_file() else ""
+        lines = [line for line in content.splitlines() if not line.startswith(":HAS_CHECKED_RESOURCES=")]
+        lines.append(":HAS_CHECKED_RESOURCES=0")
+        _atomic_write_bytes(settings, ("\n".join(lines) + "\n").encode("utf-8"))
+
+
+@contextmanager
+def prepare_injector_resources(game_root: Path, event_sink=None):
+    _log_injector_state(game_root, "before preparation", event_sink)
+    directory = game_root / "base" / "ap_enemy_resources"
+    temporary = Path(tempfile.mkdtemp(dir=game_root, prefix=".doomeap-injector-"))
+    held = temporary / directory.name
+    try:
+        if directory.exists() or directory.is_symlink():
+            if directory.is_symlink() or directory.resolve() != (game_root / "base").resolve() / directory.name:
+                raise ValueError("Generated resource directory is redirected")
+            directory.rename(held)
+        try:
+            _sanitize_injector_mapping(game_root)
+            _log_injector_state(game_root, "before", event_sink)
+            yield
+        finally:
+            if held.exists():
+                held.rename(directory)
+            _log_injector_state(game_root, "after", event_sink)
+    finally:
+        if not held.exists():
+            temporary.rmdir()
 
 
 def _required_linux_resource_specs(
@@ -1652,22 +1803,18 @@ def _required_linux_resource_specs(
         ("e1m1", "game/sp/e1m1_intro/e1m1_intro"),
         ("hub", "game/hub/hub"),
     ):
-        owner, _, _ = _packagemapspec_owner(packagemapspec, runtime_map)
-        owner_stem = PurePosixPath(owner).name.removesuffix(".resources")
-        required.append((label, runtime_map, map_member(runtime_map, owner_stem)))
+        required.append((label, runtime_map, None))
 
     shell_owners = [
         owner for owner in owners
         if re.fullmatch(r"gameresources(?:_patch\d+)?", owner, re.IGNORECASE)
     ]
-    if not shell_owners:
-        raise ValueError("room package has no shell resource owner")
-    shell_owner = "gameresources_patch1" if "gameresources_patch1" in shell_owners else shell_owners[0]
+    shell_owner = "gameresources_patch1" if "gameresources_patch1" in shell_owners else next(iter(shell_owners), "gameresources")
     shell_members = [
-        name for name in owner_members[shell_owner]
+        name for name in owner_members.get(shell_owner, ())
         if name.casefold().endswith((".decl", ".entities"))
     ]
-    required.append(("shell", "", shell_members[0] if shell_members else owner_members[shell_owner][0]))
+    required.append(("shell", "", next(iter(shell_members or owner_members.get(shell_owner, ())), None)))
 
     tag_candidates: list[tuple[str, str, str]] = []
     for name in members:
@@ -1680,13 +1827,16 @@ def _required_linux_resource_specs(
             continue
         tag_candidates.append((runtime_map, owner, name))
     for runtime_map, staged_owner, member in sorted(tag_candidates):
-        expected_owner, _, _ = _packagemapspec_owner(packagemapspec, runtime_map)
+        try:
+            expected_owner, _, _ = _packagemapspec_owner(packagemapspec, runtime_map)
+        except (OSError, ValueError):
+            continue
         expected_owner_stem = PurePosixPath(expected_owner).name.removesuffix(".resources")
         if expected_owner_stem == staged_owner:
             required.append(("tag", runtime_map, member))
             break
-    if not any(label == "tag" for label, _, _ in required):
-        raise ValueError("room package has no TAG map with matching resource owner")
+    if tag_candidates and not any(label == "tag" for label, _, _ in required):
+        required.append(("tag", sorted(tag_candidates)[0][0], None))
 
     results: list[dict[str, object]] = []
     warnings: list[str] = []
@@ -1694,14 +1844,20 @@ def _required_linux_resource_specs(
         expected_owner = ""
         priority: int | None = None
         candidates: list[str] = []
+        owner_error = ""
         if runtime_map:
-            expected_owner, priority, candidates = _packagemapspec_owner(packagemapspec, runtime_map)
+            try:
+                expected_owner, priority, candidates = _packagemapspec_owner(packagemapspec, runtime_map)
+            except (OSError, ValueError) as error:
+                owner_error = f"{type(error).__name__}: {error}"
         else:
             expected_owner = f"{shell_owner}.resources"
         owner_stem = PurePosixPath(expected_owner).name.removesuffix(".resources")
+        if runtime_map and label != "tag":
+            member = map_member(runtime_map, owner_stem)
         selected_member = member if member and member.split("/", 1)[0] == owner_stem else None
         owner_member_list = owner_members.get(owner_stem, [])
-        if selected_member is None and owner_member_list:
+        if selected_member is None and owner_member_list and not runtime_map:
             selected_member = owner_member_list[0]
         resource_path = packagemapspec.parent / expected_owner
         meta_path = resource_path.with_suffix(".meta")
@@ -1739,10 +1895,18 @@ def _required_linux_resource_specs(
             "path_present": path_present,
             "payload_present": payload_present,
             "status": status,
+            "failure_reason": "; ".join(reason for reason, present in (
+                (owner_error, not owner_error),
+                ("missing staged member", selected_member is not None),
+                ("missing resource file", resource_path.is_file()),
+                ("missing meta file", meta_path.is_file()),
+                ("resource path missing from container", path_present),
+                ("room payload missing from container", payload_present),
+            ) if not present),
         }
         results.append(result)
         if status != "verified":
-            warnings.append(f"{label}:{expected_owner}:{selected_member or 'missing staged member'}")
+            warnings.append(f"{label}:{expected_owner}:{result['failure_reason']}")
     return results, warnings
 
 
@@ -1771,6 +1935,7 @@ def _required_resource_output_issues(
     return issues
 
 
+@installation_step("verify")
 def verify_linux_mod_installation(
     game_root: Path,
     staged_mod: Path,
@@ -2246,24 +2411,16 @@ class WindowsModInjectorAdapter:
         try:
             process = self.opener(command, game_root)
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                command=command,
-                details={"launch_error": str(error)},
-            )
+            return _installation_failure(AdapterResult(state="failed", message="", command=command),
+                                         error, "injector", self.event_sink)
 
         try:
             if hasattr(process, "wait"):
                 process.wait()
             returncode = getattr(process, "returncode", 0)
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                command=command,
-                details={"wait_error": str(error)},
-            )
+            return _installation_failure(AdapterResult(state="failed", message="", command=command),
+                                         error, "injector", self.event_sink)
 
         if self.event_sink is not None:
             self.event_sink("injector_closed", command=list(command), returncode=returncode)
@@ -2273,7 +2430,7 @@ class WindowsModInjectorAdapter:
             message=(
                 "Installation finished."
                 if returncode == 0
-                else "Installer failed. Select Help -> SAVE SUPPORT REPORT."
+                else f"Installation failed at injector: exit code {returncode}. Select Help -> SAVE SUPPORT REPORT."
             ),
             command=command,
             returncode=returncode,
@@ -2291,11 +2448,7 @@ class WindowsModInjectorAdapter:
         try:
             recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                details={"staging_error": str(error)},
-            )
+            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
         try:
             batch_executable = stage_windows_injector_toolchain(
                 self.dependency,
@@ -2303,18 +2456,20 @@ class WindowsModInjectorAdapter:
                 state_dir=self.state_dir,
             )
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                details={"staging_error": str(error)},
-            )
+            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
 
         comspec = os.environ.get("COMSPEC", "cmd.exe")
         target_name = batch_executable.name if batch_executable.parent.resolve() == game_root.resolve() else str(batch_executable)
         command = (comspec, "/d", "/c", target_name)
         # The current Windows injector supports doomSandBox/DOOMSandBox64vk.exe
         # directly, so the sandbox stays in place for the whole invocation.
-        result = self._run_process(game_root, command, staged_mod)
+        # this can change, so eventually the game could update and break everything
+        try:
+            with prepare_injector_resources(game_root, self.event_sink):
+                result = self._run_process(game_root, command, staged_mod)
+        except Exception as error:
+            return _installation_failure(AdapterResult(state="failed", message="", command=command),
+                                         error, "prepare banks", self.event_sink)
         if operation != "uninstall" or result.state != "applied":
             return result
 
@@ -2383,8 +2538,7 @@ class WindowsModInjectorAdapter:
                 from doom_eap.launcher.campaign_resources import enable_campaign_resources
                 campaign_resources = enable_campaign_resources(game_root, staged)
             except Exception as error:
-                return AdapterResult(state="failed", message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                                     command=result.command, returncode=1)
+                return _installation_failure(result, error, "prepare banks", self.event_sink, game_root, staged)
             return AdapterResult(
                 state="applied",
                 message="Mod installed. Start DOOM Eternal normally through Steam and keep this launcher open.",
@@ -2445,7 +2599,7 @@ class LinuxModManagerAdapter:
             destination.parent.mkdir(parents=True, exist_ok=True)
             if destination.is_file():
                 if hashlib.sha256(destination.read_bytes()).digest() != hashlib.sha256(source.read_bytes()).digest():
-                    raise RuntimeError("The installer could not finish. Select Help -> SAVE SUPPORT REPORT.")
+                    raise RuntimeError(f"Installer tool differs from the bundled copy: {relative}")
                 continue
             shutil.copy2(source, destination)
         prepared = game_root / relative_executable
@@ -2505,13 +2659,12 @@ class LinuxModManagerAdapter:
         try:
             recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="The installer could not finish. Select Help -> SAVE SUPPORT REPORT.",
-                details={"staging_error": str(error)},
-            )
-        executable = self._prepare_tools(game_root)
-        self._configure_first_run(game_root)
+            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
+        try:
+            executable = self._prepare_tools(game_root)
+            self._configure_first_run(game_root)
+        except Exception as error:
+            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
         environment = os.environ.copy()
         stripped_loader_environment = [
             key for key in self.LOADER_ENVIRONMENT_KEYS if environment.pop(key, None) is not None
@@ -2519,20 +2672,21 @@ class LinuxModManagerAdapter:
         environment.update({"skip": "1", "skip_debug_check": "1"})
         command = (str(executable),)
         try:
-            completed = subprocess.run(
-                command,
-                cwd=game_root,
-                env=environment,
-                text=True,
-                capture_output=True,
-                timeout=self.TIMEOUT_SECONDS,
-                check=False,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
+            with prepare_injector_resources(game_root, self.event_sink):
+                completed = subprocess.run(
+                    command,
+                    cwd=game_root,
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    timeout=self.TIMEOUT_SECONDS,
+                    check=False,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
         except subprocess.TimeoutExpired as error:
             return AdapterResult(
                 state="timed_out",
-                message="Installation timed out. Retry once, then select Help -> SAVE SUPPORT REPORT.",
+                message="Installation failed at injector: timed out. Select Help -> SAVE SUPPORT REPORT.",
                 command=command,
                 stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
                 stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
@@ -2543,6 +2697,9 @@ class LinuxModManagerAdapter:
                     "loader_environment_removed": stripped_loader_environment,
                 },
             )
+        except Exception as error:
+            return _installation_failure(AdapterResult(state="failed", message="", command=command),
+                                         error, "prepare banks", self.event_sink)
         state = "applied" if completed.returncode == 0 else "failed"
         loader_symbol_failure = completed.returncode == 127 and any(
             marker in (completed.stderr or "").casefold()
@@ -2554,9 +2711,9 @@ class LinuxModManagerAdapter:
                 "Mod installed. Start through Steam and keep the launcher open."
                 if state == "applied"
                 else (
-                    "Installer could not start. Select Help -> SAVE SUPPORT REPORT."
+                    "Installation failed at injector: loader symbol lookup failed. Select Help -> SAVE SUPPORT REPORT."
                     if loader_symbol_failure
-                    else "Installation failed. Retry once, then select Help -> SAVE SUPPORT REPORT."
+                    else f"Installation failed at injector: exit code {completed.returncode}. Select Help -> SAVE SUPPORT REPORT."
                 )
             ),
             command=command,
@@ -2577,9 +2734,11 @@ class LinuxModManagerAdapter:
         result = self.run(game_root)
         if result.state != "applied":
             return result
+        step = "prepare banks"
         try:
             from doom_eap.launcher.campaign_resources import enable_campaign_resources
             campaign_resources = enable_campaign_resources(game_root, staged)
+            step = "verify"
             verification = verify_linux_mod_installation(
                 game_root,
                 staged,
@@ -2587,20 +2746,7 @@ class LinuxModManagerAdapter:
                 stderr=result.stderr,
             )
         except Exception as error:
-            return AdapterResult(
-                state="failed",
-                message="Installation could not be checked. Select Help -> SAVE SUPPORT REPORT before playing.",
-                command=result.command,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                returncode=result.returncode,
-                details={
-                    **result.details,
-                    **getattr(error, "details", {}),
-                    "post_install_verification": "failed",
-                    "verification_error": str(error),
-                },
-            )
+            return _installation_failure(result, error, step, self.event_sink, game_root, staged)
         return AdapterResult(
             state="applied",
             message="Mod installed and checked. Start through Steam.",

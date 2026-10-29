@@ -332,7 +332,7 @@ def _body_definitions(recipe, settings):
             raise ValueError("Unexpected native partial credit definition")
 
 
-def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2):
+def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
     stage = plan["maps"][map_key]
     settings = {**stage, "revision": enemy_revision}
     if re.fullmatch(r"[a-z0-9_]+", map_key) is None:
@@ -358,6 +358,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                     marker = 'ap_v070_optional_zombies_r' + recipe['origin']
                     generated.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
     functional, reachable, records = _functional_sources(source)
+    landing_positions = {}
     for point, landing in sorted(_entrance_landings(stage['recipes'], records, map_key=map_key).items()):
         helper = 'ap_v070_landing_' + _functional_token(point)
         if helper in names:
@@ -379,6 +380,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             if not all(math.isfinite(value) for value in edit['spawnPosition'].values()):
                 raise ValueError('Native traversal landing is not finite')
         edit['spawnEditableShared'] = {'groupName': helper}
+        landing_positions[point] = edit.get('spawnPosition')
         generated.append('entity {\n\tentityDef ' + helper + ' {\n\t\tinherit = "target/spawn";\n'
             '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
             _render(edit, 2) + '\n\t}\n}')
@@ -389,6 +391,27 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             [(recipe, True, 'ap_v070_counter_r') for recipe in stage.get('counter_recipes', [])]):
         recipe_definitions = []
         reference = recipe["binding"].get("reference", recipe["binding"].get("entity", ""))
+        if diagnostics is not None and not compatible:
+            visited = set()
+            initial_count = len(diagnostics)
+            def record_positions(name):
+                if name in visited or name not in records or len(visited) >= 256:
+                    return
+                visited.add(name)
+                row = records[name]
+                original = row['edit'].get('spawnPosition')
+                if original is not None and len(diagnostics) < 512:
+                    final = {axis: landing_positions.get(name, original).get(axis, 0) for axis in ('x', 'y', 'z')}
+                    diagnostics.append({'map': map_key, 'recipe': recipe['origin'], 'source': name[:160],
+                                        'position': final, 'relocated': final != {axis: original.get(axis, 0) for axis in ('x', 'y', 'z')}})
+                if row['class'] in SPAWN_CLASSES:
+                    for _, value in walk_values(row['edit']):
+                        if isinstance(value, str) and value in records:
+                            record_positions(value)
+            record_positions(reference)
+            if len(diagnostics) == initial_count and len(diagnostics) < 512:
+                diagnostics.append({'map': map_key, 'recipe': recipe['origin'], 'source': str(reference)[:160],
+                                    'position': None, 'relocated': None, 'reason': 'runtime_selected_position'})
         source_names = sorted(reachable(reference)) if recipe["family"] != "summon" else []
         if recipe["physical_count"] != len(recipe["bodies"]):
             raise ValueError("Native recipe body quantity differs")
@@ -593,8 +616,8 @@ def _source_fallback_definition(record):
                   '; class = "idTarget_Spawn"; edit = ' + _render(settings, 2) + ' } }')
 
 
-def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
-    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
+def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
+    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision, diagnostics=diagnostics)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
     source_index = entity_definition_index(source)

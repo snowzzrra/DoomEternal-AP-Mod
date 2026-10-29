@@ -8,6 +8,9 @@ CINEMATIC_BOSS_ACTORS = {'e2m2_base': frozenset({'confront_samuel_ai'})}
 FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a_target_spawn_42'})}
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
 FLYING_SUMMONS = {'e4m3_mcity': frozenset({'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL'})}
+SPIRIT_DENIED_SPAWN_POINTS = {'e4m1_rig': frozenset({
+    'traversal_section_target_spawn_127', 'destroyed_rig_target_spawn_215',
+})}
 SMALL_GROUND_ENEMIES = frozenset({'imp', 'hell_soldier', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper'})
 GROUND_ENCOUNTERS = {
     ('e1m4_boss', 'train_encounter_manager_intro_train_1'): SMALL_GROUND_ENEMIES,
@@ -90,12 +93,20 @@ def project_native_safety(plan, enemies):
         stage = result['maps'][map_key]
         protected = SCRIPTED_BOSS_ACTORS.get(map_key, frozenset()) | CINEMATIC_BOSS_ACTORS.get(map_key, frozenset())
         points = FLYING_SPAWN_POINTS.get(map_key, ())
+        spirit_denied = SPIRIT_DENIED_SPAWN_POINTS.get(map_key, ())
         settings = {**enemies, 'special_limits': stage['special_limits']}
         for recipe in stage['recipes']:
             binding = recipe['binding']
             if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
                 stage.setdefault('passthrough_actors', []).append(binding['entity'])
                 changes.append({'origin': recipe['id'], 'action': 'preserve_scripted_boss'})
+            if binding.get('reference') in spirit_denied and any(body['species'] == 'spirit' for body in recipe['bodies']):
+                stage.setdefault('compatibility_recipes', []).append(deepcopy(recipe))
+                for ordinal, body in enumerate(recipe['bodies']):
+                    if body['species'] == 'spirit':
+                        _replace_species(body, 'cacodemon', recipe, ordinal, settings, catalog, speed_capabilities)
+                        changes.append({'origin': recipe['id'], 'action': 'spirit_spawn_fallback',
+                                        'before': 'spirit', 'after': 'cacodemon'})
             flying = (binding.get('reference') in points or (binding['mode'] == 'summon' and
                       recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ())))
             if not flying or all(body['species'] in FLYING_REPLACEMENTS for body in recipe['bodies']):

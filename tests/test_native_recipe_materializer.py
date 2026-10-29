@@ -115,6 +115,16 @@ def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count
     return build_native_recipes(options, {"sequence": ["map"]}, seed=8, catalog=catalog, revision=revision)
 
 
+def test_spawn_diagnostics_leave_materialized_map_unchanged():
+    source = SOURCE.replace('edit = { entityDefs', 'edit = { spawnPosition = { x = 4; y = 5; z = 6; } entityDefs')
+    plan = frozen_plan(source)
+    diagnostics = []
+    result = materialize_native_recipe_definitions(source, 'map', plan, {'map': source}, diagnostics=diagnostics)
+    assert result == materialize_native_recipe_definitions(source, 'map', plan, {'map': source})
+    assert any(row['source'] == 'point' and row['position'] == {'x': 4, 'y': 5, 'z': 6}
+               and row['relocated'] is False for row in diagnostics)
+
+
 def test_shared_spawn_parent_keeps_map_bindings_without_foreign_species_state():
     source = SOURCE.replace('name = "original";', 'name = "lostsoul";') + dedent('''
     entity { entityDef lostsoul { inherit = "ai/fodder/lostsoul"; class = "idAI2"; edit = {

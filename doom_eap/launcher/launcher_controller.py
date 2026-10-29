@@ -1342,7 +1342,7 @@ class LauncherController:
                 self._injector_output = None
             elif kind == "injector_finished":
                 output = f"stdout:\n{payload.get('stdout', '')}\nstderr:\n{payload.get('stderr', '')}"
-                self._injector_output = output.encode("utf-8")[-64 * 1024:].decode("utf-8", errors="ignore")
+                self._injector_output = output
             if kind == "core_runtime_selected":
                 old = self.config.get("selected_core_runtime_manifest")
                 self.config["selected_core_runtime_manifest"] = payload["path"]
@@ -1735,6 +1735,17 @@ class LauncherController:
         except OSError:
             self.config["death_link_grace"] = previous
             raise
+
+    def request_finish_encounter(self) -> None:
+        with self._lifecycle_lock:
+            connected, supervisor = self.connected_room, self.supervisor
+        if not connected or supervisor is None or not supervisor.running:
+            self.emit("encounter_recovery", message="No active encounter")
+            return
+        try:
+            supervisor.send_command('AP_CONTROL {"type":"finish_encounter"}')
+        except Exception:
+            self.emit("encounter_recovery", message="Recovery outcome unknown")
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:

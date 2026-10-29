@@ -31,6 +31,7 @@ from .launcher_platform import (
     WINDOWS_MOD_INJECTOR,
     doom_saved_games_base,
     idfile_decompressor_spec,
+    installation_error_details,
     DependencyManager,
     PrerequisiteStatus,
     ProcessInspectionError,
@@ -51,7 +52,6 @@ SUPPORT_LOG_MAX_BYTES = 1024 * 1024
 SUPPORT_DIAGNOSTIC_MAX_BYTES = 256 * 1024
 SUPPORT_DIAGNOSTIC_MAX_ITEMS = 24
 SUPPORT_BUNDLE_MAX_BYTES = 10 * 1024 * 1024
-SUPPORT_INJECTOR_MAX_BYTES = 64 * 1024
 _CREDENTIAL_FIELDS = frozenset({
     "password", "passwd", "passphrase", "authorization", "token", "secret",
     "access_token", "api_token", "auth_token", "refresh_token", "id_token",
@@ -455,6 +455,110 @@ def _bound_support_text(text: str) -> str:
     return head + "\n\n[... HEAD+TAIL BOUNDARY ...]\n\n" + tail
 
 
+def _encounter_console(path: Path) -> tuple[str, dict[str, object]]:
+    limit = SUPPORT_LOG_MAX_BYTES
+    separator = b"\n[... ENCOUNTER WINDOW / CONSOLE GAP ...]\n"
+    with path.open("rb") as stream:
+        size = stream.seek(0, os.SEEK_END)
+        stream.seek(0)
+        if size <= limit:
+            payload = stream.read(limit)
+            retained = len(payload)
+            truncation = "none"
+        else:
+            last_event = None
+            marker = re.compile(rb"encounter|challenge|exit.?trigger|AP_ENEMY_WAIT|AP_CHECKPOINT", re.I)
+            while stream.tell() < size:
+                offset = stream.tell()
+                if marker.search(stream.readline(32768)):
+                    last_event = offset
+            edge = limit // 8
+            window = limit - edge * 2 - len(separator) * 2
+            center = last_event if last_event is not None else size
+            start = max(0, min(size - window, center - window * 3 // 4))
+            spans = [(0, edge), (start, start + window), (size - edge, size)]
+            merged = []
+            for begin, end in sorted(spans):
+                if merged and begin <= merged[-1][1]:
+                    merged[-1] = (merged[-1][0], max(end, merged[-1][1]))
+                else:
+                    merged.append((begin, end))
+            chunks = []
+            for begin, end in merged:
+                stream.seek(begin)
+                chunk = stream.read(end - begin)
+                if begin:
+                    chunk = chunk.partition(b"\n")[2]
+                if end < size:
+                    chunk = chunk.rpartition(b"\n")[0] + b"\n" if b"\n" in chunk else b""
+                chunks.append(chunk)
+            retained = sum(map(len, chunks))
+            payload = separator.join(chunks)
+            truncation = "encounter_window" if last_event is not None else "head_tail"
+    text = _sanitize_support_text(payload.decode("utf-8", errors="replace"))
+    text = text.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+    return text, {"source_size": size, "archived_size": len(text.encode("utf-8")),
+                  "truncation": truncation, "omitted_bytes": size - retained}
+
+
+def _windows_crash_evidence() -> dict[str, object]:
+    result: dict[str, object] = {"reports": [], "dumps": [], "errors": []}
+    if os.name != "nt":
+        return {**result, "status": "unavailable", "reason": "windows_only"}
+    locations = []
+    for variable, suffix, kind in (
+        ("PROGRAMDATA", "Microsoft/Windows/WER/ReportArchive", "reports"),
+        ("LOCALAPPDATA", "Microsoft/Windows/WER/ReportArchive", "reports"),
+        ("LOCALAPPDATA", "CrashDumps", "dumps"),
+        ("LOCALAPPDATA", "LocalDumps", "dumps"),
+    ):
+        root = os.environ.get(variable)
+        if not root:
+            continue
+        locations.append((Path(root) / suffix, kind))
+    try:
+        import winreg
+        for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+            for app in ("", r"\DOOMEternalx64vk.exe"):
+                try:
+                    with winreg.OpenKey(hive, r"SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps" + app) as key:
+                        folder, _ = winreg.QueryValueEx(key, "DumpFolder")
+                    if isinstance(folder, str) and folder:
+                        locations.append((Path(os.path.expandvars(folder)), "dumps"))
+                except OSError:
+                    pass
+    except ImportError:
+        pass
+    for directory, kind in dict.fromkeys(locations):
+        try:
+            candidates = (directory.glob("DOOMEternalx64vk.exe*.dmp") if kind == "dumps" else
+                          (path / "Report.wer" for path in directory.iterdir() if "doometernal" in path.name.casefold()))
+            recent = sorted(((path.stat().st_mtime, path) for path in candidates), reverse=True)[:8]
+            for modified, path in recent:
+                entry = {"name": path.parent.name[:192] if kind == "reports" else path.name[:192],
+                         "modified_utc": datetime.datetime.fromtimestamp(modified, datetime.timezone.utc).isoformat(timespec="seconds")}
+                if kind == "reports":
+                    with path.open("rb") as stream:
+                        raw = stream.read(32768)
+                    text = raw.decode("utf-16" if raw.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig", errors="replace")
+                    fields = dict(line.split("=", 1) for line in text.splitlines() if "=" in line)
+                    if fields.get("AppName", "").casefold() != "doometernalx64vk.exe":
+                        continue
+                    for key, label in fields.items():
+                        if label.casefold() in {"fault module name", "exception code", "exception offset"}:
+                            entry[label.casefold().replace(" ", "_")] = fields.get(key.removesuffix("Name") + "Value", "unavailable")[:256]
+                    entry["text"] = _sanitize_support_text(text)[:16384]
+                else:
+                    entry["size"] = path.stat().st_size
+                result[kind].append(entry)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            result["errors"].append(f"{directory.name}: {type(error).__name__}")
+    result["status"] = "available" if result["reports"] or result["dumps"] else "no_evidence_found"
+    return sanitize_support_value(result)
+
+
 def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
     useful: list[tuple[int, int, Path]] = []
     for index in range(0, len(candidates), 2):
@@ -796,7 +900,17 @@ def _queue_diagnostics(base: Path | None) -> dict[str, object]:
         return result
     if queue_path is None or not queue_available:
         return result
-    items: dict[str, list[str]] = {"pending": [], "processing": [], "failed": []}
+    try:
+        with (queue_path / "active_session_namespace").open("r", encoding="ascii") as stream:
+            namespace = stream.read(65).strip()
+        if re.fullmatch(r"[0-9a-f]{16}", namespace) is None:
+            namespace = None
+    except (OSError, UnicodeError):
+        namespace = None
+    def group():
+        return {"pending": 0, "processing": 0, "failed": 0,
+                "items": {"pending": [], "processing": [], "failed": []}}
+    active, historical, unscoped = group(), group(), group()
     errors: list[str] = []
     for suffix, key in ((".cmd", "pending"), (".processing", "processing"), (".failed", "failed")):
         try:
@@ -805,11 +919,19 @@ def _queue_diagnostics(base: Path | None) -> dict[str, object]:
             errors.append(f"{suffix} scan failed: {type(error).__name__}: {error}"[:256])
             continue
         for path in paths:
-            current = result.get(key, 0)
-            result[key] = (current if isinstance(current, int) else 0) + 1
-            if len(items[key]) < SUPPORT_DIAGNOSTIC_MAX_ITEMS:
-                items[key].append(path.stem)
-    result["items"] = items
+            scoped = re.match(r"recv-([0-9a-f]{16})-", path.stem)
+            target = active if scoped and scoped[1] == namespace else historical if scoped else unscoped
+            target[key] += 1
+            if len(target["items"][key]) < SUPPORT_DIAGNOSTIC_MAX_ITEMS:
+                try:
+                    modified = datetime.datetime.fromtimestamp(path.stat().st_mtime, datetime.timezone.utc).isoformat(timespec="seconds")
+                except OSError:
+                    modified = "unavailable"
+                target["items"][key].append({"name": path.stem[:192], "modified_utc": modified})
+    result.update(active)
+    result["active_session"] = {"namespace": namespace, "status": "available" if namespace else "unavailable", **active}
+    result["historical"] = historical
+    result["unscoped"] = unscoped
     if errors:
         result["errors"] = errors
     return result
@@ -987,14 +1109,16 @@ def _preparation_failure_summary(state_dir, *, filename="session_prepare_failure
     if not state_dir:
         return {"status": "unavailable"}
     try:
-        with (state_dir / filename).open("rb") as stream:
+        path = state_dir / filename
+        with path.open("rb") as stream:
             raw = stream.read(SUPPORT_DIAGNOSTIC_MAX_BYTES + 1)
         if len(raw) > SUPPORT_DIAGNOSTIC_MAX_BYTES:
             return {"status": "unavailable", "reason": "diagnostic_exceeds_support_limit"}
         document = json.loads(raw)
+        modified = datetime.datetime.fromtimestamp(path.stat().st_mtime, datetime.timezone.utc).isoformat(timespec="seconds")
     except (OSError, UnicodeError, ValueError):
         return {"status": "unavailable"}
-    return {"status": "retained", "source": source, "evidence": sanitize_support_value(document)}
+    return {"status": "retained", "source": source, "modified_utc": modified, "evidence": sanitize_support_value(document)}
 
 
 def _room_install_receipt_summary(
@@ -1025,7 +1149,7 @@ def _room_install_receipt_summary(
         "schema", "manifest_hash", "static_content_digest", "staged_mod", "staged_sha256",
         "room_zip_sha256", "generated_mod", "generated_sha256", "mods_path",
         "injector_version", "injector_command", "adapter_command", "injector_exit_code",
-        "required_resources", "post_install_verification",
+        "required_resources", "post_install_verification", "adapter_details", "adapter_message",
         "adapter_state", "installation_mode", "steam_launch_option",
     ):
         if key in document:
@@ -1058,7 +1182,7 @@ def _room_install_receipt_summary(
         for key in (
             "room_zip_sha256", "generated_sha256", "mods_path", "injector_version",
             "injector_command", "adapter_command", "injector_exit_code",
-            "required_resources", "post_install_verification",
+            "required_resources", "post_install_verification", "adapter_details", "adapter_message",
         )
         if key in result
     }
@@ -1114,7 +1238,7 @@ def _verify_linux_receipt(
         not str(receipt.get("injector_version", ""))
         or not isinstance(raw_command, (list, tuple)) or not raw_command
         or receipt.get("injector_exit_code") != 0
-        or not isinstance(raw_resources, (list, tuple)) or len(raw_resources) != 4
+        or not isinstance(raw_resources, (list, tuple)) or len(raw_resources) not in (3, 4)
         or any(not isinstance(item, Mapping) or item.get("status") != "verified" for item in raw_resources)
         or str(receipt.get("mods_path", "")) != expected_mods
     ):
@@ -1224,6 +1348,9 @@ def _support_game_link_diagnostics(
         )
     except (OSError, ValueError, RuntimeError):
         queue["status"] = "unavailable"
+    if queue.get("active_session", {}).get("status") == "unavailable":
+        queue["status"] = "unavailable"
+        queue["reason"] = "active_namespace_unavailable"
 
     meathook_status = str(meathook.get("status", "unknown"))
     issues: list[str] = []
@@ -1590,10 +1717,19 @@ def _support_summary(payload, install, members, notes):
     ):
         verdict = "PASS" if value is True else "FAIL" if value is False else "UNKNOWN"
         lines.append(f"{verdict} {name}: {detail}".rstrip(": "))
+    for scope in ("historical", "unscoped"):
+        group = queue.get(scope, {})
+        if group:
+            lines.append(f"Spool {scope}: pending={group.get('pending', 0)}, processing={group.get('processing', 0)}, failed={group.get('failed', 0)}")
+    for scope, group in (("active session", queue), ("historical", queue.get("historical", {})), ("unscoped", queue.get("unscoped", {}))):
+        for entry in group.get("items", {}).get("failed", []):
+            if isinstance(entry, Mapping):
+                lines.append(f"Spool failure ({scope}) file_modified_utc={entry.get('modified_utc', 'unknown')}: {entry.get('name', 'unknown')}")
     failure = payload.get("last_setup_failure") or support.get("session_preparation_failure", {}).get("evidence") or {}
     if failure:
         lines.append(f"FAIL Last setup failure: {failure.get('failure_domain', 'unknown')} | "
-                     f"{failure.get('user_message') or failure.get('message') or failure.get('technical_message') or 'unknown'}")
+                     f"{failure.get('user_message') or failure.get('message') or failure.get('technical_message') or 'unknown'} | "
+                     f"date={failure.get('at_utc') or failure.get('timestamp') or support.get('session_preparation_failure', {}).get('modified_utc', 'unknown')}")
     else:
         lines.append("UNKNOWN Last setup failure: none recorded")
     warnings = []
@@ -1669,34 +1805,12 @@ def write_support_bundle(
     condump_metadata = dict(support_condump or {})
     support_path = condump_metadata.get("path")
     if isinstance(support_path, (str, Path)):
-        separator = b"\n===== DOOMEAP SUPPORT CONDUMP MIDDLE OMITTED =====\n"
         try:
             source_path = Path(support_path)
-            source_size = source_path.stat().st_size
-            if source_size <= SUPPORT_DIAGNOSTIC_MAX_BYTES:
-                source_bytes = source_path.read_bytes()
-                truncation = "none"
-                omitted_bytes = 0
-            else:
-                retained = SUPPORT_DIAGNOSTIC_MAX_BYTES - len(separator)
-                head_size = retained // 2
-                tail_size = retained - head_size
-                with source_path.open("rb") as source:
-                    head = source.read(head_size)
-                    source.seek(source_size - tail_size)
-                    tail = source.read(tail_size)
-                source_bytes = head + separator + tail
-                truncation = "head_tail"
-                omitted_bytes = source_size - len(head) - len(tail)
-            condump_content = _sanitize_support_text(
-                source_bytes.decode("utf-8", errors="replace")
-            )
+            condump_content, retention = _encounter_console(source_path)
             condump_metadata.update({
                 "source_filename": condump_metadata.get("source_filename", source_path.name),
-                "source_size": source_size,
-                "archived_size": len(condump_content.encode("utf-8")),
-                "truncation": truncation,
-                "omitted_bytes": omitted_bytes,
+                **retention,
             })
         except OSError as error:
             condump_metadata.update({
@@ -1708,6 +1822,19 @@ def write_support_bundle(
     if support_diagnostics is not None:
         payload["support_diagnostics"] = sanitize_support_value(dict(support_diagnostics))
     support = payload.get("support_diagnostics", {})
+    compiled_positions = {"status": "unavailable", "reason": "room_diagnostic_missing"}
+    staged = support.get("room_install_receipt", {}).get("staged_mod")
+    if isinstance(staged, str) and staged:
+        try:
+            with zipfile.ZipFile(staged) as room:
+                member = room.getinfo("enemy_spawn_diagnostics.json")
+                if member.file_size <= SUPPORT_DIAGNOSTIC_MAX_BYTES:
+                    compiled_positions = {"status": "available", "report": json.loads(room.read(member))}
+                else:
+                    compiled_positions["reason"] = "room_diagnostic_exceeds_limit"
+        except (OSError, ValueError, KeyError, zipfile.BadZipFile):
+            pass
+    payload["compiled_spawn_positions"] = sanitize_support_value(compiled_positions)
     session = support.get("ap_session") or support.get("campaign_inspection", {}).get("session", {})
     install = sanitize_support_value(_install_diagnostics(config))
     darklord_logs, darklord = _darklord_diagnostics(config, session)
@@ -1715,24 +1842,16 @@ def write_support_bundle(
     payload["darklord_telemetry"] = sanitize_support_value(darklord)
     native_startup = _native_startup_diagnostics(config, session, install)
     payload["native_startup"] = sanitize_support_value(native_startup)
+    payload["windows_crash_evidence"] = _windows_crash_evidence()
     safe_logs = _bound_support_text(
         "\n".join(_sanitize_support_text(str(line)) for line in logs)
     )
     if safe_logs:
-        if "launcher.log" in tails:
-            provenance["launcher.history.log"] = {
-                "status": "available",
-                "source": "launcher_in_memory_diagnostics",
-                "line_count": len(safe_logs.splitlines()),
-            }
-        else:
-            provenance.setdefault("launcher.log", {})[
-                "in_memory_diagnostics"
-            ] = {
-                "status": "available",
-                "source": "launcher_in_memory_diagnostics",
-                "line_count": len(safe_logs.splitlines()),
-            }
+        provenance.setdefault("launcher.log", {})["in_memory_diagnostics"] = {
+            "status": "available",
+            "source": "launcher_in_memory_diagnostics",
+            "line_count": len(safe_logs.splitlines()),
+        }
         payload["log_provenance"] = sanitize_support_value(provenance)
     notes = []
     if "[... HEAD+TAIL BOUNDARY ...]" in safe_logs:
@@ -1760,19 +1879,16 @@ def write_support_bundle(
     if base is not None:
         console = base / "qconsole.log"
         try:
-            with console.open("rb") as stream:
-                size = stream.seek(0, 2)
-                stream.seek(max(0, size - SUPPORT_LOG_TAIL_BYTES))
-                tails["logs/qconsole.log"] = _sanitize_support_text(stream.read(SUPPORT_LOG_TAIL_BYTES).decode("utf-8", errors="replace"))
-            if size > SUPPORT_LOG_TAIL_BYTES:
-                notes.append(f"logs/qconsole.log: last 256 KiB retained; source {size} bytes")
+            tails["logs/qconsole.log"], retention = _encounter_console(console)
+            if retention["omitted_bytes"]:
+                notes.append(f"logs/qconsole.log: {retention['truncation']}; source {retention['source_size']} bytes")
         except OSError as error:
             notes.append(f"logs/qconsole.log: unavailable ({type(error).__name__})")
     else:
         notes.append("logs/qconsole.log: game directory unavailable")
     if injector_output is not None:
         tails["install/injector.log"] = _sanitize_support_text(injector_output)
-        notes.append("install/injector.log: last 64 KiB of the most recent run; earlier output omitted if longer")
+        notes.append("install/injector.log: full stdout and stderr of the most recent run")
     else:
         notes.append("install/injector.log: no run retained in this launcher session")
     for name, details in provenance.items():
@@ -1784,7 +1900,7 @@ def write_support_bundle(
         if record["truncated"]:
             notes.append(f"{record['archive_member']}: last 1 MiB retained; source {record['source_size']} bytes")
     if condump_metadata.get("omitted_bytes"):
-        notes.append(f"AP_SUPPORT_FILE.txt: head/tail retained; {condump_metadata['omitted_bytes']} bytes omitted")
+        notes.append(f"AP_SUPPORT_FILE.txt: {condump_metadata['truncation']}; {condump_metadata['omitted_bytes']} bytes omitted")
     notes.extend(install["issues"])
     notes.extend(f"install.json {item['name']}: {item['status']} ({item.get('reason', 'unavailable')})"
                  for item in install["dlls"] + install["mods"] if item["status"] in {"omitted", "unreadable"})
@@ -1794,12 +1910,14 @@ def write_support_bundle(
         "install.json": json.dumps(install, indent=2, sort_keys=True),
         "doctor.json": json.dumps(payload, indent=2, sort_keys=True),
         "native_startup.json": json.dumps(payload["native_startup"], indent=2, sort_keys=True),
+        "windows_crash_evidence.json": json.dumps(payload["windows_crash_evidence"], indent=2, sort_keys=True),
+        "compiled_spawn_positions.json": json.dumps(payload["compiled_spawn_positions"], indent=2, sort_keys=True),
         "session_admission_failure.json": json.dumps(support.get("session_admission_failure", {"status": "unavailable"}), indent=2, sort_keys=True),
     }
     if "launcher.log" not in tails:
         members["launcher.log"] = safe_logs + ("\n" if safe_logs else "")
     elif safe_logs:
-        members["launcher.history.log"] = safe_logs + "\n"
+        tails["launcher.log"] += "\n" + safe_logs + "\n"
     for name in sorted(tails, key=lambda name: not name.startswith(("sentinel/", "install/", "logs/"))):
         members[name] = tails[name]
     if condump_content is not None:
@@ -1809,8 +1927,10 @@ def write_support_bundle(
     remaining = SUPPORT_BUNDLE_MAX_BYTES - 128 * 1024
     for name, content in members.items():
         data = content.encode("utf-8")
-        limit = min(remaining, SUPPORT_INJECTOR_MAX_BYTES if name == "install/injector.log" else
-                    SUPPORT_LOG_TAIL_BYTES if name == "logs/qconsole.log" else remaining)
+        if name == "install/injector.log":
+            retained[name] = data
+            continue
+        limit = min(remaining, SUPPORT_LOG_MAX_BYTES if name == "logs/qconsole.log" else remaining)
         if len(data) > limit:
             if name.endswith(".log") and limit > 0:
                 notes.append(f"{name}: truncated from {len(data)} to at most {limit} bytes")
@@ -1871,7 +1991,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.7.1"
+    VERSION = "0.7.2"
 
     def __init__(
         self,
@@ -2048,7 +2168,7 @@ class LauncherDoctor:
                     actions.append(RepairAction(
                         "reinstall_room_mod", "Repair room mod",
                         (f"Reinstall and check {staged.name}",), True,
-                        "Installation could not be checked. Select Help -> SAVE SUPPORT REPORT.",
+                        f"Installation failed at verify: {type(error).__name__}: {error}",
                     ))
                     return tuple(actions)
             if adapter_state != "applied":
@@ -2182,8 +2302,9 @@ class LauncherDoctor:
                                 "installation_mode": mode,
                                 "post_install_verification": receipt.get("post_install_verification", ""),
                                 "verification_error": str(error),
+                                **installation_error_details(error, "verify"),
                             }
-                            checks.append(Diagnostic("mod_injection", "failed", "Installation could not be checked. Select Help -> SAVE SUPPORT REPORT.", details))
+                            checks.append(Diagnostic("mod_injection", "failed", f"Installation failed at verify: {type(error).__name__}: {error}", details))
                         else:
                             details = {
                                 "adapter_state": adapter_state,
@@ -2222,7 +2343,10 @@ class LauncherDoctor:
                     if os.name == "nt":
                         checks.append(Diagnostic("windows_mod_installer", "failed", "Follow Windows manual installation in INSTALL.md.", {"installation_mode": mode, "adapter_state": adapter_state}))
                 else:
-                    checks.append(Diagnostic("mod_injection", "failed", "Install the room mod before playing.", {"adapter_state": adapter_state, "installation_mode": mode}))
+                    details = {"adapter_state": adapter_state, "installation_mode": mode,
+                               **receipt.get("adapter_details", {})}
+                    message = str(receipt.get("adapter_message") or "Install the room mod before playing.")
+                    checks.append(Diagnostic("mod_injection", "failed", message, details))
                     if os.name == "nt":
                         checks.append(Diagnostic("windows_mod_installer", "failed", "Installer is not ready. Retry setup.", {"installation_mode": mode, "adapter_state": adapter_state}))
             except Exception:

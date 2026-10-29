@@ -177,6 +177,8 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         user_title = GAME_SETUP_FAILURE_TITLE
         user_message = GAME_SETUP_FAILURE_MESSAGE
         user_action = GAME_SETUP_FAILURE_ACTION
+    if raw_message.startswith("Installation failed at "):
+        user_message = raw_message
     return {
         "error_type": type(error).__name__,
         "message": raw_message,
@@ -248,6 +250,7 @@ class IntegratedSetupRecord:
     post_install_verification: str = ""
     static_content_digest: str = ""
     installed_resources: dict[str, str] = field(default_factory=dict)
+    adapter_details: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -581,7 +584,7 @@ class IntegratedLaunchWorkflow:
                     or not isinstance(raw_command, (list, tuple)) or not raw_command
                     or receipt.get("injector_exit_code") != 0
                     or not isinstance(raw_resources, (list, tuple))
-                    or len(raw_resources) != 4
+                    or len(raw_resources) not in (3, 4)
                     or any(not isinstance(item, dict) or item.get("status") != "verified" for item in raw_resources)
                     or str(receipt.get("mods_path", "")) != str((game_root / "Mods").resolve())
                 ):
@@ -680,6 +683,7 @@ class IntegratedLaunchWorkflow:
             self._emit(
                 "injector_finished",
                 state=result.state,
+                message=result.message,
                 returncode=result.returncode,
                 stdout=result.stdout,
                 stderr=result.stderr,
@@ -728,6 +732,7 @@ class IntegratedLaunchWorkflow:
             self._emit(
                 "injector_finished",
                 state=result.state,
+                message=result.message,
                 returncode=result.returncode,
                 stdout=result.stdout,
                 stderr=result.stderr,
@@ -1004,6 +1009,7 @@ class IntegratedLaunchWorkflow:
             ),
             static_content_digest=manifest.static_content_digest,
             installed_resources=self._installed_resources(game_root, adapter.state),
+            adapter_details=dict(adapter.details),
         )
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != record.staged_sha256:

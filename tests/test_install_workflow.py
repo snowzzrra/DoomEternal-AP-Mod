@@ -299,6 +299,33 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 backup = Path(result.backup_path) / "original"
                 self.assertEqual(before, {path.name: path.read_bytes() for path in backup.iterdir()})
 
+    def test_missing_installed_manifest_recovers_matching_files_and_preserves_foreign_files(self):
+        from doom_eap.launcher.launcher_core_install import NAMES
+
+        for remaining in (NAMES[:2], ("msimg32.dll",), ("sentinel_core.dll",)):
+            for foreign in (False, True):
+                with self.subTest(remaining=remaining, foreign=foreign), tempfile.TemporaryDirectory() as directory:
+                    root = self._create_mock_game_root(Path(directory) / "doom")
+                    manifest = _install_core_fixture(root)
+                    for name in NAMES:
+                        if name not in remaining:
+                            (root / name).unlink()
+                    if foreign:
+                        (root / remaining[0]).write_bytes(b"foreign")
+                    before = {name: (root / name).read_bytes() for name in remaining}
+                    with patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()):
+                        if foreign:
+                            with self.assertRaisesRegex(RuntimeError, "ownership"):
+                                install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                            self.assertEqual(before, {name: (root / name).read_bytes() for name in remaining})
+                            self.assertFalse((root / NAMES[2]).exists())
+                        else:
+                            result = install_meathook(root, None, consent=lambda _: False, local_artifact=manifest)
+                            self.assertEqual(result.state, "repaired")
+                            self.assertTrue(launcher_platform_mod.probe_meathook(root).ok)
+                            backup = Path(result.backup_path) / "original"
+                            self.assertEqual(before, {path.name: path.read_bytes() for path in backup.iterdir()})
+
     def test_bootstrap_recovery_uses_verified_zip_and_reports_defender(self):
         from doom_eap.contracts.core_distribution import verify_runtime
 

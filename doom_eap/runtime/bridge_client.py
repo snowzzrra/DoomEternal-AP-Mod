@@ -3046,6 +3046,7 @@ class DoomEternalContext(CommonContext):
             "native_probe_events": {"/".join(key): {field: row[field] for field in
                 ("first_seen", "last_seen", "count", "first_error") if field in row}
                 for key, row in getattr(getattr(self, "_weapon_points_link", None), "_diagnostic_signatures", {}).items()},
+            "encounter_recovery_attempts": getattr(self, "_encounter_recovery_attempts", []),
             "special_stage": materialization.get("special_stage", 0),
         }
 
@@ -3286,6 +3287,20 @@ class DoomEternalContext(CommonContext):
     def _consume_ammo_refill_discarded_storage(self, value):
         self._observe_ammo_receipts()
         self.ammo.consume_discarded(value)
+
+    async def request_finish_encounter(self):
+        trace = []
+        try:
+            link = self.native_game_link()
+        except (RuntimeError, ValueError, OSError):
+            response = {"message": "No active encounter"}
+        else:
+            response = await asyncio.to_thread(link.finish_encounter, trace=trace)
+        attempts = getattr(self, "_encounter_recovery_attempts", [])
+        attempts.append({**response, "trace": trace})
+        self._encounter_recovery_attempts = attempts[-16:]
+        log_item_event("ENCOUNTER_RECOVERY", **attempts[-1])
+        emit_launcher_event("encounter_recovery", **response)
 
     async def request_ammo_refill(self):
         self._observe_ammo_receipts()
@@ -7158,6 +7173,13 @@ async def launcher_control_loop(ctx):
             task = getattr(ctx, "_inventory_resync_task", None)
             if task is None or task.done():
                 ctx._inventory_resync_task = asyncio.create_task(_launcher_inventory_resync(ctx, control))
+            continue
+        if control.get("type") == "finish_encounter":
+            try:
+                await ctx.request_finish_encounter()
+            except Exception as error:
+                logger.warning("[Encounter recovery] %s", error)
+                emit_launcher_event("encounter_recovery", message="Recovery outcome unknown")
             continue
         if control.get("type") == "ammo_refill":
             try:

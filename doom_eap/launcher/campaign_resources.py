@@ -15,6 +15,8 @@ import struct
 import tempfile
 import zipfile
 
+from .launcher_platform import installation_step
+
 CONTAINER = "gameresources_patch2.resources"
 DECLS = (
     "devmenuoption/devmenuoption/ap_unified_campaign.decl",
@@ -218,6 +220,7 @@ def publish_resource_activation(base: Path, updates: dict[str, bytes], report: d
             path.unlink(missing_ok=True)
 
 
+@installation_step("prepare banks")
 def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
     """Finalize an injected room package; never enable unrelated resource records."""
     from doom_eap.launcher.launcher_platform import detect_doom_processes
@@ -276,23 +279,29 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         updates.update(bank_updates)
     if banks.get('consolidated') or obsolete:
         from .resource_bank import register_banks
-        report.setdefault('source_hashes', {})
-        for name in ('meta.resources', 'idRehash.map'):
-            original = (base / name).read_bytes()
-            expected_hash = banks['source_hashes'].get(name, hashlib.sha256(original).hexdigest())
-            if hashlib.sha256(original).hexdigest() != expected_hash:
-                raise RuntimeError('Resource metadata changed during bank consolidation')
-            report['source_hashes'].setdefault(name, expected_hash)
-            updates.setdefault(name, original)
-        register_banks(base, banks.get('consolidated', {}), updates, obsolete)
+        with installation_step("register banks"):
+            report.setdefault('source_hashes', {})
+            for name in ('meta.resources', 'idRehash.map'):
+                original = (base / name).read_bytes()
+                expected_hash = banks['source_hashes'].get(name, hashlib.sha256(original).hexdigest())
+                if hashlib.sha256(original).hexdigest() != expected_hash:
+                    raise RuntimeError('Resource metadata changed during bank consolidation')
+                report['source_hashes'].setdefault(name, expected_hash)
+                updates.setdefault(name, original)
+            register_banks(base, banks.get('consolidated', {}), updates, obsolete)
         report['updated_meta_sha256'] = hashlib.sha256(updates['meta.resources']).hexdigest()
     table = report["containers"].get(CONTAINER, {"previously_enabled": {}, "changed_bits": 0, "added_mask_words": 0})
     entries = [{"name": name, "index": row[0], "previously_enabled": table["previously_enabled"][row[0]]}
                for name, row in records.items()]
     from .build_manifest import register_resource_manifest
-    register_resource_manifest(base, banks.get("consolidated", {}), updates, report, obsolete)
-    publish_resource_activation(base, updates, report)
-    cleanup = cleanup_banks(base, obsolete) if obsolete else {'removed': [], 'bytes_freed': 0, 'errors': []}
+    with installation_step("manifest"):
+        register_resource_manifest(base, banks.get("consolidated", {}), updates, report, obsolete)
+    with installation_step("publish"):
+        publish_resource_activation(base, updates, report)
+    with installation_step("cleanup"):
+        cleanup = cleanup_banks(base, obsolete) if obsolete else {'removed': [], 'bytes_freed': 0, 'errors': []}
+        if cleanup['errors']:
+            raise RuntimeError("; ".join(cleanup['errors']))
     return {"state": "enabled", "container": CONTAINER if records else None, "entries": entries,
             "changed_bits": table["changed_bits"], "added_mask_words": table["added_mask_words"],
             "native_enemy_banks": banks["maps"], "meta_sha256": report.get("updated_meta_sha256"), "bank_cleanup": cleanup}
