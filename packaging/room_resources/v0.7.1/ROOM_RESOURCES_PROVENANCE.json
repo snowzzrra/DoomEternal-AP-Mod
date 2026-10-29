@@ -453,7 +453,7 @@
   },
   "source_state": {
     "apworld": {
-      "base_commit_sha": "f44ef1fedd815502f29781062e9e294616033a7b",
+      "base_commit_sha": "b87c9d08875630df45469990c33246de7c5fcf6a",
       "source_state": {
         "byte_contract": "exact_file_bytes",
         "files": {
@@ -542,8 +542,8 @@
             "size": 2879
           },
           "archipelago/.gitignore": {
-            "sha256": "97908aaae9dc336de3b1180d55eed92db9bf98f05c342f3322da22e37d0eeebe",
-            "size": 2347
+            "sha256": "29189ca8c95c5e39a9fd7b059fc34a70fafe2dfb2f1284908003de1c8374c843",
+            "size": 2337
           },
           "archipelago/.mypy_cache/.gitignore": {
             "sha256": "6a69da670d11530d37f0f0cfdc7bed30b78ea6434e24f7a73208b982e29d322c",
@@ -4362,24 +4362,20 @@
             "size": 35
           },
           "archipelago/worlds/doometernal/__init__.py": {
-            "sha256": "beee18e83c6e2470f9ede10957981bf2be72e0fe8c7c9c2a59a5030138802c4a",
-            "size": 52577
+            "sha256": "5bea9014c8500791739f2233524fa1ff905f248d52d5700e3076dca437ef2c2e",
+            "size": 51252
           },
           "archipelago/worlds/doometernal/archipelago.json": {
             "sha256": "00a65f49a80657e14e529bcfbe6c73ec34d4990fbcd9ed6dd94223157d577fd1",
             "size": 126
           },
           "archipelago/worlds/doometernal/campaign.py": {
-            "sha256": "9402df2e7d2d97bf8c9bc9182947b36f3926bbae6b7a030b63a5f1c0f138a91a",
-            "size": 38530
+            "sha256": "01ecbaa91827a9981be256f2f89376a42f7326794880f05433f4770d777c8252",
+            "size": 38486
           },
           "archipelago/worlds/doometernal/campaign_kill_sources.json": {
             "sha256": "26b4b90c9d823f7d8909bac011a1a1519440a99edfab20b2df0c63c9652549ab",
             "size": 436123
-          },
-          "archipelago/worlds/doometernal/campaign_stage_ids.json": {
-            "sha256": "91cb571e90b012c4f8f80c8b987d285e9b4a587d310240591de182453f2037ac",
-            "size": 1654
           },
           "archipelago/worlds/doometernal/challenge_enemy_targets.json": {
             "sha256": "1df45f70961f01ddc617baf1f4f601311bb799687946ecf95c6ecb5106008dbd",
@@ -4394,8 +4390,8 @@
             "size": 26374
           },
           "archipelago/worlds/doometernal/combat_readiness.py": {
-            "sha256": "981b3b38bbd6fb85cbfeed74a07eab6c1a5ec686cd51b030a1a59187ae0025ae",
-            "size": 21174
+            "sha256": "bb0b2b70158d90e38df11949cf59d58f67f6a36e4e3f0f5ff179609c256e826c",
+            "size": 19354
           },
           "archipelago/worlds/doometernal/docs/en_DOOM Eternal.md": {
             "sha256": "cc6c92e4177a2d7f294847f0818042c634533c9fcd9047197c8ede476801dd3d",
@@ -4414,8 +4410,8 @@
             "size": 14872
           },
           "archipelago/worlds/doometernal/enemy_plan.py": {
-            "sha256": "746ea07e1fdd1aae62995e4b95ce6b4c9829f7039183d6ad8a38aa6b2d2c8223",
-            "size": 10928
+            "sha256": "8d187e574eb28b108ad329f40669798a6fefef50ff8a271cc1611e0cc82f6d86",
+            "size": 9916
           },
           "archipelago/worlds/doometernal/enemy_species.json": {
             "sha256": "ecde16a8ac8e11918dc9ef1320891061fd00cad2f9971cecc7a7455674bac2cd",
@@ -4430,8 +4426,8 @@
             "size": 704
           },
           "archipelago/worlds/doometernal/generated_content.py": {
-            "sha256": "05cda1b12c80b820e9fa80a6dd42d04ba8cfe4a1f23cc4a49b011790fed7d12d",
-            "size": 126728
+            "sha256": "13aa780096f40fb8ec2d13a056ce0c320e0b1786f9ee2ebffac4c35c1a4b1d11",
+            "size": 128478
           },
           "archipelago/worlds/doometernal/identity.py": {
             "sha256": "435af67955b467714c2bc3dc6f5e3cb9a6d9084b193fce3abb7c8df6413dec37",
@@ -4442,16 +4438,16 @@
             "size": 16757
           },
           "archipelago/worlds/doometernal/killsanity_logic.py": {
-            "sha256": "f79bb6e7b2a2b0b40aaf5d79ff1d81be778e8cb26f6b9704ccad47fa1fc2082f",
-            "size": 4626
+            "sha256": "6d3be8ad4b81e3979194a785781ec9922fb3ab49ff6fb5f20508e214e47a4812",
+            "size": 3423
           },
           "archipelago/worlds/doometernal/killsanity_plan.py": {
-            "sha256": "76ced8f14849702b08c01e6d69b0bc25012414ddea89f969804925a7bb5a0b84",
-            "size": 14877
+            "sha256": "31d878aa2e7f2c7aa247ec2ee1889b439a039284893169dffee732913e3f09ef",
+            "size": 13027
           },
           "archipelago/worlds/doometernal/locations.py": {
-            "sha256": "d9a073fb51a5d9820b816b7e77d1d219d02c6eab6eacb8e65603a0d77047db2b",
-            "size": 1273
+            "sha256": "a1fb1226ef51de88872def334579abf3a10fa838f8b271fe1346bbd9e4e6cf3c",
+            "size": 879
           },
           "archipelago/worlds/doometernal/logic.py": {
             "sha256": "72fe3c132daed23c2705782a06a55e625bbc3723aa1998915496ca92cf7a911b",
@@ -4466,28 +4462,20 @@
             "size": 6544282
           },
           "archipelago/worlds/doometernal/native_enemy_plan.py": {
-            "sha256": "c8a789a2997a68b712cd30a479c46495c2d29a08dbd0d0d10386eaa43bf33fb3",
-            "size": 69591
+            "sha256": "a3cff9b13864cacd372b225d54d03158e0dc07cff0994f5047eef706bdd9f067",
+            "size": 69098
           },
           "archipelago/worlds/doometernal/native_enemy_safety.py": {
-            "sha256": "264757808ef327fab63b89256b367b89236aa4e34e2d088d3099b0aba0054e8d",
-            "size": 11923
+            "sha256": "e77ecb49547770ba06a0af937931a7a3663e6d86b667830b717801e728786258",
+            "size": 12079
           },
           "archipelago/worlds/doometernal/options.py": {
-            "sha256": "37de4ace62a4f0467eb410394fa74db090163ac15665f6aa8722a935358ae836",
-            "size": 35846
+            "sha256": "b6df9027ab6901f58e5b56ff6cf827358365a56d09aa9670d5b2563160c745e8",
+            "size": 33847
           },
           "archipelago/worlds/doometernal/planner.py": {
-            "sha256": "6dfd1132a62e63e3c948d9a4626690966ebffe41106827235b382c2012f2a4fb",
-            "size": 40298
-          },
-          "archipelago/worlds/doometernal/projection_manifest.json": {
-            "sha256": "7d89958e039a53bd8137694ea26d31b97d45f4aa3b4d5d17cd6a57652b11b521",
-            "size": 2391
-          },
-          "archipelago/worlds/doometernal/recipe_codec.py": {
-            "sha256": "0cc72f784806886ec2e1d26092212560d235461e5630954640be9a28135c0656",
-            "size": 5406
+            "sha256": "7b38c5ae677af6eb526d445523249ef0e59b8ac928feaf4990e2bd22aa434d6a",
+            "size": 40544
           },
           "archipelago/worlds/doometernal/secret_encounter_timers.json": {
             "sha256": "376397784d5378a6d2c1f1578e4a1999230c20f87c1ff7ba00e4f7c428bd0806",
@@ -4500,18 +4488,6 @@
           "archipelago/worlds/doometernal/settings.py": {
             "sha256": "1d04eaf54a5752201afe26940d1494ed0dd795025ae353211aac0c5b89d08641",
             "size": 293
-          },
-          "archipelago/worlds/doometernal/slot_catalog.json": {
-            "sha256": "7153aa4220a280bcbaeae0a9f269672f8b02c9fca48e77c50c8800d1c886275c",
-            "size": 30294
-          },
-          "archipelago/worlds/doometernal/slot_data.py": {
-            "sha256": "84c98a02e0b70ff941399bd5df2bb63ce0c8f5d2878413bcbe0f460551018b50",
-            "size": 8147
-          },
-          "archipelago/worlds/doometernal/slot_data_contract.py": {
-            "sha256": "ef0c255e1f47ceb7a9aa977108f9b47c56fc501cdf1bcf90cea64ad71418044a",
-            "size": 35044
           },
           "archipelago/worlds/doometernal/sync_version.py": {
             "sha256": "f3822f9d160b775d9ac82ae2702dc345a766205b8bf42f4924c83cf2a32b5c59",
@@ -13358,7 +13334,7 @@
             "size": 136
           }
         },
-        "fingerprint": "39bb92c04c1751432af0dda1b2690d81e5646e657e9a17960042134ccf227da0",
+        "fingerprint": "4bc86fd64edec90685222514c731c232492b640831b74484226b8152711932f1",
         "kind": "working_tree_snapshot"
       }
     },
