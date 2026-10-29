@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iomanip>
+#include <stdexcept>
 #include <vector>
 
 class FakeTransport : public CommandTransport {
@@ -42,9 +44,54 @@ static bool Dispatch(NativeCommandQueue& queue, FakeTransport& transport,
     return queue.Dispatch(GetTickCount(), queue.ArmIfPending(), true, safety, baseline, "ready", &transport);
 }
 
+static void ScenarioBarrier(const std::string& event) {
+    std::cout << "DELIVERY\t{\"event\":" << std::quoted(event) << "}" << std::endl;
+    std::string reply;
+    if (!std::getline(std::cin, reply)) throw std::runtime_error("scenario controller closed");
+}
+
+class ScenarioTransport : public FakeTransport {
+public:
+    std::string commandId;
+    void SetCurrentCommandId(const std::string& value) override { commandId = value; }
+    bool ExecuteConsoleCommand(const std::string& command) override {
+        ScenarioBarrier("attempt_journal:after");
+        std::cout << "DELIVERY\t{\"event\":\"execute\",\"id\":" << std::quoted(commandId)
+                  << ",\"command\":" << std::quoted(command) << "}" << std::endl;
+        std::string reply;
+        if (!std::getline(std::cin, reply)) throw std::runtime_error("console peer closed");
+        succeed = reply == "ok";
+        failure = AP_RPC_AMBIGUOUS;
+        ScenarioBarrier("native_completion:before");
+        return succeed;
+    }
+};
+
+static int RunScenario(const char* activeNamespace) {
+    const auto log = [](const std::string& line) {
+        std::cout << "NATIVE_LOG " << line << std::endl;
+        if (line.rfind("RPC_EXECUTE ", 0) == 0) ScenarioBarrier("attempt_journal:before");
+    };
+    ScenarioTransport transport;
+    NativeCommandQueue queue(log);
+    queue.Initialize();
+    Scope(activeNamespace);
+    ScenarioBarrier("native_claim:before");
+    queue.Import();
+    ScenarioBarrier("native_claim:after");
+    queue.DiscardInvalidScopes(true);
+    // Supply a ready scheduler tick without sleeping between console commands.
+    while (queue.Dispatch(GetTickCount() + 10000, queue.ArmIfPending(), true,
+                          {true, true}, true, "ready", &transport)) {}
+    ScenarioBarrier("native_completion:after");
+    std::cout << "DELIVERY\t{\"event\":\"done\"}" << std::endl;
+    return 0;
+}
+
 int main(int argc, char** argv) {
     // The harness runs only in pytest's isolated cwd; it never discovers a game path.
     std::filesystem::create_directories("base/ap_queue");
+    if (argc == 3 && std::string(argv[1]) == "--scenario") return RunScenario(argv[2]);
     std::vector<std::string> logs;
     const auto log = [&](const std::string& line) { logs.push_back(line); };
     FakeTransport transport;

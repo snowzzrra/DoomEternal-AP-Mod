@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "apworld_ref": "b87c9d08875630df45469990c33246de7c5fcf6a",
+  "sources": {
+    "compact_battery": "Archipelago/worlds/doometernal/test/test_short_world_generation.py::TestShortWorldGeneration::test_compact_campaign_battery_surplus_fits_budget",
+    "fixed_seeds": "seeds that broke earlier fuzz runs; the original fuzz options were not kept, so these cases use explicit option profiles"
+  },
+  "resource_version": "v0.7.1",
+  "resource_sha256": {
+    "base_mod.zip": "939fbc23dafa8160b5b375ea91dd7d6a0660cfe4058f4d647f6436c96d5b7d59",
+    "room_payloads.zip": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
+    "room_payload_manifest.json": "132b1c9480b516002c700d34ef4a037fb3f882a4f7bd7e0bf54e5c4518bdfb5b"
+  },
+  "valid_cases": [
+    {
+      "id": "compact_battery_seed_1",
+      "seed": 1,
+      "players": 1,
+      "options": {
+        "enemy_randomizer": false,
+        "mission_order": "vanilla_order",
+        "starting_weapon": "ballista",
+        "include_weapon_mastery_challenges": false,
+        "goal": "kill_the_icon_of_sin",
+        "custom_dark_lord": false,
+        "mission_pool": "custom",
+        "custom_missions": [
+          "Final Sin",
+          "The World Spear",
+          "Reclaimed Earth",
+          "Immora",
+          "The Blood Swamps",
+          "Sentinel Prime"
+        ]
+      },
+      "expected": {
+        "mission_count": 6,
+        "mode": "Vanilla Order",
+        "goal_stage": "e3m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": false,
+        "battery_economy": {
+          "cost": 16,
+          "surplus": 1,
+          "total": 17,
+          "surplus_percent": 25,
+          "native_first_battery": 0
+        }
+      }
+    },
+    {
+      "id": "vanilla_full_saga_89654039614909134671",
+      "seed": 89654039614909134671,
+      "players": 1,
+      "options": {
+        "mission_pool": "full_saga",
+        "mission_count": "all",
+        "mission_order": "vanilla_order",
+        "goal": "complete_the_full_saga",
+        "enemy_randomizer": false
+      },
+      "expected": {
+        "mission_count": 19,
+        "mode": "Vanilla Order",
+        "goal_stage": "e5m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "remote_rmo_348679427",
+      "seed": 348679427,
+      "players": 2,
+      "options": {
+        "mission_pool": "base",
+        "mission_count": "all",
+        "mission_order": "random_mission_order",
+        "goal": "kill_the_icon_of_sin",
+        "enemy_randomizer": false
+      },
+      "expected": {
+        "mission_count": 13,
+        "mode": "Random Mission Order",
+        "goal_stage": "e3m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": true
+      }
+    },
+    {
+      "id": "mission_access_164570677",
+      "seed": 164570677,
+      "players": 1,
+      "options": {
+        "mission_pool": "base",
+        "mission_count": 6,
+        "mission_order": "mission_access_as_items",
+        "starting_missions": 2,
+        "goal_mission_as_item": true,
+        "goal": "kill_the_icon_of_sin",
+        "enemy_randomizer": false
+      },
+      "expected": {
+        "mission_count": 6,
+        "mode": "Mission Access as Items",
+        "goal_stage": "e3m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "dlc_only_427264797",
+      "seed": 427264797,
+      "players": 1,
+      "options": {
+        "mission_pool": "dlc_only",
+        "mission_count": "all",
+        "mission_order": "random_mission_order",
+        "goal": "kill_the_dark_lord",
+        "include_slayer_gates": false,
+        "include_secret_encounters": false,
+        "include_weapon_mastery_challenges": false,
+        "enemy_randomizer": false
+      },
+      "expected": {
+        "mission_count": 6,
+        "mode": "Random Mission Order",
+        "goal_stage": "e5m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "enemy_descriptor_429261552",
+      "seed": 429261552,
+      "players": 1,
+      "options": {
+        "mission_pool": "base",
+        "mission_count": 6,
+        "mission_order": "random_mission_order",
+        "goal": "kill_the_icon_of_sin",
+        "enemy_randomizer": true,
+        "enemy_preset": "slayers_path"
+      },
+      "expected": {
+        "mission_count": 6,
+        "mode": "Random Mission Order",
+        "goal_stage": "e3m4_boss",
+        "enemy_descriptor": true,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "kill_rewards_2000",
+      "seed": 2200,
+      "players": 1,
+      "options": {
+        "enemy_randomizer": false,
+        "mission_order": "vanilla_order",
+        "starting_weapon": "ballista",
+        "include_weapon_mastery_challenges": false,
+        "goal": "kill_the_icon_of_sin",
+        "custom_dark_lord": false,
+        "mission_pool": "custom",
+        "custom_missions": [
+          "Final Sin",
+          "The World Spear",
+          "Reclaimed Earth",
+          "Immora",
+          "The Blood Swamps",
+          "Sentinel Prime"
+        ],
+        "killsanity": true,
+        "kills_per_check": 10,
+        "killsanity_maximum_milestones": 2000
+      },
+      "expected": {
+        "mission_count": 6,
+        "mode": "Vanilla Order",
+        "goal_stage": "e3m4_boss",
+        "enemy_descriptor": false,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "resolved_full_default",
+      "seed": 429261552,
+      "players": 1,
+      "options": {
+        "mission_pool": "full_saga",
+        "mission_count": "all",
+        "mission_order": "vanilla_order",
+        "goal": "complete_the_full_saga",
+        "enemy_randomizer": true,
+        "enemy_preset": "slayers_path"
+      },
+      "expected": {
+        "mission_count": 19,
+        "mode": "Vanilla Order",
+        "goal_stage": "e5m4_boss",
+        "enemy_descriptor": true,
+        "remote_placements": false
+      }
+    },
+    {
+      "id": "resolved_full_large",
+      "seed": 429261552,
+      "players": 1,
+      "options": {
+        "mission_pool": "full_saga",
+        "mission_count": "all",
+        "mission_order": "vanilla_order",
+        "goal": "complete_the_full_saga",
+        "enemy_randomizer": true,
+        "enemy_preset": "custom",
+        "enemy_count_mode": "multiplier",
+        "enemy_count_multiplier": 200,
+        "enemy_size_variation_chance": 25,
+        "enemy_health": {
+          "minimum": 75,
+          "maximum": 150
+        },
+        "enemy_damage": {
+          "minimum": 75,
+          "maximum": 150
+        },
+        "enemy_speed": {
+          "minimum": 75,
+          "maximum": 150
+        },
+        "enemy_size": {
+          "minimum": 75,
+          "maximum": 150
+        }
+      },
+      "expected": {
+        "mission_count": 19,
+        "mode": "Vanilla Order",
+        "goal_stage": "e5m4_boss",
+        "enemy_descriptor": true,
+        "remote_placements": false
+      }
+    }
+  ],
+  "invalid_options": [
+    {
+      "id": "unmaykr_without_base_gates",
+      "seed": 42,
+      "players": 1,
+      "options": {
+        "mission_pool": "dlc_only",
+        "goal": "acquire_the_unmaykr",
+        "enemy_randomizer": false
+      },
+      "error_match": "requires Base Slayer Gates.*DLC Only"
+    },
+    {
+      "id": "custom_pool_below_six_missions",
+      "seed": 42,
+      "players": 1,
+      "options": {
+        "mission_pool": "custom",
+        "custom_missions": [
+          "Hell on Earth",
+          "Exultia",
+          "Cultist Base",
+          "Doom Hunter Base",
+          "Super Gore Nest"
+        ],
+        "custom_dark_lord": false,
+        "goal": "kill_the_icon_of_sin",
+        "enemy_randomizer": false
+      },
+      "error_match": "requires at least 6 normal missions"
+    }
+  ],
+  "invalid_rooms": [
+    {
+      "id": "old_room_schema",
+      "slot_data": {
+        "identity": {
+          "schema": 6
+        }
+      },
+      "error_match": "This client requires a DoomEAP"
+    },
+    {
+      "id": "unknown_mod_contract",
+      "slot_data": {
+        "compatibility": {
+          "mod_contract_revision": -1
+        }
+      },
+      "error_match": "mod_contract_revision"
+    },
+    {
+      "id": "unknown_manifest_schema",
+      "slot_data": {
+        "compatibility": {
+          "manifest_schema_version": -1
+        }
+      },
+      "error_match": "manifest_schema_version"
+    },
+    {
+      "id": "missing_scout_placements",
+      "connected": {
+        "placements": []
+      },
+      "error_match": "placement set is incomplete"
+    }
+  ]
+}

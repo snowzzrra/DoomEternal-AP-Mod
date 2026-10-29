@@ -1,0 +1,113 @@
+name: Generated room acceptance
+
+'on':
+  workflow_dispatch:
+    inputs:
+      apworld_ref:
+        description: Full 40-character APWorld commit to test with this Mod checkout
+        required: true
+        default: b87c9d08875630df45469990c33246de7c5fcf6a
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    name: Generation (${{ matrix.os }}, ${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+        profile: [fast, full]
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: mod
+    env:
+      APWORLD_REF: ${{ inputs.apworld_ref }}
+      DOOMEAP_GENERATION_PROFILE: ${{ matrix.profile }}
+      PYTHONDONTWRITEBYTECODE: '1'
+      PYTHONHASHSEED: '0'
+      SKIP_REQUIREMENTS_UPDATE: '1'
+      CI: '1'
+    steps:
+      - name: Check out Mod
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: mod
+          persist-credentials: false
+
+      - name: Require an immutable APWorld input
+        run: |
+          if ($env:APWORLD_REF -cnotmatch '^[0-9a-f]{40}$') {
+            throw 'Preparation: apworld_ref must be a full lowercase 40-character commit SHA.'
+          }
+
+      - name: Check out APWorld
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: snowzzrra/DoomEternal-AP-World
+          ref: ${{ inputs.apworld_ref }}
+          path: Archipelago
+          persist-credentials: false
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12.10'
+
+      - name: Prepare isolated scratch
+        run: |
+          $scratch = Join-Path $env:RUNNER_TEMP 'generation-acceptance'
+          New-Item -ItemType Directory -Force "$scratch/temp" | Out-Null
+          "TEMP=$scratch/temp" >> $env:GITHUB_ENV
+          "TMP=$scratch/temp" >> $env:GITHUB_ENV
+          "A3_SCRATCH=$scratch" >> $env:GITHUB_ENV
+          "ARCHIPELAGO_SOURCE=$((Resolve-Path ../Archipelago).Path)" >> $env:GITHUB_ENV
+          "PYTHONPATH=$((Get-Location).Path)" >> $env:GITHUB_ENV
+          $actual = git -C ../Archipelago rev-parse HEAD
+          if ($LASTEXITCODE -ne 0 -or $actual -cne $env:APWORLD_REF) { throw 'APWorld checkout identity mismatch.' }
+
+      - name: Install generation dependencies
+        run: |
+          python -m pip install -r requirements-ci.txt colorama==0.4.6 websockets==13.1 jellyfish==1.2.1 jinja2==3.1.6 platformdirs==4.10.1 typing_extensions==4.15.0 pathspec==1.0.4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Prepare pinned frozen resources and decompressor
+        if: matrix.profile == 'full'
+        run: |
+          $resources = (Resolve-Path packaging/room_resources/v0.7.1).Path
+          "DOOMEAP_ROOM_RESOURCES=$resources" >> $env:GITHUB_ENV
+          $name = if ($IsWindows) { 'idFileDeCompressor.exe' } else { 'idFileDeCompressor' }
+          $expected = if ($IsWindows) { '02488dfb2999542cee4b7c0713ec03dd534ddd876169aac43b0217b362427a06' } else { '8bd14670fdb5a47533c5a59e9b6e1e32eaa3f06ce8b7ad2b4a8df520348b9ab8' }
+          $tool = Join-Path $env:A3_SCRATCH $name
+          Invoke-WebRequest "https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/$name" -OutFile $tool
+          if ((Get-FileHash $tool -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
+            throw 'Pinned decompressor checksum mismatch.'
+          }
+          if (-not $IsWindows) { chmod +x $tool }
+          "IDFILE_DECOMPRESSOR=$tool" >> $env:GITHUB_ENV
+
+      - name: Check function complexity
+        run: |
+          python -B -m tools.validation.function_complexity
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Run acceptance profile and record duration
+        run: |
+          $selection = @()
+          if ($env:DOOMEAP_GENERATION_PROFILE -eq 'fast') { $selection = @('-m', 'not integration') }
+          $started = Get-Date
+          python -B -m pytest tests/test_cross_repo_acceptance.py -q -p no:cacheprovider @selection --basetemp "$env:A3_SCRATCH/pytest" --durations=0 --junitxml="$env:A3_SCRATCH/results.xml" -o junit_family=legacy
+          $result = $LASTEXITCODE
+          $seconds = ((Get-Date) - $started).TotalSeconds
+          "Generation profile $env:DOOMEAP_GENERATION_PROFILE wall time: $seconds seconds" >> $env:GITHUB_STEP_SUMMARY
+          if ($result -ne 0) { exit $result }
+          [xml]$report = Get-Content -Raw "$env:A3_SCRATCH/results.xml"
+          $cases = @($report.SelectNodes('//testcase'))
+          if ($cases.Count -eq 0) { throw 'No acceptance tests ran.' }
+          if ($report.SelectNodes('//testcase/skipped[not(@type="pytest.xfail")]').Count -ne 0) {
+            throw 'Acceptance profile skipped a selected test; prepare its dependencies.'
+          }
