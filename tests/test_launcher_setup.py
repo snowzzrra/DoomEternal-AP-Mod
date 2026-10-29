@@ -189,6 +189,7 @@ def test_process_query_failure_refuses_mutation(room_files, monkeypatch, query_f
 
 @pytest.fixture
 def ui(tmp_path, monkeypatch):
+    pytest.importorskip("PySide6.QtWidgets", reason="Qt tests require requirements-launcher.txt")
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     from doom_eap.launcher.launcher_ui import LauncherUI

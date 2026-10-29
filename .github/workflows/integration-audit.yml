@@ -26,6 +26,9 @@ jobs:
       - name: Install audit dependencies
         working-directory: mod
         run: python -m pip install -r requirements-ci.txt
+      - name: Check APWorld function complexity (development)
+        working-directory: mod
+        run: python -m tools.validation.function_complexity --apworld-root ../Archipelago/worlds/doometernal
       - name: Validate producers and accepted contracts
         working-directory: mod
         run: python -m tools.validation.validate_data --apworld-root ../Archipelago/worlds/doometernal

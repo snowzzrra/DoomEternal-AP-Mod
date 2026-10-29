@@ -1,0 +1,14 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Ruff (CI undefined-name checks)
+        entry: python -m ruff check --select F821,F822,F823
+        language: system
+        types: [python]
+      - id: function-complexity
+        name: Function complexity
+        entry: python -m tools.validation.function_complexity
+        language: system
+        types: [python]
+        pass_filenames: false

@@ -21,10 +21,12 @@ name: DOOM Eternal AP Cross-Platform Build
       core_repo:
         description: 'Repository containing Sentinel Core source (owner/repository)'
         required: true
+        default: 'snowzzrra/Sentinel-Core'
         type: string
       core_ref:
         description: 'Full 40-character Sentinel Core source commit'
         required: true
+        default: 'fbca153959ecc458fd795b49ea834ff6ff8a25cd'
         type: string
 
 permissions:
@@ -219,6 +221,7 @@ jobs:
     runs-on: windows-2022
     env:
       SELECTED_CORE_COMMIT: ${{ inputs.core_ref }}
+      SENTINEL_CORE_SOURCE: ${{ github.workspace }}/Sentinel-Core
     steps:
       - name: Checkout MOD repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -271,6 +274,20 @@ jobs:
           python Sentinel-Core\tools\qualify_distribution.py --output Sentinel-Core\build\distribution\candidate --commit "%SELECTED_CORE_COMMIT%"
           if errorlevel 1 exit /b 1
           powershell.exe -NoProfile -File scripts\build\client_windows.ps1 -CoreSource Sentinel-Core -OutputDir build\release\build\client -UseCurrentToolchain
+
+      - name: Verify Native Client Contracts Without Skips
+        shell: cmd
+        run: |
+          call "%SC_VCVARS%" -vcvars_ver=14.44
+          if errorlevel 1 exit /b 1
+          if not exist Sentinel-Core\build\generated\sentinel_version.h exit /b 1
+          python -m pip install --requirement requirements-ci.txt
+          if errorlevel 1 exit /b 1
+          set "DELIVERY_TESTS="
+          if exist tests\test_delivery_scenarios.py set "DELIVERY_TESTS=tests/test_delivery_scenarios.py"
+          python -m pytest tests/test_native_queue.py tests/test_ap_client_timing.py %DELIVERY_TESTS% -q --junitxml=native-client-results.xml
+          if errorlevel 1 exit /b 1
+          python -c "import xml.etree.ElementTree as ET; root = ET.parse('native-client-results.xml').getroot(); assert list(root.iter('testcase')), 'Native-client gate collected zero tests'; assert not list(root.iter('skipped')), 'Native-client gate contains skipped tests'"
 
       - name: Build Windows Session Supervisor
         run: |
