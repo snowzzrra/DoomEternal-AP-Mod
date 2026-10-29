@@ -5,13 +5,8 @@ import json
 import math
 import re
 import struct
-import os
-import tempfile
-from pathlib import Path
 from fractions import Fraction
 from importlib.resources import files
-from collections import OrderedDict
-from threading import Lock
 
 from .enemy_plan import (BASE_COMBAT_COST, _density_weights, _limit_suffix, _random_for, enemy_combat_cost,
                          effective_special_limits, sample_instance_attributes, sample_species)
@@ -606,6 +601,83 @@ def _wave_peak(bodies, *, mobile=False):
                 superheavy_maximum=limits['superheavy'])
 
 
+def _source_logical_type(source, seed, key):
+    logical_types = source['logical_types']
+    if not logical_types or len(logical_types) != len(set(logical_types)):
+        raise ValueError(f"Native origin needs distinct logical types: {source['id']}")
+    selected_type = logical_types[_random_for(seed, key, 'logical_type').randrange(len(logical_types))]
+    selected_spawn_type({'spawn_type': source['spawn_type'], 'selected_spawn_type': selected_type})
+    return selected_type
+
+
+def _source_body_pattern(source, bodies, catalog):
+    ratio = [len(bodies), source['logical_count']]
+    if source.get('runtime_only'):
+        bodies = bodies[:len(catalog['species'])]
+        if bodies and all(body == bodies[0] for body in bodies):
+            bodies = bodies[:1]
+    if len(bodies) > 0x7fffffff:
+        raise ValueError(f"Native recipe has an invalid physical quantity: {source['id']}")
+    return bodies, ratio
+
+
+def _source_quota(source, bodies):
+    logical_count = source['logical_count']
+    maximum = source.get('maximum_emissions', logical_count)
+    if type(maximum) is not int or maximum < 0:
+        raise ValueError(f"Invalid native emission maximum: {source['id']}")
+    physical_maximum = (maximum * len(bodies) + logical_count - 1) // logical_count if maximum else 0
+    if physical_maximum > 0x7fffffff:
+        raise ValueError(f"Native recipe exceeds the engine's emission range: {source['id']}")
+    final_credit = maximum * len(bodies) - (physical_maximum - 1) * logical_count if physical_maximum else 0
+    return maximum, physical_maximum, final_credit
+
+
+def _name_recipe_bodies(recipe, settings):
+    bodies = recipe['bodies']
+    logical, maximum, credit = (recipe[name] for name in ('logical_count', 'maximum_emissions', 'final_credit_units'))
+    for ordinal, body in enumerate(bodies):
+        body['definition'] = native_body_name(recipe['origin'], ordinal, logical, len(bodies),
+                                               recipe['selected_spawn_type'], body, settings)
+        if 0 < credit < logical and ordinal == (maximum - 1) % len(bodies):
+            body['tail_definition'] = native_body_name(recipe['origin'], ordinal, logical, len(bodies),
+                recipe['selected_spawn_type'], body, settings, credit_units=credit)
+
+
+def _build_source_recipe(source, bodies, supplies, vanilla_balance, seed, map_key, catalog, settings, revision):
+    key = [map_key, source['id']]
+    token = recipe_token([str(seed), key])
+    selected_type = _source_logical_type(source, seed, key)
+    if source['id'] in supplies and not bodies and not vanilla_balance:
+        raise ValueError(f"Ammunition source has no eligible chainsaw fodder: {source['id']}")
+    bodies, ratio = _source_body_pattern(source, bodies, catalog)
+    maximum, physical_maximum, final_credit = _source_quota(source, bodies)
+    recipe = {'id': source['id'], 'origin': token,
+        **({'wave': source.get('wave', source.get('phase', source['id']))} if revision >= 5 else {}),
+        'family': source['family'], 'selected_spawn_type': selected_type,
+        'runtime_only': source.get('runtime_only', False), 'quantity_ratio': ratio,
+        'logical_mask': enemy_spawn_mask(selected_type), 'logical_count': source['logical_count'],
+        'physical_count': len(bodies), 'maximum_emissions': physical_maximum,
+        'renewable': source.get('renewable', maximum == 0) if vanilla_balance else maximum == 0,
+        'final_credit_units': final_credit,
+        'binding': dict(source['binding']) if 'binding' in source else None, 'bodies': bodies}
+    _name_recipe_bodies(recipe, settings)
+    return recipe
+
+
+def _stage_recipes(origins, phase_bodies, supplies, vanilla_balance, seed, map_key, catalog, settings, revision):
+    recipes, protected, inactive = [], [], []
+    for source in origins:
+        if source.get('protected_reason'):
+            protected.append({'id': source['id'], 'reason': source['protected_reason']})
+        elif source.get('inactive_reason'):
+            inactive.append({'id': source['id'], 'reason': source['inactive_reason']})
+        else:
+            recipes.append(_build_source_recipe(source, phase_bodies[source['id']], supplies,
+                vanilla_balance, seed, map_key, catalog, settings, revision))
+    return recipes, protected, inactive
+
+
 def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
     if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20):
         raise ValueError('Unsupported native recipe revision')
@@ -825,53 +897,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
                     **({'balanced': True, 'supply_sources': supplies, 'revision': revision,
                         'opening': phase in opening_phases} if revision >= 4 else {}))
             phase_bodies.update(generated)
-        for source in origins:
-            if source.get("protected_reason"):
-                protected.append({"id": source["id"], "reason": source["protected_reason"]})
-                continue
-            if source.get("inactive_reason"):
-                inactive.append({"id": source["id"], "reason": source["inactive_reason"]})
-                continue
-            key = [map_key, source["id"]]
-            token = recipe_token([str(seed), key])
-            logical_types = source["logical_types"]
-            if not logical_types or len(logical_types) != len(set(logical_types)):
-                raise ValueError(f"Native origin needs distinct logical types: {source['id']}")
-            selected_type = logical_types[_random_for(seed, key, "logical_type").randrange(len(logical_types))]
-            selected_spawn_type({"spawn_type": source["spawn_type"], "selected_spawn_type": selected_type})
-            logical_count = source["logical_count"]
-            bodies = phase_bodies[source["id"]]
-            if source['id'] in supplies and not bodies and not vanilla_balance:
-                raise ValueError(f"Ammunition source has no eligible chainsaw fodder: {source['id']}")
-            quantity_ratio = [len(bodies), logical_count]
-            if source.get("runtime_only"):
-                bodies = bodies[:len(catalog["species"])]
-                if bodies and all(body == bodies[0] for body in bodies):
-                    bodies = bodies[:1]
-            if len(bodies) > 0x7fffffff:
-                raise ValueError(f"Native recipe has an invalid physical quantity: {source['id']}")
-            maximum = source.get("maximum_emissions", logical_count)
-            if type(maximum) is not int or maximum < 0:
-                raise ValueError(f"Invalid native emission maximum: {source['id']}")
-            physical_maximum = ((maximum * len(bodies) + logical_count - 1) // logical_count if maximum else 0)
-            if physical_maximum > 0x7fffffff:
-                raise ValueError(f"Native recipe exceeds the engine's emission range: {source['id']}")
-            final_credit = maximum * len(bodies) - (physical_maximum - 1) * logical_count if physical_maximum else 0
-            for ordinal, body in enumerate(bodies):
-                body["definition"] = native_body_name(token, ordinal, logical_count, len(bodies), selected_type, body, settings)
-                if 0 < final_credit < logical_count and ordinal == (physical_maximum - 1) % len(bodies):
-                    body["tail_definition"] = native_body_name(token, ordinal, logical_count, len(bodies),
-                        selected_type, body, settings, credit_units=final_credit)
-            recipes.append({"id": source["id"], "origin": token,
-                **({'wave': source.get('wave', source.get('phase', source['id']))} if revision >= 5 else {}),
-                "family": source["family"], "selected_spawn_type": selected_type,
-                "runtime_only": source.get("runtime_only", False), "quantity_ratio": quantity_ratio,
-                "logical_mask": enemy_spawn_mask(selected_type), "logical_count": logical_count,
-                "physical_count": len(bodies), "maximum_emissions": physical_maximum,
-                "renewable": source.get('renewable', maximum == 0) if vanilla_balance else maximum == 0,
-                "final_credit_units": final_credit,
-                "binding": dict(source["binding"]) if "binding" in source else None,
-                "bodies": bodies})
+        recipes, protected, inactive = _stage_recipes(origins, phase_bodies, supplies, vanilla_balance,
+            seed, map_key, catalog, settings, revision)
         maps[map_key] = {"source_sha256": catalog["maps"][map_key]["source_sha256"],
                          "runtime_map": catalog["maps"][map_key].get("runtime_map", map_key),
                          "recipes": recipes, "protected": protected, "inactive": inactive,
@@ -879,6 +906,9 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
         if revision >= 5: maps[map_key]['wave_progression'] = phase_progression
         if vanilla_reference is not None:
             maps[map_key]['vanilla_reference'] = vanilla_reference
+        from .native_enemy_safety import resolve_native_stage
+        resolve_native_stage(maps[map_key], map_key, enemies, seed, catalog)
+        recipes = maps[map_key]['recipes']
         original_cost = sum((Fraction(source["combat_cost"]) for sources in phases.values() for source in sources
                              if not source.get("runtime_only")), Fraction(0))
         actual_cost = sum((enemy_combat_cost(body["species"], body["attributes"], buff_totems=revision >= 6, screechers=revision >= 7)
@@ -961,77 +991,88 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
     return plan
 
 
-_VALIDATED_PLANS = OrderedDict()
-_VALIDATION_LOCK = Lock()
-_VALIDATION_CACHE = None
+def _resolved_population(population, species_refs):
+    from .slot_data_contract import Population
 
-
-def configure_native_validation_cache(directory, compiler_fingerprint):
-    global _VALIDATION_CACHE
-    if re.fullmatch(r'[0-9a-f]{64}', compiler_fingerprint) is None:
-        raise ValueError('Native validation cache needs a compiler fingerprint')
-    _VALIDATION_CACHE = Path(directory) / compiler_fingerprint
-
-
-def native_recipe_seed(plan):
-    if plan is None:
+    if not population:
         return None
-    return {"kind": "native_recipe_seed", **{key: plan[key] for key in
-            ("revision", "seed", "campaign", "fingerprint")}}
+    counter = population.get('counter')
+    return Population(f"{population['scope']:016x}", population['maximum'], population.get('heavy', 0),
+        population['superheavy'], population['pressure'], int(population['mixed']), population.get('strict', False),
+        species_refs[counter] if counter is not None else None,
+        tuple(sorted((species_refs[name], count) for name, count in population.get('species', {}).items())))
 
 
-def validate_native_recipes(plan, enemies, campaign=None, *, catalog=None):
-    if plan is None:
-        if enemies["enabled"]:
-            raise ValueError("Enemizer requires frozen native recipes")
-        return None
-    if not isinstance(plan, dict) or not isinstance(plan.get("seed"), str) or not plan["seed"]:
-        raise ValueError("Native recipe seed is invalid")
-    compact = plan.get("kind") == "native_recipe_seed"
-    if compact and (set(plan) != {"kind", "revision", "seed", "campaign", "fingerprint"}
-                    or not isinstance(plan.get("fingerprint"), str)
-                    or re.fullmatch(r'[0-9a-f]{64}', plan["fingerprint"]) is None):
-        raise ValueError("Native recipe seed descriptor is invalid")
-    campaign = plan.get("campaign") if campaign is None else campaign
-    if not isinstance(campaign, dict) or not isinstance(campaign.get("sequence"), list):
-        raise ValueError("Native recipe campaign is invalid")
-    if catalog is None:
-        catalog = json.loads(files(__package__).joinpath("native_enemy_catalog.json").read_bytes())
-    key = hashlib.sha256(json.dumps([plan, enemies, campaign, catalog], sort_keys=True,
-                                   separators=(",", ":"), allow_nan=False).encode("utf-8")).digest()
-    with _VALIDATION_LOCK:
-        if key not in _VALIDATED_PLANS:
-            cached = _VALIDATION_CACHE / key.hex() if _VALIDATION_CACHE is not None else None
-            try:
-                verified = not compact and cached is not None and cached.stat().st_size == len(key) and cached.read_bytes() == key
-            except OSError:
-                verified = False
-            if not verified:
-                expected = build_native_recipes(enemies, campaign, seed=plan["seed"], catalog=catalog, revision=plan.get('revision'))
-                if plan != (native_recipe_seed(expected) if compact else expected):
-                    raise ValueError("Native recipes differ from the seed, options or source catalog")
-                if cached is not None and not compact:
-                    pending = None
-                    try:
-                        cached.parent.mkdir(parents=True, exist_ok=True)
-                        with tempfile.NamedTemporaryFile(dir=cached.parent, delete=False) as output:
-                            pending = Path(output.name)
-                            output.write(key)
-                        os.replace(pending, cached)
-                    except OSError:
-                        pass
-                    finally:
-                        if pending is not None:
-                            try:
-                                pending.unlink(missing_ok=True)
-                            except OSError:
-                                pass
-            if compact:
-                for old_key, value in list(_VALIDATED_PLANS.items()):
-                    if value is not None:
-                        del _VALIDATED_PLANS[old_key]
-            _VALIDATED_PLANS[key] = expected if compact else None
-            if len(_VALIDATED_PLANS) > 8:
-                _VALIDATED_PLANS.popitem(last=False)
-        _VALIDATED_PLANS.move_to_end(key)
-        return _VALIDATED_PLANS[key] if compact else plan
+def _resolved_body(body, stage_limits, refs):
+    from .recipe_codec import Body
+    from .slot_data_contract import LimitSet
+
+    special = body.get('special_limits', stage_limits)
+    limits = LimitSet(tuple(special[name] for name in ('marauder', 'archvile', 'spirit', 'combined_special')),
+                      _resolved_population(body.get('population_limits'), refs['species']))
+    attributes = body['attributes']
+    return Body(refs['templates'][body['species']], *(attributes[name + '_percent']
+                for name in ('health', 'damage', 'speed', 'size')), limits)
+
+
+def _resolved_row(recipe, role, stage_id, stage, refs):
+    from .recipe_codec import ResolvedRow
+
+    ratio = recipe['quantity_ratio']
+    return ResolvedRow(refs['sources'][stage_id, recipe['id'], role], refs['roles'][role],
+        refs['spawn_types'][recipe['selected_spawn_type']],
+        tuple(_resolved_body(body, stage['special_limits'], refs) for body in recipe['bodies']),
+        recipe['logical_count'], recipe['maximum_emissions'], recipe['final_credit_units'],
+        recipe['renewable'], *ratio)
+
+
+def _resolved_recipe_map(stage, stage_id, catalog, refs):
+    from .recipe_codec import ResolvedMap
+
+    decisions = {ref for ref, row in catalog['sources'].items() if row['stage_id'] == stage_id}
+    passthrough = {refs['sources'][stage_id, row['id'], 'primary'] for row in stage['protected']}
+    rows = tuple(_resolved_row(recipe, role, stage_id, stage, refs)
+                 for role, key in (('primary', 'recipes'), ('compatibility', 'compatibility_recipes'),
+                                   ('counter', 'counter_recipes')) for recipe in stage.get(key, ()))
+    disabled = decisions - passthrough - {row.source_ref for row in rows}
+    return ResolvedMap(rows, tuple(sorted(passthrough)), tuple(sorted(disabled)))
+
+
+def _resolved_timer_duration(duration, easier):
+    from .slot_data_contract import StructureError
+
+    duration = max(duration * 5 // 4, duration + 5000)
+    if easier:
+        duration = duration * 3 // 2
+    if not 1 <= duration <= 0x7fffffff:
+        raise StructureError("Secret Encounter duration exceeds the game's range")
+    return duration
+
+
+def _resolved_timers(plan, catalog, active, easier):
+    frozen = (plan or {}).get('secret_timers', {})
+    return tuple((ref, _resolved_timer_duration(
+        frozen.get(timer['stage_id'], {}).get(timer['entity'], timer['duration_ms']), easier))
+        for ref, timer in catalog['timers'].items() if timer['stage_id'] in active)
+
+
+def encode_native_recipes(plan, catalog=None, *, active_maps, easier_secret_encounters=True):
+    """Pack final producer decisions using frozen catalog references without drawing randomness."""
+    from .recipe_codec import ResolvedRecipes, encode_recipes, recipe_references
+    from .slot_data_contract import ReferenceError, catalog_tables, load_slot_catalog
+
+    catalog = catalog_tables(load_slot_catalog() if catalog is None else catalog)
+    try:
+        refs = recipe_references(catalog)
+        stages = (plan or {}).get('maps', {})
+        maps = {key: _resolved_recipe_map(stages.get(key, _passthrough_stage(key, catalog)), key, catalog, refs)
+                for key in active_maps}
+        return encode_recipes(ResolvedRecipes(plan is not None, maps,
+            _resolved_timers(plan, catalog, active_maps, easier_secret_encounters)))
+    except KeyError as error:
+        raise ReferenceError(f'Resolved recipe has no catalog reference: {error}') from error
+
+
+def _passthrough_stage(stage_id, catalog):
+    return {'recipes': [], 'protected': [{'id': row['source_id']} for row in catalog['sources'].values()
+            if row['stage_id'] == stage_id and row.get('role', 'primary') == 'primary']}

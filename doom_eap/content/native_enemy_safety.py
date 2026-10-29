@@ -69,69 +69,84 @@ def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_cap
             credit_units=recipe['final_credit_units'])
 
 
-def project_native_safety(plan, enemies):
-    from .enemy_plan import sample_species
-    from .enemy_species import enemy_speed_capabilities
-    from .native_enemy_plan import native_recipe_fingerprint
+def _requires_flying(recipe, map_key):
+    return (recipe['binding'].get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) or
+            recipe['binding']['mode'] == 'summon' and
+            recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ()))
 
-    if plan is None:
+
+def _flying_recipe(recipe, map_key, enemies, seed, settings, catalog, capabilities, changes):
+    from .enemy_plan import sample_species
+
+    flying = _requires_flying(recipe, map_key)
+    if not flying or all(body['species'] in FLYING_REPLACEMENTS for body in recipe['bodies']):
         return None
-    affected = (set(SCRIPTED_BOSS_ACTORS) | set(CINEMATIC_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS) | set(FLYING_SUMMONS)) & set(plan['maps'])
-    affected.update(key for key, stage in plan['maps'].items()
-                    if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'}
-                           for recipe in stage['recipes'] for body in recipe['bodies']))
-    if not affected:
-        return plan
-    result = deepcopy(plan)
-    catalog = json.loads(files(__package__).joinpath('native_enemy_catalog.json').read_bytes())
-    speed_capabilities = enemy_speed_capabilities()
-    changes = []
-    for map_key in sorted(affected):
-        stage = result['maps'][map_key]
-        protected = SCRIPTED_BOSS_ACTORS.get(map_key, frozenset()) | CINEMATIC_BOSS_ACTORS.get(map_key, frozenset())
-        points = FLYING_SPAWN_POINTS.get(map_key, ())
-        settings = {**enemies, 'special_limits': stage['special_limits']}
-        for recipe in stage['recipes']:
-            binding = recipe['binding']
-            if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
-                stage.setdefault('passthrough_actors', []).append(binding['entity'])
-                changes.append({'origin': recipe['id'], 'action': 'preserve_scripted_boss'})
-            flying = (binding.get('reference') in points or (binding['mode'] == 'summon' and
-                      recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ())))
-            if not flying or all(body['species'] in FLYING_REPLACEMENTS for body in recipe['bodies']):
-                continue
-            stage.setdefault('compatibility_recipes', []).append(deepcopy(recipe))
-            for ordinal, body in enumerate(recipe['bodies']):
-                if body['species'] in FLYING_REPLACEMENTS:
-                    continue
-                enabled = [species for species in FLYING_REPLACEMENTS if enemies['weights'][species] > 0]
-                species = (sample_species(enemies, enabled, seed=plan['seed'],
-                                         instance_key=[recipe['id'], ordinal, 'flying_spawn'])
-                           if enabled else 'cacodemon')
-                before = body['species']
-                _replace_species(body, species, recipe, ordinal, settings, catalog, speed_capabilities)
-                changes.append({'origin': recipe['id'], 'action': 'flying_spawn', 'before': before, 'after': species})
-        for recipe in stage['recipes']:
-            if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'} for body in recipe['bodies']):
-                alternate = deepcopy(recipe)
-                for ordinal, body in enumerate(alternate['bodies']):
-                    replacement = {'cursed_prowler': 'prowler', 'spirit': 'cacodemon',
-                                   'stone_imp': 'imp', 'armored_baron': 'baron'}.get(body['species'])
-                    if replacement:
-                        _replace_species(body, replacement, alternate, ordinal, settings, catalog, speed_capabilities)
-                stage.setdefault('counter_recipes', []).append(alternate)
-                for species, replacement, action in (('cursed_prowler', 'prowler', 'blood_punch_fallback'),
+    alternate = deepcopy(recipe)
+    enabled = [species for species in FLYING_REPLACEMENTS if enemies['weights'][species] > 0]
+    for ordinal, body in enumerate(recipe['bodies']):
+        if body['species'] in FLYING_REPLACEMENTS:
+            continue
+        species = (sample_species(enemies, enabled, seed=seed,
+                   instance_key=[recipe['id'], ordinal, 'flying_spawn']) if enabled else 'cacodemon')
+        before = body['species']
+        _replace_species(body, species, recipe, ordinal, settings, catalog, capabilities)
+        changes.append({'origin': recipe['id'], 'action': 'flying_spawn', 'before': before, 'after': species})
+    return alternate
+
+
+COUNTER_REPLACEMENTS = (('cursed_prowler', 'prowler', 'blood_punch_fallback'),
                         ('spirit', 'cacodemon', 'microwave_fallback'),
                         ('stone_imp', 'imp', 'stone_counter_fallback'),
-                        ('armored_baron', 'baron', 'armored_counter_fallback')):
-                    if any(body['species'] == species for body in recipe['bodies']):
-                        changes.append({'origin': recipe['id'], 'action': action, 'after': replacement})
-    if not changes:
-        return plan
-    result['source_fingerprint'] = plan['fingerprint']
-    result['compiler_adjustments'] = changes
-    result['fingerprint'] = native_recipe_fingerprint(result)
-    return result
+                        ('armored_baron', 'baron', 'armored_counter_fallback'))
+
+
+def _counter_recipe(recipe, settings, catalog, capabilities, changes):
+    replacements = {species: replacement for species, replacement, action in COUNTER_REPLACEMENTS}
+    if not any(body['species'] in replacements for body in recipe['bodies']):
+        return None
+    alternate = deepcopy(recipe)
+    for ordinal, body in enumerate(alternate['bodies']):
+        if body['species'] in replacements:
+            _replace_species(body, replacements[body['species']], alternate, ordinal, settings, catalog, capabilities)
+    present = {body['species'] for body in recipe['bodies']}
+    changes.extend({'origin': recipe['id'], 'action': action, 'after': replacement}
+                   for species, replacement, action in COUNTER_REPLACEMENTS if species in present)
+    return alternate
+
+
+def _project_stage_safety(stage, map_key, enemies, seed, catalog, capabilities):
+    protected = SCRIPTED_BOSS_ACTORS.get(map_key, frozenset()) | CINEMATIC_BOSS_ACTORS.get(map_key, frozenset())
+    settings = {**enemies, 'special_limits': stage['special_limits']}
+    changes = []
+    for recipe in stage['recipes']:
+        binding = recipe['binding']
+        if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
+            stage.setdefault('passthrough_actors', []).append(binding['entity'])
+            changes.append({'origin': recipe['id'], 'action': 'preserve_scripted_boss'})
+        alternate = _flying_recipe(recipe, map_key, enemies, seed, settings, catalog, capabilities, changes)
+        if alternate is not None:
+            stage.setdefault('compatibility_recipes', []).append(alternate)
+    for recipe in stage['recipes']:
+        alternate = _counter_recipe(recipe, settings, catalog, capabilities, changes)
+        if alternate is not None:
+            stage.setdefault('counter_recipes', []).append(alternate)
+    return changes
+
+
+def resolve_native_stage(stage, map_key, enemies, seed, catalog):
+    from .enemy_species import enemy_speed_capabilities
+
+    _project_stage_safety(stage, map_key, enemies, seed, catalog, enemy_speed_capabilities())
+    actors = set(stage.pop('passthrough_actors', ()))
+    preserved = [recipe for recipe in stage['recipes'] if recipe['binding'].get('entity') in actors]
+    stage['protected'].extend({'id': recipe['id'], 'reason': 'scripted boss acquisition actor'} for recipe in preserved)
+    preserved_ids = {recipe['id'] for recipe in preserved}
+    for key in ('recipes', 'compatibility_recipes', 'counter_recipes'):
+        if key in stage:
+            stage[key] = [recipe for recipe in stage[key] if recipe['id'] not in preserved_ids]
+    return stage
+
+
 AMBIENT_ENCOUNTERS = {
     'e2m3_core': frozenset({
         'slayer_gate_encounter_manager_ammo_room',

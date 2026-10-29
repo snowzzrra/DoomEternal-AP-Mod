@@ -88,6 +88,7 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path, saves_base: P
 
 
 def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
+    assert_packaged_slot_catalog(client_dir)
     source_root = Path(__file__).resolve().parents[2]
     manifest = load_release_manifest(manifest_path, package_root=manifest_path.parent)
     registry_path = client_dir / "data" / "checked_location_visuals.json"
@@ -138,10 +139,22 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
     return actual
 
 
+def assert_packaged_slot_catalog(client_dir: Path) -> None:
+    from doom_eap.content.slot_data_contract import catalog_digest, load_slot_catalog
+
+    source = load_slot_catalog()
+    path = client_dir / 'doom_eap/content/slot_catalog.json'
+    load_slot_catalog(catalog_digest(source), path=path)
+
+
 def assert_generation_only_apworld(apworld_path: Path) -> None:
     """Keep launcher/runtime ownership out of generation-only APWorld package."""
+    from doom_eap.content.slot_data_contract import catalog_digest, load_slot_catalog
+
     with zipfile.ZipFile(apworld_path) as archive:
         names = set(archive.namelist())
+        load_slot_catalog(catalog_digest(load_slot_catalog()),
+                          path=zipfile.Path(archive, 'doometernal/slot_catalog.json'), verify_assets=False)
     if "doometernal/__init__.py" not in names:
         raise AssertionError("packaged APWorld lacks DOOM Eternal world module")
     if "doometernal/client.py" in names:

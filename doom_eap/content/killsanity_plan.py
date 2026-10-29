@@ -1,13 +1,13 @@
-"""Kill rewards with stable threshold addresses and a finite campaign budget."""
+"""Resolve kill rewards and finite campaign budgets."""
 import json
 from copy import deepcopy
 from importlib.resources import files
 
-KILLSANITY_REVISION = 4
 KILLSANITY_ADDRESS_BASE = 7800000
+KILLSANITY_REVISION = 4
 MAXIMUM_MILESTONES = 65535
-MAXIMUM_THRESHOLD = 2147483647 - KILLSANITY_ADDRESS_BASE
 AUTO_MAXIMUM_MILESTONES = 50
+MAXIMUM_THRESHOLD = 2147483647 - KILLSANITY_ADDRESS_BASE
 
 
 def collapse_source_alternatives(rows, alternatives):
@@ -124,10 +124,6 @@ def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
     return dict(estimated_kills=estimated_kills, finite_sources=_finite_sources(result, allow_empty=True))
 
 
-def milestone_name(threshold):
-    return f"Killed {threshold} Enemies"
-
-
 def _finite_sources(finite_sources, *, allow_empty=False, allow_zero=False):
     if not isinstance(finite_sources, list) or not finite_sources and not allow_empty:
         raise ValueError("Killsanity requires the final finite campaign sources")
@@ -184,23 +180,63 @@ def build_killsanity_plan(options, finite_sources=None, *, estimated_kills=None)
             "interval": interval, "maximum_milestones": count,
             "finite_kills": finite_kills, "estimated_kills": estimate, "finite_sources": sources,
             "milestones": [{"threshold": number * interval,
-                            "location_id": KILLSANITY_ADDRESS_BASE + number * interval,
+                            "location_id": 2_200_000_000 + number,
                             "finite_supported": number * interval <= finite_kills}
                            for number in range(1, count + 1)]}
 
 
-def milestone_names(plan):
-    return {milestone_name(row["threshold"]): row["location_id"] for row in plan["milestones"]}
-
-
 def milestone_ids(plan):
-    return frozenset(row["location_id"] for row in plan["milestones"])
+    return frozenset(row["location_id"] for row in resolved_rewards(plan))
 
 
-def validate_killsanity_plan(options, plan):
-    if not isinstance(options, dict) or not isinstance(plan, dict):
-        raise ValueError("killsanity options and plan must be objects")
-    expected = build_killsanity_plan(options, plan.get("finite_sources"), estimated_kills=plan.get('estimated_kills'))
-    if json.dumps(plan, sort_keys=True) != json.dumps(expected, sort_keys=True):
-        raise ValueError("Killsanity rewards do not match the room's settings")
-    return expected
+def resolved_rewards(plan):
+    return tuple({"threshold": ordinal * plan["interval"], "location_id": 2_200_000_000 + ordinal}
+                 for ordinal in range(1, plan["count"] + 1))
+
+
+def build_resolved_killsanity(options, budget, catalog):
+    """Resolve reward counts and finite source references at the producer boundary."""
+    from .slot_data_contract import MAX_KILL_REWARDS, StructureError
+
+    enabled = options.get('enabled', False)
+    interval = options.get('interval', 100)
+    count = options.get('count', 'auto')
+    if type(enabled) is not bool or type(interval) is not int or not 1 <= interval <= 0x7fffffff:
+        raise StructureError('Kill rewards require a boolean setting and a positive integer interval')
+    if count != 'auto' and (type(count) is not int or not 1 <= count <= MAX_KILL_REWARDS):
+        raise StructureError(f'Kill rewards must be Auto or 1..{MAX_KILL_REWARDS}')
+    if not enabled:
+        return dict(interval=0, count=0, finite_supported_count=0, finite_kills=0, estimated_kills=0, sources=[])
+    return _resolved_kill_counts(interval, count, budget, catalog)
+
+
+def _resolved_kill_counts(interval, count, budget, catalog):
+    from .slot_data_contract import ReferenceError, StructureError, catalog_tables
+
+    try:
+        sources = _finite_sources(budget['finite_sources'], allow_empty=True)
+    except ValueError as error:
+        raise StructureError(str(error)) from error
+    finite = sum(row['count'] for row in sources)
+    estimate = budget['estimated_kills']
+    if type(estimate) is not int or not finite <= estimate <= 0xffffffffffffffff:
+        raise StructureError('Campaign kill estimate must cover its finite sources and fit the native counter')
+    count = _resolved_reward_count(interval, count, estimate)
+    if not count:
+        return dict(interval=0, count=0, finite_supported_count=0, finite_kills=0, estimated_kills=0, sources=[])
+    refs = {(row['stage_id'], row['source_id']): ref for ref, row in catalog_tables(catalog)['finite_sources'].items()}
+    try:
+        packed = sorted([refs[row['map_key'], row['source_id']], row['count']] for row in sources)
+    except KeyError as error:
+        raise ReferenceError(f'Finite kill source has no catalog reference: {error}') from error
+    return dict(interval=interval, count=count, finite_supported_count=min(count, finite // interval),
+                finite_kills=finite, estimated_kills=estimate, sources=packed)
+
+
+def _resolved_reward_count(interval, count, estimate):
+    from .slot_data_contract import StructureError
+
+    count = min(50, estimate * 110 // (interval * 100)) if count == 'auto' else count
+    if count * interval > MAXIMUM_THRESHOLD:
+        raise StructureError('Kill reward threshold exceeds the native counter')
+    return count

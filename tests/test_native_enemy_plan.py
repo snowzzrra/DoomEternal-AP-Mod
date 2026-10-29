@@ -1,11 +1,7 @@
-from copy import deepcopy
-from fractions import Fraction
-
 import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, validate_native_recipes
-from doom_eap.content.native_enemy_plan import native_recipe_seed
+from doom_eap.content.native_enemy_plan import build_native_recipes
 
 
 def catalog():
@@ -16,7 +12,8 @@ def catalog():
                       "ai": {"map_key": "dlc", "entity": "stone_imp", "sha256": "c" * 64}}}, "maps": {"base": {
         "source_sha256": "a" * 64, "origins": [{"id": "base/source/0", "family": "group",
             "spawn_type": "ENCOUNTER_SPAWN_IMP", "logical_types": ["ENCOUNTER_SPAWN_IMP"],
-            "logical_count": 2, "maximum_emissions": 8, "combat_cost": "2"},
+            "logical_count": 2, "maximum_emissions": 8, "combat_cost": "2",
+            "binding": {"mode": "event", "entity": "source", "reference": "spawn"}},
             {"id": "base/protected", "protected_reason": "tutorial"}]}}}
 
 
@@ -24,78 +21,6 @@ def settings(**options):
     return normalize_enemy_options({"enemies": {"revision": 5}, "enemy_size_variation_chance": 0,
         **{f"enemy_{name}": {"minimum": 100, "maximum": 100} for name in ("health", "damage", "speed", "size")},
         **options})
-
-
-def test_seed_descriptor_reconstructs_recipes_and_rejects_drift(tmp_path):
-    from doom_eap.content import native_enemy_plan
-
-    source = catalog()
-    options = settings()
-    plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
-    descriptor = native_recipe_seed(plan)
-    restored = validate_native_recipes(descriptor, options, catalog=source)
-    assert restored == plan
-    assert validate_native_recipes(descriptor, options, catalog=source) is restored
-    assert validate_native_recipes(plan, options, catalog=source) == plan
-    assert native_recipe_seed(None) is None
-    for field, value in (('seed', '8'), ('revision', 999), ('fingerprint', '0' * 64)):
-        with pytest.raises(ValueError):
-            validate_native_recipes({**descriptor, field: value}, options, catalog=source)
-    changed = deepcopy(source)
-    changed['maps']['base']['source_sha256'] = 'f' * 64
-    with pytest.raises(ValueError, match='source catalog'):
-        validate_native_recipes(descriptor, options, catalog=changed)
-    with pytest.raises(ValueError, match='options'):
-        validate_native_recipes(descriptor, settings(enemy_density=250), catalog=source)
-
-    native_enemy_plan.configure_native_validation_cache(tmp_path, 'a' * 64)
-    try:
-        native_enemy_plan._VALIDATED_PLANS.clear()
-        assert validate_native_recipes(descriptor, options, catalog=source) == plan
-        native_enemy_plan._VALIDATED_PLANS.clear()
-        assert validate_native_recipes(descriptor, options, catalog=source) == plan
-    finally:
-        native_enemy_plan._VALIDATION_CACHE = None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def test_auto_density_preserves_requests_and_frozen_revisions():
@@ -112,14 +37,10 @@ def test_auto_density_preserves_requests_and_frozen_revisions():
     assert recipes[1]['maximum_emissions'] == recipes[1]['physical_count']
     frozen = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=7)
     assert [r['physical_count'] for r in frozen['maps']['base']['recipes']] == [5, 2]
-    assert validate_native_recipes(frozen, options, catalog=source) == frozen
     legacy = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=1)
-    assert validate_native_recipes(legacy, options, catalog=source) == legacy
     assert legacy['fingerprint'] != plan['fingerprint']
-    invalid = deepcopy(plan)
-    invalid['revision'] = 999
     with pytest.raises(ValueError, match='revision'):
-        validate_native_recipes(invalid, options, catalog=source)
+        build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=999)
 
 
 def test_finite_maintenance_last_body_has_only_the_remaining_logical_credit():

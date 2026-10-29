@@ -48,7 +48,6 @@ def enemy_combat_cost(species, attributes, *, buff_totems=False, screechers=Fals
                     cost.denominator * 100 * 200 * 400 * size_denominator)
 
 
-
 def _density_weights(enemies, candidates, *, seed, phase, stage_index, stage_count):
     weights = {species: enemies["weights"][species] for species in candidates}
     density = enemies["density"]
@@ -66,7 +65,6 @@ def _density_weights(enemies, candidates, *, seed, phase, stage_index, stage_cou
     integers = {species: int(weight * denominator) for species, weight in adjusted.items()}
     divisor = math.gcd(*integers.values())
     return {species: weight // divisor for species, weight in integers.items()}
-
 
 
 LIMITED_SPECIES = ('marauder', 'archvile', 'spirit', 'buff_pod', 'zombie_t1_screecher',
@@ -110,7 +108,6 @@ def _limit_suffix(enemies, species):
     return f"{prefix}_l{values}_k{kind}"
 
 
-
 def effective_special_limits(enemies, stage_index, stage_count):
     if type(stage_count) is not int or type(stage_index) is not int or not 0 <= stage_index < stage_count:
         raise ValueError("Enemy limit progression is invalid")
@@ -125,11 +122,9 @@ def effective_special_limits(enemies, stage_index, stage_count):
     return limits
 
 
-
 def _random_for(seed, instance_key, field):
     key = json.dumps([ENEMY_DRAW_REVISION, seed, instance_key, field], separators=(",", ":"), sort_keys=True)
     return random.Random(int.from_bytes(hashlib.sha256(key.encode("utf-8")).digest(), "big"))
-
 
 
 def sample_species(enemies, eligible_species, *, seed, instance_key):
@@ -142,7 +137,6 @@ def sample_species(enemies, eligible_species, *, seed, instance_key):
         if draw < weight:
             return species
         draw -= weight
-
 
 
 def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_index, stage_count, random_draws=None):
@@ -177,13 +171,29 @@ def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_in
     return attributes
 
 
+def build_resolved_enemy_blocks(enemies, campaign, *, seed, catalog=None, resolve_stage_profiles,
+                                killsanity_options, native_catalog=None, kill_catalog=None,
+                                easier_secret_encounters=True):
+    """Produce inactive resolved blocks; readiness receives the final safe plan."""
+    from .killsanity_plan import build_campaign_kill_budget, build_resolved_killsanity
+    from .native_enemy_plan import build_native_recipes, encode_native_recipes
+    from .slot_data_contract import MAX_PAYLOAD_BYTES, PayloadSizeError, StructureError, canonical_bytes, catalog_tables, load_slot_catalog
 
-def validate_frozen_enemy_plan(plan, enemies):
-    if plan is None:
-        if enemies["enabled"]:
-            raise ValueError("Enemy Randomizer requires the room's enemy plan. Generate the room with the matching APWorld.")
-        return None
-    if not isinstance(plan, dict) or plan.get("kind") not in {"native_recipes", "native_recipe_seed"}:
-        raise ValueError("This enemy plan is incompatible. Generate the room with the v0.7 APWorld.")
-    from .native_enemy_plan import validate_native_recipes
-    return validate_native_recipes(plan, enemies)
+    catalog = load_slot_catalog() if catalog is None else catalog
+    try:
+        plan = build_native_recipes(enemies, campaign, seed=seed, catalog=native_catalog)
+        profiles = resolve_stage_profiles(plan)
+        budget = (build_campaign_kill_budget(campaign, plan, catalog=kill_catalog)
+                  if killsanity_options.get('enabled', False) else dict(estimated_kills=0, finite_sources=[]))
+    except ValueError as error:
+        raise StructureError(str(error)) from error
+    active = set(campaign['stage_ids'])
+    active.update(key for key, row in catalog_tables(catalog)['maps'].items() if row['stage_id'] is None)
+    blocks = {'recipes': encode_native_recipes(plan, catalog, active_maps=active,
+                   easier_secret_encounters=easier_secret_encounters),
+              'stage_profiles': profiles,
+              'killsanity': build_resolved_killsanity(killsanity_options, budget, catalog)}
+    total, recipe_size = len(canonical_bytes(blocks)), len(canonical_bytes(blocks['recipes']))
+    if total > MAX_PAYLOAD_BYTES:
+        raise PayloadSizeError(total, recipe_size)
+    return blocks

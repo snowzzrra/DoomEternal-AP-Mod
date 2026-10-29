@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "stages": {
+    "e1m1_intro": {"access_id": 7771000, "native_index": 0, "status": "active"},
+    "e1m2_war": {"access_id": 7771001, "native_index": 1, "status": "active"},
+    "e1m3_cult": {"access_id": 7771002, "native_index": 2, "status": "active"},
+    "e1m4_boss": {"access_id": 7771003, "native_index": 3, "status": "active"},
+    "e2m1_nest": {"access_id": 7771004, "native_index": 4, "status": "active"},
+    "e2m2_base": {"access_id": 7771005, "native_index": 5, "status": "active"},
+    "e2m3_core": {"access_id": 7771006, "native_index": 6, "status": "active"},
+    "e2m4_boss": {"access_id": 7771007, "native_index": 7, "status": "active"},
+    "e3m1_slayer": {"access_id": 7771008, "native_index": 8, "status": "active"},
+    "e3m2_hell": {"access_id": 7771009, "native_index": 9, "status": "active"},
+    "e3m2_hell_b": {"access_id": 7771010, "native_index": 10, "status": "active"},
+    "e3m3_maykr": {"access_id": 7771011, "native_index": 11, "status": "active"},
+    "e3m4_boss": {"access_id": 7771012, "native_index": 12, "status": "active"},
+    "e4m1_rig": {"access_id": 7771013, "native_index": 13, "status": "active"},
+    "e4m2_swamp": {"access_id": 7771014, "native_index": 14, "status": "active"},
+    "e4m3_mcity": {"access_id": 7771015, "native_index": 15, "status": "active"},
+    "e5m1_spear": {"access_id": 7771016, "native_index": 16, "status": "active"},
+    "e5m2_earth": {"access_id": 7771017, "native_index": 17, "status": "active"},
+    "e5m3_hell": {"access_id": 7771018, "native_index": 18, "status": "active"},
+    "e5m4_boss": {"access_id": 7771019, "native_index": 19, "status": "active"}
+  }
+}

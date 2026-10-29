@@ -1,0 +1,29 @@
+{
+  "catalog_digest": "4258e1a5584a149c6e77e53d73368de212d75fe6e37b2186087ce7d3bd76373b",
+  "catalog_source": "content/maps + content/catalog + qualified native inventory",
+  "files": {
+    "campaign_kill_sources.json": "26b4b90c9d823f7d8909bac011a1a1519440a99edfab20b2df0c63c9652549ab",
+    "campaign_stage_ids.json": "91cb571e90b012c4f8f80c8b987d285e9b4a587d310240591de182453f2037ac",
+    "challenge_enemy_targets.json": "1df45f70961f01ddc617baf1f4f601311bb799687946ecf95c6ecb5106008dbd",
+    "docs/setup_en.md": "e5def760ac655a3763740eb6750b3e3ca16b447a4b4426bf4f4400693aacab06",
+    "enemy_options.py": "72c72125069305854046f3a1ff3f8da77431123e4339985cca58083b8526a03b",
+    "enemy_plan.py": "746ea07e1fdd1aae62995e4b95ce6b4c9829f7039183d6ad8a38aa6b2d2c8223",
+    "enemy_species.json": "ecde16a8ac8e11918dc9ef1320891061fd00cad2f9971cecc7a7455674bac2cd",
+    "enemy_species.py": "61dfff696c387ccb85c3520d6730a7de48cad056734d018ddbe4ff50121b2ea7",
+    "fortress_economy.py": "8ab11e90a57393e4fe315becc9bc4b7a5aa5dbd2a98b6a4f45ea86e5fc3f0aa8",
+    "generated_content.py": "05cda1b12c80b820e9fa80a6dd42d04ba8cfe4a1f23cc4a49b011790fed7d12d",
+    "killsanity_plan.py": "76ced8f14849702b08c01e6d69b0bc25012414ddea89f969804925a7bb5a0b84",
+    "native_enemy_balance.py": "ea6cae418b0aef62f62015257a4e5e5b36522a6b6170b649865a621b087f00cf",
+    "native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
+    "native_enemy_plan.py": "c8a789a2997a68b712cd30a479c46495c2d29a08dbd0d0d10386eaa43bf33fb3",
+    "native_enemy_safety.py": "264757808ef327fab63b89256b367b89236aa4e34e2d088d3099b0aba0054e8d",
+    "recipe_codec.py": "0cc72f784806886ec2e1d26092212560d235461e5630954640be9a28135c0656",
+    "secret_encounter_timers.json": "376397784d5378a6d2c1f1578e4a1999230c20f87c1ff7ba00e4f7c428bd0806",
+    "secret_encounter_timers.py": "298833b279cd62d2e0fcbb09f9e6739db56bd0e633fb77d748273046a89e3b4e",
+    "slot_catalog.json": "7153aa4220a280bcbaeae0a9f269672f8b02c9fca48e77c50c8800d1c886275c",
+    "slot_data_contract.py": "ef0c255e1f47ceb7a9aa977108f9b47c56fc501cdf1bcf90cea64ad71418044a",
+    "vanilla_enemy_profiles.json": "fb5cd861b444fe2969f1aac5a7f9bdf9d0ee08a9d78fc06ef5749c2b73ea9548",
+    "vanilla_enemy_profiles.py": "772671abe305149c719bed653ca7ced22f80eb47412e423b906bb6b784a6c18f"
+  },
+  "generated": "python -m tools.content.compile_content_catalog"
+}

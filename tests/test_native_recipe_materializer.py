@@ -71,7 +71,7 @@ def test_traversal_without_target_uses_only_an_unambiguous_colocated_marker(mark
     assert _entrance_landings([recipe], records).get('point') == ('ledge0' if marker_count == 1 else None)
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint, validate_native_recipes
+from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
 from tools.maps.encounter_catalog import entity_records, list_items
 from tools.maps.native_recipe_materializer import materialize_native_recipe_definitions, materialize_native_recipe_calls, _refill_limits, _functional_token
 
@@ -201,38 +201,6 @@ def test_initial_maintenance_is_finite_before_a_survivor_barrier(kill_type, stop
     assert _refill_limits(source, recipes) == expected
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def test_darklord_plans_preserve_frozen_phantoms_and_compile_new_rooms_without_them():
     key = 'e5m4_boss'
     catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
@@ -248,7 +216,6 @@ def test_darklord_plans_preserve_frozen_phantoms_and_compile_new_rooms_without_t
     campaign = dict(sequence=[key])
     frozen = build_native_recipes(options, campaign, seed=8, catalog=catalog, revision=18)
     assert frozen['fingerprint'] == '9d7c86938f5e7a21c1f42c9246361cb78abc03a237586b4c27fc70791fbecb2a'
-    assert validate_native_recipes(frozen, options, campaign, catalog=catalog) == frozen
     old_recipes = frozen['maps'][key]['recipes']
     assert sum('/darklord_phantoms/' in row['id'] for row in old_recipes) == 4
     compiled = materialize_native_recipe_calls(SOURCE, key, frozen, {key: SOURCE})

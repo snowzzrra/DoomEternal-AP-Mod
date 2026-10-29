@@ -6,7 +6,7 @@ import json
 import pytest
 
 from doom_eap.content.enemy_options import normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_body_name, validate_native_recipes
+from doom_eap.content.native_enemy_plan import build_native_recipes, native_body_name
 from doom_eap.content.enemy_plan import BASE_COMBAT_COST
 from doom_eap.content.vanilla_enemy_profiles import SPECIAL_SPECIES, vanilla_profile
 
@@ -20,7 +20,8 @@ def source(catalog, map_key, species, ordinal, *, count=1, maximum=1, wave=0, ow
     return dict(id=f'{map_key}/source/{ordinal}', family='group', logical_count=count,
         maximum_emissions=maximum, logical_types=[catalog['species'][species]['spawn_type']],
         spawn_type=catalog['species'][species]['spawn_type'], combat_cost='1',
-        wave=f'{owner}/encounterComponent.entityEvents.item[0]/{wave}', binding={'owner': owner})
+        wave=f'{owner}/encounterComponent.entityEvents.item[0]/{wave}',
+        binding={'mode': 'event', 'owner': owner, 'entity': owner, 'reference': 'spawn'})
 
 
 def fixture_catalog(native_catalog, maps):
@@ -100,7 +101,6 @@ def test_contextual_balance_keeps_blood_swamps_arenas_separate_from_torches(nati
     assert all(row['kind'] == row['reference_kind'] == 'ambient_encounter' for row in torches)
     assert all(row['reference_kind'] == 'arena_encounter' for row in arenas)
     assert min(row['actual_finite_total'] for row in arenas) > max(row['actual_finite_total'] for row in torches)
-    assert validate_native_recipes(plan, effective(), campaign, catalog=native_catalog) == plan
 
 
 def test_fodder_draw_includes_drone_and_trooper_with_fewer_riot_shields(native_catalog):
@@ -166,7 +166,6 @@ def test_revision14_preserves_finite_categories_and_all_special_species(native_c
         assert all(body['attributes'][name] == 100 for name in
                    ('health_percent', 'damage_percent', 'speed_percent'))
         assert body['definition'].isascii() and len(body['definition']) < 512
-    assert validate_native_recipes(plan, options, campaign, catalog=catalog) == plan
 
 
 @pytest.mark.parametrize('count,maximum,reference_counts', [(4, 8, (2, 4)), (1, 1, (1, 1))])

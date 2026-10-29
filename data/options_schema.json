@@ -34,6 +34,11 @@
       "key": "plando_items",
       "reason": "complex_common_option_not_exposed_in_scalar_foundation",
       "source_class": "PlandoItems"
+    },
+    {
+      "key": "start_inventory_from_pool",
+      "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+      "source_class": "StartInventoryPool"
     }
   ],
   "game": "DOOM Eternal",
@@ -9108,11 +9113,11 @@
     },
     {
       "default": "auto",
-      "description": "Choose how many kill rewards to add to your campaign.\n\nAuto: Divide estimated campaign kills plus 10% by Kills per Check, round down, and cap at 50 rewards.\n1..65,535: Add that many kill rewards. Kills per Check sets the gap between rewards.",
+      "description": "Choose how many kill rewards to add to your campaign.\n\nAuto: Divide estimated campaign kills plus 10% by Kills per Check, round down, and cap at 50 rewards.\n1..2,000: Add that many kill rewards. Kills per Check sets the gap between rewards.",
       "display_name": "Kill Rewards",
       "group": "Game Options",
       "key": "killsanity_maximum_milestones",
-      "maximum": 65535,
+      "maximum": 2000,
       "minimum": 1,
       "source_class": "KillsanityMaximumMilestones",
       "special_values": [
@@ -9313,5 +9318,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "2f5715f22278e46c57e6bed167928c984af805dcff2e7d69c5eac532c5999703"
+  "source_sha256": "ce669c9eac41e5fabec5555711f0bdf176a4277016157f352949d3897d401d2a"
 }

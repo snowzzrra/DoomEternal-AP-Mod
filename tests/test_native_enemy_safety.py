@@ -5,7 +5,7 @@ import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
 from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
-from doom_eap.content.native_enemy_safety import FLYING_REPLACEMENTS, project_native_safety, _replace_species
+from doom_eap.content.native_enemy_safety import FLYING_REPLACEMENTS, resolve_native_stage, _replace_species
 from doom_eap.content.enemy_species import enemy_speed_capabilities
 
 
@@ -34,9 +34,7 @@ def test_mission_challenges_keep_finite_native_species_on_main_routes(preset):
     assert catalog == before
 
 
-def test_required_archvile_preservation_keeps_frozen_room_recipes_reconstructible():
-    from doom_eap.content.native_enemy_plan import native_recipe_seed, validate_native_recipes
-
+def test_required_archvile_preservation_keeps_challenge_supply():
     key = 'e3m2_hell_b'
     campaign = {'sequence': [key]}
     options = normalize_enemy_options({'enemy_preset': 'oops_all_imps'})
@@ -46,8 +44,6 @@ def test_required_archvile_preservation_keeps_frozen_room_recipes_reconstructibl
     old_recipe = next(recipe for recipe in old['maps'][key]['recipes'] if recipe['id'] == origin)
     assert old_recipe['bodies'] and all(body['species'] != 'archvile' for body in old_recipe['bodies'])
     assert {'id': origin, 'reason': 'challenge enemy supply'} in current['maps'][key]['protected']
-    for plan in (old, current):
-        assert validate_native_recipes(native_recipe_seed(plan), options) == plan
 
 
 def frozen_plan(map_key, species, source_types):
@@ -69,22 +65,17 @@ def frozen_plan(map_key, species, source_types):
 
 
 def test_holt_airborne_summons_keep_flying_bodies_and_checkpoint_compatibility():
-    plan, settings = frozen_plan('e4m3_mcity', 'imp', {
+    plan, _ = frozen_plan('e4m3_mcity', 'imp', {
         'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_IMP'})
-    before = deepcopy(plan)
-    projected = project_native_safety(plan, settings)
-    stage = projected['maps']['e4m3_mcity']
+    stage = plan['maps']['e4m3_mcity']
     for recipe in stage['recipes']:
         expected = {'imp'} if recipe['selected_spawn_type'] == 'ENCOUNTER_SPAWN_IMP' else FLYING_REPLACEMENTS
         assert {body['species'] for body in recipe['bodies']} <= expected
     assert len(stage['compatibility_recipes']) == 2
     assert all({body['species'] for body in recipe['bodies']} == {'imp'}
                for recipe in stage['compatibility_recipes'])
-    original_metadata = native_recipe_metadata(plan, 'e4m3_mcity').splitlines()
-    projected_metadata = native_recipe_metadata(projected, 'e4m3_mcity').splitlines()
-    assert original_metadata[0] == projected_metadata[0]
-    assert [row.split('|')[:14] for row in original_metadata[1:]] == [row.split('|')[:14] for row in projected_metadata[1:]]
-    assert plan == before
+    assert native_recipe_metadata(plan, 'e4m3_mcity').splitlines()[0] == (
+        f"EAP4|{plan['fingerprint']}|{stage['runtime_map']}")
 
 
 def test_spirit_counter_uses_its_reserved_population_without_relaxing_primary_bodies():
@@ -98,7 +89,8 @@ def test_spirit_counter_uses_its_reserved_population_without_relaxing_primary_bo
     body['population_limits'] = dict(maximum=3, pressure=3, heavy=0, superheavy=0,
                                     mixed=True, strict=True, scope=123, species=caps)
     before = deepcopy(plan)
-    projected = project_native_safety(plan, settings)['maps']['e3m1_slayer']
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    projected = resolve_native_stage(deepcopy(plan['maps']['e3m1_slayer']), 'e3m1_slayer', settings, plan['seed'], catalog)
     original, = projected['recipes']
     alternate, = projected['counter_recipes']
     assert original['bodies'][0]['population_limits']['heavy'] == 0
@@ -113,7 +105,8 @@ def test_spirit_counter_uses_its_reserved_population_without_relaxing_primary_bo
 def test_inventory_counter_keeps_quantity_and_credit(source, replacement):
     plan, settings = frozen_plan('e5m1_spear', source, {'ENCOUNTER_SPAWN_IMP'})
     before = deepcopy(plan)
-    stage = project_native_safety(plan, settings)['maps']['e5m1_spear']
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    stage = resolve_native_stage(deepcopy(plan['maps']['e5m1_spear']), 'e5m1_spear', settings, plan['seed'], catalog)
     original, = stage['recipes']
     alternate, = stage['counter_recipes']
     assert {body['species'] for body in alternate['bodies']} == {replacement}

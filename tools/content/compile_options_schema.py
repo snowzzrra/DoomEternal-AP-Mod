@@ -72,6 +72,10 @@ def _load_apworld(ap_root: Path):
     return world, Toggle, Choice, OptionSet, Range, NamedRange, OptionDict
 
 
+def _bounded_option_dict(option_type, option_dict_type):
+    return issubclass(option_type, option_dict_type) and hasattr(option_type, "entry_limits")
+
+
 def compile_schema(ap_root: Path) -> dict[str, Any]:
     world, toggle_type, choice_type, option_set_type, range_type, named_range_type, option_dict_type = _load_apworld(ap_root)
     options = []
@@ -185,7 +189,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                 named_range["maximum_label"] = "All"
             options.append(named_range)
             continue
-        if issubclass(option_type, option_dict_type) and option_type.__module__ != "Options":
+        if _bounded_option_dict(option_type, option_dict_type):
             options.append({**base, "ui_type": "option_dict", "default": dict(option_type.default),
                             "entries": [{"key": name,
                                          "label": getattr(option_type, "entry_labels", {}).get(name, name),
@@ -203,7 +207,7 @@ def compile_schema(ap_root: Path) -> dict[str, Any]:
                 }
             )
             continue
-        if option_type.__module__ != "Options":
+        if option_type.__module__ != "Options" and key != "start_inventory":
             raise ValueError(
                 f"unsupported DOOM Eternal option class: {key} ({option_type.__name__})"
             )

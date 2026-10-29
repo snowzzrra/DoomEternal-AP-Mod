@@ -6,6 +6,11 @@ import re
 MASTERY_REQUIREMENT_DIVISORS = {"Original": 1, "Half": 2, "Quarter": 4}
 
 
+def mastery_entries_for_counts(entries, counts):
+    return tuple({**entry, "signal": {**entry["signal"],
+                  "rule_0_statCount": counts[entry["signal"]["unlockable"]]}} for entry in entries)
+
+
 def mastery_entries_for_profile(entries, profile):
     try:
         divisor = MASTERY_REQUIREMENT_DIVISORS[profile]
