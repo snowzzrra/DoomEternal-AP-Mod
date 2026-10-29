@@ -354,13 +354,10 @@ def main(arguments: list[str] | None = None) -> int:
     parsed = list(sys.argv[1:] if arguments is None else arguments)
     from doom_eap.launcher.launcher_platform import restore_standard_streams
     restore_standard_streams(require_pipes='--bridge-worker' in parsed)
-    from doom_eap.launcher.launcher_platform import launcher_user_paths
     from doom_eap.content.compiler_identity import load_compiler_source_identity
-    from doom_eap.content.native_enemy_plan import configure_native_validation_cache
     frozen = bool(getattr(sys, 'frozen', False))
     root = Path(sys._MEIPASS) if frozen else Path(__file__).resolve().parents[2]
-    identity = load_compiler_source_identity(root, frozen=frozen)
-    configure_native_validation_cache(launcher_user_paths().state_dir / 'native_enemy_validation', identity['fingerprint'])
+    load_compiler_source_identity(root, frozen=frozen)
     if "--bridge-worker" in parsed:
         return _run_bridge_worker(parsed)
     if "--self-test" in parsed or "--smoke-test" in parsed:

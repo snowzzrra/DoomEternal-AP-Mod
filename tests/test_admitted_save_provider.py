@@ -1,15 +1,15 @@
 import json
 from pathlib import Path
 from doom_eap.runtime.context_registry import validate_slot_contract
-from doom_eap.content.enemy_options import normalize_enemy_options
+from doom_eap.content.slot_data_contract import generation_fingerprint
 
 
 def test_dlc_missions_do_not_require_dlc_equipment():
-    slot = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text(encoding="utf-8"))
-    slot["use_dlc_content"] = False
-    slot["enemies"] = normalize_enemy_options(slot)
-    assert slot["include_dlc_missions"] is True
-    assert validate_slot_contract(slot)["use_dlc_content"] is False
+    slot = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text(encoding="utf-8"))
+    slot["runtime"]["use_dlc_content"] = False
+    slot["native_generation_fingerprint"] = generation_fingerprint(slot)
+    assert "e5m4_boss" in slot["campaign"]["sequence"]
+    assert validate_slot_contract(slot)["runtime"]["use_dlc_content"] is False
 
 
 def test_provider_process_and_source_are_all_required(tmp_path):

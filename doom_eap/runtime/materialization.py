@@ -16,6 +16,8 @@ from doom_eap.contracts.materialization import (
     SUPPORT_RUNE_IDS, TAG_SPECIAL_CAPABILITY,
 )
 from doom_eap.runtime.item_reconciliation import ReconciliationCommand, ReconciliationPlan, compile_reconciliation_plan
+from doom_eap.contracts.receipt_delivery import ReceiptPlan
+from doom_eap.runtime.receipt_delivery import ReceiptDelivery
 
 
 @dataclass(frozen=True)
@@ -32,6 +34,67 @@ class MaterializationPlanError(ValueError):
     def __init__(self, message, *, blocked=True):
         super().__init__(message)
         self.blocked = blocked
+
+
+def apply_starting_currencies(ctx, definitions, publication):
+    facts = ctx.receipt_session.resolved_starting_ownership
+    for fact in facts:
+        definition = definitions.get(fact.item_id)
+        if isinstance(definition, dict) and definition.get("type") == "currency":
+            _apply_starting_currency(ctx, fact, definitions, publication)
+
+
+def _apply_starting_currency(ctx, fact, definitions, publication):
+    if not ctx._queue_session_authoritative:
+        raise MaterializationPlanError("starting currency requires a bound queue session")
+    state, completed, count = _starting_currency_progress(ctx.session_state, fact)
+    if count == fact.quantity:
+        return
+    context = ctx._refresh_runtime_context(ctx._connected_slot_data)
+    lease = ctx._active_materialization_lease(context)
+    if context is None or lease is None:
+        raise MaterializationPlanError("starting currency requires a ready game context")
+    scope = ctx.receipt_publication_scope(materialization_lease=lease, context_identity=context.identity)
+    delivery = ReceiptDelivery(None)
+    delivery.bind(state)
+    plan = compile_item_delivery_plan(fact.item_id, definitions)
+    plan = ReceiptPlan(tuple(command.command for command in plan.commands), plan.description)
+    for ordinal in range(count, fact.quantity):
+        # AP deliveries use nonnegative indices.
+        index = -(fact.item_id * 0x80000000 + ordinal + 1)
+        accepted, error = delivery.spool(
+            plan, fact.item_id, index, "Starting currency", scope, publication,
+            lambda reason: _persist_starting_currency(ctx, completed, fact.item_id, ordinal, reason),
+        )
+        if not accepted:
+            raise MaterializationPlanError(error)
+
+
+def _starting_currency_progress(session_state, fact):
+    state = session_state.setdefault("starting_currency", {})
+    if not isinstance(state, dict):
+        raise MaterializationPlanError("stored starting currency must be an object")
+    completed = state.setdefault("completed", {})
+    if not isinstance(completed, dict):
+        raise MaterializationPlanError("stored starting currency progress must be an object")
+    count = completed.get(str(fact.item_id), 0)
+    if type(count) is not int or not 0 <= count <= fact.quantity:
+        raise MaterializationPlanError("stored starting currency count is invalid")
+    return state, completed, count
+
+
+def _persist_starting_currency(ctx, completed, item_id, ordinal, reason):
+    if reason != "item_command_group_complete":
+        ctx.persist_session_state()
+        return
+    key = str(item_id)
+    previous = completed.get(key, 0)
+    completed[key] = ordinal + 1
+    try:
+        ctx.persist_session_state()
+    except Exception:
+        completed[key] = previous
+        raise
 
 
 def compile_materialization_plan(
@@ -294,26 +357,6 @@ def compile_materialization_plan(
         scope, plan, len(raw_commands), len(support_commands), selected_special_stage,
         special_diagnostic,
     )
-
-
-def compile_automatic_plan(authoritative_ids, context, scope, definitions, policies, *, observation=None):
-    """Route automatic repairs through shared reconciliation."""
-    from doom_eap.runtime.item_reconciliation import effective_ownership
-    from types import SimpleNamespace
-    receipt_items = tuple(
-        SimpleNamespace(item=i, player=scope.slot, location=0)
-        for i in authoritative_ids
-    )
-    ownership = effective_ownership(
-        receipt_items, slot=scope.slot,
-        randomize_chainsaw=True, randomize_dash=True,
-        checked_locations=frozenset(), local_checked_locations=frozenset(),
-        server_checked_ready=True, hell_on_earth_locations=frozenset(),
-        exultia_complete_location=0,
-    )
-    return compile_materialization_plan(
-        ownership, context, scope, definitions, policies, "the_crucible", observation=observation
-    ).reconciliation
 
 
 def authored_effects_allowed(*, evidence, campaign, epoch, lease, process_running,

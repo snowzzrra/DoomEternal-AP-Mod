@@ -2,6 +2,17 @@
 from doom_eap.contracts.goal_policy import GoalPolicy
 
 
+def test_resolved_goal_uses_active_dlc_missions_without_dlc_equipment():
+    catalog = {1: 'The Dark Lord - Mission Complete', 2: 'The World Spear - Mission Complete'}
+    policy = GoalPolicy(catalog, {'The Dark Lord', 'The World Spear'}, {'goal'},
+                        {'Kill the Dark Lord': 1}, {'Complete All Included Missions': ' - Mission Complete'})
+    room = {'campaign': {'goal': {'kind': 'Kill the Dark Lord', 'stage_id': 'e5m4_boss',
+            'endpoint_event': 'Internal Goal Endpoint: Kill the Dark Lord',
+            'additional_requirements': ['Complete All Included Missions']}},
+            'runtime': {'use_dlc_content': False}}
+    assert policy.objective_ids(room, set(catalog)) == {1, 2}
+
+
 def test_short_world_requirements_exclude_unselected_missions():
     catalog = {
         1: 'Final Sin - Mission Complete',

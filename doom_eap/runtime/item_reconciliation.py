@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
+from doom_eap.contracts.foundation import compile_item_delivery_plan
 from doom_eap.contracts.receipt_delivery import (
     NEW_RECEIPT, HISTORICAL_OWNERSHIP, RECONCILIATION_REPAIR, PRESENTATION_REPAIR,
 )
@@ -45,6 +45,58 @@ SUPPORTED_RECEIPT_FEEDBACK = frozenset(
 MATERIALIZATION_EPOCH_PATTERN = re.compile(r"[0-9]+:[0-9]+")
 
 
+class StartingOwnershipError(ValueError):
+    pass
+
+
+def load_starting_ownership(starting, item_identity):
+    if not isinstance(starting, dict) or set(starting) != {"items", "weapon_item_id"}:
+        raise StartingOwnershipError("starting must contain items and weapon_item_id")
+    rows = starting["items"]
+    if not isinstance(rows, list) or len(rows) > len(item_identity):
+        raise StartingOwnershipError("starting.items must be a bounded list")
+    counts = {}
+    for row in rows:
+        item_id, quantity = _starting_item_pair(row, item_identity)
+        if item_id in counts:
+            raise StartingOwnershipError("starting.items contains a repeated item")
+        counts[item_id] = quantity
+    weapon = starting["weapon_item_id"]
+    if type(weapon) is not int:
+        raise StartingOwnershipError("starting.weapon_item_id must be a starting weapon")
+    _starting_weapon(weapon)
+    if counts.get(weapon) != 1:
+        raise StartingOwnershipError("starting weapon must have exactly one owned copy")
+    return tuple(StartingMaterializationFact(item_id, count, "starting") for item_id, count in counts.items())
+
+
+def _starting_weapon(item_id):
+    if item_id not in {7770000, 7770001, 7770002, 7770003, 7770004, 7770005, 7770900}:
+        raise StartingOwnershipError("starting.weapon_item_id must be a starting weapon")
+
+
+def _starting_item_pair(row, item_identity):
+    if not isinstance(row, list) or len(row) != 2:
+        raise StartingOwnershipError("starting.items entries must be item and quantity pairs")
+    item_id, quantity = row
+    if type(item_id) is not int or item_id not in item_identity:
+        raise StartingOwnershipError("starting.items contains an unknown item")
+    if type(quantity) is not int or not 1 <= quantity <= 0x7fffffff:
+        raise StartingOwnershipError("starting quantity must be a positive integer")
+    return item_id, quantity
+
+
+def _persistent_start_ids(fact, definitions):
+    definition = definitions.get(fact.item_id)
+    if fact.item_id == 7770024 or definition is None:
+        return ()
+    if isinstance(definition, dict):
+        if definition.get("type") in {"currency", "native_weapon_upgrade_points"}:
+            return ()
+        return (fact.item_id,) * min(fact.quantity, len(definition.get("perks", [None])))
+    return (fact.item_id,)
+
+
 class ReceiptSession:
     """Process-local receipt rebind authority, independent of gameplay epochs."""
 
@@ -52,8 +104,7 @@ class ReceiptSession:
         self._generation = 0
         self._pending = set()
         self._processed_boundary = processed_boundary
-        self._starting_counts = {}
-        self._starting_materialization = ()
+        self._starting_ownership = ()
         self._packet_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
 
     def observe_packet(self, start_index, item_count, authoritative_count, timestamp_ns):
@@ -99,46 +150,26 @@ class ReceiptSession:
         )
 
     @property
-    def starting_materialization(self):
-        return self._starting_materialization
+    def starting_ownership(self):
+        return self._starting_ownership
 
-    def configure_starting_materialization(
-        self, *, starting_inventory, starting_weapon, item_identity,
-        processed_receipts, eligible,
-    ):
-        materialized = {}
-        facts = []
-        if isinstance(starting_inventory, dict):
-            by_name = {entry["name"]: item_id for item_id, entry in item_identity.items()}
-            for name, quantity in starting_inventory.items():
-                if (
-                    name in by_name and eligible(by_name[name])
-                    and isinstance(quantity, int) and quantity > 0
-                ):
-                    item_id = by_name[name]
-                    materialized[item_id] = materialized.get(item_id, 0) + quantity
-                    facts.append(StartingMaterializationFact(item_id, quantity, "starting_inventory"))
-        if isinstance(starting_weapon, str):
-            by_name = {entry["name"]: item_id for item_id, entry in item_identity.items()}
-            if starting_weapon in by_name:
-                item_id = by_name[starting_weapon]
-                if eligible(item_id):
-                    materialized[item_id] = materialized.get(item_id, 0) + 1
-                    facts.append(StartingMaterializationFact(item_id, 1, "starting_weapon"))
-        for receipt in processed_receipts:
-            item_id = receipt.item
-            if materialized.get(item_id, 0) > 0:
-                materialized[item_id] -= 1
-        self._starting_counts = materialized
-        self._starting_materialization = tuple(facts)
+    @property
+    def resolved_starting_ownership(self):
+        return self._starting_ownership
 
-    def consume_starting_materialization(self, item_id):
-        if item_id in {7770083, 7770901, 7770902} or item_id in MASTERY_ITEM_BITS:
-            return False
-        if self._starting_counts.get(item_id, 0) > 0:
-            self._starting_counts[item_id] -= 1
-            return True
-        return False
+    def configure_starting_ownership(self, slot_data):
+        self._starting_ownership = load_starting_ownership(slot_data.get("starting"), starting_item_identity())
+
+    def owned_count(self, item_id, received):
+        starting = sum(fact.quantity for fact in self.starting_ownership if fact.item_id == item_id)
+        return starting + received
+
+    def resolved_starting_count(self, item_id):
+        return sum(fact.quantity for fact in self.resolved_starting_ownership if fact.item_id == item_id)
+
+    def ownership_item_ids(self, received, definitions):
+        starting = self._starting_ownership
+        return tuple(item_id for fact in starting for item_id in _persistent_start_ids(fact, definitions)) + tuple(received)
 
     @property
     def processed_boundary(self):
@@ -255,13 +286,13 @@ def receipt_item_ids(received_items) -> tuple[int, ...]:
     return tuple(receipt.item for receipt in received_items)
 
 
-def progressive_receipt_stage(item_ids, item_id, item_index, excluded_indices, definition):
+def progressive_receipt_stage(item_ids, item_id, item_index, excluded_indices, definition, *, starting_count=0):
     """Resolve a stage for the caller's validated nonnegative receipt index."""
     effective_count = sum(
         1 for index, received_id in enumerate(item_ids[:item_index + 1])
         if index not in excluded_indices and received_id == item_id
     )
-    stage = max(effective_count - 1, 0)
+    stage = max(starting_count + effective_count - 1, 0)
     if (
         isinstance(definition, dict)
         and definition.get("type") in {"progressive_perk", "progressive_item"}
@@ -420,9 +451,6 @@ def observe_received_items(
     )
 
 
-classify_received_items = observe_received_items
-
-
 def receipt_history_fingerprint(received_items: Iterable[Any]) -> str:
     """Hash authoritative receipt order and stable packet identity."""
     records = []
@@ -442,11 +470,11 @@ def receipt_history_fingerprint(received_items: Iterable[Any]) -> str:
 def effective_ownership(
     processed_receipts, *, randomize_chainsaw, randomize_dash,
     checked_locations, local_checked_locations, server_checked_ready,
-    hell_on_earth_locations, exultia_complete_location, slot,
+    hell_on_earth_locations, exultia_complete_location, slot, starting_item_ids=(),
 ) -> EffectiveOwnership:
     """Project vanilla facts without manufacturing authoritative AP receipts."""
     receipts = tuple(processed_receipts)
-    item_ids = tuple(receipt_item_id(receipt) for receipt in receipts)
+    item_ids = tuple(starting_item_ids) + tuple(receipt_item_id(receipt) for receipt in receipts)
     checked = set(checked_locations) | set(local_checked_locations)
     has_hoe_check = any(
         loc in hell_on_earth_locations
@@ -476,6 +504,7 @@ def effective_ownership(
         {"index": index, "item_id": receipt_item_id(receipt), "receipt_id": receipt_identity(receipt)}
         for index, receipt in enumerate(receipts)
     ]
+    records.extend(_starting_records(starting_item_ids))
     if vanilla_chainsaw:
         records.append({
             "index": len(records), "item_id": 7770010,
@@ -491,6 +520,19 @@ def effective_ownership(
         + ((7770015,) if vanilla_dash and 7770015 not in item_ids else ()), tuple(facts),
         vanilla_dash, upgrades, fingerprint, AUTHORED_TAG_PREREQUISITES,
     )
+
+
+def _starting_records(item_ids):
+    return [{"starting_item_id": item_id} for item_id in item_ids]
+
+
+def starting_item_identity():
+    path = Path(__file__).resolve().parents[2] / "data/devinv_start_mapping.json"
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        return {int(item_id): entry for item_id, entry in document["items"].items()}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
+        raise StartingOwnershipError("starting item mapping is unavailable") from error
 
 
 def processed_receipt_counts(session):

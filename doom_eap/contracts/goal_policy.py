@@ -22,6 +22,7 @@ class GoalPolicy:
 
 
     def objective_ids(self, slot_data, server_locations):
+        slot_data = self._goal_options(slot_data)
         if not isinstance(slot_data, dict):
             return frozenset()
         goal = slot_data.get("goal")
@@ -61,4 +62,14 @@ class GoalPolicy:
                 if location_name in active_names and suffix in location_name
             )
         return frozenset(objective_ids)
+
+    def _goal_options(self, slot_data):
+        if not isinstance(slot_data, dict) or "campaign" not in slot_data:
+            return slot_data
+        goal = slot_data["campaign"]["goal"]
+        return {"goal": goal["kind"], "goal_endpoint_event": goal["endpoint_event"],
+                "goal_endpoint_available": True, "required_capabilities": list(self._capabilities),
+                "additional_victory_requirements": goal["additional_requirements"],
+                "campaign_plan": {"goal_stage": goal["stage_id"]},
+                "use_dlc_content": True, "include_dlc_missions": True}
 

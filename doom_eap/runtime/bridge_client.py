@@ -1,7 +1,8 @@
-from doom_eap.runtime.materialization import authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
+from doom_eap.runtime.materialization import apply_starting_currencies, authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
 from doom_eap.runtime.receipt_delivery import base_special_receipt_allowed
 from doom_eap.runtime.physical_checks import PhysicalChecks
 from doom_eap.runtime.killsanity import Killsanity
+from doom_eap.content.mastery_requirements import mastery_entries_for_counts
 from doom_eap.content.killsanity_plan import milestone_ids
 from doom_eap.runtime.task_supervision import SessionTasks
 from doom_eap.runtime.level_ready import LevelReady
@@ -52,7 +53,6 @@ from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime import save_files
 from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
 from doom_eap.runtime.save_records import read_unlockable_record
-from doom_eap.content.mastery_requirements import mastery_entries_for_profile
 from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
 from collections.abc import Mapping
 from pathlib import Path
@@ -88,7 +88,7 @@ from doom_eap.content.item_classification import (
     normalize_network_classification,
     notification_style_for_item,
 )
-from doom_eap.contracts.item_contracts import DEFAULT_DEATH_LINK_MODE, start_inventory_eligible
+from doom_eap.contracts.item_contracts import DEFAULT_DEATH_LINK_MODE
 from doom_eap.contracts.receipt_delivery import HISTORICAL_OWNERSHIP, NEW_RECEIPT, PRESENTATION_REPAIR, RECONCILIATION_REPAIR
 from doom_eap.runtime.item_reconciliation import receipt_item_ids, progressive_receipt_stage, fresh_receipt_owned_count, ReceiptSession, processed_receipt_counts, project_receipt_history, record_processed_receipt, validate_session_receipt_prefix, effective_ownership, CLIENT_STATE_VERSION, default_session_state, load_policy_registry, migrate_client_state, migrate_legacy_session_key, normalize_session_state, observe_received_items, receipt_history_fingerprint, receipt_identity, validate_receipt_history_prefix
 from doom_eap.runtime.observer_lifecycle import RuntimeObservationLease, observer_registry_revision
@@ -322,17 +322,6 @@ def emit_launcher_event(event_type: str, **payload):
         return
     event = {"type": event_type, **payload}
     print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
-
-
-
-
-
-
-
-
-
-
-
 
 
 ENABLE_ITEM_NOTIFICATIONS = False
@@ -722,7 +711,11 @@ def start_bridge_logger(path=None):
     return logger
 
 
+from doom_eap.runtime.ledger_shadow import ShadowObserver
+
 logger = configure_bridge_logger()
+ledger_shadow = ShadowObserver(os.environ.get("DOOM_AP_DELIVERY_LEDGER_SHADOW") == "1",
+                               CLIENT_STATE_FILE.with_name("delivery-shadow.sqlite3"), logger)
 _native_probe_log_signatures = {}
 
 
@@ -745,7 +738,7 @@ def client_state_store():
     """Compose the persistence adapter; callers retain current commit timing."""
     return ClientStateStore(
         CLIENT_STATE_FILE, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
-        log_event=log_item_event, logger=logger,
+        log_event=log_item_event, logger=logger, observer=ledger_shadow.commit,
     )
 
 
@@ -1660,7 +1653,7 @@ def command_spool_exists(command_id, state_key=None, room_scoped=True):
 def command_spool():
     """Compose the publication adapter without making it discover bridge state."""
     return CommandSpool(
-        QUEUE_DIR, arm_rpc=set_rpc_execution, log_delivery=log_delivery_event, logger=logger,
+        QUEUE_DIR, arm_rpc=set_rpc_execution, log_delivery=log_delivery_event, logger=logger, observer=ledger_shadow.capture,
     )
 
 
@@ -2656,7 +2649,7 @@ GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABIL
 class DoomEternalContext(CommonContext):
     command_processor: type = DoomCommandProcessor
     game = GAME_NAME
-    items_handling = 0b111
+    items_handling = 0b011 if _CONTENT_IDENTITY["slot_data_schema_version"] == 7 else 0b111
     # full-saga enemy plans exceed Archipelago's default 16 MiB message limit
     max_size = 64 * 1024 * 1024
 
@@ -2679,8 +2672,8 @@ class DoomEternalContext(CommonContext):
         self._ammo_projection_active = False
         self._ammo_projection_confirmed = None
         self.ammo = AmmoRefill(
-            AmmoCommandPublication(send_command, discard_queued_coalesced_command, rpc_execution_enabled, set_rpc_execution, logger),
-            AmmoStorage(self.send_msgs), self._emit_ammo_refill, logger,
+            AmmoCommandPublication(send_command, discard_queued_coalesced_command, rpc_execution_enabled, set_rpc_execution, logger, observer=ledger_shadow.capture),
+            AmmoStorage(self.send_msgs, observer=ledger_shadow.capture), self._emit_ammo_refill, logger, observer=ledger_shadow.capture,
         )
         self.ammo_requests = AmmoRequestPump(self.ammo, self.request_ammo_refill, self.exit_event, logger)
         invalidate_queue_session_namespace("bridge_start")
@@ -2698,13 +2691,13 @@ class DoomEternalContext(CommonContext):
         self.transient_effect_manager = TransientEffectManager(TransientPublication(self.base_directory, send_command), os.getpid())
         self.session_state = {}
         self.goals = GoalProgress(CAMPAIGN_GOAL_CONTRACT["runtime_map"], CULTIST_BASE_MAP, logger)
-        self.publisher_dispatch = PublisherDispatch(PUBLISHERS, self.goals, logger)
+        self.publisher_dispatch = PublisherDispatch(PUBLISHERS, self.goals, logger, observer=ledger_shadow.scope)
         self.physical_checks = PhysicalChecks(logger)
         self.level_ready = LevelReady(logger)
         self.session_tasks = SessionTasks()
         self.location_setup = LocationSetup(logger)
         self.protocol_feed = ProtocolFeed()
-        self.receipt_delivery = ReceiptDelivery(logger)
+        self.receipt_delivery = ReceiptDelivery(logger, observer=ledger_shadow.capture)
         self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
         self.death_observer = DeathObservation(logger)
         self.killsanity = Killsanity(logger)
@@ -2873,7 +2866,7 @@ class DoomEternalContext(CommonContext):
 
     def _refresh_runtime_context(self, slot_data, evidence=None):
         """Bind exact runtime context without consulting location projections."""
-        use_dlc = bool(slot_data.get("use_dlc_content"))
+        use_dlc = bool(slot_data.get("runtime", slot_data).get("use_dlc_content"))
         self.dlc_evidence = evaluate_dlc_availability(DOOM_BASE_DIR if use_dlc else None)
         base_maps = load_foundation_contracts()["active_maps"].values()
         marker = getattr(self, "cached_map_identity", None) or {}
@@ -2891,6 +2884,7 @@ class DoomEternalContext(CommonContext):
             return CONTEXT_BY_IDENTITY.get(getattr(self, "context_identity", "unknown"))
 
         transition = self.runtime_lifecycle.bind_context(context)
+        ledger_shadow.context(self, "context_refresh")
         if transition is not None:
             self.reset_transient_effects("context_transition")
             if self.runtime_lifecycle.record_transition(transition, context.identity):
@@ -3038,7 +3032,7 @@ class DoomEternalContext(CommonContext):
             "active_map_key": marker.get("map_key"),
             "active_runtime_map": marker.get("runtime_map"),
             "capabilities": sorted(self.context_capabilities),
-            "use_dlc_content": bool(getattr(self, "_connected_slot_data", {}).get("use_dlc_content")),
+            "use_dlc_content": bool(getattr(self, "_connected_slot_data", {}).get("runtime", getattr(self, "_connected_slot_data", {})).get("use_dlc_content")),
             "dlc": self.dlc_evidence.report(),
             "materialization": self.context_materialization_status,
             "materialization_mode": self.context_materialization_mode,
@@ -3076,7 +3070,7 @@ class DoomEternalContext(CommonContext):
             return None, str(error)
         context = self._refresh_runtime_context(slot_data, evidence)
         admitted, error = self.materialization.admit_context(
-            context, use_dlc_content=bool(slot_data.get("use_dlc_content")),
+            context, use_dlc_content=bool(slot_data.get("runtime", slot_data).get("use_dlc_content")),
             dlc_block=self.dlc_evidence.reason if self.dlc_evidence.blocks_enabled else None,
         )
         if not admitted:
@@ -3085,16 +3079,17 @@ class DoomEternalContext(CommonContext):
         materialization_lease = self._active_materialization_lease(context)
         ownership = effective_ownership(
             self.items_received[: self.items_processed],
-            randomize_chainsaw=bool(slot_data.get("randomize_chainsaw", False)),
-            randomize_dash=bool(slot_data.get("randomize_dash", False)),
+            randomize_chainsaw=bool(slot_data.get("runtime", slot_data).get("randomize_chainsaw", False)),
+            randomize_dash=bool(slot_data.get("runtime", slot_data).get("randomize_dash", False)),
             checked_locations=frozenset(getattr(self, "checked_locations", ())),
             local_checked_locations=frozenset(getattr(self, "locations_checked", ())),
             server_checked_ready=getattr(self, "server_checked_locations_ready", False),
             hell_on_earth_locations=HELL_ON_EARTH_LOCATION_IDS,
             exultia_complete_location=(
-                STAGES[slot_data["campaign_plan"]["fixed_dash_completion_stage"]]["completion_id"]
-                if slot_data["campaign_plan"].get("fixed_dash_completion_stage") else EXULTIA_COMPLETE_LOCATION
+                STAGES[slot_data.get("campaign", slot_data.get("campaign_plan", {}))["fixed_dash_completion_stage"]]["completion_id"]
+                if slot_data.get("campaign", slot_data.get("campaign_plan", {})).get("fixed_dash_completion_stage") else EXULTIA_COMPLETE_LOCATION
             ), slot=self.slot,
+            starting_item_ids=self.receipt_session.ownership_item_ids((), ITEM_ID_TO_COMMAND),
         )
         scope = MaterializationScope(
             self.room_seed_name, self.team, self.slot, self.state_key,
@@ -3110,7 +3105,7 @@ class DoomEternalContext(CommonContext):
             )
         outcome = self.materialization.reconcile(
             scope, context, ownership, transition, ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES,
-            slot_data.get("special_weapon"), reconciliation_publisher(), self.persist_session_state,
+            slot_data.get("runtime", slot_data).get("special_weapon"), reconciliation_publisher(), self.persist_session_state,
             observation=observation, selected_item_ids=selected_item_ids,
         )
         if outcome.complete_transition:
@@ -3210,7 +3205,7 @@ class DoomEternalContext(CommonContext):
         await self.send_connect()
 
     def _observe_ammo_receipts(self):
-        return self.ammo.observe_receipts(receipt_item_ids(self.items_received).count(AMMO_REFILL_ITEM_ID))
+        return self.ammo.observe_receipts(self.receipt_session.resolved_starting_count(AMMO_REFILL_ITEM_ID) + receipt_item_ids(self.items_received).count(AMMO_REFILL_ITEM_ID))
 
     def _emit_ammo_refill(self, *args, **kwargs):
         emit_launcher_event(*args, **kwargs)
@@ -3314,8 +3309,8 @@ class DoomEternalContext(CommonContext):
             await asyncio.sleep(0.25)
         scope = AmmoCommandScope(
             self.state_key, self.runtime_lifecycle.map_identity.current_map, self.active_save_slot,
-            active_crucible(self._connected_slot_data.get("special_weapon"),
-                            receipt_item_ids(self.items_received[: self.items_processed])),
+            active_crucible(self._connected_slot_data.get("runtime", self._connected_slot_data).get("special_weapon"),
+                            self.received_item_ids(processed_only=True)),
             materialization_lease=identity[2],
         )
         return await self.ammo.request(scope, readiness)
@@ -3324,9 +3319,9 @@ class DoomEternalContext(CommonContext):
         return self.ammo_requests.consume(ammo_refill_request_files())
 
     def _reject_slot_contract(self, error):
-        message = f"Unsupported DOOM Eternal slot contract: {error}"
+        message = str(error)
         logger.error("[Contract] Connected slot rejected: %s", error)
-        self._report_launcher_connection_failure(message, code="room_incompatible", technical_message=message)
+        self._report_launcher_connection_failure(message, code=getattr(error, "code", "room_incompatible"), technical_message=message)
 
     async def _validate_connected_package(self, args):
         slot_data = args.get("slot_data", {})
@@ -3411,19 +3406,13 @@ class DoomEternalContext(CommonContext):
                 return
             self.goals.connected(self.persist_session_state)
             self._refresh_runtime_context(slot_data)
-            self.deathlink.configure(slot_data.get("death_link", False), slot_data.get("death_link_mode", "soft"))
+            self.deathlink.configure(slot_data["runtime"]["death_link"]["enabled"], slot_data["runtime"]["death_link"]["mode"])
             logger.info(
                 "[DeathLink] enabled=%s receive_policy=native mode=%s",
                 self.death_link_enabled,
                 self.deathlink.mode,
             )
-            self.receipt_session.configure_starting_materialization(
-                starting_inventory=slot_data.get("starting_inventory", {}),
-                starting_weapon=slot_data.get("starting_weapon"),
-                item_identity=ITEM_CLASSIFICATION_IDENTITY,
-                processed_receipts=self.items_received[:min(self.items_processed, len(self.items_received))],
-                eligible=start_inventory_eligible,
-            )
+            self.receipt_session.configure_starting_ownership(slot_data)
             self._death_link_task = self.session_tasks.start(
                 lambda: self.update_death_link(self.death_link_enabled)
             )
@@ -3484,6 +3473,7 @@ class DoomEternalContext(CommonContext):
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             self.deathlink.observe_echo(data.get("time"), self.last_death_link)
+        ledger_shadow.package(self, cmd, args)
 
 
     def _fail_placement_scout(self, message):
@@ -3525,7 +3515,6 @@ class DoomEternalContext(CommonContext):
             return
         self.location_setup.resolved()
         self._complete_connected(placements)
-
 
 
     def _complete_connected(self, placements):
@@ -3583,6 +3572,7 @@ class DoomEternalContext(CommonContext):
             success=packet_accepted,
             packet_received_monotonic_ns=packet_received_ns,
         )
+        ledger_shadow.history(self, packet_start_index)
         self._schedule_item_delivery("packet")
         self._schedule_ammo_refill_overflow_normalization("received_items")
 
@@ -3635,6 +3625,7 @@ class DoomEternalContext(CommonContext):
             receipt_session_token = self.receipt_session.capture(getattr(self, "state_key", ""))
             try:
                 history_observation = self.observe_received_item_history()
+                apply_starting_currencies(self, ITEM_ID_TO_COMMAND, ReceiptPublication(send_command, observer=ledger_shadow.capture))
                 duplicate_indices = {
                     receipt.index for receipt in history_observation.duplicates
                 }
@@ -3719,31 +3710,6 @@ class DoomEternalContext(CommonContext):
                             return False
                     continue
 
-                if self.receipt_session.consume_starting_materialization(item_id):
-                    logger.info(
-                        "[To Game] Materialized starting receipt acknowledged without replay: "
-                        "index=%s item_id=%s",
-                        item_index,
-                        item_id,
-                    )
-                    self._acknowledge_receipt(network_item)
-                    log_item_event(
-                        "ITEM_RECEIPT_ACK",
-                        receipt_index=item_index,
-                        item_id=item_id,
-                        receipt_id=receipt_identity(network_item),
-                        outcome="materialized_no_replay",
-                        boundary=self.items_processed,
-                        trigger=trigger,
-                        state_key=getattr(self, "state_key", None),
-                    )
-                    batch_count += 1
-                    if batch_count >= ITEM_DELIVERY_BATCH_SIZE:
-                        batch_count = 0
-                        await asyncio.sleep(0)
-                        if not self.receipt_session.is_current(receipt_session_token, getattr(self, "state_key", "")):
-                            return False
-                    continue
 
                 log_delivery_event(
                     "ITEM_RECEIPT",
@@ -3923,7 +3889,7 @@ class DoomEternalContext(CommonContext):
                 special_ids = {7770007, 7770009, 7770901, 7770902}
                 defer_special = item_id in special_ids and not base_special_receipt_allowed(
                     item_id, getattr(runtime_context, "campaign", None),
-                    slot_data.get("special_weapon"),
+                    slot_data.get("runtime", slot_data).get("special_weapon"),
                 )
                 materialization_lease = self._active_materialization_lease(runtime_context)
                 replay_policy = ITEM_REPLAY_POLICIES.get(item_id)
@@ -4302,6 +4268,7 @@ class DoomEternalContext(CommonContext):
             return False
         self.invalidate_active_save_proof()
         self.runtime_lifecycle.suspend_marker(evidence_epoch, reason)
+        ledger_shadow.context(self, "context_suspend")
         publish_materialization_lease(None)
         self.runtime_lifecycle.record_lease_publication(None, False)
         self.runtime_lifecycle.clear_context()
@@ -4399,6 +4366,7 @@ class DoomEternalContext(CommonContext):
             self.reset_transient_effects("map_transition")
             self.fast_travel.invalidate(clear_submitted=True)
         marker_data = self.runtime_lifecycle.accept_marker(marker_data, evidence_epoch)
+        ledger_shadow.context(self, "context_load")
         materialized_epoch = marker_data.get("gameplay_epoch")
         published = publish_materialization_lease(materialized_epoch)
         self.runtime_lifecycle.record_lease_publication(materialized_epoch, published)
@@ -4531,9 +4499,9 @@ class DoomEternalContext(CommonContext):
             projection['encounter_rewards'] = {row['stage']: self._mission_presentations.encounter_snapshot(
                 row['map'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
                 for row in projection['rows']}
-            ratings = self._connected_slot_data.get("mission_presentation_v2",
-                                                    self._connected_slot_data.get("mission_presentation_v1", {}))
-            projection["ratings_version"] = 2 if "mission_presentation_v2" in self._connected_slot_data else 1
+            ratings = {key: {"skull_tier": row["skulls"]} for key, row in
+                       self._connected_slot_data.get("stage_profiles", {}).items()}
+            projection["ratings_version"] = 2
             projection["ratings"] = {row["stage"]: ratings[row["stage"]]
                                      for row in projection["rows"]
                                      if row["revealed"] and row["stage"] in ratings}
@@ -5087,12 +5055,12 @@ class DoomEternalContext(CommonContext):
             existing_session = default_session_state()
         self.session_state = normalize_session_state(existing_session)
         from doom_eap.runtime.weapon_points import namespace_id
-        self.killsanity.bind(
+        self.killsanity.bind_resolved(
             self.session_state, namespace_id(effective_seed_name, self.team, self.slot, generation),
-            slot_data.get("killsanity", {}).get("milestones", ()),
+            slot_data["killsanity"],
         )
         self.goals.bind(self.state_key, self.session_state)
-        masteries = mastery_entries_for_profile(WEAPON_MASTERY_ENTRIES, slot_data["mastery_requirements"])
+        masteries = mastery_entries_for_counts(WEAPON_MASTERY_ENTRIES, slot_data["runtime"]["mastery_requirement_counts"])
         self.save_checks.bind({entry["signal"]["unlockable"]: entry for entry in masteries})
         self.receipt_delivery.bind(self.session_state)
         self.publisher_dispatch.bind(self.session_state.setdefault("publisher_acknowledgements", {}))
@@ -5116,6 +5084,7 @@ class DoomEternalContext(CommonContext):
         self.session_state["save_slot_observations"] = self.save_observer.restore_slot_observations(raw_save_observations)
         self.session_state.pop("sticky_mastery_observed", None)
         self.session_state.pop("weapon_masteries_observed", None)
+        ledger_shadow.bind(self, effective_seed_name, generation)
         self.item_state_ready = True
         self.reconnect_resync_attempted = False
         self.bootstrap.bind(self.session_state["bootstrap"])
@@ -5201,12 +5170,10 @@ class DoomEternalContext(CommonContext):
         return WeaponPointReceipts(self.session_state, self.persist_session_state, link, link.namespace), authoritative
 
     def _reconcile_blood_punch(self, trigger):
-        if "progressive_blood_punch_v1" not in self._connected_slot_data.get("required_capabilities", ()):
+        if not {"slot_data_v7", "progressive_blood_punch_v1"}.intersection(self._connected_slot_data.get("compatibility", self._connected_slot_data).get("required_capabilities", ())):
             return
-        starting = sum(fact.quantity for fact in self.receipt_session.starting_materialization
-                       if fact.item_id == 7770904)
         received = sum(item.item == 7770904 for item in self.items_received[:self.items_processed])
-        desired = min(4, max(starting, received))
+        desired = min(4, self.receipt_session.owned_count(7770904, received))
         lease = self._active_materialization_lease()
         if not desired or lease is None:
             return
@@ -5232,7 +5199,7 @@ class DoomEternalContext(CommonContext):
         if 7770011 in self.session_state.get("deferred_frag_items", {}).values():
             return False
         return any(item.item == 7770011 for item in self.items_received[:self.items_processed]) or any(
-            fact.item_id == 7770011 and fact.quantity for fact in self.receipt_session.starting_materialization
+            fact.item_id == 7770011 and fact.quantity for fact in self.receipt_session.starting_ownership
         )
 
     def _flush_deferred_frag_upgrades(self):
@@ -5264,7 +5231,7 @@ class DoomEternalContext(CommonContext):
         self._flush_deferred_frag_upgrades()
         self._reconcile_blood_punch(trigger)
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
-        hook_owned = any(item.item == 7770083 for item in authoritative)
+        hook_owned = 7770083 in self.receipt_session.ownership_item_ids(receipt_item_ids(authoritative), ITEM_ID_TO_COMMAND)
         mastery_mask = 0
         rune_mask = 0
         support_mask = 0
@@ -5272,21 +5239,21 @@ class DoomEternalContext(CommonContext):
             mastery_mask |= MASTERY_ITEM_BITS.get(item.item, 0)
             rune_mask |= NORMAL_RUNE_ITEM_BITS.get(item.item, 0)
             support_mask |= SUPPORT_RUNE_ITEM_BITS.get(item.item, 0)
-        for fact in self.receipt_session.starting_materialization:
+        for fact in self.receipt_session.starting_ownership:
             if fact.quantity:
                 mastery_mask |= MASTERY_ITEM_BITS.get(fact.item_id, 0)
                 rune_mask |= NORMAL_RUNE_ITEM_BITS.get(fact.item_id, 0)
                 support_mask |= SUPPORT_RUNE_ITEM_BITS.get(fact.item_id, 0)
         starting_special_count = sum(
-            fact.quantity for fact in self.receipt_session.starting_materialization
+            fact.quantity for fact in self.receipt_session.starting_ownership
             if fact.item_id == 7770901
         )
-        special_count = min(3, max(
-            starting_special_count,
+        special_count = min(3, self.receipt_session.owned_count(
+            7770901,
             sum(item.item == 7770901 for item in authoritative),
         ))
-        hammer_count = min(2, max(
-            sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == 7770902),
+        hammer_count = min(2, self.receipt_session.owned_count(
+            7770902,
             sum(item.item == 7770902 for item in authoritative),
         ))
         log_item_event(
@@ -5319,6 +5286,7 @@ class DoomEternalContext(CommonContext):
                            link.ensure_masteries(desired) if domain == "arsenal_mastery" else
                            link.ensure_progressive_special_weapon(desired, hammer_only=True) if domain == "hammer" else
                           link.ensure_progressive_special_weapon(desired))
+                ledger_shadow.native(self, "native_reconciliation", result, identity=domain)
                 if domain in {"special", "hammer"}:
                     self._synchronize_special_preference(link, result)
                 log_item_event(
@@ -5367,7 +5335,7 @@ class DoomEternalContext(CommonContext):
         elif item.item in NORMAL_RUNE_ITEM_BITS or item.item in SUPPORT_RUNE_IDS:
             bits = SUPPORT_RUNE_ITEM_BITS if item.item in SUPPORT_RUNE_IDS else NORMAL_RUNE_ITEM_BITS
             mask = 0
-            for fact in self.receipt_session.starting_materialization:
+            for fact in self.receipt_session.starting_ownership:
                 if fact.quantity:
                     mask |= bits.get(fact.item_id, 0)
             for receipt in self.items_received[:index + 1]:
@@ -5375,14 +5343,15 @@ class DoomEternalContext(CommonContext):
             result = link.ensure_support_runes(mask) if item.item in SUPPORT_RUNE_IDS else link.ensure_normal_runes(mask)
         else:
             hammer_only = item.item == 7770902
-            count = min(2 if hammer_only else 3, max(
-                sum(fact.quantity for fact in self.receipt_session.starting_materialization if fact.item_id == item.item),
+            count = min(2 if hammer_only else 3, self.receipt_session.owned_count(
+                item.item,
                 sum(receipt.item == item.item for receipt in self.items_received[:index + 1]),
             ))
             if not count:
                 raise ValueError("Progressive Special Weapon receipt count is empty")
             result = (link.ensure_progressive_special_weapon(count, hammer_only=True) if hammer_only
                       else link.ensure_progressive_special_weapon(count))
+        ledger_shadow.native(self, "native_receipt", result, index)
         if ENABLE_ITEM_NOTIFICATIONS:
             accepted, description = self.spool_deferred_receipt_notification(item.item, index)
             if not accepted:
@@ -5394,6 +5363,7 @@ class DoomEternalContext(CommonContext):
         received_item_classification(7770903, item.flags)
         owner, authoritative = self.weapon_points_receipt_owner()
         owner.deliver(index, receipt_identity(item), authoritative)
+        ledger_shadow.capture("native_receipt", state_key=self.state_key, receipt_index=index, result_kind="weapon_points_delivered")
         if ENABLE_ITEM_NOTIFICATIONS:
             accepted, description = self.spool_deferred_receipt_notification(7770903, index)
             if not accepted:
@@ -5418,6 +5388,7 @@ class DoomEternalContext(CommonContext):
                 self._record_processed_receipt(network_item)
             self.receipt_session.advance()
             self.persist_session_state()
+            ledger_shadow.capture("cursor", state_key=self.state_key, boundary=self.items_processed)
         except Exception as error:
             self.receipt_session.restore_boundary(boundary)
             if history is None:
@@ -5449,11 +5420,11 @@ class DoomEternalContext(CommonContext):
         return self.receipt_session.processed_boundary
 
     def received_rune_count(self):
-        return sum(item_id in REVISION_ONE_RUNE_IDS for item_id in receipt_item_ids(self.items_received))
+        return sum(item_id in REVISION_ONE_RUNE_IDS for item_id in self.receipt_session.ownership_item_ids(receipt_item_ids(self.items_received), ITEM_ID_TO_COMMAND))
 
     def received_item_ids(self, processed_only=False):
         items = self.items_received[: self.items_processed] if processed_only else self.items_received
-        return frozenset(receipt_item_ids(items))
+        return frozenset(self.receipt_session.ownership_item_ids(receipt_item_ids(items), ITEM_ID_TO_COMMAND))
 
     def _processed_receipt_ids(self):
         return processed_receipt_counts(self.session_state)
@@ -5525,6 +5496,7 @@ class DoomEternalContext(CommonContext):
                 else:
                     self.session_state["receipt_history"] = history
                 raise
+        ledger_shadow.projection(self, observation)
         return observation
 
     def _reconciliation_eligibility(self, *, require_connection):
@@ -5678,6 +5650,7 @@ class DoomEternalContext(CommonContext):
             if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
                                    context_identity=self.context_identity):
                 continue
+            ledger_shadow.capture("inventory_result", state_key=identity[0], identity=identity, epoch=evidence.epoch, observation=native)
             if all(native.confirms_repair(command.item_id, command.stage) for command in plan.commands):
                 if any(native.get_state(item_id) == UNKNOWN for item_id in relevant):
                     return plan, "Native ownership pending for item IDs: " + ", ".join(
@@ -5714,7 +5687,7 @@ class DoomEternalContext(CommonContext):
             return None, "active runtime context is unrecognized"
         if (
             context.campaign != "Base"
-            and not getattr(self, "_connected_slot_data", {}).get("use_dlc_content")
+            and not getattr(self, "_connected_slot_data", {}).get("runtime", getattr(self, "_connected_slot_data", {})).get("use_dlc_content")
         ):
             self.materialization.log_automatic_noop(reason, "dlc_context_ignored", evidence.epoch, fingerprint)
             return None, None
@@ -5936,7 +5909,7 @@ class DoomEternalContext(CommonContext):
             return False
         slot_data = getattr(self, "_connected_slot_data", {})
         active_context = self._refresh_runtime_context(slot_data)
-        use_dlc = slot_data.get("use_dlc_content")
+        use_dlc = slot_data.get("runtime", slot_data).get("use_dlc_content")
         admission = self.level_ready.start(
             epoch, active_context, use_dlc, self.dlc_evidence if use_dlc else None,
             newest_path or marker.get("path"),
@@ -6153,6 +6126,7 @@ class DoomEternalContext(CommonContext):
         return progressive_receipt_stage(
             receipt_item_ids(self.items_received), item_id, item_index,
             frozenset(excluded_receipt_indices), ITEM_ID_TO_COMMAND.get(item_id),
+            starting_count=self.receipt_session.resolved_starting_count(item_id),
         )
 
     def _fresh_receipt_owned_count(
@@ -6227,8 +6201,9 @@ class DoomEternalContext(CommonContext):
             suppress_local_toast=False,
         )
         plan = ReceiptPlan(tuple(commands) if commands is not None else None, description)
+        ledger_shadow.capture("compiled_plan", state_key=self.state_key, item_id=item_id, item_index=item_index, commands=plan.commands, lease=None, optional=True, source=NEW_RECEIPT)
         return self.receipt_delivery.deferred_notification(plan, item_id, item_index, self.delivery_item_name(item_id),
-            self.receipt_publication_scope(), ReceiptPublication(send_command), self.persist_session_state)
+            self.receipt_publication_scope(), ReceiptPublication(send_command, observer=ledger_shadow.capture), self.persist_session_state)
 
     def spool_item_commands(
         self,
@@ -6262,9 +6237,10 @@ class DoomEternalContext(CommonContext):
             excluded_receipt_indices=excluded_receipt_indices,
         )
         plan = ReceiptPlan(tuple(commands) if commands is not None else None, description)
+        ledger_shadow.capture("compiled_plan", state_key=self.state_key, item_id=item_id, item_index=item_index, commands=plan.commands, lease=materialization_lease, source=intent)
         return self.receipt_delivery.spool(plan, item_id, item_index, self.delivery_item_name(item_id),
             self.receipt_publication_scope(packet_received_ns, materialization_lease, context_identity),
-            ReceiptPublication(send_command), self._persist_receipt_progress)
+            ReceiptPublication(send_command, observer=ledger_shadow.capture), self._persist_receipt_progress)
 
     @property
     def death_link_enabled(self):
@@ -6462,7 +6438,7 @@ class DoomEternalContext(CommonContext):
         )
 
     def check_publication(self):
-        return CheckPublication(self.send_msgs, self.locations_checked.add, ClientStatus.CLIENT_GOAL)
+        return CheckPublication(self.send_msgs, self.locations_checked.add, ClientStatus.CLIENT_GOAL, observer=ledger_shadow.scope(self.state_key))
 
     async def evaluate_campaign_goal(self, source_description):
         if not hasattr(self, "unified_campaign") or not self.unified_campaign.goal_admitted(
@@ -6847,6 +6823,7 @@ class DoomEternalContext(CommonContext):
         pending_locations = []
         for location_id, paths in event_paths_by_location.items():
             disposition = self.physical_checks.disposition(location_id, facts, self.item_state_ready)
+            ledger_shadow.capture("check_observation", state_key=state_key, location_id=location_id, disposition=disposition)
             if disposition == "acknowledged":
                 for path in paths:
                     try:

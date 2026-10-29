@@ -5,13 +5,14 @@ from types import SimpleNamespace
 import pytest
 
 from doom_eap.launcher.launcher_session import APSessionOwner
+from tests.test_slot_admission import resolved_room, snapshot_for, invalid_room, tree_bytes
 
 
 def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
     from doom_eap.runtime.weapon_points import namespace_id
     owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
     snapshot = SimpleNamespace(seed_name="fixture", team=0, slot=1,
-        slot_data={"native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 0}})
+        slot_data={"native_generation_fingerprint": "a" * 64, "runtime": {"difficulty": {"engine": 0}}})
     config = {"steam_remote_dir": str(tmp_path / "remote"), "save_games_dir": str(tmp_path / "local")}
     assert owner.inspect_campaign(snapshot, config)["status"] == "absent"
     assert not (tmp_path / "data").exists()
@@ -23,6 +24,7 @@ def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
     (directory / "campaign.contract").write_text(f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={'a' * 64}\n"
         "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=0\nslot=AUTOSAVE0\n", newline="\n")
     assert owner.inspect_campaign(snapshot, config)["status"] == "partial_metadata"
+
     save = tmp_path / "remote" / native / "GAME-AUTOSAVE0/game.details"
     save.parent.mkdir(parents=True)
     save.write_bytes(b"native checkpoint")
@@ -63,7 +65,7 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
     with patch.object(owner, "_prepare", side_effect=refuse):
         with pytest.raises(RuntimeError) as refused:
             from pathlib import Path
-            slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+            slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text())
             owner.prepare(SimpleNamespace(seed_name="fixture", team=0, slot=1, slot_data=slot_data), {})
     assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
     assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
@@ -268,13 +270,13 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         installed = install_meathook(game, DependencyManager(state / "deps"), state_dir=state,
                                     consent=lambda _: True, local_artifact=runtime / "distribution.json")
         assert installed.state == "installed"
-        slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
-        slot_data.update({
-            "slot_data_revision": "0.7.0", "slot_data_schema_version": 6,
-            "native_generation_fingerprint": "a" * 64, "campaign_plan": {"difficulty": 1},
-            "starting_inventory": {"Frag Grenade": 1}, "starting_weapon": "Combat Shotgun",
-        })
-        snapshot = SimpleNamespace(seed_name="sala-á", team=0, slot=1, slot_data=slot_data)
+        slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text())
+        from doom_eap.content.slot_data_contract import generation_fingerprint
+        slot_data["runtime"]["difficulty"]["engine"] = 1
+        slot_data["starting"] = {"items": [[7770011, 1], [7770900, 1]], "weapon_item_id": 7770900}
+        slot_data["native_generation_fingerprint"] = generation_fingerprint(slot_data)
+        generation = slot_data["native_generation_fingerprint"]
+        snapshot = SimpleNamespace(seed_name="sala-Ã¡", team=0, slot=1, slot_data=slot_data)
         owner = APSessionOwner(root, data, state)
         config = {"game_root": str(game), "save_games_dir": str(local),
                   "client_state_file": str(data / "client_state.json"),
@@ -296,7 +298,7 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         project_receipt_history(session, receipts, boundary, observe_received_items(receipts, boundary))
         client_state = Path(config["client_state_file"])
         client_state.write_text(json.dumps({"version": 2, "sessions": {
-            "sala-á:0:1:" + "a" * 64: session, "other-room:0:1": default_session_state(),
+            "sala-Ã¡:0:1:" + generation: session, "other-room:0:1": default_session_state(),
         }}), encoding="utf-8")
         receipt_bytes = client_state.read_bytes()
         system = Path(os.environ["SystemRoot"]) / "System32"
@@ -326,7 +328,7 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
             native.mkdir()
             (native / f"sentinel-owner-{namespace}.txt").write_text(
                 f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
-                f"team=0\nslot=1\ngeneration_fingerprint={'a' * 64}\nprovenance=synthetic-fixture\n", encoding="utf-8", newline="\n")
+                f"team=0\nslot=1\ngeneration_fingerprint={generation}\nprovenance=synthetic-fixture\n", encoding="utf-8", newline="\n")
             assert owner.prepare(snapshot, config)["intent"] == "create"
             assert client_state.read_bytes() == receipt_bytes
             assert _campaign_native_root(data / "campaigns", namespace) == first
@@ -352,7 +354,7 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
             orphan = native / "save.fixture"
             orphan.write_bytes(b"retained native payload")
             contract.write_text(
-                f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={'a' * 64}\n"
+                f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={generation}\n"
                 "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=1\nslot=AUTOSAVE0\n",
                 encoding="utf-8", newline="\n",
             )
@@ -374,3 +376,42 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
             owner.retire()
             steam.communicate(b"", timeout=5)
         assert not (game / "sentinel-prelaunch.txt").exists()
+
+
+@pytest.mark.parametrize("fault", ["structure", "digest", "size", "reference", "battery"])
+def test_resolved_session_rejects_before_preparation(resolved_room, tmp_path, fault):
+    from copy import deepcopy
+    from dataclasses import replace
+    from doom_eap.runtime.context_registry import SlotAdmissionError
+
+    data, catalog = resolved_room
+    snapshot = snapshot_for(data)
+    snapshot = replace(snapshot, slot_data=invalid_room(deepcopy(data), catalog, fault))
+    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
+    owner._prepare = Mock(side_effect=AssertionError("Admission must precede session preparation"))
+    before = tree_bytes(tmp_path)
+    with pytest.raises(SlotAdmissionError):
+        owner.prepare(snapshot, {})
+    owner._prepare.assert_not_called()
+    assert tree_bytes(tmp_path) == before
+
+
+def test_resolved_session_accepts_before_preparation(resolved_room, tmp_path):
+    data, _ = resolved_room
+    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
+    owner._prepare = Mock(return_value={"state": "fixture"})
+    snapshot = snapshot_for(data)
+    assert owner.prepare(snapshot, {}) == {"state": "fixture"}
+    owner._prepare.assert_called_once()
+
+
+def test_session_schema_rejection_preserves_tree(resolved_room, tmp_path):
+    from pathlib import Path
+    from doom_eap.runtime.context_registry import SlotAdmissionError
+
+    legacy = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
+    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
+    with pytest.raises(SlotAdmissionError) as caught:
+        owner.prepare(SimpleNamespace(slot_data=legacy), {})
+    assert caught.value.code == "slot_schema"
+    assert tree_bytes(tmp_path) == {}

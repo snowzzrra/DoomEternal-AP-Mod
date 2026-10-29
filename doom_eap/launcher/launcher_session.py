@@ -475,7 +475,7 @@ class APSessionOwner:
                 if not re.fullmatch(r"[a-z0-9-]{1,128}", str(recovery_basename)):
                     raise ValueError("Invalid AP backup basename")
                 intent = "recover"
-            difficulty = snapshot.slot_data["campaign_plan"].get("difficulty")
+            difficulty = snapshot.slot_data["runtime"]["difficulty"]["engine"]
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError("Room campaign difficulty is unsupported")
             descriptor = (f"sentinel-test-session-v3\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
@@ -636,7 +636,7 @@ class APSessionOwner:
                 paths[name] = {"status": "not_configured", "path": None}
         expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
                     f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\n"
-                    f"difficulty={snapshot.slot_data['campaign_plan']['difficulty']}\nslot=AUTOSAVE0\n").encode()
+                    f"difficulty={snapshot.slot_data['runtime']['difficulty']['engine']}\nslot=AUTOSAVE0\n").encode()
         for name in ("campaign.contract", "campaign.checkpoint"):
             if paths[name]["status"] == "present":
                 try:

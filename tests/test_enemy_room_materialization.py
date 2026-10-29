@@ -1,12 +1,11 @@
 import json
-from copy import deepcopy
 from pathlib import Path
 from zipfile import ZipFile
 
 import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes
+from doom_eap.content.native_enemy_plan import build_native_recipes, encode_native_recipes
 from doom_eap.launcher.launcher_core import ModCompiler, RoomCompiler, SeedManifest
 from tools.maps.encounter_catalog import text_sha256
 from tools.maps.ap_map_generator import find_entity_block_bounds
@@ -16,6 +15,16 @@ from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
+
+def options_for_plan(plan):
+    from doom_eap.content.slot_data_contract import load_slot_catalog
+    from tests.test_slot_data_contract import sign_slot
+
+    catalog = load_slot_catalog()
+    data = json.loads((ROOT / "tests/fixtures/resolved_room_slot_data.json").read_text())
+    data["recipes"] = encode_native_recipes(plan, catalog, active_maps=[*data["campaign"]["sequence"], "hub"])
+    return sign_slot(data, catalog)
+
 
 def cold_case(tmp_path, monkeypatch):
     enemies = normalize_enemy_options({})
@@ -56,8 +65,9 @@ def cold_case(tmp_path, monkeypatch):
     compiler._compress_entities_text = lambda text: text.encode()
     manifest = SeedManifest.create(seed_name="Cold", team=0, slot=1,
         active_location_ids=ModCompiler(ROOT).known_location_ids(),
-        options={"enemy_plan": plan, "enemies": enemies, "use_dlc_content": True}, static_precompile=True)
-    return compiler, manifest
+        options=options_for_plan(plan), static_precompile=True)
+    from dataclasses import replace
+    return compiler, replace(manifest, options=options_for_plan(plan))
 
 
 def base_files(compiler):
@@ -74,7 +84,8 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
     enemies = normalize_enemy_options({"enemy_count_mode": "multiplier", "enemy_count_multiplier": 100,
         "enemy_weights": {name: int(name in {"demonic_trooper", "imp"}) for name in SPECIES_IDS}})
     plan = build_native_recipes(enemies, {"sequence": ["e1m1_intro"]}, seed=73822)
-    manifest = replace(manifest, options={**manifest.options, "enemy_plan": plan, "enemies": enemies})
+    manifest = replace(manifest, options=options_for_plan(plan))
+    plan = compiler._resolved_enemy_plan(manifest)
     assembled = base_files(compiler)
     assets_path = "e1m1_intro_patch3/EternalMod/assetsinfo/e1m1_intro.json"
     model = "md6def/characters/monsters/demonic_troops/base/demonic_troops.md6"
@@ -123,12 +134,9 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
 
 
 def test_cold_compiler_rejects_drift_before_replacing_packaged_map(tmp_path, monkeypatch):
-    from dataclasses import replace
-
     compiler, manifest = cold_case(tmp_path, monkeypatch)
-    options = deepcopy(manifest.options)
-    options["enemy_plan"]["maps"]["e1m1_intro"]["source_sha256"] = "0" * 64
+    compiler.payload_manifest["source_snapshots"]["e1m1_intro"]["sha256"] = "0" * 64
     assembled = base_files(compiler)
-    with pytest.raises(ValueError, match="differ from the seed, options or source catalog"):
-        compiler._apply_enemy_plan(assembled, replace(manifest, options=options))
+    with pytest.raises(ValueError, match="snapshot.*(hash|digest|mismatch)|source snapshot"):
+        compiler._apply_enemy_plan(assembled, manifest)
     assert assembled == base_files(compiler)

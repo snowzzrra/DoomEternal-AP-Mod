@@ -1,13 +1,13 @@
 {
-  "apworld_revision": "0.7.0",
+  "apworld_revision": "0.8.0",
   "bridge_protocol_version": 4,
   "compiler_revision": 5,
   "content_revision": "0.7.0",
   "content_schema_version": 3,
   "game": "DOOM Eternal",
   "manifest_schema_version": 3,
-  "release_version": "0.7.0",
+  "release_version": "0.8.0",
   "session_mod_contract_revision": 2,
   "slot_data_revision": "0.7.0",
-  "slot_data_schema_version": 6
+  "slot_data_schema_version": 7
 }

@@ -39,8 +39,6 @@ def _registry(*entries):
     }
 
 
-
-
 def test_reconnect_classifies_new_receipts_once_in_order():
     history = [Receipt(item, index, 1, 0) for index, item in enumerate(range(13))]
     first = observe_received_items(history, 10)
@@ -75,8 +73,6 @@ def test_reconciliation_history_stops_at_processed_boundary():
 
     assert [selection.item_id for selection in plan.selections] == list(range(10))
     assert all(command.item_id < 10 for command in plan.commands)
-
-
 
 
 def test_shifted_history_overlap_uses_occurrence_count_not_item_id():
@@ -123,8 +119,6 @@ def test_state_migration_preserves_history_and_safes_malformed_sessions():
     assert set(state["sessions"]) == {"room-a:0:1", "room-b:0:1"}
 
 
-
-
 def test_generation_identity_never_adopts_another_campaign_session():
     sessions = {
         "room-a:0:1": {
@@ -154,14 +148,6 @@ def test_never_replay_has_zero_commands():
     assert plan.skipped_never_replay == 1
 
 
-
-
-
-
-
-
-
-
 def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
     session = ReceiptSession()
     key = ("room", 0, "receipt")
@@ -183,22 +169,18 @@ def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
         token.generation = 10
 
 
-def test_starting_materialization_tracks_sources_and_subtracts_processed_occurrences():
+def test_resolved_starting_ownership_does_not_suppress_own_world_delivery():
+    from doom_eap.runtime.item_reconciliation import progressive_receipt_stage
+
     session = ReceiptSession()
-    receipt = Receipt(8, -2, 1, 0)
-    inputs = dict(
-        starting_inventory={"Item": 2}, starting_weapon="Item",
-        item_identity={8: {"name": "Item"}}, eligible=lambda _item: True,
+    session.configure_starting_ownership(
+        {"identity": {"schema": 7}, "starting": {"items": [[7770004, 1], [7770902, 1]], "weapon_item_id": 7770004}},
     )
-    session.configure_starting_materialization(**inputs, processed_receipts=[receipt, receipt])
-    assert [(fact.item_id, fact.quantity, fact.provenance) for fact in session.starting_materialization] == [
-        (8, 2, "starting_inventory"), (8, 1, "starting_weapon"),
-    ]
-    assert session.consume_starting_materialization(8)
-    assert not session.consume_starting_materialization(8)
+    assert session.owned_count(7770902, 1) == 2
+    assert progressive_receipt_stage(
+        (7770902,), 7770902, 0, frozenset(), {"type": "progressive_perk", "perks": ["a", "b"]},
+        starting_count=session.resolved_starting_count(7770902),
+    ) == 1
     session.begin_rebind()
-    assert not session.consume_starting_materialization(8)
-    session.configure_starting_materialization(**inputs, processed_receipts=[receipt] * 3)
-    assert not session.consume_starting_materialization(8)
-    with pytest.raises(FrozenInstanceError):
-        session.starting_materialization[0].quantity = 9
+    assert session.owned_count(7770902, 1) == 2
+    assert session.owned_count(7770004, 1) == 2

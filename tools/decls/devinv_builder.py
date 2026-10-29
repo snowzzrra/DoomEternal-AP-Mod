@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from doom_eap.content.map_registry import load_map_registry
+from doom_eap.runtime.item_reconciliation import load_starting_ownership
 from doom_eap.contracts.tag_prerequisites import (
     TAG_PAID_NORMAL_MOD_UPGRADES, TAG_REQUIRED_ENGINE_PERKS, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
 )
@@ -678,9 +679,42 @@ def _currency_totals(source: str) -> dict[str, int]:
     return totals
 
 
+def devinv_starting_arguments(slot_data):
+    if slot_data.get("identity", {}).get("schema") == 7:
+        starting = slot_data.get("starting")
+        load_starting_ownership(starting, load_devinv_mapping())
+        return {"starting": starting}
+    return {"starting_inventory": slot_data.get("starting_inventory", {}),
+            "starting_weapon": slot_data.get("starting_weapon")}
+
+
+def devinv_starting_values(starting, starting_inventory, starting_weapon):
+    if starting is None:
+        return starting_inventory, starting_weapon
+    mapping = load_devinv_mapping()
+    facts = load_starting_ownership(starting, mapping)
+    inventory = {mapping[fact.item_id]["name"]: fact.quantity for fact in facts
+                 if mapping[fact.item_id]["kind"] not in {"currency", "stored_charge"}}
+    weapon = mapping[starting["weapon_item_id"]]["name"]
+    inventory.pop(weapon)
+    for fact in facts:
+        entry = mapping[fact.item_id]
+        if entry["kind"] == "progressive":
+            inventory[entry["name"]] = min(fact.quantity, len(entry["tiers"]))
+        elif entry["kind"] == "special_weapon":
+            inventory[entry["name"]] = min(fact.quantity, entry["max_quantity"])
+    return inventory, weapon
+
+
+def _validate_starting_currencies(source, starting):
+    if starting is not None and _currency_totals(source) != _currency_totals(canonical_base()):
+        raise ValueError("starting currency must use durable delivery")
+
+
 def build_devinv_loadout(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
+    *, starting=None,
 ) -> str:
     """Build safe E1M1 DevInv from resolved AP item names.
 
@@ -688,6 +722,7 @@ def build_devinv_loadout(
     values. Unknown names, malformed quantities, duplicate starting weapon
     ownership, and random/unresolved weapon values fail closed.
     """
+    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
     if starting_inventory is None:
         starting_inventory = {}
     if not isinstance(starting_inventory, Mapping):
@@ -747,17 +782,20 @@ def build_devinv_loadout(
     return source
 
 
-def build_devinv(*, starting_inventory=None, starting_weapon=None) -> str:
+def build_devinv(*, starting_inventory=None, starting_weapon=None, starting=None) -> str:
     """Keyword-friendly alias for package/compiler callers."""
-    return build_devinv_loadout(starting_inventory, starting_weapon)
+    return build_devinv_loadout(starting_inventory, starting_weapon, starting=starting)
 
 
 def validate_devinv_source(
     source: str,
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
+    *, starting=None,
 ) -> None:
     """Validate canonical base, preserved stats, and optional materialization."""
+    _validate_starting_currencies(source, starting)
+    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
         'STAT_SUIT_PAGE_UNLOCKED', 'STAT_RUNE_PAGE_UNLOCKED',
@@ -1021,9 +1059,12 @@ def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
 def build_tag_devinv_overrides(
     starting_inventory: Mapping[str, int] | None = None,
     starting_weapon: str | None = None,
-    *, progressive_blood_punch: bool = False,
+    *, progressive_blood_punch: bool = False, starting=None,
 ) -> dict[str, str]:
     """Build exact TAG archive overrides from project-owned declaration inputs."""
+    if starting is not None:
+        return _resolved_tag_devinv_overrides(starting)
+    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
     manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
     result: dict[str, str] = {}
     tag_root_record = manifest["declarations"]["e4m1_rig"]
@@ -1119,16 +1160,27 @@ def build_tag_devinv_overrides(
                 + CODEX_DOSSIER_BLOCK.rstrip("\n")
                 + override[codex_match.end():]
             )
-        # Runtime loads one self-contained declaration per archive.  The
-        # extracted inheritance chain is provenance, not a package dependency.
+        # runtime requires one self-contained declaration per archive.
         override = _INHERIT_DECL_RE.sub("", override)
-        if re.search(r"^[ \t]*inherit\s*=", override, re.MULTILINE):
-            raise ValueError(f"TAG DevInv output retained inheritance: {declaration_key}")
         validate_tag_devinv_source(override, progressive_blood_punch=progressive_blood_punch)
         archive = Path(record["archive"])
         map_key = record["map_key"]
         result[(archive.stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=map_key))] = override
     return result
+
+
+def _resolved_tag_devinv_overrides(starting):
+    source = build_devinv_loadout(starting=starting)
+    match = _STARTING_INVENTORY_RE.search(source)
+    body = match.group("body")
+    count = len(list(_ITEM_BLOCK_RE.finditer(body)))
+    additions = [_decl_item("perk", path, (), count + index)
+                 for index, path in enumerate(sorted(TAG_REQUIRED_ENGINE_PERKS))]
+    body = body.replace(f"num = {count};", f"num = {count + len(additions)};", 1)
+    source = source[:match.start("body")] + body + "\n" + "\n".join(additions) + source[match.end("body"):]
+    manifest = json.loads(TAG_DEVINV_MANIFEST.read_text(encoding="utf-8"))
+    return {Path(record["archive"]).stem + "/" + TAG_DEVINV_DECL_PATH.format(map_key=record["map_key"]): source
+            for record in manifest["declarations"].values()}
 
 
 def main() -> None:
@@ -1141,13 +1193,10 @@ def main() -> None:
                         default=Path(__file__).resolve().parents[2] / "data" / "map_sources.json")
     parser.add_argument("--map-key", default=OUTPUT_MAP_KEY)
     parser.add_argument("--slot-data", type=Path,
-                        help="Resolved slot_data JSON containing starting_inventory and starting_weapon")
+                        help="Resolved slot_data JSON containing starting ownership")
     args = parser.parse_args()
     slot_data = json.loads(args.slot_data.read_text(encoding="utf-8")) if args.slot_data else {}
-    override = build_devinv_loadout(
-        starting_inventory=slot_data.get("starting_inventory", {}),
-        starting_weapon=slot_data.get("starting_weapon"),
-    )
+    override = build_devinv_loadout(**devinv_starting_arguments(slot_data))
 
     output_path = output_path_for_map(args.mod_root, args.map_registry, args.map_key)
     output_path.parent.mkdir(parents=True, exist_ok=True)

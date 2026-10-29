@@ -20,6 +20,26 @@ PRODUCER = ["71", "101", "b" * 32, "test-build"]
 MILESTONES = [{"threshold": 100, "location_id": 1}, {"threshold": 200, "location_id": 2}]
 
 
+@pytest.mark.parametrize("interval", [1, 100, 1000000])
+def test_resolved_rewards_publish_stable_ordinals_and_keep_thresholds_for_progress(interval):
+    from doom_eap.content.killsanity_plan import milestone_ids
+
+    plan = {"interval": interval, "count": 2000}
+    ids = milestone_ids(plan)
+    assert ids == set(range(2_200_000_001, 2_200_002_001))
+    kills = Killsanity(logging.getLogger("killsanity-test"))
+    kills.bind_resolved({}, NAMESPACE, plan)
+    assert kills.counter() == {"total": 0, "target": interval}
+    assert kills.consume(snapshot(interval * 2), lambda: None) == (2_200_000_001, 2_200_000_002)
+    sent = []
+    async def locations(due):
+        sent.extend(due)
+    facts = SimpleNamespace(connected=True, checked_ready=True, server_locations=ids, checked=set(), submitted=set())
+    asyncio.run(kills.publish(facts, SimpleNamespace(locations=locations, mark_submitted=facts.submitted.add)))
+    assert sent == [2_200_000_001, 2_200_000_002]
+    assert kills.counter()["target"] == interval * 3
+
+
 def snapshot(kills, *, producer=PRODUCER, gaps=0, namespace=NAMESPACE):
     return dict(producer=producer, namespace_id=namespace, qualified_kills=kills, observation_gaps=gaps)
 

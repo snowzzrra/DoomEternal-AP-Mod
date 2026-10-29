@@ -8,9 +8,8 @@ from typing import Any, Iterable, Mapping
 
 from doom_eap.contracts.runtime_context import DlcEvidence, RuntimeContext
 from doom_eap.runtime.lifecycle import RuntimeLifecycle
-from doom_eap.content.enemy_options import normalize_enemy_options
-from doom_eap.content.killsanity_plan import validate_killsanity_plan
-from doom_eap.content.enemy_plan import validate_frozen_enemy_plan
+from doom_eap.content import slot_data_contract
+from doom_eap.contracts.core_distribution import version_key
 from doom_eap.contracts.materialization import (
     SUPPORT_RUNE_CAPABILITY, TAG_SPECIAL_CAPABILITY, SUPPORT_RUNE_IDS,
     TAG_SPECIAL_IDS, CRUCIBLE_ID, GATE_KEY_TO_MAP, context_item_ids, support_rune_commands,
@@ -22,26 +21,74 @@ REGISTRY_PATH = REPO_ROOT / "data" / "runtime_contexts.json"
 _SLOT_IDENTITY = json.loads(
     (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
 )
-SLOT_DATA_REVISION = str(_SLOT_IDENTITY["slot_data_revision"])
-CAPABILITY_CROSS_CAMPAIGN = "cross_campaign_materialization_v1"
 TAG_CAPABILITY = "tag_context_v1"
 GOAL_CAPABILITIES = frozenset({"goal_events_v1", "goal_endpoint_events_v1"})
-GOAL_VALUES = frozenset({
-    "Acquire the Unmaykr",
-    "Kill the Icon of Sin",
-    "Kill the Dark Lord",
-    "Complete the Full Saga",
+
+SUPPORTED_SLOT_CAPABILITIES = frozenset({
+    "room_mod_v2", "slot_data_v6", "slot_data_v7", "unified_campaign_v1",
+    "fortress_economy_v1", "progressive_blood_punch_v1", "enemy_recipe_seed_v1",
+    "dlc_missions_v1", "goal_events_v1", "goal_endpoint_events_v1", "placement_scouts_v1",
+    "randomize_dash_v1", "starting_inventory_v1", "starting_weapon_v1",
+    "special_weapon_progression_v1", "ammo_refill_v1", "physical_options_v1",
+    "room_options_v1", "cross_campaign_materialization_v1", "deathlink_mode_v1",
 })
-VICTORY_REQUIREMENT_VALUES = frozenset({
-    "Complete All Enabled Missions",
-    "Complete All Included Missions",
-    "Complete All Slayer Gates",
-    "Complete All Escalation Encounters",
-    "Complete All Secret Encounters",
-    "Complete All Mission Challenges",
-    "Complete All Weapon Mastery Challenges",
-    "Acquire the Unmaykr",
-})
+
+
+class SlotAdmissionError(ValueError):
+    failure_domain = "room_package"
+
+    def __init__(self, code: str, message: str):
+        self.code = code
+        super().__init__(message)
+
+
+def slot_schema_version() -> int:
+    return _SLOT_IDENTITY["slot_data_schema_version"]
+
+
+def load_slot_catalog() -> dict:
+    return slot_data_contract.load_slot_catalog(path=REPO_ROOT / "doom_eap/content/slot_catalog.json")
+
+
+def admit_slot_data(slot_data, *, placements=None):
+    """Select the packaged schema before any room preparation or state changes."""
+    if not isinstance(slot_data, Mapping):
+        raise SlotAdmissionError("slot_structure", "Room data must be an object.")
+    expected = slot_schema_version()
+    identity = slot_data.get("identity")
+    if not isinstance(identity, dict) or type(identity.get("schema")) is not int or identity["schema"] != expected:
+        version = _SLOT_IDENTITY["release_version"]
+        apworld = _SLOT_IDENTITY["apworld_revision"]
+        raise SlotAdmissionError("slot_schema", f"This client requires a DoomEAP {version} room "
+                                 f"(slot_data schema {expected}). Generate a compatible room with APWorld {apworld}.")
+    try:
+        resolved = slot_data_contract.validate_slot_data(
+            slot_data, load_slot_catalog(), placements=placements,
+            supported_capabilities=SUPPORTED_SLOT_CAPABILITIES,
+        )
+    except slot_data_contract.ContractError as error:
+        codes = {slot_data_contract.StructureError: "slot_structure", slot_data_contract.ReferenceError: "slot_reference",
+                 slot_data_contract.DigestError: "slot_digest", slot_data_contract.ExpansionError: "slot_expansion",
+                 slot_data_contract.PayloadSizeError: "slot_size"}
+        raise SlotAdmissionError(codes.get(type(error), "slot_contract"), str(error)) from error
+    _validate_resolved_compatibility(resolved.compatibility)
+    return resolved
+
+
+def _validate_resolved_compatibility(compatibility):
+    identity = _SLOT_IDENTITY
+    expected = (identity["bridge_protocol_version"], identity["manifest_schema_version"],
+                identity["session_mod_contract_revision"])
+    actual = (compatibility.bridge_protocol, compatibility.manifest_schema_version, compatibility.mod_contract_revision)
+    if actual != expected:
+        raise SlotAdmissionError("slot_compatibility", "The room requires a different client contract.")
+    try:
+        supported = version_key(identity["release_version"]) >= version_key(compatibility.minimum_client_version)
+        version_key(compatibility.apworld_version)
+    except ValueError as error:
+        raise SlotAdmissionError("slot_compatibility", "The room has an invalid compatibility version.") from error
+    if not supported:
+        raise SlotAdmissionError("slot_compatibility", "The room requires a newer client.")
 
 
 def _load_registry() -> tuple[RuntimeContext, ...]:
@@ -120,70 +167,7 @@ def evaluate_dlc_availability(base_dir: str | Path | None) -> DlcEvidence:
 
 def validate_slot_contract(slot_data: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the generated room identity and exact option contract."""
-    slot_data = dict(slot_data)
-    if slot_data.get("slot_data_revision") != SLOT_DATA_REVISION:
-        raise ValueError(
-            "DoomEAP 0.7 requires a new 0.7 room and AP save. "
-            "Your existing save has not been changed."
-        )
-    if slot_data.get("slot_data_schema_version") != _SLOT_IDENTITY["slot_data_schema_version"]:
-        raise ValueError("slot_data_schema_version is incompatible")
-    if not isinstance(slot_data.get("enemies"), dict) or json.dumps(slot_data["enemies"], sort_keys=True) != json.dumps(
-        normalize_enemy_options(slot_data), sort_keys=True
-    ):
-        raise ValueError("enemies does not match its generated options")
-    required = slot_data.get("required_capabilities")
-    if (
-        not isinstance(required, list)
-        or any(not isinstance(value, str) for value in required)
-        or CAPABILITY_CROSS_CAMPAIGN not in required
-    ):
-        raise ValueError("cross_campaign_materialization_v1 capability is required")
-    goal_fields = {
-        "goal",
-        "goal_endpoint_event",
-        "goal_endpoint_available",
-        "additional_victory_requirements",
-    }
-    goal_contract_present = bool(goal_fields & slot_data.keys()) or bool(
-        GOAL_CAPABILITIES & set(required)
-    )
-    if not isinstance(slot_data.get("use_dlc_content"), bool):
-        raise ValueError("use_dlc_content must be boolean")
-    if not isinstance(slot_data.get("include_dlc_missions"), bool):
-        raise ValueError("include_dlc_missions must be boolean")
-    if slot_data.get("logic_difficulty") not in {"Relaxed", "Standard", "Expert"}:
-        raise ValueError("logic_difficulty is invalid")
-    validate_killsanity_plan(slot_data.get("killsanity_options"), slot_data.get("killsanity"))
-    slot_data["enemy_plan"] = validate_frozen_enemy_plan(slot_data.get("enemy_plan"), slot_data["enemies"])
-    if slot_data.get("mastery_requirements") not in {"Original", "Half", "Quarter"}:
-        raise ValueError("mastery_requirements is invalid")
-    if type(slot_data.get("easier_secret_encounters")) is not bool:
-        raise ValueError("easier_secret_encounters must be boolean")
-    if slot_data.get("special_weapon") not in {
-        "progressive_special_weapon", "progressive_sentinel_hammer", "the_crucible",
-        "Progressive Special Weapon", "Progressive Sentinel Hammer", "The Crucible",
-    }:
-        raise ValueError("special_weapon is invalid")
-    if goal_contract_present:
-        if not GOAL_CAPABILITIES <= set(required):
-            raise ValueError("goal event capabilities are required")
-        goal = slot_data.get("goal")
-        if goal not in GOAL_VALUES:
-            raise ValueError("goal is invalid")
-        if slot_data.get("goal_endpoint_event") != f"Internal Goal Endpoint: {goal}":
-            raise ValueError("goal_endpoint_event is invalid")
-        if slot_data.get("goal_endpoint_available") is not True:
-            raise ValueError("goal_endpoint_available must be true")
-        requirements = slot_data.get("additional_victory_requirements")
-        if (
-            not isinstance(requirements, list)
-            or any(value not in VICTORY_REQUIREMENT_VALUES for value in requirements)
-            or len(requirements) != len(set(requirements))
-        ):
-            raise ValueError("additional_victory_requirements is invalid")
-    from .unified_campaign import validate_plan
-    validate_plan(slot_data)
+    admit_slot_data(slot_data)
     return dict(slot_data)
 
 

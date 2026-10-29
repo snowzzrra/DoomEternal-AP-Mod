@@ -9,10 +9,18 @@ import json
 from pathlib import Path
 
 from doom_eap.content.map_registry import load_map_registry
-from tools.decls.devinv_builder import build_tag_devinv_overrides, validate_devinv_source
+from tools.decls.devinv_builder import build_tag_devinv_overrides, devinv_starting_arguments, validate_devinv_source
 
 
 DECL_PREFIX = Path("generated/decls/devinvloadout")
+
+
+def _validate_tag_starting(text, options, expected):
+    if options.get("identity", {}).get("schema") == 7:
+        if text != expected:
+            raise ValueError("TAG DevInv does not match starting ownership")
+        return
+    validate_devinv_source(text, **devinv_starting_arguments(options))
 
 
 def expected_decl_path(mod_root: Path, registry_path: Path, generated_map: Path) -> Path:
@@ -68,17 +76,17 @@ def validate(
     try:
         validate_devinv_source(
             text,
-            options.get("starting_inventory", {}),
-            options.get("starting_weapon"),
+            **devinv_starting_arguments(options),
         )
     except ValueError as error:
         raise AssertionError(str(error)) from error
 
     if has_room_manifest:
-        tag_paths = [mod_root / path for path in build_tag_devinv_overrides(
-            options.get("starting_inventory", {}), options.get("starting_weapon")
-        )]
-        if options.get("use_dlc_content", True):
+        tag_overrides = build_tag_devinv_overrides(
+            **devinv_starting_arguments(options)
+        )
+        tag_paths = [mod_root / path for path in tag_overrides]
+        if options.get("runtime", options).get("use_dlc_content", True):
             for tag_path in tag_paths:
                 if not tag_path.is_file():
                     raise AssertionError(f"missing TAG DevInv override: {tag_path}")
@@ -86,7 +94,7 @@ def validate(
                     tag_text = tag_path.read_text(encoding="utf-8")
                     if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
                         raise ValueError("TAG DevInv override retains inherit declaration")
-                    validate_devinv_source(tag_text, options.get("starting_inventory", {}), options.get("starting_weapon"))
+                    _validate_tag_starting(tag_text, options, tag_overrides[tag_path.relative_to(mod_root).as_posix()])
                 except ValueError as error:
                     raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
         elif any(path.exists() for path in tag_paths):

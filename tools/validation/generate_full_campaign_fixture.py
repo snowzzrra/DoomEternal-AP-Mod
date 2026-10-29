@@ -29,18 +29,19 @@ def main():
     sys.modules["pyximport"] = None
     from test.general import setup_multiworld
     from Fill import distribute_items_restrictive
+    from worlds.AutoWorld import call_all
     from worlds.doometernal import DoomEternalWorld
 
     world = setup_multiworld(DoomEternalWorld, seed=700, options=OPTIONS)
     distribute_items_restrictive(world)
+    call_all(world, "post_fill")
+    call_all(world, "finalize_multiworld")
     slot_data = world.worlds[1].fill_slot_data()
-    target = mod_root / "tests/fixtures/full_campaign_slot_data.json"
-    temporary = target.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(slot_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
-    temporary.replace(target)
+    target = mod_root / "tests/fixtures/resolved_room_slot_data.json"
+    target.write_text(json.dumps(slot_data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({"rng_seed": 700, "python_hash_seed": 0,
                       "fingerprint": slot_data["native_generation_fingerprint"],
-                      "active_locations": slot_data["active_location_count"]}))
+                      "active_locations": sum(location.address is not None for location in world.get_locations(1))}))
     return 0
 
 

@@ -12,6 +12,182 @@ from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselin
 from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
 
 
+class RecipeMaterializationError(ValueError):
+    failure_domain = "room_package"
+
+    def __init__(self, code, message):
+        self.code = code
+        super().__init__(message)
+
+
+def _resolved_population_limits(population):
+    if population is None:
+        return {}
+    if population.heavy > 0xffffff:
+        raise RecipeMaterializationError('recipe_unsafe', 'Population heavy limit exceeds its native field.')
+    return {"population_limits": dict(scope=int(population.scope, 16), maximum=population.maximum,
+        heavy=population.heavy, superheavy=population.superheavy, pressure=population.pressure,
+        mixed=population.mixed, strict=population.strict, counter=population.counter,
+        **({'species': dict(population.species_caps)} if population.species_caps else {}))}
+
+
+def _resolved_native_body(body, templates):
+    from doom_eap.content.native_enemy_plan import _body_hitpoints
+
+    donor = templates[body.template_ref]
+    attributes = dict(zip(("health_percent", "damage_percent", "speed_percent", "size_percent"),
+        (body.health_percent, body.damage_percent, body.speed_percent, body.size_percent)))
+    if donor['qualification']['status'] != 'qualified' or any(value > 10000 for value in attributes.values()):
+        raise RecipeMaterializationError('recipe_unsafe', 'Enemy body attributes are not qualified.')
+    validate_enemy_speed_percent(donor['species'], body.speed_percent)
+    return dict(species=donor['species'], spawn_type=donor['spawn_type'], ai=dict(donor['ai']),
+        attributes=attributes, hitpoints=_body_hitpoints(donor, attributes),
+        special_limits=dict(zip(('marauder', 'archvile', 'spirit', 'combined_special'), body.limits.special)),
+        **_resolved_population_limits(body.limits.population))
+
+
+def _check_resolved_source(row, source, map_key, restrictions):
+    binding = source['binding']
+    protected = set(restrictions['scripted_boss_actors'].get(map_key, ()))
+    protected.update(restrictions['cinematic_boss_actors'].get(map_key, ()))
+    if source.get('protected_reason') or source.get('inactive_reason') or binding.get('entity') in protected:
+        raise RecipeMaterializationError('recipe_unsafe', 'Recipe replaces a protected or inactive source.')
+    if row.logical_count != source['logical_count'] or row.spawn_type_ref not in source['logical_types']:
+        raise RecipeMaterializationError('recipe_source', 'Recipe differs from its native source request.')
+    maximum = source.get('maximum_emissions', source['logical_count'])
+    units = (row.maximum_emissions - 1) * row.logical_count + row.final_credit_units
+    if row.bodies and maximum and (not row.maximum_emissions or units > maximum * len(row.bodies)):
+        raise RecipeMaterializationError('recipe_quota', 'Recipe quota differs from its native source.')
+
+
+def _resolved_requires_flying(recipe, map_key, restrictions):
+    binding = recipe['binding']
+    return (binding.get('reference') in restrictions['flying_spawn_points'].get(map_key, ()) or
+            binding['mode'] == 'summon' and
+            recipe['selected_spawn_type'] in restrictions['flying_summons'].get(map_key, ()))
+
+
+def _check_resolved_species(recipe, source, map_key, role, restrictions):
+    from doom_eap.content.native_enemy_safety import SMALL_GROUND_ENEMIES
+
+    species = {body['species'] for body in recipe['bodies']}
+    allowed = source.get('allowed_species')
+    if source['logical_types'] == ['ENCOUNTER_SPAWN_TENTACLE']:
+        allowed = SMALL_GROUND_ENEMIES
+    allowed = next((rule['species'] for rule in restrictions['ground_encounters']
+                    if (rule['map_key'], rule['owner']) == (map_key, source['binding'].get('owner'))), allowed)
+    if allowed and not species <= set(allowed):
+        raise RecipeMaterializationError('recipe_unsafe', 'Enemy body does not fit its source.')
+    if role != 'compatibility' and _resolved_requires_flying(recipe, map_key, restrictions) and not species <= set(restrictions['flying_replacements']):
+        raise RecipeMaterializationError('recipe_unsafe', 'Enemy source requires flying bodies.')
+
+
+def _resolved_native_row(row, source, map_key, catalog, identity):
+    from doom_eap.content.enemy_species import enemy_spawn_mask
+    from doom_eap.content.native_enemy_plan import _name_recipe_bodies, recipe_token
+
+    restrictions = catalog['runtime_restrictions']
+    _check_resolved_source(row, source, map_key, restrictions)
+    recipe = dict(id=source['id'], origin=recipe_token([identity, map_key, source['id']]),
+        family=source['family'], binding=dict(source['binding']), runtime_only=source.get('runtime_only', False),
+        selected_spawn_type=row.spawn_type_ref, logical_mask=enemy_spawn_mask(row.spawn_type_ref),
+        logical_count=row.logical_count, physical_count=len(row.bodies), maximum_emissions=row.maximum_emissions,
+        final_credit_units=row.final_credit_units, renewable=row.renewable,
+        quantity_ratio=[row.ratio_numerator, row.ratio_denominator],
+        bodies=[_resolved_native_body(body, catalog['templates']) for body in row.bodies])
+    _check_resolved_species(recipe, source, map_key, row.role_ref, restrictions)
+    _name_recipe_bodies(recipe, {'revision': 9})
+    return recipe
+
+
+def _check_resolved_alternate(original, alternate, field, map_key, catalog):
+    if original is None:
+        raise RecipeMaterializationError('recipe_role', 'Recipe alternative has no primary row.')
+    fields = ('logical_count', 'physical_count', 'maximum_emissions', 'final_credit_units',
+              'quantity_ratio', 'selected_spawn_type', 'renewable')
+    if any(original[key] != alternate[key] for key in fields):
+        raise RecipeMaterializationError('recipe_role', 'Recipe alternative changes its request quota.')
+    expected = _resolved_counter_species(original, catalog)
+    if field == 'counter_recipes' and [body['species'] for body in alternate['bodies']] != expected:
+        raise RecipeMaterializationError('recipe_role', 'Recipe counter bodies do not match the primary row.')
+    if field == 'compatibility_recipes' and not _resolved_requires_flying(original, map_key, catalog['runtime_restrictions']):
+        raise RecipeMaterializationError('recipe_role', 'Recipe source does not permit a compatibility row.')
+
+
+def _resolved_counter_species(recipe, catalog):
+    replacements = {rule['species']: rule['replacement'] for rule in catalog['counter_rules']}
+    return [replacements.get(body['species'], body['species']) for body in recipe['bodies']]
+
+
+def _check_resolved_alternatives(stage, map_key, catalog):
+    primary = {row['id']: row for row in stage['recipes']}
+    replacements = {rule['species']: rule['replacement'] for rule in catalog['counter_rules']}
+    for field in ('compatibility_recipes', 'counter_recipes'):
+        for alternate in stage[field]:
+            _check_resolved_alternate(primary.get(alternate['id']), alternate, field, map_key, catalog)
+    counters = {row['id'] for row in stage['counter_recipes']}
+    if any(row['id'] not in counters and any(body['species'] in replacements for body in row['bodies'])
+           for row in primary.values()):
+        raise RecipeMaterializationError('recipe_role', 'Enemy recipe is missing its counter row.')
+
+
+def _resolved_native_stage(record, map_key, catalog, identity):
+    native = catalog['maps'][map_key]
+    sources = {source['id']: source for source in native['origins'] + native.get('runtime_origins', [])}
+    stage = dict(source_sha256=native['source_sha256'], runtime_map=native['runtime_map'],
+                 recipes=[], compatibility_recipes=[], counter_recipes=[])
+    fields = dict(primary='recipes', compatibility='compatibility_recipes', counter='counter_recipes')
+    for row in record.rows:
+        source = sources[catalog['sources'][row.source_ref]['source_id']]
+        stage[fields[row.role_ref]].append(_resolved_native_row(row, source, map_key, catalog, identity))
+    _check_resolved_alternatives(stage, map_key, catalog)
+    return stage
+
+
+def expand_resolved_native_recipes(slot, catalog):
+    """Bind admitted room decisions to installed donors without selecting replacements."""
+    from doom_eap.content.native_enemy_plan import native_recipe_fingerprint
+    from doom_eap.content.recipe_codec import decode_recipes
+    from doom_eap.content.slot_data_contract import catalog_tables
+
+    catalog = catalog_tables(catalog)
+    try:
+        recipes = decode_recipes(slot.recipes)
+        if not recipes.enabled and any(record.rows for record in recipes.maps.values()):
+            raise RecipeMaterializationError('recipe_unsafe', 'Disabled recipes contain replacement rows.')
+        plan = dict(revision=20, source_fingerprint=slot.identity.recipe_digest,
+            maps={key: _resolved_native_stage(record, key, catalog, slot.identity.recipe_digest)
+                  for key, record in recipes.maps.items()})
+        plan['fingerprint'] = native_recipe_fingerprint(plan)
+        return plan
+    except (KeyError, TypeError, IndexError) as error:
+        raise RecipeMaterializationError('recipe_reference', f'Recipe cannot resolve an installed reference: {error}') from error
+    except ValueError as error:
+        if isinstance(error, RecipeMaterializationError):
+            raise
+        raise RecipeMaterializationError('recipe_unsafe', str(error)) from error
+
+
+def materialize_resolved_timers(text, member, slot, catalog):
+    from doom_eap.content.slot_data_contract import catalog_tables
+
+    catalog = catalog_tables(catalog)
+    for ref, duration in slot.recipes.timers:
+        timer = catalog['timers'][ref]
+        runtime = catalog['maps'][timer['stage_id']]['runtime_map']
+        if not member.endswith('/maps/' + runtime + '.entities'):
+            continue
+        bounds = find_entity_block_bounds(text, timer['entity'])
+        if bounds is None:
+            raise RecipeMaterializationError('recipe_timer', 'Resolved timer target is missing.')
+        try:
+            block = _edit(text[slice(*bounds)], ('challengeDuration',), duration)
+        except ValueError as error:
+            raise RecipeMaterializationError('recipe_timer', str(error)) from error
+        text = text[:bounds[0]] + block + text[bounds[1]:]
+    return text
+
+
 def _functional_token(name):
     value = 14695981039346656037
     for byte in name.encode("utf8"):

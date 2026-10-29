@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from .launcher_core import LaunchWorkflow, RoomCompiler, RoomSnapshot, SeedManifest
+from doom_eap.runtime.context_registry import SlotAdmissionError, admit_slot_data
 from .launcher_workers import LauncherJob, LauncherWorkCancelled, LauncherWorkers
 from .launcher_session import APSessionOwner
 from .launcher_core_runtime import CoreRuntime
@@ -83,12 +84,21 @@ UNINSTALL_OWNED_STATES = frozenset({
 })
 
 
-def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
-    """Classify setup failures without weakening any validation boundary."""
+def _declared_failure_domain(error, phase):
+    if isinstance(error, SlotAdmissionError):
+        return error.failure_domain
     if getattr(error, "failure_domain", None) == "proton_runtime":
         return "proton_runtime"
     if phase == "campaign_session" or getattr(error, "failure_domain", None) == "campaign_session":
         return "campaign_session"
+    return None
+
+
+def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
+    """Classify setup failures without weakening any validation boundary."""
+    declared = _declared_failure_domain(error, phase)
+    if declared:
+        return declared
     text = f"{type(error).__name__}: {error}".casefold()
     app_tokens = (
         "component=map_package",
@@ -130,7 +140,9 @@ def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
 
 def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str, object]:
     """Return user routing metadata alongside untouched technical failure data."""
-    raw_message = str(error) or type(error).__name__
+    if isinstance(error, SlotAdmissionError):
+        return _slot_admission_failure_payload(error, phase)
+    raw_message = _error_message(error)
     failure_domain = classify_setup_failure(error, phase=phase)
     tool_unavailable = (
         "idfiledecompressor" in raw_message.casefold()
@@ -207,6 +219,20 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
         "proton_reason": getattr(error, "proton_reason", None),
         "proton_candidates": getattr(error, "proton_candidates", None),
         "proton_selected": getattr(error, "proton_selected", None),
+    }
+
+
+def _error_message(error):
+    return str(error) or type(error).__name__
+
+
+def _slot_admission_failure_payload(error, phase):
+    return {
+        "error_type": type(error).__name__, "message": str(error), "raw_message": str(error),
+        "technical_error_type": type(error).__name__, "technical_message": str(error),
+        "code": error.code, "failure_domain": error.failure_domain, "stage": phase or "slot_admission",
+        "recovery_action": "generate_room", "user_title": "ROOM DATA IS INCOMPATIBLE",
+        "user_message": str(error), "user_action": "GENERATE A COMPATIBLE ROOM",
     }
 
 
@@ -358,6 +384,7 @@ class IntegratedLaunchWorkflow:
         )
 
     def _manifest_for(self, snapshot: RoomSnapshot) -> SeedManifest:
+        admit_slot_data(snapshot.slot_data)
         room_compiler = self._room_compiler()
         return self.base_workflow.manifest_for(
             snapshot,
@@ -838,6 +865,7 @@ class IntegratedLaunchWorkflow:
         )
 
     def execute(self, snapshot: RoomSnapshot, endpoint: str = "") -> IntegratedSetupRecord:
+        admit_slot_data(snapshot.slot_data)
         self._failure_phase = "game_setup"
         config = self._config()
         game_root = self._game_root(config)

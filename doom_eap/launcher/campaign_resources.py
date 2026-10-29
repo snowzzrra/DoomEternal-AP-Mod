@@ -235,9 +235,6 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         huds = {name.split('/')[0]: package.read(name) for name in names
                 if name.count('/') == 3 and name.endswith('/' + hud_name)}
         plan = manifest.get("options", {}).get("enemy_plan")
-        if plan:
-            from doom_eap.content.native_enemy_safety import project_native_safety
-            plan = project_native_safety(plan, manifest["options"]["enemies"])
         roots = json.loads(package.read("seed_receipt.json")).get("native_resource_roots", {}) if "seed_receipt.json" in names else {}
     campaign_required = bool(expected) or "unified_campaign_v1" in manifest.get("required_capabilities", ()) or EXCLUDED_LAYER in required
     base = game_root / "base"

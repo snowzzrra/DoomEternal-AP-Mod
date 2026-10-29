@@ -1,6 +1,8 @@
-"""Room-bound kill progress and ordinary AP milestone publication."""
+"""Room-bound kill progress and reward publication."""
 from copy import deepcopy
 import asyncio
+
+from doom_eap.content.killsanity_plan import resolved_rewards
 
 
 class Killsanity:
@@ -34,6 +36,9 @@ class Killsanity:
             raise ValueError("Killsanity progress has invalid producer identity")
         if state.get("cursor", 0) and producer is None:
             raise ValueError("Killsanity cursor has no producer identity")
+
+    def bind_resolved(self, session, namespace, plan):
+        self.bind(session, namespace, resolved_rewards(plan))
 
     @property
     def enabled(self):
