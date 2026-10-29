@@ -19,6 +19,8 @@ from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
 
+from .setup_progress import SetupStep
+
 logger = logging.getLogger(__name__)
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
@@ -1338,6 +1340,7 @@ class LauncherController:
             generation = payload.get("launcher_job_generation")
             if generation is not None and not self.workers.accepts(generation):
                 return
+            payload = self._setup_progress_context(payload)
             if kind == "injector_started":
                 self._injector_output = None
             elif kind == "injector_finished":
@@ -1382,6 +1385,16 @@ class LauncherController:
             self._stop_native_client()
         if kind == "setup_ready" and payload.get("adapter_state") == "applied":
             self._ensure_native_client(generation=generation)
+
+    def _setup_progress_context(self, payload):
+        if "launcher_job_generation" not in payload:
+            return payload
+        setup = getattr(self, "setup", None)
+        room = setup.current_event if setup is not None else None
+        return {
+            "setup_progress_room": RoomSetupCoordinator.room_key(room) if room else None,
+            **payload,
+        }
 
     def _setup_result(self, record: IntegratedSetupRecord, generation: int) -> None:
         with self._lifecycle_lock:
@@ -1573,9 +1586,12 @@ class LauncherController:
             def emit(kind, **payload):
                 self._setup_event(kind, job.event(payload))
 
+            def readiness_event(kind, payload):
+                self._setup_event(kind, {**payload, "setup_progress_step": SetupStep.SAVE})
+
             try:
                 snapshot = RoomSnapshot.from_event(event)
-                workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
+                workflow = self.workflow.for_job(job, readiness_event, self.interactions.for_job(job))
                 state = workflow.install_state(snapshot)
             except LauncherWorkCancelled:
                 raise

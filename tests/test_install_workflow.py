@@ -45,9 +45,7 @@ def _install_core_fixture(game_root: Path) -> Path:
 
 def _snapshot() -> RoomSnapshot:
     ids = ModCompiler().active_location_ids({"randomize_dash": False})
-    slot_data = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_bytes())
-    from doom_eap.content.enemy_options import normalize_enemy_options
-    slot_data['enemies'] = normalize_enemy_options(slot_data)
+    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_bytes())
     placements = [
         {
             "location_id": location_id,
@@ -62,6 +60,10 @@ def _snapshot() -> RoomSnapshot:
         }
         for location_id in ids
     ]
+    from doom_eap.content.slot_data_contract import generation_fingerprint, placement_digest
+    slot_data["placement_digest"] = placement_digest([[row["location_id"], row["item_id"], row["recipient_slot"]]
+                                                    for row in placements])
+    slot_data["native_generation_fingerprint"] = generation_fingerprint(slot_data)
     return RoomSnapshot.from_packets(
         {"seed_name": "install-seed"},
         {
@@ -383,7 +385,6 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 with self.assertRaises(RuntimeError) as ctx:
                     workflow.execute(_snapshot())
 
-            self.assertIn("Repair Core", str(ctx.exception))
             failure = setup_failure_payload(ctx.exception, phase=workflow._failure_phase)
             self.assertEqual(failure["recovery_action"], "repair_game_integration")
             self.assertEqual(failure["failure_domain"], "game_setup")

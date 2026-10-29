@@ -56,11 +56,14 @@ from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 
 from .connection_errors import enrich_connection_failure
 from .launcher_controller import LauncherController, normalize_ammo_refill_keybind
+from .launcher_integration import RoomSetupCoordinator
 from .launcher_platform import (
+    LinuxModManagerAdapter,
     doom_saved_games_base,
     is_saved_games_base_shape,
     redact_secrets,
 )
+from .setup_progress import SetupAction, SetupProgress
 
 
 def _simple_physical_key_token(event: QKeyEvent) -> str | None:
@@ -581,6 +584,7 @@ class LauncherUI(QMainWindow):
         self._event_poll_scheduled = False
         self._setup_state = "disconnected"
         self._previous_setup_state = ""
+        self._setup_progress = SetupProgress(windows=os.name == "nt", installer_wait_seconds=LinuxModManagerAdapter.TIMEOUT_SECONDS)
         self._resolved_consent_requests: set[str] = set()
         self._native_health_presentation: tuple[str, str] | None = None
         self._session_log_limit = 400
@@ -1103,6 +1107,10 @@ class LauncherUI(QMainWindow):
         setup_buttons.addWidget(self.session_manual_complete_action)
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
+        self.session_setup_help = QPushButton("Check setup")
+        self.session_setup_help.clicked.connect(self._show_progress_help)
+        self.session_setup_help.setVisible(False)
+        setup_buttons.addWidget(self.session_setup_help)
         setup_buttons.addStretch(1)
         setup_layout.addLayout(setup_buttons)
         return card
@@ -1920,13 +1928,14 @@ class LauncherUI(QMainWindow):
                 True,
                 "READY",
             ),
-            "failed": ("GAME SETUP NEEDS ATTENTION", "Game setup did not finish. Repair game integration and try again.", "FIX SETUP", True, "ACTION NEEDED"),
+            "failed": ("Game setup failed", "Game setup did not finish. Open Help and select Fix Setup. If it fails again, save a support report.", "FIX SETUP", True, "ACTION NEEDED"),
             "campaign_failed": ("SAVE SETUP FAILED", "Close DOOM Eternal. Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again.", "AP SAVE", True, "ACTION NEEDED"),
             "proton_needed": ("SELECT PROTON", "Select the Proton version used by DOOM Eternal in Steam.", "SELECT PROTON", True, "ACTION NEEDED"),
         }
         title, fallback, action, enabled, top_state = presentations[state]
         self._setup_state = state
         copy = fallback if state in {"package_failed", "package_incompatible"} else detail or fallback
+        self._setup_copy = copy
         tone = "ready" if state == "ready" else "working" if state in {"checking", "installing", "updating"} else "warning"
         self.session_setup.setProperty("actionTone", tone)
         self.session_setup.style().unpolish(self.session_setup)
@@ -1951,6 +1960,34 @@ class LauncherUI(QMainWindow):
         self._set_home(title, copy, action, top_state, enabled=enabled)
         self.hero_action.setVisible(state != "disconnected")
         self._refresh_help_room_package()
+        self._render_setup_progress()
+
+    def _observe_setup_progress(self, event) -> None:
+        kind = event.get("type")
+        room = self.room_event if self._room_connected else None
+        if kind == "connected":
+            room = event
+        elif kind == "disconnected":
+            room = None
+        key = RoomSetupCoordinator.room_key(room) if room else None
+        generation = self.controller.operation_generation
+        self._setup_progress.activate(generation, key)
+        if kind == "connected":
+            event = {**event, "launcher_job_generation": generation, "setup_progress_room": key}
+        self._setup_progress.observe(event)
+
+    def _render_setup_progress(self) -> None:
+        view = self._setup_progress.present()
+        active = view is not None and self._setup_state in {"checking", "installing", "updating"}
+        self.session_setup_help.setVisible(active and view.next_action is SetupAction.DIAGNOSE)
+        if self._setup_state in {"checking", "installing", "updating"}:
+            copy = view.text if active else self._setup_copy
+            self.session_setup_detail.setText(copy)
+            self.hero_detail.setText(copy)
+
+    def _show_progress_help(self) -> None:
+        self._show_page(4)
+        self._run_doctor()
 
     def _run_setup_action(self) -> None:
         if self._setup_state in {"install_needed", "update_required"}:
@@ -1981,7 +2018,7 @@ class LauncherUI(QMainWindow):
             if confirm == QMessageBox.StandardButton.Yes:
                 try:
                     if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
-                        self._set_setup_state("installing", "Repairing game integration...")
+                        self._set_setup_state("installing", "Repairing the game connection…")
                 except Exception as error:
                     self._append_log(f"Game integration repair error: {error}")
                     self._set_setup_state("game_link_update_needed", "Game connection repair failed. Select Fix Setup again. If it fails again, select Help -> SAVE SUPPORT REPORT.")
@@ -2126,10 +2163,11 @@ class LauncherUI(QMainWindow):
                 self._show_connection_failure(event)
             else:
                 self._append_log(f"Local setup input error: {type(error).__name__}: {raw}")
-                self.join_error.setText(f"Game setup needs attention. {raw}")
+                message = "Game setup failed. Open Help and select Check Setup. If it fails again, save a support report."
+                self.join_error.setText(message)
                 self.join_error.show()
-                self._set_home("CHECK GAME SETUP", raw, "JOIN ROOM", "SETUP REQUIRED")
-                QMessageBox.warning(self, "Game setup needs attention", raw)
+                self._set_home("CHECK GAME SETUP", message, "JOIN ROOM", "SETUP REQUIRED")
+                QMessageBox.warning(self, "Game setup failed", message)
             self._activity_event({"type": "connection_input_error", "message": raw})
             return
         self.join_error.hide()
@@ -2948,8 +2986,8 @@ class LauncherUI(QMainWindow):
         diagnostics = report.get("diagnostics", [])
         technical_lines = []
         groups: dict[str, list[str]] = {
-            "DOOM Eternal": [], "Game Integration": [],
-            "Mod Installation": [], "Saved Games": [],
+            "DOOM Eternal": [], "Game connection": [],
+            "Room mod": [], "Saved games": [],
         }
         if isinstance(diagnostics, list):
             for item in diagnostics:
@@ -2963,9 +3001,9 @@ class LauncherUI(QMainWindow):
                     )
                     folded = key.casefold()
                     group = (
-                        "Saved Games" if "save" in folded or "queue" in folded
-                        else "Mod Installation" if "mod" in folded or "inject" in folded or "receipt" in folded
-                        else "Game Integration" if any(token in folded for token in ("native", "xinput", "bridge", "runtime", "meathook"))
+                        "Saved games" if "save" in folded or "queue" in folded
+                        else "Room mod" if "mod" in folded or "inject" in folded or "receipt" in folded
+                        else "Game connection" if any(token in folded for token in ("native", "xinput", "bridge", "runtime", "meathook"))
                         else "DOOM Eternal"
                     )
                     groups[group].append(status)
@@ -3108,6 +3146,9 @@ class LauncherUI(QMainWindow):
             QTimer.singleShot(0, self._poll_events)
 
     def _poll_slow_state(self) -> None:
+        key = RoomSetupCoordinator.room_key(self.room_event) if self._room_connected else None
+        self._setup_progress.activate(self.controller.operation_generation, key)
+        self._render_setup_progress()
         self.controller.poll_game_lifecycle()
         self._refresh_native_health()
 
@@ -3158,7 +3199,9 @@ class LauncherUI(QMainWindow):
     def _present_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
         try:
+            self._observe_setup_progress(event)
             self._handle_event(event)
+            self._render_setup_progress()
         except Exception as error:
             self._append_log(f"UI lifecycle presentation failed for {kind}: {type(error).__name__}: {error}")
         try:
@@ -3191,7 +3234,7 @@ class LauncherUI(QMainWindow):
             self.activity.setCellWidget(row, 2, detail_label)
             self.activity.setRowHeight(row, 38)
         else:
-            self.activity.setItem(row, 2, QTableWidgetItem(detail or "Session update received"))
+            self.activity.setItem(row, 2, QTableWidgetItem(detail))
         while self.activity.rowCount() > 100:
             self.activity.removeRow(self.activity.rowCount() - 1)
         if selected_row >= 0:
@@ -3237,7 +3280,7 @@ class LauncherUI(QMainWindow):
         return None
 
     def _archipelago_activity_detail(self, event: dict[str, object]) -> str:
-        plain = str(event.get("plain") or "Archipelago update received")
+        plain = str(event.get("plain") or "")
         segments = event.get("segments")
         if event.get("schema") != 1 or not isinstance(segments, list):
             return html.escape(plain)
@@ -3259,11 +3302,17 @@ class LauncherUI(QMainWindow):
             rendered.append(f'<span style="color:{color};">{text}</span>')
         return "".join(rendered) or html.escape(plain)
 
+    def _render_core_update(self, event) -> None:
+        if event.get("state") == "skipped":
+            return
+        message = "Game connection files selected." if event.get("type") == "core_runtime_selected" else event.get("message", "")
+        self.core_status.setText(str(message))
+
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
         if kind in {"core_update_status", "core_runtime_selected"}:
-            self.core_status.setText(str(event.get("message") or ("Using local game connection files: " if event.get("development_override") else "Selected game connection files: ") + str(event.get("path", ""))))
+            self._render_core_update(event)
             return
         if kind == "support_bundle_ready":
             self.doctor_action.setText(f"Support report saved: {event.get('path', '')}")
@@ -3574,17 +3623,10 @@ class LauncherUI(QMainWindow):
             self._append_log(message)
         elif kind == "injector_finished":
             state = str(event.get("state", ""))
-            returncode = event.get("returncode")
-            stdout = str(event.get("stdout", ""))
-            stderr = str(event.get("stderr", ""))
             if state == "applied":
                 self._append_log("Installation finished.")
             else:
                 self._append_log("Installation failed. Select Help -> SAVE SUPPORT REPORT.")
-                if stdout:
-                    self._append_log(f"Injector stdout: {stdout[-500:]}")
-                if stderr:
-                    self._append_log(f"Injector stderr: {stderr[-500:]}")
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")

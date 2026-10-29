@@ -116,7 +116,7 @@ class CoreRuntime:
                             candidates.append((manifest, assets))
                     except (ValueError, KeyError, TypeError) as error:
                         self.emit("core_update_status", state="skipped",
-                                  message=f"Core release {release.get('tag_name', 'unknown')} skipped: {error}")
+                                  technical_message=f"Game connection release {release.get('tag_name', 'unknown')} skipped: {error}")
                 if candidates:
                     manifest, assets = max(candidates, key=lambda row: version_key(row[0]["version"]))
                     self._download(manifest, assets)
@@ -126,7 +126,7 @@ class CoreRuntime:
                             break
                 self.emit("core_update_status", state="checked", message="Update check finished.")
             except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
-                self.emit("core_update_status", state="deferred", message="Update check failed. Retry later.")
+                self.emit("core_update_status", state="deferred", message="Update check failed. Retry later.", technical_message=str(error))
 
     def _download(self, manifest, assets):
         identity = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
@@ -206,4 +206,4 @@ class CoreRuntime:
             return candidates[0][1]
         if selected:
             return Path(str(selected))
-        raise RuntimeError("A complete compatible Core runtime is unavailable. Repair Core to retry the download or select a local distribution.")
+        raise RuntimeError("Game connection files are unavailable. Open Help and select Repair Game Connection.")
