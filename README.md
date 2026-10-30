@@ -34,6 +34,9 @@ DOOM Eternal Archipelago release. Keep the launcher and its `client` folder toge
 Follow [Install and connect](docs/INSTALL.md) for the complete Windows or Linux/Proton
 instructions. Joining an existing room does not require a YAML file.
 
+Rooms can also be generated and hosted on [multiworld.gg](https://multiworld.gg/), which
+DOOM Eternal supports.
+
 ## Choose your game
 
 Set mission selection, starting equipment, victory objectives and enemy settings
@@ -45,36 +48,72 @@ kill rewards, DeathLink and inventory recovery. The options table below might he
 
 ## 2. Player options
 
-| Option name | Default | Summary | Other values |
+| Option | Default | Summary | Values |
 |---|---|---|---|
-| Progression Balancing | normal | Moves progression earlier when generation needs it. | 0–99; Disabled; Extreme; Normal |
-| Accessibility | Full | Sets which generated objectives must be reachable. | Full; Minimal |
-| Death Link | False | Shares deaths with other DeathLink players. | Off; On |
-| Use DLC Content | True | Adds TAG equipment and Support Runes to the item catalog. | Off; On |
-| Mission Pool | Full Saga | Selects eligible missions. | Base; Full Saga; DLC Only; Custom |
-| Custom Missions | ARC Complex, Cultist Base, Doom Hunter Base, Exultia, Final Sin, Hell on Earth, Immora, Mars Core, Nekravol, Nekravol Part II, Reclaimed Earth, Sentinel Prime, Super Gore Nest, Taras Nabad, The Blood Swamps, The Holt, The World Spear, UAC Atlantica Facility, Urdak | Missions included when Mission Pool is set to Custom. | ARC Complex; Cultist Base; Doom Hunter Base; Exultia; Final Sin; Hell on Earth; Immora; Mars Core; Nekravol; Nekravol Part II; Reclaimed Earth; Sentinel Prime; Super Gore Nest; Taras Nabad; The Blood Swamps; The Holt; The World Spear; UAC Atlantica Facility; Urdak |
-| Custom Dark Lord | True | Include The Dark Lord when Mission Pool is set to Custom. | Off; On |
-| Mission Count | all | Sets the number of included missions. | 3–19; All |
-| DLC Logic Timing | Late Game | Choose when The Ancient Gods can enter your Archipelago progression. | Late Game; From the Beginning |
-| Mission Order | Random Mission Order | Selects progression through included missions. | Vanilla Order; Random Mission Order; Mission Access as Items |
-| Campaign Difficulty | Ultra Violence | Sets the campaign difficulty for this player. | Im Too Young To Die; Hurt Me Plenty; Ultra Violence; Nightmare |
-| Starting Missions | 1 | Sets the number of initially accessible missions. | 1–3 |
-| Full Saga Final Boss | Random | Reserve the final Full Saga encounter. Vanilla Order always ends at Davoth. | Random; Icon of Sin; Davoth / The Dark Lord |
-| Goal Mission as Item | False | In Access mode, place the selected boss stage's concrete Access item. | Off; On |
-| Goal | Acquire the Unmaykr | Selects the campaign victory objective. | Acquire the Unmaykr; Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
-| Additional Victory Requirements | Complete All Escalation Encounters, Complete All Included Missions, Complete All Slayer Gates | Adds selected objectives to victory. | Acquire the Unmaykr; Complete All Escalation Encounters; Complete All Included Missions; Complete All Mission Challenges; Complete All Secret Encounters; Complete All Slayer Gates; Complete All Weapon Mastery Challenges |
-| Special Weapon | Progressive Special Weapon | Selects the Crucible or progressive special weapons. | Progressive Special Weapon; Progressive Sentinel Hammer; The Crucible |
-| DeathLink Mode | Soft | Selects which deaths count for DeathLink. | Soft; Hardcore |
-| Enhanced Melee Damage | False | Strengthens normal punches. | Off; On |
-| Randomize Chainsaw | False | Places Chainsaw in the item pool. | Off; On |
-| Randomize Dash | False | Places Dash in the item pool and enables Dash access logic. | Off; On |
-| Randomize First Sentinel Battery | False | When enabled, the mandatory first Sentinel Battery is shuffled into the | Off; On |
-| Include Weapon Mastery Challenges | True | Includes weapon mastery locations. | Off; On |
-| Reveal AP Locations on Automap | False | Shows AP location markers on Automap. | Off; On |
-| Starting Weapon | Combat Shotgun | Selects the starting weapon. | Random; Heavy Cannon; Plasma Rifle; Rocket Launcher; Ballista; Chaingun; Combat Shotgun; Super Shotgun |
-| Praetor Suit Upgrades in Pool | 21 | Sets the number of individual suit upgrades in the pool. | 0–21; Random |
-| Trap Percentage | 10 | Replaces filler with enabled traps. | 0–100 |
-| Enabled Traps | Ammo Drain Trap, Arachnotron Trap, Archvile Trap, BFG Drain Trap, Baron Trap, Carcass Trap, Cueball Trap, Dread Knight Trap, Fuel Drain Trap, Hell Knight Trap, Imp Trap, Marauder Trap, Revenant Trap, Tyrant Trap | Selects the eligible trap types. | Ammo Drain Trap; Arachnotron Trap; Archvile Trap; BFG Drain Trap; Baron Trap; Carcass Trap; Cueball Trap; Dread Knight Trap; Fuel Drain Trap; Hell Knight Trap; Imp Trap; Marauder Trap; Revenant Trap; Tyrant Trap |
+| **Campaign and Missions** | | | |
+| Mission Pool | Full Saga | Choose which missions can appear in your campaign. | Base; Full Saga; DLC Only; Custom |
+| Custom Missions | 19 selected | Pick the missions you want when Mission Pool is Custom. | any mission |
+| Custom Dark Lord | On | Add The Dark Lord to your choices when Mission Pool is Custom. | Off; On |
+| Mission Count | All | Choose how many missions to play in Random Mission Order or Mission Access as Items. | 6–19; All |
+| Mission Order | Random Mission Order | Choose how you unlock missions. | Vanilla Order; Random Mission Order; Mission Access as Items |
+| Starting Missions | 1 | Choose how many missions are open at the start in Mission Access as Items. | 1–3 |
+| Goal | Acquire the Unmaykr | Choose what you need to do to win. | Acquire the Unmaykr; Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
+| Goal Mission as Item | Off | Unlock your goal's boss mission by finding its Access item in Mission Access as Items. | Off; On |
+| Full Saga Final Boss | Randomized | Choose the last boss for the Complete the Full Saga goal. | Randomized; Icon of Sin; Davoth |
+| Additional Victory Requirements | none | Choose extra tasks to finish before you win. | any of 7 |
+| Include Slayer Gates | On | Earn Archipelago items by completing Slayer Gates and find their keys among shuffled items. | Off; On |
+| Include Secret Encounters | On | Earn Archipelago items by completing the optional timed Secret Encounters. | Off; On |
+| Include Weapon Mastery Challenges | On | Earn Archipelago items by completing the 13 weapon mastery challenges. | Off; On |
+| **Items and Pool** | | | |
+| Use DLC Content | On | Add The Ancient Gods weapons, Support Runes and enemy types to your campaign. | Off; On |
+| Starting Weapon | Combat Shotgun | Choose the weapon you have when you start. | Random Weapon; Heavy Cannon; Plasma Rifle; Rocket Launcher; Ballista; Chaingun; Combat Shotgun; Super Shotgun |
+| Special Weapon | Progressive Special Weapon | Choose which special weapon upgrades you can find. | Progressive Special Weapon; Progressive Sentinel Hammer; The Crucible |
+| Randomize Chainsaw | Off | Choose where you find the Chainsaw. | Off; On |
+| Randomize Dash | Off | Choose where you find Dash. | Off; On |
+| Resource Profile | Balanced | Choose how many upgrades, spare resources and recovery items you can find. | Balanced; Generous; Lean |
+| Item Pool Overrides | none | Choose exact amounts of individual upgrades and permanent items to place in your campaign. | per-item values |
+| Praetor Suit Upgrades in Pool | Auto | Choose how many individual Praetor Suit upgrades you can find. | 0–17; Random; Auto |
+| Filler Weights | none | Choose how often you find each helpful consumable in extra reward slots. | per-item values |
+| Trap Percentage | 10 | Choose the percentage of extra item rewards that become traps. | 0–100 |
+| Enabled Traps | 14 selected | Pick the traps that other players can send you. | any of 14 |
+| Trap Weights | none | Choose how often each selected trap appears. | per-item values |
+| **Enemies** | | | |
+| Enemy Randomizer | On | Randomize the enemies you fight and vary their health, damage and size. | Off; On |
+| Enemy Preset | Slayer's Path | Choose a starting setup for enemy randomization. | UAC Patrol; Sentinel Training; Slayer's Path; Hell's Vanguard; Icon's Wrath; Gore Nest; Gladiator's Gauntlet; Cultist Chaos; Oops! All Imps; Piñata Party; Custom |
+| Early Intensity | Auto | Choose how tough randomized fights should be near the start when Enemy Count is Auto. | 1–10000; Auto |
+| Late Intensity | Auto | Choose how tough randomized fights should become near the end when Enemy Count is Auto. | 1–10000; Auto |
+| Density | Auto | Choose how many enemies can fight at the same time when Enemy Count is Auto. | 1–10000; Auto |
+| Enemy Length | Auto | Choose the total enemies across each arena when Enemy Count is Auto. | 100–10000; Auto |
+| Variety | Auto | Choose how many different enemy types you tend to face in the same fight. | 0–100; Auto |
+| Enemy Count | Preset | Choose how to decide the number of randomized enemies in a fight. | Preset; Auto; Multiplier |
+| Enemy Count Multiplier | Auto | Choose how many enemies to request when Enemy Count is Multiplier. | 1–10000; Auto |
+| Size Variation Chance | Auto | Choose the chance for an enemy to appear at half size or double size. | 0–100; Auto |
+| Bestiary Weights | none | Choose how often each enemy type appears. | per-item values |
+| Health Ranges | none | Choose enemy health as a percentage of its usual value: 50% is half health, 100% is normal, 200% is double. | per-item values |
+| Damage Ranges | none | Choose enemy damage as a percentage of its usual value: 50% is half damage, 100% is normal, 200% is double. | per-item values |
+| Speed Ranges | none | Choose how fast enemies move and attack: 100% is normal speed. | per-item values |
+| Size Ranges | none | Choose enemy size as a percentage: 50% is half size, 100% is normal, 200% is double. | per-item values |
+| Special Enemy Limits | none | Choose how many special enemies can fight you at the same time. | per-item values |
+| **Killsanity** | | | |
+| Killsanity | Off | Earn an Archipelago reward after every Kills per Check enemy deaths. | Off; On |
+| Kills per Check | 100 | Send one check at each multiple of this many enemy deaths. | 1–2000 |
+| Kill Rewards | Auto | Choose how many kill rewards to add to your campaign. | 1–100; Auto |
+| **Difficulty** | | | |
+| Campaign Difficulty | Ultra Violence | Choose the game's combat difficulty for your campaign. | I'm Too Young To Die; Hurt Me Plenty; Ultra Violence; Nightmare |
+| Logic Difficulty | Standard | Choose how much equipment Archipelago expects you to have before a fight. | Relaxed; Standard; Expert |
+| Progressive Difficulty | On | Make randomized fights grow harder as you progress through the campaign. | Off; On |
+| Enhanced Melee Damage | Off | Make normal punches deal more damage, giving you another way to fight at close range. | Off; On |
+| Easier Secret Encounters | Off | Give yourself 50% more time to finish Secret Encounters. | Off; On |
+| Mastery Requirements | Half | Choose how many times you need to repeat an action to finish a weapon mastery challenge. | Original; Half; Quarter |
+| **Extras** | | | |
+| Accessibility | Full | Choose how much of your world Archipelago makes reachable. | Full; Minimal |
+| Progression Balancing | Normal | Help players in a multiworld find useful items at a similar pace. | 0–99; Disabled; Normal; Extreme |
+| Death Link | Off | Share deaths with other players who enable Death Link. | Off; On |
+| DeathLink Mode | Soft | Choose how deaths shared through Death Link affect you. | Soft; Hardcore |
+| Reveal AP Locations on Automap | Off | Show Archipelago pickup locations on the DOOM Eternal Automap, making checks easier to find while exploring or replaying missions. | Off; On |
+| **Starting items** | | | |
+| Start Inventory | none | Start with extra copies of these items; use start_inventory_from_pool to take copies from the pool instead. | per-item values |
+| Start Inventory from Pool | none | Start with the specified amount of these items and don't place them in the world. | per-item values |
 
 ## 3. Installation
 
@@ -170,8 +209,8 @@ For development, read [Content and builds](docs/DEVELOPMENT.md) and
   guidance.
 - KaitoKid (from the AP After Dark Discord server) for the very detailed logic guidance.
 - chrispy for creating
-  [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation this
-  project builds on.
+  [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation DoomEAP
+  was first built on.
 - PowerBall253 / brunoanc for
   [EternalResourceExtractor](https://github.com/brunoanc/EternalResourceExtractor)
   and `idFileDeCompressor`.
@@ -187,6 +226,10 @@ For development, read [Content and builds](docs/DEVELOPMENT.md) and
   and overall very useful help.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
   logo used by the AP client (both old and new) and the repository preview.
+- Doctor Pyro (from the AP After Dark Discord server) for overall immense help
+  in testing, catching dozens of bugs in each version. Thanks a lot for that.
+- [Lucas](https://www.behance.net/lucasmab) for the start screen and main
+  menu logos, and launcher visuals feedback.
 
 ## 7. License
 
