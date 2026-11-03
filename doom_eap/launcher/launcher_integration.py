@@ -170,7 +170,21 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
     elif failure_domain == "campaign_session":
         recovery_action = "inspect_campaign"
         user_title = "SAVE SETUP FAILED"
-        user_message = "Close DOOM Eternal. Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again."
+        processes = getattr(error, "processes", None)
+        channel_failure = isinstance(error, (BrokenPipeError, EOFError)) or any(
+            token in raw_message.casefold() for token in (
+                "broken pipe", "supervisor is unavailable", "supervisor exited", "supervisor channel", "end of file"))
+        if processes:
+            user_message = "Close DOOM Eternal. Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again."
+        elif channel_failure:
+            user_message = ("The game connection helper stopped. Check that the selected Proton version matches "
+                            "DOOM Eternal in Steam, then select Help -> SAVE SUPPORT REPORT before trying again. "
+                            "Save changes are blocked until the game connection can be confirmed.")
+        elif processes is not None:
+            user_message = "Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again."
+        else:
+            user_message = ("Save changes are blocked until DOOM Eternal's process identity can be confirmed. "
+                            "Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again.")
         user_action = "AP SAVE"
     else:
         recovery_action = "repair_game_integration"
