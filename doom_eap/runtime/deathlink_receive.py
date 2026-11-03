@@ -6,6 +6,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 
+from .deathlink_publication import DeathLinkDispatchError
+
 
 class ReceiveState(str, Enum):
     RECEIVED = "RECEIVED"
@@ -221,6 +223,10 @@ class DeathLinkReceiver:
         try:
             accepted = dispatch()
         except Exception as error:
+            if (isinstance(error, DeathLinkDispatchError) and error.request_kind in {1, 2}
+                    and error.native_result.get("state") == 4 and error.native_result.get("reason") == 25):
+                event.next_attempt_at = now + self.retry_interval
+                return self._result(event.event_id, event.state, "native_budget_refused", now)
             return self._finish(ReceiveState.FAILED, f"dispatch_error:{type(error).__name__}", now=now)
         if not accepted:
             return self._finish(ReceiveState.FAILED, "rpc_not_accepted", now=now)

@@ -5,8 +5,8 @@ from types import SimpleNamespace
 import pytest
 
 from doom_eap.runtime import deathlink_session as domain
-from doom_eap.runtime.deathlink_receive import DeathLinkReceiver
-from doom_eap.runtime.deathlink_publication import DeathLinkPublication
+from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState
+from doom_eap.runtime.deathlink_publication import DeathLinkPublication, DeathLinkDispatchError
 
 
 def setup_session(tmp_path):
@@ -125,3 +125,72 @@ def test_cancel_failure_does_not_stop_later_receives_or_local_deaths(tmp_path, m
     asyncio.run(owner.report_local_death("Slayer", send, publication))
     assert sent == ["Slayer fell."]
     assert owner.receive({"time": 4, "source": "friend"}, lambda: None)
+
+
+@pytest.mark.parametrize("kind", [1, 2])
+def test_budget_refusal_then_success_applies_same_event_once(tmp_path, monkeypatch, kind):
+    clock = SimpleNamespace(monotonic=lambda: 10)
+    monkeypatch.setattr(domain, "time", clock)
+    owner, _, publication, _ = setup_session(tmp_path)
+    data = {"time": 3, "source": "friend"}
+    owner.receive(data, lambda: None)
+    event = publication._event = owner.active_event
+    native = publication._link()
+    request = native.deathlink_request
+    calls, identities = [], []
+    refused = False
+
+    def invoke(operation, **args):
+        nonlocal refused
+        calls.append(operation)
+        if operation == 2:
+            identities.append((args["event_id"], args["event_hash"]))
+        if operation == kind and not refused:
+            refused = True
+            error = RuntimeError("native execution refused")
+            error.native_result = {"state": 4, "reason": 25}
+            raise error
+        result = request(operation, **args)
+        if operation == 0:
+            result["remote_state"] = 4
+        return result
+
+    monkeypatch.setattr(native, "deathlink_request", invoke)
+    owner.advance(True, publication)
+    assert owner.active_event is event and event.attempts == 0
+    clock.monotonic = lambda: 11
+    owner.advance(True, publication)
+    assert calls == ([1] if kind == 1 else [1, 2])
+    clock.monotonic = lambda: 12
+    owner.advance(True, publication)
+    assert event.state is ReceiveState.COMMAND_IN_FLIGHT and event.attempts == 1
+    clock.monotonic = lambda: 13
+    owner.advance(True, publication)
+    owner.advance(True, publication)
+    assert owner.active_event is None and event.deliveries == 1
+    assert native.calls.count(2) == 1
+    assert len(set(identities)) == 1
+    assert owner.receive(data, lambda: pytest.fail("duplicate persisted again")) is None
+
+
+@pytest.mark.parametrize("kind", [1, 2])
+def test_publication_preserves_structured_native_refusal(tmp_path, monkeypatch, kind):
+    owner, _, publication, _ = setup_session(tmp_path)
+    owner.receive({"time": 3, "source": "friend"}, lambda: None)
+    publication._event = owner.active_event
+    native = publication._link()
+    request = native.deathlink_request
+    original = RuntimeError("refused")
+    original.native_result = {"state": 4, "reason": 25, "request_id": 123}
+
+    def invoke(operation, **args):
+        if operation == kind:
+            raise original
+        return request(operation, **args)
+
+    monkeypatch.setattr(native, "deathlink_request", invoke)
+    with pytest.raises(DeathLinkDispatchError) as caught:
+        publication.dispatch("room-A")
+    assert caught.value.request_kind == kind
+    assert caught.value.native_result is original.native_result
+    assert caught.value.__cause__ is original
