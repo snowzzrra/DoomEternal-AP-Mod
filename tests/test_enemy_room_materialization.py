@@ -26,6 +26,15 @@ def options_for_plan(plan):
     return sign_slot(data, catalog)
 
 
+def test_resolved_room_requests_native_donor_maps():
+    from doom_eap.launcher.campaign_resources import room_enemy_plan
+    from doom_eap.launcher.native_enemy_resources import native_resource_maps
+
+    plan = build_native_recipes(normalize_enemy_options({}), {"sequence": ["e1m1_intro"]}, seed=73822)
+    requested = native_resource_maps(room_enemy_plan(options_for_plan(plan)))
+    assert requested and requested == native_resource_maps(plan)
+
+
 def cold_case(tmp_path, monkeypatch):
     enemies = normalize_enemy_options({})
     plan = build_native_recipes(enemies, {"sequence": ["e1m1_intro"]}, seed=73822)

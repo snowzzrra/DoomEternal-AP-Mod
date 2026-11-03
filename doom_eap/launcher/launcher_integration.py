@@ -1459,11 +1459,13 @@ class RoomSetupCoordinator:
 
     @staticmethod
     def room_key(event: dict[str, object]) -> tuple[object, ...]:
+        slot_data = event.get("slot_data", {})
+        fingerprint = slot_data.get("native_generation_fingerprint") if isinstance(slot_data, dict) else None
         return (
             event.get("seed_name"),
             event.get("team"),
             event.get("slot"),
-            json.dumps(event.get("slot_data", {}), sort_keys=True),
+            fingerprint if isinstance(fingerprint, str) else json.dumps(slot_data, sort_keys=True),
         )
 
     def _receipt_context(self) -> dict[str, object]:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import pickle
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -47,7 +49,27 @@ def slot_schema_version() -> int:
 
 
 def load_slot_catalog() -> dict:
-    return slot_data_contract.load_slot_catalog(path=REPO_ROOT / "doom_eap/content/slot_catalog.json")
+    directory = REPO_ROOT / "doom_eap/content"
+    paths = (directory / "slot_catalog.json", directory / "projection_manifest.json",
+             *(slot_data_contract.catalog_dependency_path(directory, name)
+               for name in slot_data_contract.CATALOG_DEPENDENCIES))
+    signature = tuple(_catalog_file_identity(path) for path in paths)
+    return pickle.loads(_slot_catalog_snapshot(signature))
+
+
+def _catalog_file_identity(path):
+    try:
+        stat = path.stat()
+        return path, stat.st_size, stat.st_mtime_ns
+    except OSError:
+        return path, None, None
+
+
+@lru_cache(maxsize=1)
+def _slot_catalog_snapshot(signature):
+    catalog = slot_data_contract.load_slot_catalog(path=signature[0][0])
+    # in-memory snapshots isolate mutable tables without rehashing assets.
+    return pickle.dumps(catalog, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def admit_slot_data(slot_data, *, placements=None):

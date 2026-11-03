@@ -65,6 +65,27 @@ def bridge(tmp_path, monkeypatch):
     return module
 
 
+def test_checked_kill_reward_keeps_receipt_notification(bridge):
+    async def run():
+        ctx = bridge.DoomEternalContext(None, None)
+        item_id, physical, reward = 7770001, 7770001, 2_200_000_001
+        locations = {physical, reward}
+        ctx.items_received = [SimpleNamespace(item=item_id, location=location, player=1, flags=1)
+                              for location in (reward, physical)]
+        ctx.server_checked_locations_ready = True
+        ctx.checked_locations = locations
+        ctx.locations_info = dict.fromkeys(locations)
+        ctx.location_setup.begin({"missing_locations": [], "checked_locations": list(locations)}, {physical}, {reward})
+        assert ctx.location_setup.consume({"locations": [(item_id, location, 1, 1) for location in locations]}, locations) is None
+
+        reward_commands, _ = ctx.item_activation_commands(item_id, 0, intent=bridge.NEW_RECEIPT)
+        physical_commands, _ = ctx.item_activation_commands(item_id, 1, intent=bridge.NEW_RECEIPT)
+        assert any("ap_notify_item_" in command for command in reward_commands)
+        assert not any("ap_notify_item_" in command for command in physical_commands)
+
+    asyncio.run(run())
+
+
 def context_for(bridge, tmp_path, monkeypatch):
     ctx = bridge.DoomEternalContext(None, None)
     ctx.state_key, ctx.slot, ctx.team, ctx.auth = "StartingRoom:0:1", 1, 0, "StartingSlot"
@@ -201,6 +222,32 @@ def test_starting_currency_resumes_after_publication_refusal(bridge, tmp_path, m
         await apply_starting_currencies(ctx, bridge.ITEM_ID_TO_COMMAND, publication)
         assert len(commands) == 4
         assert ctx.session_state["starting_currency"]["completed"] == {"7770016": 2, "7770142": 1}
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("missing", ["session", "lease"])
+def test_starting_currency_waits_for_game_readiness_and_completed_delivery_does_not_block(bridge, tmp_path, monkeypatch, missing):
+    async def run():
+        ctx = context_for(bridge, tmp_path, monkeypatch)
+        commands, events = [], []
+        monkeypatch.setattr(bridge, "send_command", lambda command, **_: commands.append(command) or True)
+        monkeypatch.setattr(bridge, "log_item_event", lambda name, **fields: events.append((name, fields)))
+        ctx._queue_session_authoritative = missing != "session"
+        ctx._active_materialization_lease.return_value = None if missing == "lease" else "1:1"
+        assert not await ctx.process_pending_item_receipts("packet")
+        blocked = [fields for name, fields in events if name == "ITEM_DELIVERY_BLOCKED"]
+        assert len(blocked) == 1 and blocked[0]["reason"] == "starting_currency_pending"
+        assert ("bound queue session" if missing == "session" else "ready game context") in blocked[0]["detail"]
+        assert ctx._item_delivery_waiting_for_state and ctx._item_delivery_wakeup
+        assert commands == [] and ctx.items_processed == 0
+        ctx._queue_session_authoritative = True
+        ctx._active_materialization_lease.return_value = "1:1"
+        assert await ctx.process_pending_item_receipts("packet")
+        assert len(commands) == 3
+        ctx._queue_session_authoritative = False
+        ctx._active_materialization_lease.return_value = None
+        assert await ctx.process_pending_item_receipts("packet")
+        assert not ctx._item_delivery_waiting_for_state and len(commands) == 3
     asyncio.run(run())
 
 

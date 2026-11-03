@@ -193,7 +193,6 @@ doom_eap/launcher/launcher_ui.py::LauncherUI._refresh_create_dependencies 20 18
 doom_eap/launcher/launcher_ui.py::LauncherUI._refresh_enemy_dependencies 17 24
 doom_eap/launcher/launcher_ui.py::LauncherUI._render_doctor_report 52 28
 doom_eap/launcher/launcher_ui.py::LauncherUI._render_native_health 23 16
-doom_eap/launcher/launcher_ui.py::LauncherUI._render_room 13 16
 doom_eap/launcher/launcher_ui.py::LauncherUI._request_dependency_consent 9 11
 doom_eap/launcher/launcher_ui.py::LauncherUI._room_option_value 18 11
 doom_eap/launcher/launcher_ui.py::LauncherUI._run_setup_action 17 13

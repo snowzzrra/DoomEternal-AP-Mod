@@ -1,4 +1,4 @@
-from doom_eap.runtime.materialization import apply_starting_currencies, authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
+from doom_eap.runtime.materialization import MaterializationPlanError, apply_starting_currencies, authored_effects_allowed, reconciliation_session_block, reconciliation_runtime_block
 from doom_eap.runtime.receipt_delivery import base_special_receipt_allowed
 from doom_eap.runtime.physical_checks import PhysicalChecks
 from doom_eap.runtime.killsanity import Killsanity
@@ -3650,6 +3650,36 @@ class DoomEternalContext(CommonContext):
     def _packet_receipt_is_live_tail(self, receipt_index):
         return self.receipt_session.packet_is_live_tail(receipt_index)
 
+    async def _prepare_item_delivery(self, trigger):
+        try:
+            history = self.observe_received_item_history()
+        except ValueError as exc:
+            logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
+            log_item_event(
+                "ITEM_DELIVERY_BLOCKED",
+                reason="history_incompatible",
+                detail=str(exc),
+                trigger=trigger,
+                boundary=getattr(self, "items_processed", None),
+                received_count=len(self.items_received),
+                state_key=getattr(self, "state_key", None),
+                bridge_revision=BRIDGE_REVISION,
+                mapping_revision=ITEM_MAPPING_REVISION,
+            )
+            return None
+
+        try:
+            await apply_starting_currencies(self, ITEM_ID_TO_COMMAND, ReceiptPublication(send_command, observer=ledger_shadow.capture))
+        except MaterializationPlanError as exc:
+            log_item_event(
+                "ITEM_DELIVERY_BLOCKED", reason="starting_currency_pending", detail=str(exc),
+                trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
+            )
+            self._item_delivery_waiting_for_state = True
+            self._item_delivery_wakeup = True
+            return None
+        return history
+
     async def process_pending_item_receipts(self, trigger):
         """Consume authoritative receipts once, in increasing receive-index order."""
         async with self._item_delivery_lock:
@@ -3667,26 +3697,10 @@ class DoomEternalContext(CommonContext):
                 return False
             self._item_delivery_waiting_for_state = False
             receipt_session_token = self.receipt_session.capture(getattr(self, "state_key", ""))
-            try:
-                history_observation = self.observe_received_item_history()
-                await apply_starting_currencies(self, ITEM_ID_TO_COMMAND, ReceiptPublication(send_command, observer=ledger_shadow.capture))
-                duplicate_indices = {
-                    receipt.index for receipt in history_observation.duplicates
-                }
-            except ValueError as exc:
-                logger.error("[Tracking] ReceivedItems history rejected: %s", exc)
-                log_item_event(
-                    "ITEM_DELIVERY_BLOCKED",
-                    reason="history_incompatible",
-                    detail=str(exc),
-                    trigger=trigger,
-                    boundary=getattr(self, "items_processed", None),
-                    received_count=len(self.items_received),
-                    state_key=getattr(self, "state_key", None),
-                    bridge_revision=BRIDGE_REVISION,
-                    mapping_revision=ITEM_MAPPING_REVISION,
-                )
+            history_observation = await self._prepare_item_delivery(trigger)
+            if history_observation is None:
                 return False
+            duplicate_indices = {receipt.index for receipt in history_observation.duplicates}
 
             if trigger != "packet":
                 (await self._reconcile_native_receipt_owners(trigger))
@@ -6247,7 +6261,7 @@ class DoomEternalContext(CommonContext):
             self._fresh_receipt_owned_count(item_id, item_index, fresh_receipt_boundary, excluded_receipt_indices),
             self.items_processed, getattr(network_item, "location", None), getattr(self, "server_checked_locations_ready", False),
             frozenset(getattr(self, "checked_locations", ()) or ()),
-            frozenset(getattr(self, "locations_info", {}) or {}), self.location_setup.received_ids,
+            frozenset(getattr(self, "locations_info", {}) or {}), self.location_setup.received_ids & DOOM_LOCATION_NAMES.keys(),
         )
         stage = (self.progressive_stage(item_id, item_index, excluded_receipt_indices=excluded_receipt_indices)
                  if requires_progressive_observation(request, ITEM_ID_TO_COMMAND) else None)

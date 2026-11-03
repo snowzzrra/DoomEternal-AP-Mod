@@ -13,6 +13,18 @@ from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, Roo
 from test_install_workflow import _snapshot
 
 
+def test_setup_room_identity_separates_rooms_and_uses_resolved_fingerprint():
+    event = {"seed_name": "room", "team": 0, "slot": 1,
+             "slot_data": {"native_generation_fingerprint": "generation", "payload": object()}}
+    key = RoomSetupCoordinator.room_key(event)
+    assert key == RoomSetupCoordinator.room_key({**event, "slot_data": {"native_generation_fingerprint": "generation"}})
+    for field, value in (("seed_name", "other"), ("team", 1), ("slot", 2),
+                         ("slot_data", {"native_generation_fingerprint": "other"})):
+        assert key != RoomSetupCoordinator.room_key({**event, field: value})
+    legacy = {**event, "slot_data": {"option": 1}}
+    assert RoomSetupCoordinator.room_key(legacy) != RoomSetupCoordinator.room_key({**legacy, "slot_data": {"option": 2}})
+
+
 
 
 def test_serialization_cancelled_queue_and_same_key_replacement():

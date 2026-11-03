@@ -226,6 +226,16 @@ def _cleanup_resource_banks(base, obsolete):
     return cleanup_banks(base, obsolete) if obsolete else {'removed': [], 'bytes_freed': 0, 'errors': []}
 
 
+def room_enemy_plan(options):
+    if not options:
+        return None
+    from doom_eap.runtime.context_registry import admit_slot_data, load_slot_catalog
+    from tools.maps.native_recipe_materializer import expand_resolved_native_recipes
+
+    plan = expand_resolved_native_recipes(admit_slot_data(options), load_slot_catalog())
+    return {"kind": "native_recipes", **plan}
+
+
 @installation_step("prepare banks")
 def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
     """Finalize an injected room package; never enable unrelated resource records."""
@@ -243,8 +253,8 @@ def enable_campaign_resources(game_root: Path, mod_zip: Path) -> dict:
         hud_name = "swf/hud/hud_score.swf"
         huds = {name.split('/')[0]: package.read(name) for name in names
                 if name.count('/') == 3 and name.endswith('/' + hud_name)}
-        plan = manifest.get("options", {}).get("enemy_plan")
-        roots = json.loads(package.read("seed_receipt.json")).get("native_resource_roots", {}) if "seed_receipt.json" in names else {}
+        plan = room_enemy_plan(manifest.get("options"))
+        roots =json.loads(package.read("seed_receipt.json")).get("native_resource_roots", {}) if "seed_receipt.json" in names else {}
     campaign_required = bool(expected) or "unified_campaign_v1" in manifest.get("required_capabilities", ()) or EXCLUDED_LAYER in required
     base = game_root / "base"
     if any(process["name"].casefold() == "doometernalx64vk.exe" for process in detect_doom_processes()):

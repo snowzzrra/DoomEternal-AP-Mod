@@ -1,4 +1,5 @@
 import json
+import shutil
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -12,6 +13,24 @@ from doom_eap.launcher import launcher_core as core
 from doom_eap.runtime import context_registry as registry
 from doom_eap.runtime.unified_campaign import UnifiedCampaign, validate_plan
 from tests.test_slot_data_contract import sample_catalog, sample_slot, sign_slot
+
+
+@pytest.mark.parametrize("changed", ["slot_catalog.json", "projection_manifest.json", "native_enemy_assets.json"])
+def test_cached_catalog_is_isolated_and_rejects_changed_installed_files(tmp_path, monkeypatch, changed):
+    directory = tmp_path / "doom_eap/content"
+    directory.mkdir(parents=True)
+    installed = registry.REPO_ROOT / "doom_eap/content"
+    for name in ("slot_catalog.json", "projection_manifest.json", *slot_data_contract.CATALOG_DEPENDENCIES):
+        shutil.copyfile(slot_data_contract.catalog_dependency_path(installed, name), directory / name)
+    monkeypatch.setattr(registry, "REPO_ROOT", tmp_path)
+    first = registry.load_slot_catalog()
+    first["roles"].clear()
+    first.tables["maps"].clear()
+    second = registry.load_slot_catalog()
+    assert second["roles"] and second.tables["maps"]
+    (directory / changed).write_text("{}", encoding="utf-8")
+    with pytest.raises(slot_data_contract.DigestError):
+        registry.load_slot_catalog()
 
 
 @pytest.fixture

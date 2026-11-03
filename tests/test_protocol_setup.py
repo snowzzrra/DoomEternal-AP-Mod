@@ -29,6 +29,23 @@ def test_placement_collection_waits_for_exact_history_and_preserves_scout_packet
     assert setup.received_ids == frozenset({10, 20})
 
 
+def test_kill_reward_placements_are_scouted_with_map_locations():
+    setup = LocationSetup(logging.getLogger("setup-contract"))
+    packets = []
+
+    async def send(value):
+        packets.extend(value)
+
+    reward = 2_200_000_001
+    assert setup.begin({"missing_locations": [10, reward], "checked_locations": []}, {10}, {reward}) == {10, reward}
+    asyncio.run(setup.scout(CheckPublication(send, None, None)))
+    assert packets[0]["locations"] == [10, reward]
+    assert setup.consume({"locations": [(1, 10, 2, 0)]}, {10}) is None
+    assert not setup.ready_to_resolve
+    assert setup.consume({"locations": [(1, reward, 2, 0)]}, {10, reward}) is None
+    assert setup.ready_to_resolve
+
+
 @pytest.mark.parametrize("missing,checked,error", [
     (None, [], "must be a location list"), ([True], [], "invalid location ID"),
     ([1], [1], "overlap"), ([99], [], "unknown DOOM location IDs"),

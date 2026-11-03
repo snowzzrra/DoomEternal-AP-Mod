@@ -2516,10 +2516,11 @@ class LauncherUI(QMainWindow):
         self._clear_drift()
         raw_slot_data = event.get("slot_data")
         slot_data: dict[object, object] = raw_slot_data if isinstance(raw_slot_data, dict) else {}
-        goal = self._room_option_value(slot_data, "goal", "Not supplied")
-        dlc_enabled = slot_data.get("use_dlc_content") is True
-        campaign = "Full Saga" if dlc_enabled else "Base Campaign"
-        logic = self._room_option_value(slot_data, "logic_difficulty", "Not supplied")
+        options = slot_data.get("tracker_options", {})
+        options = options if isinstance(options, dict) else {}
+        goal = self._room_option_value(options, "goal", "Not supplied")
+        campaign = self._room_option_value(options, "mission_pool", "Not supplied")
+        logic = self._room_option_value(options, "logic_difficulty", "Not supplied")
         fields = (
             ("Seed", seed),
             ("Player", f"{player} · Team {team} · Player number {slot}"),
@@ -2528,13 +2529,6 @@ class LauncherUI(QMainWindow):
             ("Campaign", campaign),
             ("Logic Difficulty", logic),
         )
-        enemy_plan = slot_data.get("enemy_plan")
-        if isinstance(enemy_plan, dict) and isinstance(enemy_plan.get("maps"), dict):
-            reduced = sum(bool(operation.get("reduction"))
-                          for stage in enemy_plan["maps"].values() if isinstance(stage, dict)
-                          for operation in stage.get("operations", []) if isinstance(operation, dict))
-            if reduced:
-                fields += (("Enemy placement", f"{reduced} small fights were skipped because they cannot support the selected enemies."),)
         self.room_summary.setText("<br>".join(
             f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}"
             for label, value in fields
@@ -2550,7 +2544,7 @@ class LauncherUI(QMainWindow):
                 if not isinstance(option, dict) or option.get("key") != key:
                     continue
                 for choice in option.get("choices", []) or []:
-                    if isinstance(choice, dict) and choice.get("key") == value:
+                    if isinstance(choice, dict) and value in (choice.get("key"), choice.get("value")):
                         return str(choice.get("label", value))
         return self._option_value_text(value)
 
@@ -3309,7 +3303,8 @@ class LauncherUI(QMainWindow):
         self.core_status.setText(str(message))
 
     def _log_installation_failure(self, event, stdout, stderr):
-        self._append_log(str(event.get("message") or "Installation failed. Select Help -> SAVE SUPPORT REPORT."))
+        self._append_log(str(event.get("message") or
+                             f"Installation failed at injector: exit code {event.get('returncode')}. Select Help -> SAVE SUPPORT REPORT."))
         if stdout:
             self._append_log(f"Injector stdout: {stdout[-500:]}")
         if stderr:
@@ -3630,6 +3625,8 @@ class LauncherUI(QMainWindow):
             self._append_log(message)
         elif kind == "injector_finished":
             state = str(event.get("state", ""))
+            stdout = str(event.get("stdout", ""))
+            stderr = str(event.get("stderr", ""))
             if state == "applied":
                 self._append_log("Installation finished.")
             else:

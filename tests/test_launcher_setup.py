@@ -215,6 +215,24 @@ def test_help_respects_doctor_attention(ui):
     assert "NEEDS ATTENTION" in ui.doctor_evidence.text()
 
 
+def test_room_summary_displays_tracker_options(ui):
+    ui.controller.item_history_status = None
+    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text(encoding="utf-8"))
+    ui._render_room({"seed_name": "room", "team": 0, "slot": 1, "slot_data": slot_data})
+    summary = ui.room_summary.text()
+    assert "Complete the Full Saga" in summary and "Standard" in summary
+    assert "<b>CAMPAIGN</b> &nbsp; Full Saga" in summary
+
+
+def test_injector_failure_displays_exit_code_and_output(ui):
+    with patch.object(ui, "_append_log") as log:
+        ui._handle_event({"type": "injector_finished", "state": "failed", "returncode": 23,
+                          "stdout": "injection output", "stderr": "injection error"})
+    messages = [call.args[0] for call in log.call_args_list]
+    assert any("exit code 23" in message for message in messages)
+    assert "Injector stdout: injection output" in messages and "Injector stderr: injection error" in messages
+
+
 
 
 

@@ -45,11 +45,11 @@ async def apply_starting_currencies(ctx, definitions, publication):
 
 
 async def _apply_starting_currency(ctx, fact, definitions, publication):
-    if not ctx._queue_session_authoritative:
-        raise MaterializationPlanError("starting currency requires a bound queue session")
     state, completed, count = _starting_currency_progress(ctx.session_state, fact)
     if count == fact.quantity:
         return
+    if not ctx._queue_session_authoritative:
+        raise MaterializationPlanError("starting currency requires a bound queue session")
     context = ctx._refresh_runtime_context(ctx._connected_slot_data)
     lease = await ctx._active_materialization_lease(context)
     if context is None or lease is None:
