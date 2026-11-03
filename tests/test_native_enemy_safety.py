@@ -4,10 +4,19 @@ import json
 from pathlib import Path
 import pytest
 
-from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
+from doom_eap.content.enemy_options import ENEMY_RECIPES, SPECIES_IDS, normalize_enemy_options
 from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
 from doom_eap.content.native_enemy_safety import FLYING_REPLACEMENTS, project_native_safety, _replace_species
 from doom_eap.content.enemy_species import enemy_speed_capabilities
+
+
+@pytest.mark.parametrize('preset', [None, *ENEMY_RECIPES])
+def test_presets_exclude_tentacles_but_allow_explicit_weights(preset):
+    raw = {} if preset is None else {'enemy_preset': preset}
+    settings = normalize_enemy_options(raw)
+    assert settings['weights']['tentacle'] == settings['weights']['super_tentacle'] == 0
+    settings = normalize_enemy_options({**raw, 'enemy_weights': {'tentacle': 75, 'super_tentacle': 25}})
+    assert settings['weights']['tentacle'] == 3 * settings['weights']['super_tentacle'] > 0
 
 
 @pytest.mark.parametrize('preset', ['slayers_path', 'oops_all_imps'])
@@ -148,6 +157,67 @@ def test_atlantica_spirit_denylist_preserves_other_bodies_and_frozen_identity(at
     other_stage = project_native_safety(other_map, settings)['maps']['e4m2_swamp']
     assert other_stage['recipes'] == before['maps']['e4m1_rig']['recipes']
     assert 'compatibility_recipes' not in other_stage
+
+
+def test_tentacle_projection_preserves_other_species_origin_credit_and_checkpoints(atlantica_mixed_plan):
+    plan, settings = atlantica_mixed_plan
+    key = 'e4m1_rig'
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    stage = plan['maps'][key]
+    for recipe, species in zip(stage['recipes'], [
+            ('tentacle', 'super_tentacle', 'turret'), ('buff_pod', 'imp', 'hell_soldier'),
+            ('imp', 'buff_pod', 'super_tentacle')]):
+        for ordinal, (body, name) in enumerate(zip(recipe['bodies'], species)):
+            _replace_species(body, name, recipe, ordinal, {**settings, 'special_limits': stage['special_limits']},
+                             catalog, enemy_speed_capabilities())
+    plan['fingerprint'] = native_recipe_fingerprint(plan)
+    before = deepcopy(plan)
+    projected = project_native_safety(plan, settings)
+    stage = projected['maps'][key]
+    assert stage['compatibility_recipes'] == [before['maps'][key]['recipes'][index] for index in (0, 2)]
+    for original, recipe in zip(before['maps'][key]['recipes'], stage['recipes']):
+        assert {k: v for k, v in recipe.items() if k != 'bodies'} == {
+            k: v for k, v in original.items() if k != 'bodies'}
+        for old, body in zip(original['bodies'], recipe['bodies']):
+            if old['species'] in {'tentacle', 'super_tentacle'}:
+                assert body['species'] == 'imp'
+                assert body['ai'] == catalog['species']['imp']['ai']
+                assert body['definition'] != old['definition']
+                if 'tail_definition' in old:
+                    assert body['tail_definition'] != old['tail_definition']
+                for field in ('attributes', 'population_limits'):
+                    assert body.get(field) == old.get(field)
+            else:
+                assert body == old
+    assert [row.split('|')[:14] for row in native_recipe_metadata(plan, key).splitlines()] == [
+        row.split('|')[:14] for row in native_recipe_metadata(projected, key).splitlines()]
+    assert projected['fingerprint'] == native_recipe_fingerprint(projected) != before['fingerprint']
+    assert plan == before
+
+
+def test_tentacle_and_spirit_fallbacks_share_original_checkpoint_recipe(atlantica_mixed_plan):
+    plan, settings = atlantica_mixed_plan
+    stage = plan['maps']['e4m1_rig']
+    catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
+    for recipe in stage['recipes']:
+        _replace_species(recipe['bodies'][0], 'tentacle', recipe, 0,
+                         {**settings, 'special_limits': stage['special_limits']}, catalog, enemy_speed_capabilities())
+    plan['fingerprint'] = native_recipe_fingerprint(plan)
+    original = deepcopy(stage['recipes'])
+    projected = project_native_safety(plan, settings)['maps']['e4m1_rig']
+    assert sorted(projected['compatibility_recipes'], key=lambda row: row['id']) == sorted(original, key=lambda row: row['id'])
+    assert all(recipe['bodies'][0]['species'] == 'imp' for recipe in projected['recipes'])
+
+
+def test_tentacle_fallback_respects_airborne_origins_without_duplicate_libraries():
+    plan, settings = frozen_plan('e4m3_mcity', 'tentacle', {
+        'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', 'ENCOUNTER_SPAWN_IMP'})
+    original = deepcopy(plan['maps']['e4m3_mcity']['recipes'])
+    stage = project_native_safety(plan, settings)['maps']['e4m3_mcity']
+    assert sorted(stage['compatibility_recipes'], key=lambda row: row['id']) == sorted(original, key=lambda row: row['id'])
+    for recipe in stage['recipes']:
+        expected = {'imp'} if recipe['selected_spawn_type'] == 'ENCOUNTER_SPAWN_IMP' else FLYING_REPLACEMENTS
+        assert {body['species'] for body in recipe['bodies']} <= expected
 
 
 def test_atlantica_projected_and_checkpoint_bodies_reach_room_package(atlantica_mixed_plan, monkeypatch):

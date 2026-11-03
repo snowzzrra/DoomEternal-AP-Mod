@@ -81,7 +81,8 @@ def project_native_safety(plan, enemies):
         return None
     affected = (set(SCRIPTED_BOSS_ACTORS) | set(CINEMATIC_BOSS_ACTORS) | set(FLYING_SPAWN_POINTS) | set(FLYING_SUMMONS)) & set(plan['maps'])
     affected.update(key for key, stage in plan['maps'].items()
-                    if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'}
+                    if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron',
+                                               'tentacle', 'super_tentacle'}
                            for recipe in stage['recipes'] for body in recipe['bodies']))
     if not affected:
         return plan
@@ -123,6 +124,15 @@ def project_native_safety(plan, enemies):
                 _replace_species(body, species, recipe, ordinal, settings, catalog, speed_capabilities)
                 changes.append({'origin': recipe['id'], 'action': 'flying_spawn', 'before': before, 'after': species})
         for recipe in stage['recipes']:
+            if any(body['species'] in {'tentacle', 'super_tentacle'} for body in recipe['bodies']):
+                if not any(saved['origin'] == recipe['origin'] for saved in stage.get('compatibility_recipes', [])):
+                    stage.setdefault('compatibility_recipes', []).append(deepcopy(recipe))
+                for ordinal, body in enumerate(recipe['bodies']):
+                    if body['species'] in {'tentacle', 'super_tentacle'}:
+                        before = body['species']
+                        _replace_species(body, 'imp', recipe, ordinal, settings, catalog, speed_capabilities)
+                        changes.append({'origin': recipe['id'], 'action': 'tentacle_spawn_fallback',
+                                        'before': before, 'after': 'imp'})
             if any(body['species'] in {'cursed_prowler', 'spirit', 'stone_imp', 'armored_baron'} for body in recipe['bodies']):
                 alternate = deepcopy(recipe)
                 for ordinal, body in enumerate(alternate['bodies']):

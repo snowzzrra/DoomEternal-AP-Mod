@@ -169,11 +169,8 @@ def normalize_enemy_options(raw):
     if revision >= 4:
         weights['zombie_t1_screecher'] = min(recipe.group_weights[2:])
     if revision >= 8:
-        weights.update(tentacle=recipe.group_weights[0] // 2,
-                       super_tentacle=recipe.group_weights[1] // 4,
-                       turret=recipe.group_weights[1] // 2)
+        weights.update(tentacle=0, super_tentacle=0, turret=recipe.group_weights[1] // 2)
     if revision >= 9:
-        weights['super_tentacle'] = 0
         weights['blood_angel'] = (weights['blood_angel'] * 5 + 3) // 4
     if preset == "oops_all_imps":
         weights.update(imp=900, stone_imp=100)
