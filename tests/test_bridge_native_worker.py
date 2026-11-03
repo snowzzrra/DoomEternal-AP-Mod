@@ -40,7 +40,9 @@ def test_process_probe_keeps_loop_responsive_and_fails_closed(bridge, monkeypatc
     release = threading.Event()
     entered = threading.Event()
     expected = Path(bridge.DOOM_BASE_DIR).parent / "DOOMEternalx64vk.exe"
-    rows = ({"pid": 123, "created": 456, "path": str(expected)},) if available else (() if available is False else None)
+    # the Proton helper reports Windows-style paths, the native path is the host path
+    reported = proton.windows_path(expected) if platform == "posix" else str(expected)
+    rows = ({"pid": 123, "created": 456, "path": reported},) if available else (() if available is False else None)
 
     def query(*args):
         entered.set()
