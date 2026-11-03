@@ -1,13 +1,13 @@
 {
   "schema": 1,
-  "apworld_ref": "b87c9d08875630df45469990c33246de7c5fcf6a",
+  "apworld_ref": "1347488458dbeb035063d055c91263e100b6c2a9",
   "sources": {
     "compact_battery": "Archipelago/worlds/doometernal/test/test_short_world_generation.py::TestShortWorldGeneration::test_compact_campaign_battery_surplus_fits_budget",
     "fixed_seeds": "seeds that broke earlier fuzz runs; the original fuzz options were not kept, so these cases use explicit option profiles"
   },
-  "resource_version": "v0.7.1",
+  "resource_version": "v0.8.0",
   "resource_sha256": {
-    "base_mod.zip": "939fbc23dafa8160b5b375ea91dd7d6a0660cfe4058f4d647f6436c96d5b7d59",
+    "base_mod.zip": "2e723c45ff047af778bd02d45e89812e2498b580e2faedafd4747317aacc7fa7",
     "room_payloads.zip": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
     "room_payload_manifest.json": "132b1c9480b516002c700d34ef4a037fb3f882a4f7bd7e0bf54e5c4518bdfb5b"
   },

@@ -21,7 +21,7 @@ from tools.release.source_bytes import SOURCE_BYTE_CONTRACT, compiler_source_byt
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # patch releases reuse the room resources of the release that last changed content.
-ROOM_RESOURCES_VERSION = "0.7.1"
+ROOM_RESOURCES_VERSION = "0.8.0"
 
 DEPENDENCY_DIRS = (
     "data",

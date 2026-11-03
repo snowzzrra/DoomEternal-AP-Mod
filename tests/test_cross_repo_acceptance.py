@@ -317,7 +317,7 @@ def without_authoring_maps():
 @pytest.fixture(scope="module")
 def compiler():
     if not os.environ.get("DOOMEAP_ROOM_RESOURCES"):
-        pytest.skip("Set DOOMEAP_ROOM_RESOURCES to the pinned v0.7.1 bundle for real compilation.")
+        pytest.skip("Set DOOMEAP_ROOM_RESOURCES to the pinned room resources bundle for real compilation.")
     resources = prepared_path("DOOMEAP_ROOM_RESOURCES")
     decompressor = prepared_path("IDFILE_DECOMPRESSOR")
     for name, expected in CORPUS["resource_sha256"].items():
