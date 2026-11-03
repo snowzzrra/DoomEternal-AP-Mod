@@ -5,6 +5,7 @@ import asyncio
 import importlib
 import pytest
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 
 @pytest.mark.parametrize("following_item", (7770904, 7770902))
@@ -51,23 +52,23 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
             native_calls.append((count, hammer_only))
             return {"outcome": 0}
 
-        monkeypatch.setattr(context, "native_game_link", lambda: SimpleNamespace(ensure_progressive_special_weapon=ensure_special))
+        monkeypatch.setattr(context, "_native_game_link_async", AsyncMock(return_value=SimpleNamespace(ensure_progressive_special_weapon=ensure_special)))
 
-        def reconcile(_history):
+        async def reconcile(_history, run):
             checkpoint.append(True)
             raise RuntimeError("native queue full")
 
-        monkeypatch.setattr(context, "weapon_points_receipt_owner", lambda: (SimpleNamespace(reconcile=reconcile), {}))
-        monkeypatch.setattr(context, "_reconcile_native_receipt_owners", lambda _: None)
+        monkeypatch.setattr(context, "weapon_points_receipt_owner", AsyncMock(return_value=(SimpleNamespace(reconcile_async=reconcile), {})))
+        monkeypatch.setattr(context, "_reconcile_native_receipt_owners", AsyncMock())
         from doom_eap.contracts.runtime_context import RuntimeContext
         runtime_context = RuntimeContext("base/e1m1_intro", "Base", ("game/sp/e1m1_intro/e1m1_intro",), ("e1m1_intro",), frozenset())
         monkeypatch.setattr(context, "_refresh_runtime_context", lambda _: runtime_context)
-        monkeypatch.setattr(context, "_active_materialization_lease", lambda _: "42:1")
+        monkeypatch.setattr(context, "_active_materialization_lease", AsyncMock(return_value="42:1"))
         monkeypatch.setattr(context, "spool_item_commands", lambda item, index, **kw: (notifications.append((item, index)) or True, ""))
         monkeypatch.setattr(context, "spool_deferred_receipt_notification", lambda item, index, **kw: (notifications.append((item, index)) or True, ""))
         monkeypatch.setattr(context, "persist_session_state", lambda: None)
-        monkeypatch.setattr(context, "_reconcile_blood_punch", lambda _: None)
-        monkeypatch.setattr(context, "_trigger_live_context_materialization", lambda: None)
+        monkeypatch.setattr(context, "_reconcile_blood_punch", AsyncMock())
+        monkeypatch.setattr(context, "_trigger_live_context_materialization", AsyncMock())
         monkeypatch.setattr(context, "onboard_bootstrap", lambda _: None)
         await context.process_pending_item_receipts("received_items")
         assert checkpoint == [True]
@@ -81,7 +82,7 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
             await context.process_pending_item_receipts("received_items")
             assert context.items_processed == 3 and native_calls[-1] == (2, True)
             native_calls.clear()
-            bridge.DoomEternalContext._reconcile_native_receipt_owners(context, "reconnect")
+            await bridge.DoomEternalContext._reconcile_native_receipt_owners(context, "reconnect")
             assert native_calls == [(2, True)]
 
         saved = copy.deepcopy(context.session_state)
@@ -100,6 +101,8 @@ def test_weapon_point_reconciliation_does_not_hold_other_receipts(tmp_path, monk
         assert context.validate_item_history_prefix()
         assert not context.item_delivery_blocked and events[-1][1]["status"] == "ready"
         assert context.session_state == saved
+        if hasattr(context, "_native_worker"):
+            context._native_worker.close()
 
         context.items_received = history + [history[0]]
         assert context.validate_item_history_prefix() and not context.item_delivery_blocked
@@ -281,12 +284,12 @@ def test_rune_budget_deferral_preserves_receipts_and_reconciles(tmp_path, monkey
                 owned[0] |= desired
             return {"outcome": 0}
 
-        monkeypatch.setattr(context, "native_game_link", lambda: SimpleNamespace(
-            ensure_normal_runes=ensure, ensure_support_runes=ensure))
+        monkeypatch.setattr(context, "_native_game_link_async", AsyncMock(return_value=SimpleNamespace(
+            ensure_normal_runes=ensure, ensure_support_runes=ensure)))
         monkeypatch.setattr(context, "spool_deferred_receipt_notification",
                             lambda item, index: (notifications.append((item, index)) or True, ""))
-        monkeypatch.setattr(context, "_flush_deferred_frag_upgrades", lambda: None)
-        monkeypatch.setattr(context, "_reconcile_blood_punch", lambda _: None)
+        monkeypatch.setattr(context, "_flush_deferred_frag_upgrades", AsyncMock())
+        monkeypatch.setattr(context, "_reconcile_blood_punch", AsyncMock())
         monkeypatch.setattr(context, "persist_session_state", lambda: (tmp_path / "state.json").write_text(
             json.dumps({"boundary": context.items_processed, "session": context.session_state})))
 
@@ -322,6 +325,7 @@ def test_rune_budget_deferral_preserves_receipts_and_reconciles(tmp_path, monkey
         await context.process_pending_item_receipts("tracker")
         await context.process_pending_item_receipts("tracker")
         assert native_grants == [mask] and notifications == [(item_id, 0)]
+        context._native_worker.close()
         await context.process_pending_item_receipts("packet")
         assert context.items_processed == 1
         history = context.session_state["receipt_history"]

@@ -4,6 +4,7 @@ import json
 import threading
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -85,14 +86,14 @@ def test_server_mission_completion_wakes_inventory_materialization(bridge, monke
 
 @pytest.mark.parametrize("old_key", [None, "room-A", "room-B"])
 def test_map_publishers_are_bound_to_room_and_pending_same_room_survives(bridge, tmp_path, old_key):
-    context = SimpleNamespace(get_ap_state_key=lambda: "room-B")
+    context = SimpleNamespace(get_ap_state_key=lambda: "room-B", _query_process_identity=AsyncMock(return_value="fixture-process"))
     context.quarantine_unbound_physical_events = bridge.DoomEternalContext.quarantine_unbound_physical_events.__get__(context)
     files = [tmp_path / name for name in bridge.PUBLISHER_MAP_EVENT_FILENAMES]
     for file in files:
         file.write_bytes(b"pending publisher")
     if old_key:
         (tmp_path / "ap_event_session.json").write_text(json.dumps({"ap_state_key": old_key}))
-    assert bridge.DoomEternalContext.check_and_update_event_session(context)
+    assert asyncio.run(bridge.DoomEternalContext.check_and_update_event_session(context))
     if old_key == "room-B":
         assert all(file.read_bytes() == b"pending publisher" for file in files)
     else:
@@ -103,11 +104,11 @@ def test_map_publishers_are_bound_to_room_and_pending_same_room_survives(bridge,
 def test_failed_quarantine_cannot_bind_old_events_to_new_room(bridge, tmp_path, monkeypatch):
     file = tmp_path / next(iter(bridge.PUBLISHER_MAP_EVENT_FILENAMES))
     file.write_bytes(b"old room")
-    context = SimpleNamespace(get_ap_state_key=lambda: "room-B")
+    context = SimpleNamespace(get_ap_state_key=lambda: "room-B", _query_process_identity=AsyncMock(return_value="fixture-process"))
     context.quarantine_unbound_physical_events = bridge.DoomEternalContext.quarantine_unbound_physical_events.__get__(context)
     monkeypatch.setattr(bridge, "quarantine_event_file", lambda *a, **k: None)
     with pytest.raises(RuntimeError, match="could not be quarantined"):
-        bridge.DoomEternalContext.check_and_update_event_session(context)
+        asyncio.run(bridge.DoomEternalContext.check_and_update_event_session(context))
     assert not (tmp_path / "ap_event_session.json").exists()
     assert file.read_bytes() == b"old room"
 
@@ -152,18 +153,19 @@ def test_lost_wup_ledger_drains_received_queue_and_replay_does_not_duplicate(bri
         native.grant_weapon_upgrade_points = grant
         history = {index: bridge.receipt_identity(item) for index, item in enumerate(context.items_received)}
         monkeypatch.setattr(context, "persist_session_state", lambda: None)
-        monkeypatch.setattr(context, "weapon_points_receipt_owner", lambda: (
-            WeaponPointReceipts(context.session_state, context.persist_session_state, native, "room"), history))
-        monkeypatch.setattr(context, "_reconcile_native_receipt_owners", lambda _: None)
+        monkeypatch.setattr(context, "weapon_points_receipt_owner", AsyncMock(side_effect=lambda: (
+            WeaponPointReceipts(context.session_state, context.persist_session_state, native, "room"), history)))
+        monkeypatch.setattr(context, "_reconcile_native_receipt_owners", AsyncMock())
         runtime = RuntimeContext("base/e1m1_intro", "Base", ("game/sp/e1m1_intro/e1m1_intro",), ("e1m1_intro",), frozenset())
         monkeypatch.setattr(context, "_refresh_runtime_context", lambda _: runtime)
-        monkeypatch.setattr(context, "_active_materialization_lease", lambda _: "42:1")
+        monkeypatch.setattr(context, "_active_materialization_lease", AsyncMock(return_value="42:1"))
         monkeypatch.setattr(context, "spool_deferred_receipt_notification", lambda *a, **k: (True, ""))
-        monkeypatch.setattr(context, "_reconcile_blood_punch", lambda _: None)
-        monkeypatch.setattr(context, "_trigger_live_context_materialization", lambda: None)
+        monkeypatch.setattr(context, "_reconcile_blood_punch", AsyncMock())
+        monkeypatch.setattr(context, "_trigger_live_context_materialization", AsyncMock())
         monkeypatch.setattr(context, "onboard_bootstrap", lambda _: None)
         await context.process_pending_item_receipts("received_items")
         assert context.items_processed == 22 and native.grants == [3]
         await context.process_pending_item_receipts("reconnect")
         assert context.items_processed == 22 and native.grants == [3]
+        context._native_worker.close()
     asyncio.run(run())

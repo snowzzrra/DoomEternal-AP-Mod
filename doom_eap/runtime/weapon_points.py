@@ -470,10 +470,10 @@ class WeaponPointReceipts:
     def __init__(self, session_state, persist, link, namespace):
         self.state, self.persist, self.link, self.namespace = session_state, persist, link, namespace
 
-    def _ledger(self, authoritative):
+    def _ledger(self, authoritative, facts=None):
         ledger = self.state.get("weapon_points")
         if ledger is None:
-            facts = self.link.observe()
+            facts = self.link.observe() if facts is None else facts
             gained = facts["gained_after"]
             history = sorted(authoritative.items())
             if type(gained) is not int or gained < 0 or gained % AMOUNT or gained > len(history) * AMOUNT:
@@ -518,6 +518,10 @@ class WeaponPointReceipts:
         if authoritative.get(index) != receipt or not receipt:
             raise WeaponPointsBlocked("WUP receipt is not authoritative")
         ledger = self._ledger(authoritative)
+        self._record_receipt(ledger, index, receipt)
+        self.reconcile(authoritative)
+
+    def _record_receipt(self, ledger, index, receipt):
         existing = next((r for r in ledger["receipts"] if r["index"] == index), None)
         if existing is not None:
             if existing["receipt"] != receipt:
@@ -526,11 +530,35 @@ class WeaponPointReceipts:
             if ledger["receipts"] and ledger["receipts"][-1]["index"] >= index:
                 raise WeaponPointsBlocked("WUP receipt order changed")
             ledger["receipts"].append({"index": index, "receipt": receipt, "amount": AMOUNT})
-            # This must succeed before any native mutation. A crash after it is
-            # resolved using gained, even if the general processed cursor lags.
+            # persist ownership before mutation so recovery can use the native gained total
             try:
                 self.persist()
             except Exception:
                 ledger["receipts"].pop()
                 raise
-        self.reconcile(authoritative)
+
+    async def _ledger_async(self, authoritative, run):
+        facts = await run(self.link, "observe") if self.state.get("weapon_points") is None else None
+        return self._ledger(authoritative, facts)
+
+    async def reconcile_async(self, authoritative, run):
+        ledger = await self._ledger_async(authoritative, run)
+        for record in ledger["receipts"]:
+            if authoritative.get(record["index"]) != record["receipt"]:
+                raise WeaponPointsBlocked("AP history does not own the persisted WUP receipt")
+        gained = (await run(self.link, "observe"))["gained_after"]
+        total = sum(record["amount"] for record in ledger["receipts"])
+        if gained > total or gained % AMOUNT:
+            raise WeaponPointsBlocked("Native earned WUP disagrees with receipt ownership")
+        while gained < total:
+            result = await run(self.link, "grant_weapon_upgrade_points", AMOUNT, gained)
+            if result["gained_before"] != gained or result["gained_after"] != gained + AMOUNT:
+                raise WeaponPointsBlocked("Native grant result does not match the pending receipt")
+            gained += AMOUNT
+
+    async def deliver_async(self, index, receipt, authoritative, run):
+        if authoritative.get(index) != receipt or not receipt:
+            raise WeaponPointsBlocked("WUP receipt is not authoritative")
+        ledger = await self._ledger_async(authoritative, run)
+        self._record_receipt(ledger, index, receipt)
+        await self.reconcile_async(authoritative, run)

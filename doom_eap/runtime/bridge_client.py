@@ -51,6 +51,7 @@ from doom_eap.runtime.materialization_coordinator import MaterializationCoordina
 from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 from doom_eap.runtime import save_files
 from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
+from doom_eap.runtime.native_worker import StaleNativeResult
 from doom_eap.runtime.save_records import read_unlockable_record
 from doom_eap.content.mastery_requirements import mastery_entries_for_profile
 from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
@@ -1838,10 +1839,6 @@ def delegated_rpc_command(item_id, command_index=None):
     return f"ai_ScriptCmdEnt {entity_name} activate"
 
 
-def deathlink_publication(ctx):
-    return DeathLinkPublication(ctx.native_game_link, ctx.deathlink.active_event, ctx.deathlink.mode)
-
-
 def reconciliation_publisher():
     return ReconciliationPublisher(send_command, command_spool_exists, logger)
 
@@ -2386,7 +2383,10 @@ def read_game_details():
 class DoomCommandProcessor(ClientCommandProcessor):
     def _cmd_ap_reconcile(self):
         """Manually restore replay-safe AP inventory after Mission Reset."""
-        plan, error = self.ctx.manual_reconcile_inventory()
+        self.ctx.session_tasks.start(self._reconcile)
+
+    async def _reconcile(self):
+        plan, error = await self.ctx.manual_reconcile_inventory()
         if error:
             self.output(f"AP reconcile rejected: {error}")
             return
@@ -2395,7 +2395,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
             f"skipped_never_replay={plan.skipped_never_replay} "
             f"skipped_unproven={plan.skipped_unproven}"
         )
-        rune_plan, rune_error = self.ctx.reconcile_owned_runes("manual", force=True)
+        rune_plan, rune_error = await self.ctx.reconcile_owned_runes("manual", force=True)
         if rune_error:
             self.output(f"Rune reconcile: {rune_error}")
         else:
@@ -2406,7 +2406,10 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
     def _cmd_doom_rune_diag(self):
         """Show AP Rune ownership and distinct native Rune state surfaces."""
-        for line in self.ctx.observe_rune_diagnostic_lines():
+        self.ctx.session_tasks.start(self._rune_diag)
+
+    async def _rune_diag(self):
+        for line in await self.ctx.observe_rune_diagnostic_lines():
             self.output(line)
 
     def _cmd_doom_context_diag(self):
@@ -2787,7 +2790,6 @@ class DoomEternalContext(CommonContext):
         self._slot_validation_task = None
         self._pending_slot_packages = []
         self._ammo_projection_active = False
-        self._publish_native_ammo_refill(reason)
         self.runtime_lifecycle.invalidate_work()
         self.session_tasks.invalidate()
         self.physical_checks.invalidate()
@@ -2796,6 +2798,7 @@ class DoomEternalContext(CommonContext):
         self.protocol_feed.invalidate()
         self.ammo_requests.reset()
         self.ammo.invalidate(reason)
+        self.session_tasks.start(lambda: self._publish_native_ammo_refill(reason))
         self.deathlink.invalidate_outbound()
         self.goals.invalidate_publication()
         self.publisher_dispatch.invalidate()
@@ -2905,20 +2908,20 @@ class DoomEternalContext(CommonContext):
         if result is not None:
             logger.warning("CONTEXT_EVIDENCE_REJECTED reason=%s marker=%s evidence=%s count=%s", *result)
 
-    def _active_materialization_lease(self, context=None):
+    async def _active_materialization_lease(self, context=None):
         marker = self.cached_map_identity or {}
-        if marker.get("native_scope") and not self.runtime_effects_ready():
+        if marker.get("native_scope") and not (await self.runtime_effects_ready()):
             return None
         marker_context = classify_runtime_context(marker.get("runtime_map", ""))
         return self.runtime_lifecycle.materialization_lease(
             getattr(marker_context, "campaign", None), getattr(context, "campaign", None),
         )
 
-    def authored_map_runtime_ready(self, evidence=None):
+    async def authored_map_runtime_ready(self, evidence=None):
         evidence = evidence or read_gameplay_save_evidence()
         marker = self.cached_map_identity or {}
         context = classify_runtime_context(marker.get("runtime_map", ""))
-        lease = self._active_materialization_lease(context)
+        lease = (await self._active_materialization_lease(context))
         socket = getattr(getattr(self, "server", None), "socket", None)
         observation = self.runtime_observation_lease
         return authored_effects_allowed(
@@ -2930,16 +2933,16 @@ class DoomEternalContext(CommonContext):
             queue_authoritative=self._queue_session_authoritative,
         )
 
-    def _native_materialization_scope(self, evidence, admitted=None, link=None):
+    async def _native_materialization_scope(self, evidence, admitted=None, link=None):
         from doom_eap.contracts.save_observation import admitted_evidence_matches
         try:
-            link = link or self.native_game_link()
-            admitted = admitted or self.admitted_campaign_save()
+            link = link or (await self._native_game_link_async())
+            admitted = admitted or (await self.admitted_campaign_save())
             admission = getattr(link, "save_admission", {})
             if (not getattr(evidence, "native_safe", False)
                     or not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, admission)):
                 return None
-            scope = link._run(["--pid", str(link.pid), "--native", "--json"])
+            scope = (await self._native_call(link, '_run', ["--pid", str(link.pid), "--native", "--json"]))
             identity = (str(admission.get("process_created")), admission.get("instance_id"), admission.get("build_id"))
             if (scope.get("target_pid") != link.pid or scope.get("server_pid") != link.pid
                     or (str(scope.get("process_created")), scope.get("instance_id"), scope.get("build_id")) != identity
@@ -2956,8 +2959,8 @@ class DoomEternalContext(CommonContext):
         except (RuntimeError, OSError, ValueError, KeyError, TypeError):
             return None
 
-    def _recover_native_materialization(self, evidence):
-        scope = self._native_materialization_scope(evidence)
+    async def _recover_native_materialization(self, evidence):
+        scope = (await self._native_materialization_scope(evidence))
         marker = self.cached_map_identity or {}
         if scope is None:
             if marker.get("native_scope") and self.published_materialization_lease is not None:
@@ -2981,25 +2984,25 @@ class DoomEternalContext(CommonContext):
         logger.info("[MAP] Native Core context recovered map=%s epoch=%s", scope[-1], epoch)
         return True
 
-    def runtime_effects_ready(self, evidence=None):
+    async def runtime_effects_ready(self, evidence=None):
         """Canonical admission predicate for map-scoped runtime effects."""
         evidence = evidence or read_gameplay_save_evidence()
         from doom_eap.contracts.save_observation import admitted_evidence_matches
-        admitted = self.admitted_campaign_save()
+        admitted = (await self.admitted_campaign_save())
         if admitted is None:
             return False
-        link = self.native_game_link()
+        link = (await self._native_game_link_async())
         if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid,
                                         getattr(link, "save_admission", {})):
             return False
         marker = getattr(self, "cached_map_identity", None)
         if marker and marker.get("native_scope"):
-            return marker["native_scope"] == self._native_materialization_scope(evidence, admitted, link)
+            return marker["native_scope"] == (await self._native_materialization_scope(evidence, admitted, link))
         context = classify_runtime_context(
             marker.get("runtime_map", "") if isinstance(marker, Mapping) else ""
         )
         if context is not None and context.campaign != "Base":
-            return self.authored_map_runtime_ready(evidence)
+            return (await self.authored_map_runtime_ready(evidence))
         return bool(
             evidence is not None
             and evidence.state == "gameplay"
@@ -3049,24 +3052,24 @@ class DoomEternalContext(CommonContext):
             "special_stage": materialization.get("special_stage", 0),
         }
 
-    def _trigger_live_context_materialization(self):
+    async def _trigger_live_context_materialization(self):
         self.materialization.invalidate_completed_ownership()
         evidence = read_gameplay_save_evidence()
-        if not self.runtime_effects_ready(evidence):
+        if not (await self.runtime_effects_ready(evidence)):
             self.materialization.trigger("receipt")
             return
-        _plan, error = self._context_materialize_inventory(evidence, trigger="receipt")
+        _plan, error = (await self._context_materialize_inventory(evidence, trigger="receipt"))
         if error:
             logger.warning("CONTEXT_MATERIALIZATION_RETRY detail=%s", error)
 
     def _poll_materialization_completion(self):
         return self.materialization.poll_completion(reconciliation_publisher())
 
-    def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False, observation=None, selected_item_ids=None):
+    async def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False, observation=None, selected_item_ids=None):
         """Reconcile AP-owned persistent state for each accepted context lease."""
         if trigger is not None:
             self.materialization.trigger(str(trigger))
-        if not self.runtime_effects_ready(evidence):
+        if not (await self.runtime_effects_ready(evidence)):
             return None, "runtime effects are not level-ready"
         slot_data = getattr(self, "_connected_slot_data", {})
         try:
@@ -3082,7 +3085,7 @@ class DoomEternalContext(CommonContext):
         if not admitted:
             return None, error
         transition = self.pending_context_transition
-        materialization_lease = self._active_materialization_lease(context)
+        materialization_lease = (await self._active_materialization_lease(context))
         ownership = effective_ownership(
             self.items_received[: self.items_processed],
             randomize_chainsaw=bool(slot_data.get("randomize_chainsaw", False)),
@@ -3102,7 +3105,7 @@ class DoomEternalContext(CommonContext):
             str(self.get_ap_state_key() or "unbound"), manual,
         )
         if observation is None and getattr(self, "inventory_observation_port", None) is not None:
-            observation = self.inventory_observation_port.observe_inventory(
+            observation = await self._observe_native_inventory(self.inventory_observation_port,
                 room_seed_name=self.room_seed_name,
                 epoch=evidence.epoch,
                 context_identity=context.identity,
@@ -3214,9 +3217,10 @@ class DoomEternalContext(CommonContext):
 
     def _emit_ammo_refill(self, *args, **kwargs):
         emit_launcher_event(*args, **kwargs)
-        self._publish_native_ammo_refill(kwargs.get("source") or kwargs.get("status") or "owner")
+        source = kwargs.get("source") or kwargs.get("status") or "owner"
+        self.session_tasks.start(lambda: self._publish_native_ammo_refill(source))
 
-    def _publish_native_ammo_refill(self, source):
+    async def _publish_native_ammo_refill(self, source):
         self._ammo_projection_confirmed = None
         socket = getattr(getattr(self, "server", None), "socket", None)
         state_key = getattr(self, "state_key", "")
@@ -3225,8 +3229,10 @@ class DoomEternalContext(CommonContext):
         snapshot = self.ammo.balance() if bound else {"authoritative": False}
         connected = bool(bound and socket is not None and not socket.closed)
         try:
-            link = self.native_game_link()
-            result = link.publish_ammo_refill(snapshot, connected=connected)
+            link = (await self._native_game_link_async())
+            result = (await self._native_call(link, 'publish_ammo_refill', snapshot, connected=connected))
+        except StaleNativeResult:
+            return None
         except Exception as exc:
             logger.info("AMMO_NATIVE_PUBLICATION_UNCONFIRMED source=%s reason=%s", source, exc)
             return None
@@ -3253,15 +3259,15 @@ class DoomEternalContext(CommonContext):
         self._observe_ammo_receipts()
         self.ammo.schedule_overflow(source)
 
-    def _ammo_refill_readiness(self):
+    async def _ammo_refill_readiness(self):
         socket = getattr(getattr(self, "server", None), "socket", None)
         evidence = read_gameplay_save_evidence()
         return ammo_readiness(
             placement_ready=bool(self.location_setup.complete), item_ready=bool(self.item_state_ready),
             connected=bool(socket is not None and not socket.closed),
             namespace_match=bool(self._queue_session_authoritative and queue_session_namespace(self.state_key) is not None),
-            marker=self.runtime_lifecycle.map_identity.cached_marker, active_lease=self._active_materialization_lease(),
-            native_safe=bool(evidence is not None and evidence.native_safe), runtime_ready=self.runtime_effects_ready(evidence),
+            marker=self.runtime_lifecycle.map_identity.cached_marker, active_lease=(await self._active_materialization_lease()),
+            native_safe=bool(evidence is not None and evidence.native_safe), runtime_ready=(await self.runtime_effects_ready(evidence)),
             active_slot=self.active_save_slot, available=self.ammo.available,
         )
 
@@ -3290,7 +3296,7 @@ class DoomEternalContext(CommonContext):
     async def request_ammo_refill(self):
         self._observe_ammo_receipts()
         work = self.runtime_lifecycle.capture_work()
-        identity = (self.state_key, self.active_save_slot, self._active_materialization_lease())
+        identity = (self.state_key, self.active_save_slot, (await self._active_materialization_lease()))
         deadline = time.monotonic() + 30
         waiting = False
         while True:
@@ -3298,11 +3304,11 @@ class DoomEternalContext(CommonContext):
                 raise asyncio.CancelledError
             evidence = read_gameplay_save_evidence()
             if (not self.runtime_lifecycle.work_is_current(work)
-                    or identity != (self.state_key, self.active_save_slot, self._active_materialization_lease())
+                    or identity != (self.state_key, self.active_save_slot, (await self._active_materialization_lease()))
                     or evidence is None or evidence.state != "gameplay"):
                 emit_launcher_event("ammo_refill", status="cancelled", message="Ammo Refill cancelled: the room, save or level changed.")
                 return False
-            readiness = self._ammo_refill_readiness()
+            readiness = (await self._ammo_refill_readiness())
             if readiness[0] not in {"native_safe", "runtime_effects_ready"}:
                 break
             if not waiting:
@@ -3477,8 +3483,7 @@ class DoomEternalContext(CommonContext):
                     self.materialization.trigger("mission_complete")
                 self.snapshot_fast_travel_eligibility(refresh=True)
             self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
-            self.reconcile_checked_automap_cleanup("server_checked_update")
-            self.reconcile_fast_travel_unlock("server_checked_update")
+            self.session_tasks.start(lambda: self._reconcile_server_checks("server_checked_update"))
             self.session_tasks.start(self.check_mission_challenge_locations)
             self.session_tasks.start(lambda: self.evaluate_campaign_goal("server checked update"))
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
@@ -3531,8 +3536,7 @@ class DoomEternalContext(CommonContext):
     def _complete_connected(self, placements):
         self.server_checked_locations_ready = True
         self.onboard_bootstrap("on_connect")
-        self.reconcile_checked_automap_cleanup("server_connected")
-        self.reconcile_fast_travel_unlock("connected")
+        self.session_tasks.start(lambda: self._reconcile_server_checks("server_connected"))
         self.session_tasks.start(self.check_mission_challenge_locations)
         self.session_tasks.start(lambda: self.evaluate_campaign_goal("server connected"))
         if self._item_delivery_wakeup:
@@ -3586,6 +3590,13 @@ class DoomEternalContext(CommonContext):
         self._schedule_item_delivery("packet")
         self._schedule_ammo_refill_overflow_normalization("received_items")
 
+    async def _reconcile_server_checks(self, trigger):
+        try:
+            await self.reconcile_checked_automap_cleanup(trigger)
+            await self.reconcile_fast_travel_unlock(trigger)
+        except StaleNativeResult:
+            return
+
     def _schedule_item_delivery(self, trigger):
         """Coalesce packet wakeups into one event-loop delivery runner."""
         exit_event = getattr(self, "exit_event", None)
@@ -3605,6 +3616,8 @@ class DoomEternalContext(CommonContext):
                 await self.process_pending_item_receipts("packet")
                 if self._item_delivery_waiting_for_state:
                     return
+        except StaleNativeResult:
+            return
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -3654,11 +3667,11 @@ class DoomEternalContext(CommonContext):
                 return False
 
             if trigger != "packet":
-                self._reconcile_native_receipt_owners(trigger)
+                (await self._reconcile_native_receipt_owners(trigger))
             if self.session_state.get("weapon_points") is not None:
                 try:
-                    owner, authoritative = self.weapon_points_receipt_owner()
-                    owner.reconcile(authoritative)
+                    owner, authoritative = (await self.weapon_points_receipt_owner())
+                    await owner.reconcile_async(authoritative, self._native_call)
                 except (RuntimeError, OSError, ValueError) as error:
                     logger.warning("[WUP] Native checkpoint reconciliation deferred: %s", error)
             batch_count = 0
@@ -3792,7 +3805,7 @@ class DoomEternalContext(CommonContext):
 
                 if item_id == 7770903:
                     try:
-                        self._apply_weapon_points_receipt(item_index, network_item)
+                        (await self._apply_weapon_points_receipt(item_index, network_item))
                     except (RuntimeError, OSError, ValueError) as error:
                         logger.error("[WUP] Receipt %s blocked: %s", item_index, error)
                         self.item_delivery_blocked = True
@@ -3804,7 +3817,7 @@ class DoomEternalContext(CommonContext):
                     if time.monotonic() < self._rune_budget_retry[2]:
                         break
                     try:
-                        result = self._apply_native_owner_receipt(item_index, network_item)
+                        result = (await self._apply_native_owner_receipt(item_index, network_item))
                     except (RuntimeError, OSError, ValueError) as error:
                         native_result = getattr(error, "native_result", None)
                         budget_refused = (
@@ -3925,7 +3938,7 @@ class DoomEternalContext(CommonContext):
                     item_id, getattr(runtime_context, "campaign", None),
                     slot_data.get("special_weapon"),
                 )
-                materialization_lease = self._active_materialization_lease(runtime_context)
+                materialization_lease = (await self._active_materialization_lease(runtime_context))
                 replay_policy = ITEM_REPLAY_POLICIES.get(item_id)
                 context_allows_item = bool(
                     runtime_context is not None
@@ -3969,11 +3982,11 @@ class DoomEternalContext(CommonContext):
                         state_key=getattr(self, "state_key", None),
                     )
                     if item_id == 7770904:
-                        self._reconcile_blood_punch(trigger)
+                        (await self._reconcile_blood_punch(trigger))
                     if item_id in SUPPORT_RUNE_IDS or materialization_lease is None or (
                         runtime_context is not None and runtime_context.campaign != "Base"
                     ):
-                        self._trigger_live_context_materialization()
+                        (await self._trigger_live_context_materialization())
                     batch_count += 1
                     continue
                 if (
@@ -4114,7 +4127,7 @@ class DoomEternalContext(CommonContext):
                     if not self.receipt_session.is_current(receipt_session_token, getattr(self, "state_key", "")):
                         return False
 
-            self._flush_deferred_frag_upgrades()
+            (await self._flush_deferred_frag_upgrades())
             self.receipt_session.prune_processed_packets()
             return True
 
@@ -4194,7 +4207,7 @@ class DoomEternalContext(CommonContext):
         """Clear proof authority at a gameplay/process lifecycle boundary."""
         self.save_observer.invalidate_proof()
 
-    def ingest_visible_runtime_lifecycle(self, evidence=None, lifecycle_markers=None):
+    async def ingest_visible_runtime_lifecycle(self, evidence=None, lifecycle_markers=None):
         """Accept fresh FirstThink markers as live-map and load-epoch authority."""
         lease = getattr(self, "runtime_observation_lease", None)
         evidence_epoch = getattr(evidence, "epoch", None)
@@ -4209,14 +4222,14 @@ class DoomEternalContext(CommonContext):
             else discover_active_map_markers()
         )
         if not markers:
-            return self.advance_known_map_materialization(evidence)
+            return (await self.advance_known_map_materialization(evidence))
         newest_mtime, newest_path = markers[-1]
         started = getattr(lease, "started_ns", None) if lease else None
         action = self.runtime_lifecycle.authored_timestamp_action(newest_mtime, started)
         if action == "ignore":
-            return self.advance_known_map_materialization(evidence)
+            return (await self.advance_known_map_materialization(evidence))
         if action == "native_fallback":
-            return self.advance_known_map_materialization(evidence)
+            return (await self.advance_known_map_materialization(evidence))
         marker_data = parse_active_map_marker(newest_path, newest_mtime)
         if marker_data is None:
             self.invalidate_map_identity("malformed_marker")
@@ -4238,12 +4251,12 @@ class DoomEternalContext(CommonContext):
             cleanup_active_map_marker_file(marker_path)
         return True
 
-    def advance_known_map_materialization(self, evidence):
+    async def advance_known_map_materialization(self, evidence):
         """Advance epoch from a fresh native load edge or transition."""
         cached = getattr(self, "cached_map_identity", None)
         if cached is None or cached.get("native_scope") or cached.get("materialization_suspended"):
             evidence = evidence or read_gameplay_save_evidence()
-            if self._recover_native_materialization(evidence):
+            if (await self._recover_native_materialization(evidence)):
                 return True
             if cached and cached.get("native_scope"):
                 return False
@@ -4415,9 +4428,9 @@ class DoomEternalContext(CommonContext):
             )
         return marker_data
 
-    def read_active_map_identity(self, evidence=None):
+    async def read_active_map_identity(self, evidence=None):
         lease = getattr(self, "runtime_observation_lease", None)
-        self.ingest_visible_runtime_lifecycle(evidence=evidence)
+        (await self.ingest_visible_runtime_lifecycle(evidence=evidence))
         if lease is not None and not lease.process_probe():
             self.invalidate_active_save_proof()
             return self.invalidate_map_identity("game_not_running")
@@ -4431,7 +4444,7 @@ class DoomEternalContext(CommonContext):
         if cached.get("materialization_suspended"):
             return None
         if cached.get("native_scope"):
-            return cached if self.runtime_effects_ready(evidence) else None
+            return cached if (await self.runtime_effects_ready(evidence)) else None
         marker_mtime = cached.get("mtime_ns", 0)
         if lease is not None and lease.started_ns and marker_mtime < lease.started_ns:
             return self.invalidate_map_identity("stale_marker")
@@ -4468,10 +4481,10 @@ class DoomEternalContext(CommonContext):
             proof,
         )
 
-    def admitted_campaign_save(self, filename="game_duration.dat"):
+    async def admitted_campaign_save(self, filename="game_duration.dat"):
         try:
-            link = self.native_game_link()
-            native_root = link.admitted_save_root()
+            link = (await self._native_game_link_async())
+            native_root = (await self._native_call(link, 'admitted_save_root'))
             self.save_observer.bind_ap_provider(link.namespace, native_root)
             return save_files.admitted_ap_save(STEAM_REMOTE_DIR, native_root, filename)
         except (RuntimeError, OSError, ValueError) as error:
@@ -4502,12 +4515,12 @@ class DoomEternalContext(CommonContext):
                 row["gate_key"] = row["slayer_gate"] and gate_key in owned
                 row["gate_complete"] = row["slayer_gate"] and gate_checks.get(
                     row["title"] + " - Slayer Gate Complete") in self.checked_locations
-            self.synchronize_fortress_phase(projection)
+            (await self.synchronize_fortress_phase(projection))
             from doom_eap.runtime.mission_presentation import MissionPresentations
             if not hasattr(self, "_mission_presentations"):
                 self._mission_presentations = MissionPresentations(REPO_ROOT,
                                                                     MISSION_CHALLENGE_ENTRIES)
-            link = self.native_game_link()
+            link = (await self._native_game_link_async())
             facts = self.check_observation()
             pending = self.physical_checks.pending(facts)
             generation = self._connected_slot_data["native_generation_fingerprint"]
@@ -4537,7 +4550,8 @@ class DoomEternalContext(CommonContext):
             projection["ratings"] = {row["stage"]: ratings[row["stage"]]
                                      for row in projection["rows"]
                                      if row["revealed"] and row["stage"] in ratings}
-            result = await asyncio.to_thread(self._campaign_menu.synchronize, link, projection)
+            result = await self._blocking_native_worker().call(
+                self._campaign_menu.synchronize, link, projection, process=link._process_identity)
             from doom_eap.runtime.presentation_hints import PresentationHints
             hints = getattr(self, "_presentation_hints", None)
             if hints is None or hints.namespace != link.namespace:
@@ -4565,16 +4579,16 @@ class DoomEternalContext(CommonContext):
                 logger.info("[Campaign] Native menu pending: %s", reason)
                 self._campaign_menu_refusal = reason
 
-    def synchronize_fortress_phase(self, projection):
+    async def synchronize_fortress_phase(self, projection):
         """Project server chronology after native arrival, including stage exits.
 
         This never loads a map. The existing native queue/lifecycle owns entity
         execution and rejects a command after its materialization lease expires.
         """
         evidence = read_gameplay_save_evidence()
-        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not self.runtime_effects_ready(evidence):
+        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not (await self.runtime_effects_ready(evidence)):
             return
-        lease = self._active_materialization_lease()
+        lease = (await self._active_materialization_lease())
         if lease is None:
             return
         phase = projection["fortress_phase"]
@@ -4603,13 +4617,13 @@ class DoomEternalContext(CommonContext):
             self._fortress_phase_publication = identity
             logger.info("[Campaign] Fortress phase=%s queued for lease=%s; native execution pending", phase, lease)
 
-    def update_save_slot_lifecycle(self):
+    async def update_save_slot_lifecycle(self):
         """Keep an authoritative slot through transient samples; prove switches."""
         evidence = read_gameplay_save_evidence()
-        admitted = self.admitted_campaign_save()
+        admitted = (await self.admitted_campaign_save())
         if admitted is not None and evidence is not None and evidence.state == "gameplay":
             from doom_eap.contracts.save_observation import admitted_evidence_matches
-            link = self.native_game_link()
+            link = (await self._native_game_link_async())
             facts = getattr(link, "save_admission", {})
             if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, facts):
                 self.save_observer.set_frozen(True)
@@ -4617,8 +4631,8 @@ class DoomEternalContext(CommonContext):
                     evidence_slot=evidence.slot_directory, candidate_slot=admitted.slot_directory,
                     candidate_mtime=admitted.mtime_ns, active_slot=self.active_save_slot, marker_map=evidence.map_name)
                 return None
-        self.ingest_visible_runtime_lifecycle(evidence=evidence)
-        marker = self.read_active_map_identity(evidence=evidence)
+        (await self.ingest_visible_runtime_lifecycle(evidence=evidence))
+        marker = (await self.read_active_map_identity(evidence=evidence))
         marker_map = marker["runtime_map"] if marker else None
         marker_context = classify_runtime_context(marker_map) if marker_map else None
         evidence_context = None
@@ -4716,7 +4730,7 @@ class DoomEternalContext(CommonContext):
             if decision.reset_observation_slot:
                 self.invalidate_save_observation_slot(decision.continued.slot_directory)
             self.save_observer.continue_selection(decision.continued)
-            self.reconcile_fast_travel_unlock("save_proof")
+            (await self.reconcile_fast_travel_unlock("save_proof"))
             return decision.continued
 
         selected = admitted if admitted and admitted.slot_directory == decision.target_slot else None
@@ -4843,7 +4857,7 @@ class DoomEternalContext(CommonContext):
             self.arm_final_sin_completion_candidate(
                 selected, details, active_map, proof_load_epoch
             )
-            self.reconcile_fast_travel_unlock("save_proof")
+            (await self.reconcile_fast_travel_unlock("save_proof"))
             return selected
         else:
             if not self.mission_select_observation_map:
@@ -4865,11 +4879,11 @@ class DoomEternalContext(CommonContext):
             self.arm_final_sin_completion_candidate(
                 selected, details, active_map, proof_load_epoch
             )
-            self.reconcile_fast_travel_unlock("save_proof")
+            (await self.reconcile_fast_travel_unlock("save_proof"))
             return selected
 
-    def observe_active_game_details(self):
-        selected = self.update_save_slot_lifecycle()
+    async def observe_active_game_details(self):
+        selected = (await self.update_save_slot_lifecycle())
         return read_game_details_for_selection(selected) if selected else None
 
     def get_ap_state_key(self):
@@ -4933,9 +4947,15 @@ class DoomEternalContext(CommonContext):
         )
         return selected
 
-    def check_and_update_event_session(self):
+    async def check_and_update_event_session(self):
         current_key = self.get_ap_state_key()
-        if not current_key or not doom_process_identity():
+        if not current_key:
+            return False
+        try:
+            identity = await self._query_process_identity()
+        except StaleNativeResult:
+            return False
+        if not identity or current_key != self.get_ap_state_key():
             return False
 
         session_file = Path(INV_DUMP_DIR) / "ap_event_session.json"
@@ -5164,11 +5184,14 @@ class DoomEternalContext(CommonContext):
             return
         quarantine_incompatible_receipt_jobs(self.state_key)
         self._queue_session_authoritative = True
-        self.check_and_update_event_session()
+        self.session_tasks.start(self.check_and_update_event_session)
 
     def native_game_link(self):
-        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, namespace_id
         identity = doom_process_identity()
+        return self._native_game_link_for_identity(identity)
+
+    def _native_game_link_for_identity(self, identity):
+        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, namespace_id
         if not identity or not identity.startswith("windows:"):
             raise RuntimeError("Sentinel requires a qualified Windows game process")
         namespace = namespace_id(self.room_seed_name, self.team, self.slot,
@@ -5191,27 +5214,59 @@ class DoomEternalContext(CommonContext):
                 command_prefix=command, environment=environment,
                 diagnostic=lambda evidence: log_item_event("ITEM_NATIVE_PROBE_RESPONSE", **evidence))
             self._native_link_key = key
+            self._native_link._process_identity = identity
         return self._native_link
 
-    def weapon_points_receipt_owner(self):
+    def _native_work_identity(self):
+        return (self.state_key, self.room_seed_name, self.team, self.slot, id(self.session_state),
+                self.runtime_lifecycle.capture_work(), self.receipt_session.capture(self.state_key),
+                self._connected_slot_data.get("native_generation_fingerprint"), self.exit_event.is_set())
+
+    def _blocking_native_worker(self):
+        from doom_eap.runtime.native_worker import NativeWorker
+        if not hasattr(self, "_native_worker"):
+            self._native_worker = NativeWorker(self._native_work_identity, doom_process_identity)
+        return self._native_worker
+
+    async def _query_process_identity(self):
+        def query():
+            identity = doom_process_identity()
+            return identity if identity and doom_process_identity() == identity else None
+
+        return await self._blocking_native_worker().call(query)
+
+    async def _native_game_link_async(self):
+        identity = await self._query_process_identity()
+        return self._native_game_link_for_identity(identity)
+
+    async def _native_call(self, link, method, *args, **kwargs):
+        return await self._blocking_native_worker().call(
+            getattr(link, method), *args, process=getattr(link, "_process_identity", None), **kwargs)
+
+    async def _observe_native_inventory(self, port, **kwargs):
+        link = await self._native_game_link_async()
+        return await self._blocking_native_worker().call(
+            port.observe_inventory, **kwargs, link=link, process=link._process_identity)
+
+    async def weapon_points_receipt_owner(self):
         from doom_eap.runtime.weapon_points import WeaponPointReceipts
-        link = self.native_game_link()
+        link = (await self._native_game_link_async())
         authoritative = {index: receipt_identity(item) for index, item in enumerate(self.items_received)
                          if item.item == 7770903}
         return WeaponPointReceipts(self.session_state, self.persist_session_state, link, link.namespace), authoritative
 
-    def _reconcile_blood_punch(self, trigger):
+    async def _reconcile_blood_punch(self, trigger):
         if "progressive_blood_punch_v1" not in self._connected_slot_data.get("required_capabilities", ()):
             return
         starting = sum(fact.quantity for fact in self.receipt_session.starting_materialization
                        if fact.item_id == 7770904)
         received = sum(item.item == 7770904 for item in self.items_received[:self.items_processed])
         desired = min(4, max(starting, received))
-        lease = self._active_materialization_lease()
+        lease = (await self._active_materialization_lease())
         if not desired or lease is None:
             return
         try:
-            observed = self.native_game_link().observe_blood_punch()
+            observed = (await self._native_call((await self._native_game_link_async()), 'observe_blood_punch'))
             missing = [stage for stage in range(desired) if not observed & (1 << stage)]
             for stage in missing:
                 plan = compile_item_delivery_plan(7770904, ITEM_ID_TO_COMMAND, stage=stage)
@@ -5235,12 +5290,12 @@ class DoomEternalContext(CommonContext):
             fact.item_id == 7770011 and fact.quantity for fact in self.receipt_session.starting_materialization
         )
 
-    def _flush_deferred_frag_upgrades(self):
+    async def _flush_deferred_frag_upgrades(self):
         pending = self.session_state.get("deferred_frag_items", {})
-        if not pending or not self.runtime_effects_ready():
+        if not pending or not (await self.runtime_effects_ready()):
             return
         context = self._refresh_runtime_context(getattr(self, "_connected_slot_data", {}))
-        lease = self._active_materialization_lease(context)
+        lease = (await self._active_materialization_lease(context))
         if lease is None:
             return
         for key, item_id in sorted(pending.items(), key=lambda entry: (entry[1] != 7770011, int(entry[0]))):
@@ -5260,9 +5315,9 @@ class DoomEternalContext(CommonContext):
             del pending[key]
             self.persist_session_state()
 
-    def _reconcile_native_receipt_owners(self, trigger):
-        self._flush_deferred_frag_upgrades()
-        self._reconcile_blood_punch(trigger)
+    async def _reconcile_native_receipt_owners(self, trigger):
+        (await self._flush_deferred_frag_upgrades())
+        (await self._reconcile_blood_punch(trigger))
         authoritative = self.items_received[:min(self.items_processed, len(self.items_received))]
         hook_owned = any(item.item == 7770083 for item in authoritative)
         mastery_mask = 0
@@ -5312,15 +5367,15 @@ class DoomEternalContext(CommonContext):
             if not desired:
                 continue
             try:
-                link = self.native_game_link()
-                result = (link.ensure_meat_hook() if domain == "arsenal" else
-                           link.ensure_normal_runes(desired) if domain == "normal_runes" else
-                           link.ensure_support_runes(desired) if domain == "support_runes" else
-                           link.ensure_masteries(desired) if domain == "arsenal_mastery" else
-                           link.ensure_progressive_special_weapon(desired, hammer_only=True) if domain == "hammer" else
-                          link.ensure_progressive_special_weapon(desired))
+                link = (await self._native_game_link_async())
+                result = ((await self._native_call(link, 'ensure_meat_hook')) if domain == "arsenal" else
+                           (await self._native_call(link, 'ensure_normal_runes', desired)) if domain == "normal_runes" else
+                           (await self._native_call(link, 'ensure_support_runes', desired)) if domain == "support_runes" else
+                           (await self._native_call(link, 'ensure_masteries', desired)) if domain == "arsenal_mastery" else
+                           (await self._native_call(link, 'ensure_progressive_special_weapon', desired, hammer_only=True)) if domain == "hammer" else
+                          (await self._native_call(link, 'ensure_progressive_special_weapon', desired)))
                 if domain in {"special", "hammer"}:
-                    self._synchronize_special_preference(link, result)
+                    (await self._synchronize_special_preference(link, result))
                 log_item_event(
                     "ITEM_NATIVE_OWNER_RECONCILED", domain=domain, trigger=trigger,
                     desired_count=int(desired), boundary=self.items_processed,
@@ -5339,17 +5394,20 @@ class DoomEternalContext(CommonContext):
                     trigger=trigger, boundary=self.items_processed, state_key=getattr(self, "state_key", None),
                 )
 
-    def _synchronize_special_preference(self, link, result):
+    async def _synchronize_special_preference(self, link, result):
         if not result.get("flags", 0) & 4096 or not result.get("native_state_known", 0) & 8:
             return
         preferences = config.setdefault("special_selection", {})
         if not isinstance(preferences, dict):
             raise ValueError("special_selection configuration must be a namespace mapping")
-        process = (doom_process_identity(), link.namespace)
+        identity = await self._query_process_identity()
+        if identity != link._process_identity:
+            raise StaleNativeResult("Game process changed before saving special preference")
+        process = (identity, link.namespace)
         if getattr(self, "_special_preference_process", None) != process:
             saved = preferences.get(link.namespace)
             if type(saved) is int and saved in (1, 2) and saved != result["native_selected"]:
-                result = link.select_special_weapon(saved)
+                result = (await self._native_call(link, 'select_special_weapon', saved))
             self._special_preference_process = process
         selected = result["native_selected"]
         if selected in (1, 2) and preferences.get(link.namespace) != selected:
@@ -5358,12 +5416,12 @@ class DoomEternalContext(CommonContext):
             log_item_event("ITEM_SPECIAL_PREFERENCE_SAVED", namespace=link.namespace,
                            selected=selected, source="core_policy", config_path=str(CONFIG_FILE))
 
-    def _apply_native_owner_receipt(self, index, item):
-        link = self.native_game_link()
+    async def _apply_native_owner_receipt(self, index, item):
+        link = (await self._native_game_link_async())
         if item.item == 7770083:
-            result = link.ensure_meat_hook()
+            result = (await self._native_call(link, 'ensure_meat_hook'))
         elif item.item in MASTERY_ITEM_BITS:
-            result = link.ensure_masteries(MASTERY_ITEM_BITS[item.item])
+            result = (await self._native_call(link, 'ensure_masteries', MASTERY_ITEM_BITS[item.item]))
         elif item.item in NORMAL_RUNE_ITEM_BITS or item.item in SUPPORT_RUNE_IDS:
             bits = SUPPORT_RUNE_ITEM_BITS if item.item in SUPPORT_RUNE_IDS else NORMAL_RUNE_ITEM_BITS
             mask = 0
@@ -5372,7 +5430,7 @@ class DoomEternalContext(CommonContext):
                     mask |= bits.get(fact.item_id, 0)
             for receipt in self.items_received[:index + 1]:
                 mask |= bits.get(receipt.item, 0)
-            result = link.ensure_support_runes(mask) if item.item in SUPPORT_RUNE_IDS else link.ensure_normal_runes(mask)
+            result = (await self._native_call(link, 'ensure_support_runes', mask)) if item.item in SUPPORT_RUNE_IDS else (await self._native_call(link, 'ensure_normal_runes', mask))
         else:
             hammer_only = item.item == 7770902
             count = min(2 if hammer_only else 3, max(
@@ -5381,8 +5439,8 @@ class DoomEternalContext(CommonContext):
             ))
             if not count:
                 raise ValueError("Progressive Special Weapon receipt count is empty")
-            result = (link.ensure_progressive_special_weapon(count, hammer_only=True) if hammer_only
-                      else link.ensure_progressive_special_weapon(count))
+            result = ((await self._native_call(link, 'ensure_progressive_special_weapon', count, hammer_only=True)) if hammer_only
+                      else (await self._native_call(link, 'ensure_progressive_special_weapon', count)))
         if ENABLE_ITEM_NOTIFICATIONS:
             accepted, description = self.spool_deferred_receipt_notification(item.item, index)
             if not accepted:
@@ -5390,10 +5448,10 @@ class DoomEternalContext(CommonContext):
         self._acknowledge_receipt(item)
         return result
 
-    def _apply_weapon_points_receipt(self, index, item):
+    async def _apply_weapon_points_receipt(self, index, item):
         received_item_classification(7770903, item.flags)
-        owner, authoritative = self.weapon_points_receipt_owner()
-        owner.deliver(index, receipt_identity(item), authoritative)
+        owner, authoritative = (await self.weapon_points_receipt_owner())
+        await owner.deliver_async(index, receipt_identity(item), authoritative, self._native_call)
         if ENABLE_ITEM_NOTIFICATIONS:
             accepted, description = self.spool_deferred_receipt_notification(7770903, index)
             if not accepted:
@@ -5527,7 +5585,7 @@ class DoomEternalContext(CommonContext):
                 raise
         return observation
 
-    def _reconciliation_eligibility(self, *, require_connection):
+    async def _reconciliation_eligibility(self, *, require_connection):
         socket = getattr(getattr(self, "server", None), "socket", None)
         block = reconciliation_session_block(
             item_ready=self.item_state_ready, require_connection=require_connection,
@@ -5539,11 +5597,11 @@ class DoomEternalContext(CommonContext):
             return None, block
         evidence = read_gameplay_save_evidence()
         gameplay = evidence is not None and evidence.state == "gameplay"
-        marker = self.read_active_map_identity(evidence=evidence) if gameplay else None
+        marker = (await self.read_active_map_identity(evidence=evidence)) if gameplay else None
         context = classify_runtime_context(marker["runtime_map"]) if marker else None
         block = reconciliation_runtime_block(
             evidence=evidence, marker=marker,
-            runtime_ready=bool(marker and self.runtime_effects_ready(evidence)),
+            runtime_ready=bool(marker and (await self.runtime_effects_ready(evidence))),
             campaign=getattr(context, "campaign", None), active_slot=self.active_save_slot,
             active_epoch=self.active_native_evidence_epoch,
             active_map=canonical_map_name(marker["runtime_map"]) if marker else None,
@@ -5567,15 +5625,15 @@ class DoomEternalContext(CommonContext):
             materialization_lease=materialization_lease, context_identity=context_identity,
         )
 
-    def _manual_reconcile_inventory_unlocked(self, *, observation=None, selected_item_ids=None):
+    async def _manual_reconcile_inventory_unlocked(self, *, observation=None, selected_item_ids=None):
         """Queue current-context persistent ownership without mutating AP receipt state."""
-        evidence, error = self._reconciliation_eligibility(require_connection=True)
+        evidence, error = (await self._reconciliation_eligibility(require_connection=True))
         if error:
             return None, error
         try:
-            plan, error = self._context_materialize_inventory(
+            plan, error = (await self._context_materialize_inventory(
                 evidence, trigger="manual", manual=True, observation=observation, selected_item_ids=selected_item_ids
-            )
+            ))
         except ValueError as error:
             log_item_event(
                 "ITEM_RECONCILIATION_BLOCKED",
@@ -5620,8 +5678,8 @@ class DoomEternalContext(CommonContext):
         )
         return plan, None
 
-    def manual_reconcile_inventory(self, *, observation=None):
-        return self._manual_reconcile_inventory_unlocked(observation=observation)
+    async def manual_reconcile_inventory(self, *, observation=None):
+        return (await self._manual_reconcile_inventory_unlocked(observation=observation))
 
     async def manual_reconcile_inventory_async(self, *, observation=None, domain="all", item_id=None):
         from doom_eap.contracts.inventory_domain import selected_persistent_items
@@ -5636,7 +5694,7 @@ class DoomEternalContext(CommonContext):
             if (not self.runtime_lifecycle.work_is_current(work)
                     or identity != (self.state_key, self.room_seed_name, self.context_identity)):
                 return None, "Inventory resync cancelled: the room, save or level changed. Request it again."
-            _, error = self._reconciliation_eligibility(require_connection=True)
+            _, error = (await self._reconciliation_eligibility(require_connection=True))
             if not error:
                 break
             evidence = read_gameplay_save_evidence()
@@ -5654,9 +5712,9 @@ class DoomEternalContext(CommonContext):
             if (not self.runtime_lifecycle.work_is_current(work)
                     or identity != (self.state_key, self.room_seed_name, self.context_identity)):
                 return None, "Inventory resync cancelled: the room, save or level changed. Request it again."
-            plan, error = self._manual_reconcile_inventory_unlocked(
+            plan, error = (await self._manual_reconcile_inventory_unlocked(
                 observation=observation, selected_item_ids=selected,
-            )
+            ))
             if error or plan is None:
                 return plan, error
             return await self._observe_inventory_repair(plan, work, identity)
@@ -5666,14 +5724,14 @@ class DoomEternalContext(CommonContext):
         deadline = time.monotonic() + 3
         while time.monotonic() < deadline:
             await asyncio.sleep(0.1)
-            evidence, eligibility_error = self._reconciliation_eligibility(require_connection=True)
+            evidence, eligibility_error = (await self._reconciliation_eligibility(require_connection=True))
             if (eligibility_error or not self.runtime_lifecycle.work_is_current(work)
                     or identity != (self.state_key, self.room_seed_name, self.context_identity)):
                 return plan, "Repair dispatched; context changed before ownership could be observed"
             port = getattr(self, "inventory_observation_port", None)
             if port is None:
                 break
-            native = port.observe_inventory(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
+            native = await self._observe_native_inventory(port, room_seed_name=self.room_seed_name, epoch=evidence.epoch,
                 context_identity=self.context_identity, campaign=CONTEXT_BY_IDENTITY[self.context_identity].campaign)
             if native is None or native.is_stale_for(room_seed_name=self.room_seed_name, epoch=evidence.epoch,
                                    context_identity=self.context_identity):
@@ -5692,13 +5750,13 @@ class DoomEternalContext(CommonContext):
             self.persist_session_state()
             logger.info("RESYNC_READBACK status=%s detail=%s", "pending" if error else "observed", error or "owned")
 
-    def automatic_reconcile_inventory(self, reason, *, observation=None):
+    async def automatic_reconcile_inventory(self, reason, *, observation=None):
         """Run one guarded resync routing through the single reconciliation authority."""
         if reason in {"reconnect", "level_ready"}:
             self.materialization.trigger(reason)
             return None, None
         fingerprint = receipt_history_fingerprint(self.items_received)
-        evidence, error = self._reconciliation_eligibility(require_connection=True)
+        evidence, error = (await self._reconciliation_eligibility(require_connection=True))
         if error:
             self.materialization.log_automatic_noop(
                 reason,
@@ -5718,7 +5776,7 @@ class DoomEternalContext(CommonContext):
         ):
             self.materialization.log_automatic_noop(reason, "dlc_context_ignored", evidence.epoch, fingerprint)
             return None, None
-        materialization_lease = self._active_materialization_lease(context)
+        materialization_lease = (await self._active_materialization_lease(context))
         if materialization_lease is None:
             self.materialization.log_automatic_noop(
                 reason,
@@ -5752,9 +5810,9 @@ class DoomEternalContext(CommonContext):
         )
         try:
             self.validate_item_history_prefix()
-            plan, error = self._context_materialize_inventory(
+            plan, error = (await self._context_materialize_inventory(
                 evidence, trigger=reason, manual=False, observation=observation
-            )
+            ))
         except ValueError as error:
             self.materialization.record_automatic_failure(reason, evidence.epoch, fingerprint)
             self.persist_session_state()
@@ -5804,7 +5862,7 @@ class DoomEternalContext(CommonContext):
         self.persist_session_state()
         return epoch
 
-    def observe_rune_native_state(self):
+    async def observe_rune_native_state(self):
         """Read distinct Rune surfaces only from lifecycle-proven active save."""
         if not self.has_authoritative_save_proof() or not self.active_save_slot:
             return None, "authoritative active-save proof required"
@@ -5813,15 +5871,15 @@ class DoomEternalContext(CommonContext):
         if evidence_epoch is None:
             evidence_epoch = self.active_native_evidence_epoch or "unknown"
         return RuneNativeState.from_game_details(
-            self.observe_active_game_details(),
+            (await self.observe_active_game_details()),
             save_slot=self.active_save_slot,
             evidence_epoch=evidence_epoch,
         ), None
 
-    def observe_owned_rune_plan(self):
+    async def observe_owned_rune_plan(self):
         if not self.item_state_ready:
             return None, "item state is not ready"
-        native, error = self.observe_rune_native_state()
+        native, error = (await self.observe_rune_native_state())
         if error:
             return None, error
         try:
@@ -5832,8 +5890,8 @@ class DoomEternalContext(CommonContext):
             return None, str(error)
         return plan, None
 
-    def reconcile_owned_runes(self, trigger, *, force=False):
-        plan, error = self.observe_owned_rune_plan()
+    async def reconcile_owned_runes(self, trigger, *, force=False):
+        plan, error = (await self.observe_owned_rune_plan())
         if error:
             if trigger != "level_ready":
                 logger.info("RUNE_RECONCILE_NOOP trigger=%s detail=%s", trigger, error)
@@ -5844,11 +5902,11 @@ class DoomEternalContext(CommonContext):
             publisher=reconciliation_publisher(), persist=self.persist_session_state, force=force,
         )
 
-    def observe_rune_diagnostic_lines(self):
-        native, error = self.observe_rune_native_state()
+    async def observe_rune_diagnostic_lines(self):
+        native, error = (await self.observe_rune_native_state())
         authority = "authoritative"
         if error:
-            candidate = self.observe_active_game_details()
+            candidate = (await self.observe_active_game_details())
             if not isinstance(candidate, dict):
                 return [
                     "Rune diagnostic unavailable: "
@@ -5860,7 +5918,7 @@ class DoomEternalContext(CommonContext):
                 evidence_epoch=getattr(self, "active_native_evidence_epoch", None) or "unknown",
             )
             authority = "observational"
-        plan, plan_error = self.observe_owned_rune_plan()
+        plan, plan_error = (await self.observe_owned_rune_plan())
         owned_perks = (
             ", ".join(sorted(entry.perk for entry in plan.entries)) or "-"
             if plan is not None
@@ -5909,11 +5967,11 @@ class DoomEternalContext(CommonContext):
     def fast_travel_eligibility_snapshot(self):
         return self.fast_travel.eligibility
 
-    def reconcile_fast_travel_unlock(self, trigger):
+    async def reconcile_fast_travel_unlock(self, trigger):
         return self.fast_travel.reconcile(
             trigger, map_identity=self.runtime_lifecycle.map_identity,
             room_identity=self.get_ap_state_key(), state_key=self.state_key,
-            runtime_ready=self.runtime_effects_ready(), item_ready=self.item_state_ready,
+            runtime_ready=(await self.runtime_effects_ready()), item_ready=self.item_state_ready,
             rpc_ready=rpc_execution_enabled(), send=send_command,
         )
 
@@ -5926,13 +5984,13 @@ class DoomEternalContext(CommonContext):
     async def process_level_ready(self, newest_path=None):
         """Adapt native observations and apply the ordered effects of an accepted job."""
         evidence = read_gameplay_save_evidence()
-        self.read_active_map_identity(evidence=evidence)
+        (await self.read_active_map_identity(evidence=evidence))
         self.snapshot_fast_travel_eligibility()
         marker = self.cached_map_identity
         epoch = marker.get("gameplay_epoch") if isinstance(marker, Mapping) else None
         if not self.level_ready.can_start(epoch):
             return False
-        if not self.level_ready.observe_readiness(epoch, self.runtime_effects_ready(evidence), getattr(evidence, "state", None)):
+        if not self.level_ready.observe_readiness(epoch, (await self.runtime_effects_ready(evidence)), getattr(evidence, "state", None)):
             return False
         slot_data = getattr(self, "_connected_slot_data", {})
         active_context = self._refresh_runtime_context(slot_data)
@@ -5956,9 +6014,9 @@ class DoomEternalContext(CommonContext):
                 if not self.receipt_session.is_current(receipt_token, self.state_key) or not self.level_ready.is_current(job):
                     return False
                 evidence = read_gameplay_save_evidence()
-                self.read_active_map_identity(evidence=evidence)
+                (await self.read_active_map_identity(evidence=evidence))
                 if not self.level_ready.observe_resume(
-                    job, self.runtime_lifecycle.map_identity, self.runtime_effects_ready(evidence), settled=True,
+                    job, self.runtime_lifecycle.map_identity, (await self.runtime_effects_ready(evidence)), settled=True,
                 ):
                     return False
             if self.level_ready.needs_preparation(job, "reconciliation"):
@@ -5971,7 +6029,7 @@ class DoomEternalContext(CommonContext):
                 self.level_ready.prepared(job, "reconciliation")
             rune_error = None
             if self.level_ready.needs_preparation(job, "runes"):
-                _, rune_error = self.reconcile_owned_runes("level_ready")
+                _, rune_error = (await self.reconcile_owned_runes("level_ready"))
                 if rune_error:
                     self.level_ready.wait(job, rune_error, domain="runes")
                 else:
@@ -5980,16 +6038,16 @@ class DoomEternalContext(CommonContext):
                 self.advance_automap_cleanup_epoch()
                 self.level_ready.prepared(job, "cleanup_epoch")
             if self.level_ready.needs_preparation(job, "cleanup"):
-                self.reconcile_checked_automap_cleanup("level_ready")
+                (await self.reconcile_checked_automap_cleanup("level_ready"))
                 self.level_ready.prepared(job, "cleanup")
             await self.check_mission_challenge_locations()
             if not self.receipt_session.is_current(receipt_token, self.state_key) or not self.level_ready.is_current(job):
                 return False
             evidence = read_gameplay_save_evidence()
-            self.read_active_map_identity(evidence=evidence)
-            if not self.level_ready.observe_resume(job, self.runtime_lifecycle.map_identity, self.runtime_effects_ready(evidence)):
+            (await self.read_active_map_identity(evidence=evidence))
+            if not self.level_ready.observe_resume(job, self.runtime_lifecycle.map_identity, (await self.runtime_effects_ready(evidence))):
                 return False
-            _, context_error = self._context_materialize_inventory(evidence, trigger="level_ready")
+            _, context_error = (await self._context_materialize_inventory(evidence, trigger="level_ready"))
             if context_error == "materialization queued; awaiting native application":
                 self.level_ready.wait(job, "native_materialization_pending")
                 return False
@@ -5998,7 +6056,7 @@ class DoomEternalContext(CommonContext):
                 return False
             if rune_error:
                 return False
-            self.reconcile_fast_travel_unlock("level_ready")
+            (await self.reconcile_fast_travel_unlock("level_ready"))
             self.level_ready.complete(job)
             return True
         finally:
@@ -6013,12 +6071,12 @@ class DoomEternalContext(CommonContext):
         return self.level_ready.completed
 
 
-    def reconcile_checked_automap_cleanup(self, trigger):
+    async def reconcile_checked_automap_cleanup(self, trigger):
         if self.server_checked_locations_ready:
             checked = frozenset(getattr(self, "checked_locations", ()))
             try:
-                link = self.native_game_link()
-                result = link.publish_checked_locations(checked, time.time_ns())
+                link = (await self._native_game_link_async())
+                result = (await self._native_call(link, 'publish_checked_locations', checked, time.time_ns()))
                 publication = (result.get("pid"), result.get("process_created"),
                                result.get("lifecycle_generation"), checked)
                 if publication != self._native_automap_published:
@@ -6043,7 +6101,7 @@ class DoomEternalContext(CommonContext):
             room_identity=self.get_ap_state_key(), state_key=self.state_key,
             checked=getattr(self, "checked_locations", None),
             checked_ready=self.server_checked_locations_ready,
-            runtime_ready=self.runtime_effects_ready(), rpc_ready=rpc_execution_enabled(), send=send_command,
+            runtime_ready=(await self.runtime_effects_ready()), rpc_ready=rpc_execution_enabled(), send=send_command,
         )
 
     def record_local_automap_cleanup_ownership(self, location_id, event_paths):
@@ -6291,21 +6349,33 @@ class DoomEternalContext(CommonContext):
         )
 
 
-    def queue_received_deathlink(self):
+    async def queue_received_deathlink(self):
         try:
             ready = (not self.runtime_observers_frozen and self.has_authoritative_save_proof()
-                     and self.runtime_effects_ready())
+                     and (await self.runtime_effects_ready()))
             if ready and self.deathlink.receiving:
                 discard_queued_coalesced_command("deathlink-kill", self.state_key)
-            self.deathlink.advance(
-                ready,
-                deathlink_publication(self),
-            )
+            if not self.deathlink.receiving:
+                return
+            identity = await self._query_process_identity()
+            link = self._native_game_link_for_identity(identity) if identity else None
+            session = copy.copy(self.deathlink)
+            before = copy.deepcopy(self.deathlink._receiver.__dict__)
+            session._receiver = copy.deepcopy(self.deathlink._receiver)
+            def require_link():
+                if link is None:
+                    raise RuntimeError("Sentinel requires a qualified Windows game process")
+                return link
+            publication = DeathLinkPublication(require_link, session.active_event, session.mode)
+            await self._blocking_native_worker().call(
+                session.advance, ready, publication, process=identity)
+            if self.deathlink._receiver.__dict__ == before:
+                self.deathlink._receiver.__dict__.update(session._receiver.__dict__)
         except RuntimeError as error:
             logger.info("[DeathLink] Native receive pending: %s", error)
 
     async def check_game_duration_death(self):
-        selected = self.update_save_slot_lifecycle()
+        selected = (await self.update_save_slot_lifecycle())
         if not selected:
             # The durable-save path is available but deliberately frozen until
             # native gameplay evidence promotes a slot. Do not fall back to a
@@ -6340,7 +6410,7 @@ class DoomEternalContext(CommonContext):
         self.observe_mission_challenges(
             snapshot["mission_challenge_records"], selected
         )
-        marker = self.read_active_map_identity()
+        marker = (await self.read_active_map_identity())
         event_identity = self.death_observer.observe_checkpoint(
             snapshot, selected, self.active_save_proof_load_epoch,
             marker["runtime_map"] if marker else "unknown",
@@ -6416,7 +6486,7 @@ class DoomEternalContext(CommonContext):
             self.check_observation(), self.check_publication())
 
     async def check_mission_challenge_locations(self):
-        self.ingest_visible_runtime_lifecycle()
+        (await self.ingest_visible_runtime_lifecycle())
         token = self.receipt_session.capture(self.state_key)
         for entry in MISSION_CHALLENGE_ENTRIES:
             await self.check_mission_challenge_location(entry)
@@ -6432,14 +6502,26 @@ class DoomEternalContext(CommonContext):
         await self.check_weapon_mastery_location(STICKY_MASTERY_ENTRY)
 
     async def check_game_details_death(self):
-        details = self.observe_active_game_details()
+        details = (await self.observe_active_game_details())
         if self.death_observer.observe_details(details):
             logger.info("[DeathLink] LOCAL_DEATH_OBSERVED source=game.details path=%s", details.get("_path"))
             await self.report_local_death()
 
     async def report_local_death(self):
-        await self.deathlink.report_local_death(self.auth, self.send_death, deathlink_publication(self),
+        from types import SimpleNamespace
+        event, mode = self.deathlink.active_event, self.deathlink.mode
+        cancellations = []
+        publication = SimpleNamespace(cancel=cancellations.append)
+        await self.deathlink.report_local_death(self.auth, self.send_death, publication,
             grace=load_config().get("death_link_grace", 0), persist=self.persist_session_state)
+        for state_key in cancellations:
+            try:
+                link = await self._native_game_link_async()
+                publication = DeathLinkPublication(lambda: link, event, mode)
+                await self._blocking_native_worker().call(
+                    publication.cancel, state_key, process=link._process_identity)
+            except (RuntimeError, OSError) as error:
+                logger.warning("[DeathLink] Native cancellation unavailable: %s", error)
 
     @staticmethod
     def goal_objective_ids(slot_data, server_locations):
@@ -6497,7 +6579,7 @@ class DoomEternalContext(CommonContext):
 
     async def check_campaign_goal_event(self):
         """Consume independent map files and native transition triggers."""
-        if not self.check_and_update_event_session():
+        if not (await self.check_and_update_event_session()):
             return False
         receipt_token = self.receipt_session.capture(self.state_key)
         observed = False
@@ -6636,7 +6718,7 @@ class DoomEternalContext(CommonContext):
             return False
         if not self.goals.candidate_slot_allowed(self.active_save_proof_authoritative, self.active_save_proof_slot):
             return False
-        selected = self.admitted_campaign_save()
+        selected = (await self.admitted_campaign_save())
         if selected and selected.slot_directory != candidate["slot"]:
             selected = None
         details = read_game_details_for_selection(selected) if selected else None
@@ -6662,11 +6744,11 @@ class DoomEternalContext(CommonContext):
             return
         if not self.receipt_session.is_current(receipt_token, self.state_key):
             return
-        marker = self.read_active_map_identity(evidence=read_gameplay_save_evidence())
+        marker = (await self.read_active_map_identity(evidence=read_gameplay_save_evidence()))
         active_map = canonical_map_name(marker["runtime_map"]) if marker else ""
         if not active_map:
             return
-        details = self.observe_active_game_details()
+        details = (await self.observe_active_game_details())
         if not details:
             return
         intent = self.goals.observe_completion(details, self.persist_session_state)
@@ -6689,9 +6771,9 @@ class DoomEternalContext(CommonContext):
             return
         await self.evaluate_campaign_goal("central objective evaluator")
 
-    def check_rpc_autopause(self):
+    async def check_rpc_autopause(self):
         evidence = read_gameplay_save_evidence()
-        marker = self.read_active_map_identity(evidence=evidence)
+        marker = (await self.read_active_map_identity(evidence=evidence))
 
         if marker is None:
             self.bootstrap.observe_supported_map(None)
@@ -6703,7 +6785,7 @@ class DoomEternalContext(CommonContext):
         if getattr(evidence, "state", None) != "gameplay":
             return
         self.snapshot_fast_travel_eligibility()
-        self.reconcile_fast_travel_unlock("map_ready")
+        (await self.reconcile_fast_travel_unlock("map_ready"))
         if self.bootstrap.observe_supported_map(map_name):
             self.onboard_bootstrap("on_supported_map_load")
 
@@ -6715,14 +6797,16 @@ class DoomEternalContext(CommonContext):
         link = None
         try:
             if game_running:
-                link = self.native_game_link()
+                link = (await self._native_game_link_async())
                 if link.namespace != tracker.namespace:
                     return
-                snapshot = await asyncio.to_thread(link.observe_combat, set(CONTEXT_BY_MAP))
+                snapshot = await self._native_call(link, "observe_combat", set(CONTEXT_BY_MAP))
                 if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
                     return
                 tracker.consume(snapshot, self.persist_session_state)
             self._killsanity_observation_error = None
+        except StaleNativeResult:
+            return
         except Exception as error:
             signature = str(error)
             if signature != getattr(self, "_killsanity_observation_error", None):
@@ -6732,8 +6816,11 @@ class DoomEternalContext(CommonContext):
             return
         if game_running and link is not None:
             try:
-                await tracker.present(link, getattr(self, "killsanity_counter_visible", True))
+                await tracker.present(link, getattr(self, "killsanity_counter_visible", True),
+                                      run=lambda method, *args: self._native_call(link, "publish_combat_progress", *args))
                 self._killsanity_presentation_error = None
+            except StaleNativeResult:
+                return
             except Exception as error:
                 signature = str(error)
                 if signature != getattr(self, "_killsanity_presentation_error", None):
@@ -6790,9 +6877,9 @@ class DoomEternalContext(CommonContext):
                 await asyncio.sleep(0.25)
                 continue
             await self.prime_death_baseline()
-            self.check_rpc_autopause()
-            self.queue_received_deathlink()
-            game_running = bool(doom_process_identity())
+            (await self.check_rpc_autopause())
+            (await self.queue_received_deathlink())
+            game_running = bool((await self._query_process_identity()))
             await self.check_killsanity(game_running)
             if not game_running:
                 await asyncio.sleep(1.0)
@@ -6823,7 +6910,7 @@ class DoomEternalContext(CommonContext):
     async def flush_check_event_files(self):
         get_key = getattr(self, "get_ap_state_key", None)
         state_key = get_key() if get_key else None
-        if not state_key or not self.check_and_update_event_session():
+        if not state_key or not (await self.check_and_update_event_session()):
             return
 
         event_paths_by_location = {}
@@ -6893,6 +6980,8 @@ class DoomEternalContext(CommonContext):
             try:
                 if self.item_state_ready and self.server and self.server.socket and not self.server.socket.closed:
                     await self.flush_check_event_files()
+            except StaleNativeResult:
+                continue
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -6918,7 +7007,7 @@ class DoomEternalContext(CommonContext):
             if not self.item_state_ready:
                 await asyncio.sleep(0.25)
                 continue
-            if not doom_process_identity():
+            if not (await self._query_process_identity()):
                 self.invalidate_map_identity("game_not_running")
                 await asyncio.sleep(4.0)
                 continue
@@ -6933,7 +7022,7 @@ class DoomEternalContext(CommonContext):
                 )
 
             self._observe_ammo_receipts()
-            self._publish_native_ammo_refill("tracker")
+            (await self._publish_native_ammo_refill("tracker"))
             if self.server and self.server.socket and not self.server.socket.closed:
                 try:
                     evidence = read_gameplay_save_evidence()
@@ -6946,10 +7035,12 @@ class DoomEternalContext(CommonContext):
                     if markers:
                         _, newest_path = markers[-1]
                         try:
-                            self.ingest_visible_runtime_lifecycle(
+                            (await self.ingest_visible_runtime_lifecycle(
                                 evidence=evidence,
                                 lifecycle_markers=markers,
-                            )
+                            ))
+                        except StaleNativeResult:
+                            continue
                         except Exception as exc:
                             logger.error(
                                 "[RPC] Auto-RPC failed to consume telemetry ready file %s: %s",
@@ -6972,15 +7063,17 @@ class DoomEternalContext(CommonContext):
                             migrate_direct_item_command_jobs(self.state_key)
                     if getattr(evidence, "state", None) == "gameplay":
                         self.onboard_bootstrap("on_reconnect")
-                        self.reconcile_checked_automap_cleanup("connect_or_reconnect")
+                        (await self.reconcile_checked_automap_cleanup("connect_or_reconnect"))
                     if not self.repair_item_mappings():
                         await asyncio.sleep(0.25)
                         continue
                     if not self.reconnect_resync_attempted:
-                        _, resync_error = self.automatic_reconcile_inventory("reconnect")
+                        _, resync_error = (await self.automatic_reconcile_inventory("reconnect"))
                         if resync_error is None:
                             self.reconnect_resync_attempted = True
-                            self.reconcile_owned_runes("reconnect")
+                            (await self.reconcile_owned_runes("reconnect"))
+                except StaleNativeResult:
+                    continue
                 except Exception as exc:
                     logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
 
@@ -6992,11 +7085,11 @@ class DoomEternalContext(CommonContext):
                     await self.check_mission_challenge_locations()
                     if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
                         continue
-                    self.reconcile_fast_travel_unlock("readiness")
+                    (await self.reconcile_fast_travel_unlock("readiness"))
                 if self.materialization.snapshot.triggers:
-                    _, context_error = self._context_materialize_inventory(
+                    _, context_error = (await self._context_materialize_inventory(
                         evidence, trigger=None
-                    )
+                    ))
                     if context_error:
                         logger.info(
                             "[Context] MATERIALIZATION_PENDING reason=%s",
@@ -7017,6 +7110,8 @@ class DoomEternalContext(CommonContext):
             try:
                 await self.death_monitor_loop()
                 return
+            except StaleNativeResult:
+                continue
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -7038,6 +7133,8 @@ class DoomEternalContext(CommonContext):
             try:
                 await self.tracker_loop()
                 break
+            except StaleNativeResult:
+                continue
             except asyncio.CancelledError:
                 logger.info("[Supervisor] TRACKER_STOPPED (clean shutdown)")
                 self.tracker_alive = False
@@ -7185,6 +7282,29 @@ async def launcher_control_loop(ctx):
             emit_launcher_event("chat_sent", text=text)
 
 
+def report_server_stop(ctx, task):
+    try:
+        error = task.exception()
+    except asyncio.CancelledError:
+        error = None
+    if ctx.exit_event.is_set():
+        ctx.reset_queue_session_authority("server_loop_stopped")
+        return
+    ctx.reset_queue_session_authority("server_loop_stopped")
+    if ctx._room_session_established and not ctx.disconnected_intentionally:
+        # CommonClient owns autoreconnect after an established session.
+        # connection_lost already describes this outage to the launcher.
+        return
+    if error is not None:
+        emit_launcher_event(
+            "error",
+            code="server_loop_failed",
+            message=f"{type(error).__name__}: {error}",
+        )
+    else:
+        emit_launcher_event("disconnected")
+
+
 async def amain(launch_args=None):
     start_bridge_logger()
     log_effective_runtime_paths()
@@ -7203,7 +7323,7 @@ async def amain(launch_args=None):
         set_rpc_execution(False)
     except Exception as error:
         logger.warning("[RPC] Initial RPC gate disarm failed: %s", error)
-    if doom_process_identity():
+    if await ctx._query_process_identity():
         cleanup_active_map_markers()
         cleanup_ammo_refill_request_files()
         cleanup_telemetry_dumps()
@@ -7236,29 +7356,10 @@ async def amain(launch_args=None):
             await original_process_server_cmd(client_ctx, package)
 
         APCommonClient.process_server_cmd = launcher_process_server_cmd
-    ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
-    def report_server_stop(task):
-        if ctx.exit_event.is_set():
-            ctx.reset_queue_session_authority("server_loop_stopped")
-            return
-        ctx.reset_queue_session_authority("server_loop_stopped")
-        if ctx._room_session_established and not ctx.disconnected_intentionally:
-            # CommonClient owns autoreconnect after an established session.
-            # connection_lost already describes this outage to the launcher.
-            return
-        try:
-            error = task.exception()
-        except asyncio.CancelledError:
-            error = None
-        if error is not None:
-            emit_launcher_event(
-                "error",
-                code="server_loop_failed",
-                message=f"{type(error).__name__}: {error}",
-            )
-        else:
-            emit_launcher_event("disconnected")
-    ctx.server_task.add_done_callback(report_server_stop)
+    from doom_eap.runtime.server_connection import server_loop as bridge_server_loop
+    APCommonClient.server_loop = bridge_server_loop
+    ctx.server_task = asyncio.create_task(bridge_server_loop(ctx), name="server loop")
+    ctx.server_task.add_done_callback(lambda task: report_server_stop(ctx, task))
 
     if gui_enabled:
         raise RuntimeError("DOOM Eternal bridge worker requires --nogui")
@@ -7279,6 +7380,10 @@ async def amain(launch_args=None):
     await ctx.session_tasks.close()
     await asyncio.gather(*tasks, return_exceptions=True)
     await ctx.shutdown()
+    await ctx._publish_native_ammo_refill("bridge_shutdown")
+    await ctx.session_tasks.close()
+    if hasattr(ctx, "_native_worker"):
+        ctx._native_worker.close()
     await ctx.connection_diagnostics.close()
     APCommonClient.websockets = ctx.connection_diagnostics.websockets
 

@@ -86,10 +86,10 @@ class Killsanity:
             self._toast_range = (self._toast_range[0] or crossed[0][0], crossed[-1][0], self.milestones[0][0])
         return tuple(location for _, location in crossed)
 
-    async def present(self, link, visible):
+    async def present(self, link, visible, run=asyncio.to_thread):
         epoch, notices = self._epoch, self._toast_range
         counter = self.counter()
-        await asyncio.to_thread(link.publish_combat_progress, counter["total"], counter["target"] or 0,
+        await run(link.publish_combat_progress, counter["total"], counter["target"] or 0,
                                 *notices, visible and counter["target"] is not None)
         if epoch == self._epoch and notices == self._toast_range:
             self._toast_range = (0, 0, 0)

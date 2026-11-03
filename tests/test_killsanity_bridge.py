@@ -5,6 +5,7 @@ import json
 import logging
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -62,12 +63,15 @@ def test_late_observation_or_presentation_cannot_publish_after_rebind(bridge, ph
 
     ctx = SimpleNamespace(
         killsanity=kills, item_state_ready=True, state_key='room', session_state=session,
-        native_game_link=lambda: SimpleNamespace(namespace=namespace, observe_combat=observe,
-                                                publish_combat_progress=present),
+        _native_game_link_async=AsyncMock(return_value=SimpleNamespace(
+            namespace=namespace, observe_combat=observe, publish_combat_progress=present)),
         persist_session_state=lambda: committed.append(kills.total),
         check_observation=lambda: CheckObservation(frozenset(), frozenset(), frozenset({1}), True, True),
         check_publication=lambda: CheckPublication(send, lambda location: None, 30),
     )
+    async def native_call(link, method, *args):
+        return await asyncio.to_thread(getattr(link, method), *args)
+    ctx._native_call = native_call
     asyncio.run(bridge.DoomEternalContext.check_killsanity(ctx, True))
     assert sent == []
     assert committed == ([100] if phase == 'present' else [])
