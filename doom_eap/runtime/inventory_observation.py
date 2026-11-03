@@ -17,10 +17,13 @@ class SentinelInventoryObservation:
         self.log_event = log_event
         self.last_logged = None
 
-    def observe_inventory(self, *, room_seed_name, epoch, context_identity, campaign):
+    def _native_inventory(self, link):
+        link = link or self.context.native_game_link()
+        return link, link.observe_inventory()
+
+    def observe_inventory(self, *, room_seed_name, epoch, context_identity, campaign, link=None):
         try:
-            link = self.context.native_game_link()
-            result = link.observe_inventory()
+            link, result = self._native_inventory(link)
         except (RuntimeError, OSError, ValueError) as error:
             self.logger.info("INVENTORY_OBSERVATION_DEFERRED detail=%s", error)
             return None

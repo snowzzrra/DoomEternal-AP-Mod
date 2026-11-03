@@ -1176,7 +1176,9 @@ class RoomCompiler:
     def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> dict[str, list[str]]:
         from dataclasses import replace
 
-        from tools.maps.native_recipe_materializer import materialize_native_recipe_calls
+        from tools.maps.native_recipe_materializer import (
+            MAX_POSITION_DIAGNOSTICS, MAX_POSITION_DIAGNOSTICS_PER_MAP, materialize_native_recipe_calls,
+        )
         from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
         from tools.release.room_payloads import read_source_snapshots
 
@@ -1218,6 +1220,7 @@ class RoomCompiler:
             resource_roots[row["runtime_map"]] = sorted(roots - {""})
         compiler = ModCompiler(ROOT)
         neutral_manifest = replace(manifest, options=self._compile_options(manifest.options), static_precompile=True)
+        spawn_diagnostics = []
         with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
             staged = Path(temporary)
             for map_key, row in sorted(changed_maps.items()):
@@ -1227,7 +1230,7 @@ class RoomCompiler:
                 if member not in assembled:
                     raise ValueError(f"Enemy generation map is not active: {map_key}")
                 materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
-                    enemy_revision=9)
+                    enemy_revision=9, diagnostics=spawn_diagnostics)
                 source_path = staged / f"{map_key}.source"
                 output_path = staged / f"{map_key}.entities"
                 source_path.write_bytes(materialized.encode("utf-8"))
@@ -1247,6 +1250,11 @@ class RoomCompiler:
                 entries.extend({"name": name, "mapResourceType": kind}
                                for kind, name in map_assets[map_key] if (kind, name) not in existing)
                 assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
+        assembled['enemy_spawn_diagnostics.json'] = (json.dumps({
+            'positions': spawn_diagnostics, 'limit': MAX_POSITION_DIAGNOSTICS,
+            'limit_per_map': MAX_POSITION_DIAGNOSTICS_PER_MAP,
+            'limit_reached': len(spawn_diagnostics) >= MAX_POSITION_DIAGNOSTICS,
+        }, sort_keys=True) + '\n').encode('utf8')
         return resource_roots
 
     def _apply_boon_resources(self, assembled, manifest, resource_roots):

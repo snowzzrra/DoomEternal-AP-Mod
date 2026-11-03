@@ -278,6 +278,12 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             os.environ["APPDATA"] = str(fake_user_config)
             os.environ["LOCALAPPDATA"] = str(fake_user_state)
 
+            # the controller would otherwise download a Core release into this temporary directory
+            from doom_eap.launcher.launcher_platform import launcher_user_paths
+            fake_paths = launcher_user_paths()
+            fake_paths.config_dir.mkdir(parents=True, exist_ok=True)
+            (fake_paths.config_dir / "launcher.json").write_text(json.dumps({"core_auto_update": False}))
+
             from doom_eap.launcher.launcher_controller import LauncherController, LauncherState
             controller = LauncherController(application_dir=fixture_app)
             if controller.state != LauncherState.IDLE:

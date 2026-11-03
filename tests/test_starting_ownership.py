@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -74,9 +75,9 @@ def context_for(bridge, tmp_path, monkeypatch):
     bind_starting(ctx.receipt_session)
     runtime = RuntimeContext("base/hub", "Base", ("game/hub/hub",), ("hub",), frozenset())
     monkeypatch.setattr(ctx, "_refresh_runtime_context", lambda _: runtime)
-    monkeypatch.setattr(ctx, "_active_materialization_lease", lambda _=None: "1:1")
-    monkeypatch.setattr(ctx, "_flush_deferred_frag_upgrades", lambda: None)
-    monkeypatch.setattr(ctx, "_reconcile_native_receipt_owners", lambda _: None)
+    monkeypatch.setattr(ctx, "_active_materialization_lease", AsyncMock(return_value="1:1"))
+    monkeypatch.setattr(ctx, "_flush_deferred_frag_upgrades", AsyncMock())
+    monkeypatch.setattr(ctx, "_reconcile_native_receipt_owners", AsyncMock())
     state_path = tmp_path / "saved-state.json"
     monkeypatch.setattr(ctx, "persist_session_state", lambda: state_path.write_text(json.dumps(ctx.session_state)))
     monkeypatch.setattr(ctx, "_persist_receipt_progress", lambda _: ctx.persist_session_state())
@@ -195,9 +196,9 @@ def test_starting_currency_resumes_after_publication_refusal(bridge, tmp_path, m
             return len(commands) != 2
         publication = ReceiptPublication(send)
         with pytest.raises(MaterializationPlanError):
-            apply_starting_currencies(ctx, bridge.ITEM_ID_TO_COMMAND, publication)
+            await apply_starting_currencies(ctx, bridge.ITEM_ID_TO_COMMAND, publication)
         assert ctx.session_state["starting_currency"]["completed"] == {"7770016": 1}
-        apply_starting_currencies(ctx, bridge.ITEM_ID_TO_COMMAND, publication)
+        await apply_starting_currencies(ctx, bridge.ITEM_ID_TO_COMMAND, publication)
         assert len(commands) == 4
         assert ctx.session_state["starting_currency"]["completed"] == {"7770016": 2, "7770142": 1}
     asyncio.run(run())
@@ -210,12 +211,12 @@ def test_own_world_progressive_delivery_adds_to_starting_ownership(bridge, tmp_p
         def ensure(count, *, hammer_only=False):
             targets.append((count, hammer_only))
             return {"outcome": 0}
-        monkeypatch.setattr(ctx, "native_game_link", lambda: SimpleNamespace(ensure_progressive_special_weapon=ensure))
+        monkeypatch.setattr(ctx, "_native_game_link_async", AsyncMock(return_value=SimpleNamespace(ensure_progressive_special_weapon=ensure)))
         monkeypatch.setattr(bridge, "send_command", lambda *_args, **_kwargs: True)
         ctx.items_received = [SimpleNamespace(item=7770902, location=100, player=1, flags=1)]
         assert await ctx.process_pending_item_receipts("packet")
         assert targets == [(2, True)] and ctx.items_processed == 1
-        bridge.DoomEternalContext._reconcile_native_receipt_owners(ctx, "save_load")
+        await bridge.DoomEternalContext._reconcile_native_receipt_owners(ctx, "save_load")
         assert targets == [(2, True), (2, True)]
     asyncio.run(run())
 
@@ -226,9 +227,9 @@ def test_schema_7_blood_punch_repairs_starting_tiers(bridge, tmp_path, monkeypat
         ctx._connected_slot_data = {"compatibility": {"required_capabilities": ["slot_data_v7"]}}
         bind_starting(ctx.receipt_session, {"items": [[7770004, 1], [7770904, 2]], "weapon_item_id": 7770004})
         commands = []
-        monkeypatch.setattr(ctx, "native_game_link", lambda: SimpleNamespace(observe_blood_punch=lambda: 0))
+        monkeypatch.setattr(ctx, "_native_game_link_async", AsyncMock(return_value=SimpleNamespace(observe_blood_punch=lambda: 0)))
         monkeypatch.setattr(bridge, "send_command", lambda command, **_: commands.append(command) or True)
-        ctx._reconcile_blood_punch("save_load")
+        await ctx._reconcile_blood_punch("save_load")
         assert len(commands) == 2
     asyncio.run(run())
 

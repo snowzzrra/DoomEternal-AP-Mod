@@ -3308,6 +3308,13 @@ class LauncherUI(QMainWindow):
         message = "Game connection files selected." if event.get("type") == "core_runtime_selected" else event.get("message", "")
         self.core_status.setText(str(message))
 
+    def _log_installation_failure(self, event, stdout, stderr):
+        self._append_log(str(event.get("message") or "Installation failed. Select Help -> SAVE SUPPORT REPORT."))
+        if stdout:
+            self._append_log(f"Injector stdout: {stdout[-500:]}")
+        if stderr:
+            self._append_log(f"Injector stderr: {stderr[-500:]}")
+
     def _handle_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", ""))
         self._append_session_event(event)
@@ -3626,7 +3633,7 @@ class LauncherUI(QMainWindow):
             if state == "applied":
                 self._append_log("Installation finished.")
             else:
-                self._append_log("Installation failed. Select Help -> SAVE SUPPORT REPORT.")
+                self._log_installation_failure(event, stdout, stderr)
         elif kind == "disconnected":
             self._connection_pending = False; self._room_connected = False; self._set_connection_controls(True)
             self._chat_pending_text = None; self._set_chat_enabled(False); self._set_hints_state("disconnected")

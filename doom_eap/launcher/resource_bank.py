@@ -255,11 +255,13 @@ def write_resource_bank(selected, cache):
     return target, receipt
 
 
-def read_masks(base):
-    from .campaign_resources import _records, resource_mapping_lines
-    mask = _records(base / 'meta.resources', {'generated/buildgame/container.mask'})['generated/buildgame/container.mask'][3]
+def mask_tables(mask):
+    if len(mask) < 8:
+        raise ValueError('Truncated native resource mask')
     tables, at = {}, 8
     for _ in range(_u32(mask, 4)):
+        if at + 12 > len(mask):
+            raise ValueError('Truncated native resource mask')
         end = at + 12 + 8 * _u32(mask, at + 8)
         if end > len(mask):
             raise ValueError('Truncated native resource mask')
@@ -267,6 +269,13 @@ def read_masks(base):
         at = end
     if at != len(mask):
         raise ValueError('Invalid native resource mask boundary')
+    return tables
+
+
+def read_masks(base):
+    from .campaign_resources import _records, resource_mapping_lines
+    mask = _records(base / 'meta.resources', {'generated/buildgame/container.mask'})['generated/buildgame/container.mask'][3]
+    tables = mask_tables(mask)
     result = {}
     for line in resource_mapping_lines(mask, (base / 'idRehash.map').read_text(encoding='utf-8-sig')):
         name, offset = line.rsplit(';', 1)

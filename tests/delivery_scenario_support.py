@@ -32,7 +32,7 @@ def environment(root):
         "DOOM_AP_LAUNCHER_EVENTS": "1", "HEADLESS": "1", "CI": "1",
         "LOCALAPPDATA": str(root), "APPDATA": str(root), "XDG_STATE_HOME": str(root),
         "PYTHONPATH": os.pathsep.join((str(ROOT / "packaging/standalone_runtime"), str(ROOT),
-                                     str(ROOT.parent / "Archipelago"))),
+                                     os.environ.get("ARCHIPELAGO_SOURCE", str(ROOT.parent / "Archipelago")))),
     })
     result.pop("ARCHIPELAGO_SOURCE", None)
     return result

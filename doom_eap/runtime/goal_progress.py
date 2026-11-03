@@ -1,5 +1,6 @@
 """Goal publication and delayed save completion; no discovery or lifecycle authority."""
 from types import MappingProxyType
+from time import monotonic
 from doom_eap.contracts.check_observation import CheckObservation, CheckPublicationPort
 from doom_eap.contracts.publisher_contracts import canonical_map_name
 
@@ -16,6 +17,9 @@ class GoalProgress:
         self._last_details_mtime = None
         self._completion_states = {}
         self._pending_objectives = None
+        self._diagnostic = None
+        self._diagnostic_time = 0
+        self._diagnostic_count = 0
 
     @property
     def sent(self):
@@ -32,6 +36,8 @@ class GoalProgress:
     def invalidate_publication(self):
         self._generation += 1
         self._in_flight = False
+        self._diagnostic = None
+        self._diagnostic_count = 0
 
     def bind(self, state_key, state):
         self.invalidate_publication()
@@ -74,13 +80,44 @@ class GoalProgress:
                 return "publish"
         return "pending"
 
-    async def evaluate(self, source_description, objective_ids, facts: CheckObservation, publication: CheckPublicationPort):
+    def _diagnose(self, source, objective_ids, facts, admitted, admission_missing, decision):
+        missing = objective_ids - facts.checked
+        diagnostic = (objective_ids, missing, facts.checked_ready, facts.connected,
+                      admitted, tuple(admission_missing), self._sent, self._in_flight, decision)
+        self._diagnostic_count += 1
+        now = monotonic()
+        if diagnostic == self._diagnostic and now - self._diagnostic_time < 30:
+            return
+        self._logger.info(
+            "[Goal] EVALUATION source=%s evaluations=%s checked_ready=%s connected=%s "
+            "admitted=%s admission_missing=%s objective_count=%s objective_ids=%s "
+            "missing_count=%s missing=%s sent=%s in_flight=%s decision=%s",
+            str(source)[:160], self._diagnostic_count, facts.checked_ready, facts.connected,
+            admitted, list(admission_missing)[:32], len(objective_ids), sorted(objective_ids)[:32],
+            len(missing), sorted(missing)[:32], self._sent, self._in_flight, decision,
+        )
+        self._diagnostic, self._diagnostic_time, self._diagnostic_count = diagnostic, now, 0
+
+    def _publication_block(self, admitted, facts):
+        if not admitted:
+            return "campaign_unavailable" if admitted is None else "campaign_not_admitted"
         if self._sent:
-            return True
+            return "already_sent"
         if self._in_flight:
-            return False
+            return "in_flight"
         if not facts.checked_ready:
-            return False
+            return "checked_not_ready"
+        return None
+
+    async def evaluate(self, source_description, objective_ids, facts: CheckObservation, publication: CheckPublicationPort,
+                       *, admitted=True, admission_missing=()):
+        def diagnose(decision):
+            self._diagnose(source_description, objective_ids, facts, admitted, admission_missing, decision)
+
+        decision = self._publication_block(admitted, facts)
+        if decision:
+            diagnose(decision)
+            return self._sent if admitted else False
         checked_locations = facts.checked
         missing = frozenset(objective_ids - checked_locations)
         pending = (bool(objective_ids), missing)
@@ -89,9 +126,15 @@ class GoalProgress:
             self._logger.info("[Goal] OBJECTIVES_OBSERVED contract_ready=%s missing=%s",
                               bool(objective_ids), sorted(missing))
         if not objective_ids or missing:
+            diagnose("missing_objectives" if objective_ids else "objectives_unavailable")
             return False
         if not facts.connected:
+            diagnose("disconnected")
             return False
+        diagnose("send")
+        return await self._publish_goal(source_description, objective_ids, publication)
+
+    async def _publish_goal(self, source_description, objective_ids, publication):
         self._in_flight = True
         self._logger.info(
             "[Goal] CLIENT_GOAL_SEND source=%s objective_ids=%s",
@@ -101,15 +144,19 @@ class GoalProgress:
         generation = self._generation
         try:
             await publication.goal()
-        except Exception:
+        except Exception as error:
+            self._logger.warning("[Goal] CLIENT_GOAL_RESULT result=error error_type=%s current=%s",
+                                 type(error).__name__, generation == self._generation)
             if generation != self._generation:
                 return False
             self._in_flight = False
             raise
         if generation != self._generation:
+            self._logger.info("[Goal] CLIENT_GOAL_RESULT result=stale")
             return False
         self._in_flight = False
         self._sent = True
+        self._logger.info("[Goal] CLIENT_GOAL_RESULT result=returned")
         return True
 
 

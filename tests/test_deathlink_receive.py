@@ -1,4 +1,6 @@
 from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState
+from doom_eap.runtime.deathlink_publication import DeathLinkDispatchError
+import pytest
 
 
 class FakeSpool:
@@ -79,3 +81,50 @@ def test_dispatch_failure_fails_safe_without_retry():
     assert result.state is ReceiveState.FAILED
     assert result.detail == "rpc_not_accepted"
     assert receiver.active is None
+
+
+def test_persistent_budget_refusal_expires_with_backoff_and_no_delivery():
+    receiver = DeathLinkReceiver()
+    receiver.receive("one", 0)
+    event = receiver.active
+    calls = []
+
+    def dispatch():
+        calls.append(True)
+        raise DeathLinkDispatchError(2, {"state": 4, "reason": 25})
+
+    def tick(now):
+        return receiver.advance(now=now, safe_gameplay=True, dispatch=dispatch, command_in_flight=lambda: False)
+
+    assert tick(1).detail == "native_budget_refused"
+    assert tick(2).detail == "retry_interval"
+    assert tick(3).detail == "native_budget_refused"
+    assert tick(59).detail == "native_budget_refused"
+    assert receiver.active is event and event.total_deadline == 60
+    assert tick(60).state is ReceiveState.EXPIRED
+    assert tick(61).state is None
+    assert len(calls) == 3 and event.attempts == event.deliveries == 0
+    assert receiver.confirm_local_death(61).detail == "not_linked"
+
+
+@pytest.mark.parametrize("error", [
+    OSError("transport interrupted"),
+    DeathLinkDispatchError(2, {"state": 6, "reason": 25}),
+    DeathLinkDispatchError(2, {"state": 4, "reason": 1}),
+    DeathLinkDispatchError(0, {"state": 4, "reason": 25}),
+])
+def test_uncertain_or_other_refusal_never_replays(error):
+    receiver = DeathLinkReceiver()
+    receiver.receive("one", 0)
+    calls = []
+
+    def dispatch():
+        calls.append(True)
+        raise error
+
+    def tick(now):
+        return receiver.advance(now=now, safe_gameplay=True, dispatch=dispatch, command_in_flight=lambda: False)
+
+    assert tick(1).state is ReceiveState.FAILED
+    assert tick(3).state is None
+    assert len(calls) == 1

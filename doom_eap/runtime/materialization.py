@@ -36,22 +36,22 @@ class MaterializationPlanError(ValueError):
         self.blocked = blocked
 
 
-def apply_starting_currencies(ctx, definitions, publication):
+async def apply_starting_currencies(ctx, definitions, publication):
     facts = ctx.receipt_session.resolved_starting_ownership
     for fact in facts:
         definition = definitions.get(fact.item_id)
         if isinstance(definition, dict) and definition.get("type") == "currency":
-            _apply_starting_currency(ctx, fact, definitions, publication)
+            await _apply_starting_currency(ctx, fact, definitions, publication)
 
 
-def _apply_starting_currency(ctx, fact, definitions, publication):
+async def _apply_starting_currency(ctx, fact, definitions, publication):
     if not ctx._queue_session_authoritative:
         raise MaterializationPlanError("starting currency requires a bound queue session")
     state, completed, count = _starting_currency_progress(ctx.session_state, fact)
     if count == fact.quantity:
         return
     context = ctx._refresh_runtime_context(ctx._connected_slot_data)
-    lease = ctx._active_materialization_lease(context)
+    lease = await ctx._active_materialization_lease(context)
     if context is None or lease is None:
         raise MaterializationPlanError("starting currency requires a ready game context")
     scope = ctx.receipt_publication_scope(materialization_lease=lease, context_identity=context.identity)

@@ -6,7 +6,6 @@ name: Generated room acceptance
       apworld_ref:
         description: Full 40-character APWorld commit to test with this Mod checkout
         required: true
-        default: b87c9d08875630df45469990c33246de7c5fcf6a
         type: string
 
 permissions:
@@ -78,7 +77,7 @@ jobs:
       - name: Prepare pinned frozen resources and decompressor
         if: matrix.profile == 'full'
         run: |
-          $resources = (Resolve-Path packaging/room_resources/v0.7.1).Path
+          $resources = (python -B -c "from tools.release.prebuilt_room_resources import get_frozen_bundle_dir; print(get_frozen_bundle_dir())").Trim()
           "DOOMEAP_ROOM_RESOURCES=$resources" >> $env:GITHUB_ENV
           $name = if ($IsWindows) { 'idFileDeCompressor.exe' } else { 'idFileDeCompressor' }
           $expected = if ($IsWindows) { '02488dfb2999542cee4b7c0713ec03dd534ddd876169aac43b0217b362427a06' } else { '8bd14670fdb5a47533c5a59e9b6e1e32eaa3f06ce8b7ad2b4a8df520348b9ab8' }

@@ -11,6 +11,7 @@ sc_command_request submitted{};
 const char* nativeVersion = SC_PRODUCT_VERSION;
 sentinel::ProbeResult nativeResult = sentinel::ProbeResult::ok;
 uint32_t nativeAvailability = SC_NATIVE_ENABLED;
+uint32_t commandOutcome = SC_COMMAND_DISPATCHED, nativeException = 0;
 }
 namespace sentinel {
 Inspection query_native(uint32_t, uint32_t, uint64_t) {
@@ -32,7 +33,8 @@ Inspection query_command(uint32_t, uint32_t, uint16_t operation, const sc_comman
     Inspection reply{};
     reply.result = ProbeResult::ok;
     reply.command.execution.state = terminal;
-    reply.command.outcome = SC_COMMAND_DISPATCHED;
+    reply.command.outcome = commandOutcome;
+    reply.command.native_exception = nativeException;
     if (operation == command_submit_operation) {
         assert(retained < SC_DIAGNOSTIC_CAPACITY);
         submitted = request;
@@ -73,6 +75,14 @@ int main() {
     terminal = SC_DIAGNOSTIC_REJECTED;
     assert(!client.ExecuteConsoleCommand("echo refused"));
     assert(retained == 0 && released == SC_DIAGNOSTIC_CAPACITY * 3 + 1);
+    terminal = SC_DIAGNOSTIC_EXECUTED;
+    commandOutcome = SC_COMMAND_NATIVE_FAILED;
+    nativeException = 0xC0000005;
+    std::string log;
+    client.SetLogCallback([&](const std::string& line) { log = line; });
+    assert(!client.ExecuteConsoleCommand("give ammo"));
+    assert(client.LastResult() == AP_RPC_AMBIGUOUS && client.LastTransportStatus() == nativeException);
+    assert(log.find("native_exception=3221225477") != std::string::npos && log.size() < 512);
     client.SetTargetProcess(0);
     assert(!client.PollHealth() && !client.Ready() && client.LastResult() == AP_RPC_PIPE_MISSING);
 }

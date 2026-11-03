@@ -82,3 +82,27 @@ def test_chat_echo_is_bounded_local_once_and_cannot_cross_connection(monkeypatch
     assert not feed.consume_echo(event)
     assert hints_key(1, 2) == "_read_hints_1_2"
     assert hints_key(True, 2) is None
+
+
+def test_real_unknown_merit_name_is_retained_with_bounded_display_text():
+    from doom_eap.runtime.location_names import resolve_placement_records
+
+    names = SimpleNamespace(
+        location_names=SimpleNamespace(lookup_in_slot=lambda *_: "Unknown Merit"),
+        item_names=SimpleNamespace(lookup_in_slot=lambda *_: "Unknown Merit"),
+        player_names={2: "Recipient"},
+    )
+    item = SimpleNamespace(item=123, player=2, flags=1)
+    record, = resolve_placement_records({10}, {10: item}, {2: object()}, names, 1)
+    assert record == dict(location_id=10, location_name="Unknown Merit", item_id=123,
+        item_name="Unknown Merit", recipient_slot=2, recipient_name="Recipient",
+        classification=1, trap=False, local=False)
+    names.item_names.lookup_in_slot = lambda *_: 123
+    names.location_names.lookup_in_slot = lambda *_: "x" * 200
+    bounded, = resolve_placement_records({10}, {10: item}, {2: object()}, names, 1)
+    assert bounded['item_name'] == "123" and bounded['location_name'] == "x" * 128
+    with pytest.raises(ValueError, match="recipient slot is unknown"):
+        resolve_placement_records({10}, {10: item}, {}, names, 1)
+    item.flags = True
+    with pytest.raises(ValueError, match="invalid item classification"):
+        resolve_placement_records({10}, {10: item}, {2: object()}, names, 1)

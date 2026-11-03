@@ -16,8 +16,8 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
     import asyncio
 
     root = Path(__file__).resolve().parents[1]
-    helper_path = root.parent / 'Sentinel-Core/tools/prepare_vanilla_backup.py'
-    if not helper_path.is_file() or not (root.parent / 'Archipelago/CommonClient.py').is_file():
+    helper_path = Path(os.environ.get('SENTINEL_CORE_SOURCE', root.parent / 'Sentinel-Core')) / 'tools/prepare_vanilla_backup.py'
+    if not helper_path.is_file() or not (Path(os.environ.get('ARCHIPELAGO_SOURCE', root.parent / 'Archipelago')) / 'CommonClient.py').is_file():
         pytest.skip('Source Archipelago and Core backup helper are required')
     steam = tmp_path / 'Steam/userdata/160032537/782330'
     local = tmp_path / 'local'
@@ -33,11 +33,13 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
         'bridge_log_dir': str(tmp_path / 'logs')}))
     monkeypatch.setenv('DOOM_AP_CONFIG_FILE', str(config))
     monkeypatch.setenv('DOOM_AP_APPLICATION_DIR', str(tmp_path))
-    monkeypatch.syspath_prepend(str(root.parent / 'Archipelago'))
+    monkeypatch.syspath_prepend(str(Path(os.environ.get('ARCHIPELAGO_SOURCE', root.parent / 'Archipelago'))))
     monkeypatch.syspath_prepend(str(root / 'packaging/standalone_runtime'))
     bridge = importlib.import_module('doom_eap.runtime.bridge_client')
+    monkeypatch.setattr(bridge, 'INV_DUMP_DIR', str(local))
     monkeypatch.setattr(bridge, 'doom_process_identity', lambda: None)
     context = SimpleNamespace(get_ap_state_key=lambda: 'new-room',
+        _query_process_identity=AsyncMock(return_value=None),
         quarantine_unbound_physical_events=Mock(side_effect=AssertionError('quarantine while stopped')))
     context.check_and_update_event_session = lambda: bridge.DoomEternalContext.check_and_update_event_session(context)
     spec = importlib.util.spec_from_file_location('backup_review', helper_path)
@@ -49,7 +51,7 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
 
     def connected_poll(*args, **kwargs):
         copied = copy_file(*args, **kwargs)
-        assert context.check_and_update_event_session() is False
+        assert asyncio.run(context.check_and_update_event_session()) is False
         asyncio.run(bridge.DoomEternalContext.flush_check_event_files(context))
         return copied
 
@@ -64,9 +66,9 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
     assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
     for name in ('tracker_loop', 'death_monitor_loop'):
         stopped = SimpleNamespace(exit_event=asyncio.Event(), item_state_ready=True,
-            prime_death_baseline=AsyncMock(),
+            prime_death_baseline=AsyncMock(), _query_process_identity=AsyncMock(return_value=None),
             reset_transient_effects=Mock(), invalidate_map_identity=Mock(),
-            check_rpc_autopause=Mock(), queue_received_deathlink=Mock(), check_killsanity=AsyncMock())
+            check_rpc_autopause=AsyncMock(), queue_received_deathlink=AsyncMock(), check_killsanity=AsyncMock())
 
         async def stop_after_poll(_delay):
             stopped.exit_event.set()
@@ -76,8 +78,9 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
             asyncio.run(getattr(bridge.DoomEternalContext, name)(stopped))
     assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
     monkeypatch.setattr(bridge, 'doom_process_identity', lambda: 'windows:42:99')
+    context._query_process_identity.return_value = 'windows:42:99'
     context.quarantine_unbound_physical_events = Mock()
-    assert context.check_and_update_event_session() is True
+    assert asyncio.run(context.check_and_update_event_session()) is True
     context.quarantine_unbound_physical_events.assert_called_once_with(old_state_key='old-room', new_state_key='new-room', reason='session_changed')
     assert json.loads((local / 'ap_event_session.json').read_text())['ap_state_key'] == 'new-room'
 

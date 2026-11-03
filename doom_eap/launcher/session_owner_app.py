@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from doom_eap.launcher.launcher_session import APSessionOwner
+from doom_eap.launcher.launcher_session import SESSION_PIPE_LIMIT, APSessionOwner
 from doom_eap.launcher.launcher_core import RoomSnapshot
 from doom_eap.launcher.launcher_platform import restore_standard_streams
 from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
@@ -38,8 +38,8 @@ def main():
     native = None
     log = None
     try:
-        while raw := sys.stdin.buffer.readline(1024 * 1024 + 1):
-            if len(raw) > 1024 * 1024:
+        while raw := sys.stdin.buffer.readline(SESSION_PIPE_LIMIT + 1):
+            if len(raw) > SESSION_PIPE_LIMIT:
                 raise ValueError("Session request is too large")
             try:
                 request = json.loads(raw)

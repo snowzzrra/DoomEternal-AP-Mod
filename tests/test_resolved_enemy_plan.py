@@ -251,3 +251,75 @@ def test_generated_resolved_blocks_pass_full_boundary(generated, case_id):
         assert packed == data['recipes']
         assert recipe_digest(packed) == data['identity']['recipe_digest']
         assert len(canonical_bytes(data)) <= MAX_PAYLOAD_BYTES
+
+
+@pytest.fixture(params=[('e4m1_rig', 'spirit'), ('e4m1_rig', 'tentacle'),
+                        ('e4m1_rig', 'super_tentacle'), ('e4m3_mcity', 'tentacle')])
+def spawn_safety_case(request):
+    from doom_eap.content.slot_data_contract import load_slot_catalog
+    from tests.test_resolved_room_materialization import installed_slot
+
+    key, species = request.param
+    catalog = load_slot_catalog()
+    observed = []
+    def readiness(plan):
+        observed.append(plan)
+        return {key: deepcopy(sample_slot()['stage_profiles']['a'])}
+    options = settings(enemy_weights={name: 100 * int(name == species) + int(name == 'imp') for name in SPECIES_IDS})
+    blocks = build_resolved_enemy_blocks(options, dict(sequence=[key], stage_ids=[key]), seed=712,
+        catalog=catalog, resolve_stage_profiles=readiness,
+        killsanity_options=dict(enabled=True, interval=2, count=10))
+    data = installed_slot(catalog, blocks['recipes'], [key])
+    return key, species, catalog, observed[0], blocks, data
+
+
+def test_spawn_safety_is_final_before_readiness_cost_and_ordinal_checks(spawn_safety_case):
+    key, species, catalog, plan, blocks, data = spawn_safety_case
+    stage = plan['maps'][key]
+    cost = sum(enemy_combat_cost(body['species'], body['attributes'], buff_totems=True, screechers=True)
+               for recipe in stage['recipes'] if not recipe['runtime_only'] for body in recipe['bodies'])
+    assert plan['combat_costs'][key]['actual'] == float(cost)
+    assert plan['fingerprint'] == native_recipe_fingerprint(plan)
+    assert stage['compatibility_recipes']
+    from doom_eap.content.killsanity_plan import resolved_rewards
+    rewards = resolved_rewards(blocks['killsanity'])
+    assert [row['location_id'] for row in rewards] == [
+        2_200_000_000 + index for index in range(1, blocks['killsanity']['count'] + 1)]
+
+
+
+def test_spawn_safety_rows_pass_consumer_without_resolution(spawn_safety_case, monkeypatch):
+    from doom_eap.content.native_enemy_safety import SPIRIT_DENIED_SPAWN_POINTS
+    from tests.test_resolved_room_materialization import forbid_selection
+    from tools.maps.native_recipe_materializer import expand_resolved_native_recipes
+
+    key, species, catalog, plan, blocks, data = spawn_safety_case
+    slot = validate_slot_data(data, catalog)
+    forbid_selection(monkeypatch)
+    stage = expand_resolved_native_recipes(slot, catalog)['maps'][key]
+    assert all(body['species'] not in {'tentacle', 'super_tentacle'}
+               for recipe in stage['recipes'] for body in recipe['bodies'])
+    denied = [recipe for recipe in stage['recipes'] if recipe['binding'].get('reference') in
+              SPIRIT_DENIED_SPAWN_POINTS.get(key, ())]
+    assert all(body['species'] != 'spirit' for recipe in denied for body in recipe['bodies'])
+    assert encode_recipes(decode_recipes(slot.recipes)) == blocks['recipes']
+
+
+def test_unsafe_resolved_body_is_refused_instead_of_repaired(spawn_safety_case):
+    from dataclasses import replace
+    from doom_eap.content.slot_data_contract import catalog_tables
+    from tools.maps.native_recipe_materializer import RecipeMaterializationError, expand_resolved_native_recipes
+
+    key, species, catalog, plan, blocks, data = spawn_safety_case
+    resolved = decode_recipes(validate_slot_data(data, catalog).recipes)
+    tables = catalog_tables(catalog)
+    stage = resolved.maps[key]
+    row = next(row for row in stage.rows if row.role_ref == 'compatibility')
+    primary = next(candidate for candidate in stage.rows if candidate.role_ref == 'primary' and
+        tables['sources'][candidate.source_ref]['source_id'] == tables['sources'][row.source_ref]['source_id'])
+    unsafe = replace(primary, bodies=row.bodies)
+    rows = tuple(unsafe if candidate is primary else candidate for candidate in stage.rows)
+    packed = encode_recipes(replace(resolved, maps={**resolved.maps, key: replace(stage, rows=rows)}))
+    slot = validate_slot_data(sign_slot({**deepcopy(data), 'recipes': packed}, catalog), catalog)
+    with pytest.raises(RecipeMaterializationError, match='spawn safety|flying bodies'):
+        expand_resolved_native_recipes(slot, catalog)

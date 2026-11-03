@@ -8,6 +8,9 @@ CINEMATIC_BOSS_ACTORS = {'e2m2_base': frozenset({'confront_samuel_ai'})}
 FLYING_SPAWN_POINTS = {'e1m4_boss': frozenset({'wing_a_target_spawn_41', 'wing_a_target_spawn_42'})}
 FLYING_REPLACEMENTS = frozenset({'cacodemon', 'pain_elemental', 'lost_soul'})
 FLYING_SUMMONS = {'e4m3_mcity': frozenset({'ENCOUNTER_SPAWN_CACODEMON', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL'})}
+SPIRIT_DENIED_SPAWN_POINTS = {'e4m1_rig': frozenset({
+    'traversal_section_target_spawn_127', 'destroyed_rig_target_spawn_215',
+})}
 SMALL_GROUND_ENEMIES = frozenset({'imp', 'hell_soldier', 'shotgun_soldier', 'chaingun_soldier', 'demonic_trooper'})
 GROUND_ENCOUNTERS = {
     ('e1m4_boss', 'train_encounter_manager_intro_train_1'): SMALL_GROUND_ENEMIES,
@@ -114,6 +117,22 @@ def _counter_recipe(recipe, settings, catalog, capabilities, changes):
     return alternate
 
 
+SAFETY_REPLACEMENTS = {'tentacle': 'imp', 'super_tentacle': 'imp'}
+
+
+def _spawn_safe_recipe(recipe, map_key, settings, catalog, capabilities):
+    replacements = dict(SAFETY_REPLACEMENTS)
+    if recipe['binding'].get('reference') in SPIRIT_DENIED_SPAWN_POINTS.get(map_key, ()):
+        replacements['spirit'] = 'cacodemon'
+    if not any(body['species'] in replacements for body in recipe['bodies']):
+        return None
+    original = deepcopy(recipe)
+    for ordinal, body in enumerate(recipe['bodies']):
+        if body['species'] in replacements:
+            _replace_species(body, replacements[body['species']], recipe, ordinal, settings, catalog, capabilities)
+    return original
+
+
 def _project_stage_safety(stage, map_key, enemies, seed, catalog, capabilities):
     protected = SCRIPTED_BOSS_ACTORS.get(map_key, frozenset()) | CINEMATIC_BOSS_ACTORS.get(map_key, frozenset())
     settings = {**enemies, 'special_limits': stage['special_limits']}
@@ -123,9 +142,10 @@ def _project_stage_safety(stage, map_key, enemies, seed, catalog, capabilities):
         if binding['mode'] == 'independent_actor' and binding['entity'] in protected:
             stage.setdefault('passthrough_actors', []).append(binding['entity'])
             changes.append({'origin': recipe['id'], 'action': 'preserve_scripted_boss'})
+        original = _spawn_safe_recipe(recipe, map_key, settings, catalog, capabilities)
         alternate = _flying_recipe(recipe, map_key, enemies, seed, settings, catalog, capabilities, changes)
-        if alternate is not None:
-            stage.setdefault('compatibility_recipes', []).append(alternate)
+        if original is not None or alternate is not None:
+            stage.setdefault('compatibility_recipes', []).append(original if original is not None else alternate)
     for recipe in stage['recipes']:
         alternate = _counter_recipe(recipe, settings, catalog, capabilities, changes)
         if alternate is not None:

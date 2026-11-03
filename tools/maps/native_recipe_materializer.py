@@ -11,6 +11,9 @@ from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_re
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
 from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
 
+MAX_POSITION_DIAGNOSTICS_PER_MAP = 512
+MAX_POSITION_DIAGNOSTICS = MAX_POSITION_DIAGNOSTICS_PER_MAP * 64
+
 
 class RecipeMaterializationError(ValueError):
     failure_domain = "room_package"
@@ -78,8 +81,32 @@ def _check_resolved_species(recipe, source, map_key, role, restrictions):
                     if (rule['map_key'], rule['owner']) == (map_key, source['binding'].get('owner'))), allowed)
     if allowed and not species <= set(allowed):
         raise RecipeMaterializationError('recipe_unsafe', 'Enemy body does not fit its source.')
+    _check_resolved_safety(recipe, map_key, role, restrictions)
     if role != 'compatibility' and _resolved_requires_flying(recipe, map_key, restrictions) and not species <= set(restrictions['flying_replacements']):
         raise RecipeMaterializationError('recipe_unsafe', 'Enemy source requires flying bodies.')
+
+
+def _safety_species(recipe, map_key, restrictions):
+    replacements = dict(restrictions['safety_replacements'])
+    if recipe['binding'].get('reference') in restrictions['spirit_denied_spawn_points'].get(map_key, ()):
+        replacements['spirit'] = 'cacodemon'
+    return [replacements.get(body['species'], body['species']) for body in recipe['bodies']]
+
+
+def _check_resolved_safety(recipe, map_key, role, restrictions):
+    if role != 'compatibility' and _safety_species(recipe, map_key, restrictions) != [
+            body['species'] for body in recipe['bodies']]:
+        raise RecipeMaterializationError('recipe_unsafe', 'Enemy bodies violate spawn safety restrictions.')
+
+
+def _check_safety_compatibility(original, alternate, map_key, restrictions):
+    if _resolved_requires_flying(original, map_key, restrictions):
+        return
+    expected = _safety_species(alternate, map_key, restrictions)
+    before = [body['species'] for body in alternate['bodies']]
+    after = [body['species'] for body in original['bodies']]
+    if expected == before or expected != after:
+        raise RecipeMaterializationError('recipe_role', 'Recipe source does not permit these compatibility bodies.')
 
 
 def _resolved_native_row(row, source, map_key, catalog, identity):
@@ -110,8 +137,8 @@ def _check_resolved_alternate(original, alternate, field, map_key, catalog):
     expected = _resolved_counter_species(original, catalog)
     if field == 'counter_recipes' and [body['species'] for body in alternate['bodies']] != expected:
         raise RecipeMaterializationError('recipe_role', 'Recipe counter bodies do not match the primary row.')
-    if field == 'compatibility_recipes' and not _resolved_requires_flying(original, map_key, catalog['runtime_restrictions']):
-        raise RecipeMaterializationError('recipe_role', 'Recipe source does not permit a compatibility row.')
+    if field == 'compatibility_recipes':
+        _check_safety_compatibility(original, alternate, map_key, catalog['runtime_restrictions'])
 
 
 def _resolved_counter_species(recipe, catalog):
@@ -508,7 +535,49 @@ def _body_definitions(recipe, settings):
             raise ValueError("Unexpected native partial credit definition")
 
 
-def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2):
+def _spawn_position(name, row, landing_positions, map_key, recipe):
+    original = row['edit'].get('spawnPosition')
+    if original is None:
+        return None
+    final = {axis: landing_positions.get(name, original).get(axis, 0) for axis in ('x', 'y', 'z')}
+    return {'map': map_key, 'recipe': recipe['origin'], 'source': name[:160],
+            'position': final, 'relocated': final != {axis: original.get(axis, 0) for axis in ('x', 'y', 'z')}}
+
+
+def _spawn_references(row, records):
+    if row['class'] not in SPAWN_CLASSES:
+        return []
+    return [value for _, value in walk_values(row['edit']) if isinstance(value, str) and value in records]
+
+
+def _position_diagnostic_limit(map_key, diagnostics, compatible):
+    if diagnostics is None or compatible:
+        return 0
+    remaining = max(0, MAX_POSITION_DIAGNOSTICS_PER_MAP - sum(row['map'] == map_key for row in diagnostics))
+    return min(len(diagnostics) + remaining, MAX_POSITION_DIAGNOSTICS)
+
+
+def _record_spawn_positions(reference, records, landing_positions, map_key, recipe, diagnostics, compatible):
+    limit = _position_diagnostic_limit(map_key, diagnostics, compatible)
+    if not limit:
+        return
+    visited, pending, initial_count = set(), [reference], len(diagnostics)
+    while pending and len(visited) < 256:
+        name = pending.pop()
+        if name in visited or name not in records:
+            continue
+        visited.add(name)
+        row = records[name]
+        position = _spawn_position(name, row, landing_positions, map_key, recipe)
+        if position is not None and len(diagnostics) < limit:
+            diagnostics.append(position)
+        pending.extend(reversed(_spawn_references(row, records)))
+    if len(diagnostics) == initial_count and len(diagnostics) < limit:
+        diagnostics.append({'map': map_key, 'recipe': recipe['origin'], 'source': str(reference)[:160],
+                            'position': None, 'relocated': None, 'reason': 'runtime_selected_position'})
+
+
+def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
     stage = plan["maps"][map_key]
     settings = {**stage, "revision": enemy_revision}
     if re.fullmatch(r"[a-z0-9_]+", map_key) is None:
@@ -534,6 +603,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                     marker = 'ap_v070_optional_zombies_r' + recipe['origin']
                     generated.append('entity { entityDef ' + marker + ' { inherit = "info/null"; class = "idInfo"; edit = {} } }')
     functional, reachable, records = _functional_sources(source)
+    landing_positions = {}
     for point, landing in sorted(_entrance_landings(stage['recipes'], records, map_key=map_key).items()):
         helper = 'ap_v070_landing_' + _functional_token(point)
         if helper in names:
@@ -555,6 +625,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             if not all(math.isfinite(value) for value in edit['spawnPosition'].values()):
                 raise ValueError('Native traversal landing is not finite')
         edit['spawnEditableShared'] = {'groupName': helper}
+        landing_positions[point] = edit.get('spawnPosition')
         generated.append('entity {\n\tentityDef ' + helper + ' {\n\t\tinherit = "target/spawn";\n'
             '\t\tclass = "idTarget_Spawn";\n\t\tedit = ' +
             _render(edit, 2) + '\n\t}\n}')
@@ -565,6 +636,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
             [(recipe, True, 'ap_v070_counter_r') for recipe in stage.get('counter_recipes', [])]):
         recipe_definitions = []
         reference = recipe["binding"].get("reference", recipe["binding"].get("entity", ""))
+        _record_spawn_positions(reference, records, landing_positions, map_key, recipe, diagnostics, compatible)
         source_names = sorted(reachable(reference)) if recipe["family"] != "summon" else []
         if recipe["physical_count"] != len(recipe["bodies"]):
             raise ValueError("Native recipe body quantity differs")
@@ -769,8 +841,8 @@ def _source_fallback_definition(record):
                   '; class = "idTarget_Spawn"; edit = ' + _render(settings, 2) + ' } }')
 
 
-def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2):
-    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision)
+def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
+    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision, diagnostics=diagnostics)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
     source_index = entity_definition_index(source)

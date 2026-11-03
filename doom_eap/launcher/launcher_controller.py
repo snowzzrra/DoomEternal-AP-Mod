@@ -1345,7 +1345,7 @@ class LauncherController:
                 self._injector_output = None
             elif kind == "injector_finished":
                 output = f"stdout:\n{payload.get('stdout', '')}\nstderr:\n{payload.get('stderr', '')}"
-                self._injector_output = output.encode("utf-8")[-64 * 1024:].decode("utf-8", errors="ignore")
+                self._injector_output = output
             if kind == "core_runtime_selected":
                 old = self.config.get("selected_core_runtime_manifest")
                 self.config["selected_core_runtime_manifest"] = payload["path"]

@@ -31,7 +31,7 @@ def fixture(root, *, build_id="b" * 64, bootstrap_build_id=None):
     data = (root / "sentinel-runtime.zip").read_bytes()
     artifacts.append({"path": "sentinel-runtime.zip", "role": "runtime_zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     document = {"schema": 1, "product": "sentinel-core", "version": "1.1.0-rc-1", "base_version": "1.1.0",
-                "channel": "rc", "rc_number": 1, "mod_version_range": ">=0.7.0,<0.8.0", "minimum_launcher_version": "0.7.0",
+                "channel": "rc", "rc_number": 1, "mod_version_range": ">=0.7.0,<0.9.0", "minimum_launcher_version": "0.7.0",
                 "architecture": "x64", "platform": "windows",
                 "abi": dict(ABI), "required_capabilities": [2097152, 4194304, 8388608], "source_commit": "a" * 40,
                 "source_dirty": False, "build_id": build_id, "pair_id": build_id, "artifacts": artifacts}

@@ -63,7 +63,8 @@ bool SentinelCommandClient::ExecuteConsoleCommand(const std::string& command) {
                     reply.command.outcome == SC_COMMAND_NATIVE_FAILED ? AP_RPC_AMBIGUOUS : AP_RPC_REJECTED;
                 if (log_) log_("CORE_COMMAND command_id=" + command_id_ +
                     " request_id=" + std::to_string(request.execution.request_id) +
-                    " outcome=" + std::to_string(reply.command.outcome) + " gameplay_effect=unverified");
+                    " outcome=" + std::to_string(reply.command.outcome) +
+                    " native_exception=" + std::to_string(reply.command.native_exception) + " gameplay_effect=unverified");
                 return result_ == AP_RPC_DELIVERED;
             }
             if (execution.state >= SC_DIAGNOSTIC_REJECTED) {

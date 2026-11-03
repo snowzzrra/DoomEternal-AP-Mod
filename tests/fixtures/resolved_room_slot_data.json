@@ -2,7 +2,7 @@
   "identity": {
     "schema": 7,
     "algorithm_revision": 3,
-    "catalog_digest": "4258e1a5584a149c6e77e53d73368de212d75fe6e37b2186087ce7d3bd76373b",
+    "catalog_digest": "4e7d0356ff4b523f68bef92539ef01a12397223a1268ac80f1a8147d9267b9a4",
     "recipe_digest": "b968ea6ec3b351ec21dde0f14b06c79a6f9453de79cedf94c07c05605a107750"
   },
   "compatibility": {
@@ -24478,5 +24478,5 @@
     ]
   },
   "placement_digest": "3ea2e84edca5d017f74f4f52450e1680a422b5f2c8408405a470c4f6cd074c26",
-  "native_generation_fingerprint": "18173197b6b06e722f2d20c03f92f5dfea302b771eb7d1db49731aaf23af57ba"
+  "native_generation_fingerprint": "55b7aac639dc89ffc86124ad2accf662b423427fe6df381359ca208617d0e8ae"
 }

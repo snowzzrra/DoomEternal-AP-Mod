@@ -6,6 +6,7 @@ from pathlib import Path
 import subprocess
 import sys
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -19,7 +20,7 @@ def test_boss_without_item_checks_can_recover_materialization(tmp_path, monkeypa
         'bridge_log_path': str(tmp_path / 'bridge.log')}))
     monkeypatch.setenv('DOOM_AP_CONFIG_FILE', str(config))
     env = dict(os.environ, SKIP_REQUIREMENTS_UPDATE='1', PYTHONPATH=os.pathsep.join(map(str, (
-        root, root.parent / 'Archipelago', root / 'packaging/standalone_runtime'))))
+        root, Path(os.environ.get('ARCHIPELAGO_SOURCE', root.parent / 'Archipelago')), root / 'packaging/standalone_runtime'))))
     script = '''
 from pathlib import Path
 from types import SimpleNamespace
@@ -41,7 +42,7 @@ assert lifecycle.classify_native_load(evidence, bridge.MATERIALIZATION_MAPS) is 
 
 def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[1]
-    if not (root.parent / "Archipelago" / "CommonClient.py").is_file():
+    if not (Path(os.environ.get("ARCHIPELAGO_SOURCE", root.parent / "Archipelago")) / "CommonClient.py").is_file():
         pytest.skip("Archipelago source required for bridge integration")
     for directory in (tmp_path / "game/base", tmp_path / "local", tmp_path / "Steam/userdata/1/782330/remote"):
         directory.mkdir(parents=True)
@@ -53,7 +54,7 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
     }))
     monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(config))
     monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
-    monkeypatch.syspath_prepend(str(root.parent / "Archipelago"))
+    monkeypatch.syspath_prepend(str(Path(os.environ.get("ARCHIPELAGO_SOURCE", root.parent / "Archipelago"))))
     monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
     bridge = importlib.import_module("doom_eap.runtime.bridge_client")
     monkeypatch.setattr(bridge, "QUEUE_DIR", str(tmp_path / "game/base/ap_queue"))
@@ -67,9 +68,9 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
         evidence = SimpleNamespace(state="GAMEPLAY_READY")
         monkeypatch.setattr(bridge, "read_gameplay_save_evidence", lambda: evidence)
         monkeypatch.setattr(bridge, "rpc_execution_enabled", lambda: True)
-        monkeypatch.setattr(context, "read_active_map_identity", lambda **kw: marker)
+        monkeypatch.setattr(context, "read_active_map_identity", AsyncMock(return_value=marker))
         monkeypatch.setattr(context, "snapshot_fast_travel_eligibility", lambda: None)
-        monkeypatch.setattr(context, "runtime_effects_ready", lambda _: True)
+        monkeypatch.setattr(context, "runtime_effects_ready", AsyncMock(return_value=True))
         runtime = RuntimeContext("base/e1m1_intro", "Base", ("game/sp/e1m1_intro/e1m1_intro",), ("e1m1_intro",), frozenset())
         monkeypatch.setattr(context, "_refresh_runtime_context", lambda _: runtime)
         published = []
@@ -79,15 +80,15 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
             assert result.accepted
             published.append(name)
         monkeypatch.setattr(context, "advance_reconciliation_epoch", lambda _: published.append("epoch") or 1)
-        monkeypatch.setattr(context, "reconcile_owned_runes", lambda _: (None, None))
+        monkeypatch.setattr(context, "reconcile_owned_runes", AsyncMock(return_value=(None, None)))
         monkeypatch.setattr(context, "advance_automap_cleanup_epoch", lambda: published.append("cleanup_epoch"))
-        monkeypatch.setattr(context, "reconcile_checked_automap_cleanup", lambda _: publish("cleanup"))
-        monkeypatch.setattr(context, "reconcile_fast_travel_unlock", lambda _: publish("fast_travel"))
+        monkeypatch.setattr(context, "reconcile_checked_automap_cleanup", AsyncMock(side_effect=lambda _: publish("cleanup")))
+        monkeypatch.setattr(context, "reconcile_fast_travel_unlock", AsyncMock(side_effect=lambda _: publish("fast_travel")))
         async def challenges():
             pass
         monkeypatch.setattr(context, "check_mission_challenge_locations", challenges)
         observation = ["empty plan has unresolved native observations"]
-        monkeypatch.setattr(context, "_context_materialize_inventory", lambda *a, **kw: (None, observation[0]))
+        monkeypatch.setattr(context, "_context_materialize_inventory", AsyncMock(side_effect=lambda *a, **kw: (None, observation[0])))
         context.level_ready.queue("42:1", None)
         for _ in range(5):
             assert not await context.process_level_ready()

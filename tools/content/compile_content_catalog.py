@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 
 from doom_eap.content.campaign_stages import campaign_stages
@@ -13,7 +14,7 @@ from doom_eap.content.killsanity_plan import build_campaign_kill_budget
 from doom_eap.contracts.source_bytes import first_party_text_bytes
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_AP_ROOT = MOD_ROOT.parent / "Archipelago"
+DEFAULT_AP_ROOT = Path(os.environ.get("ARCHIPELAGO_SOURCE", MOD_ROOT.parent / "Archipelago"))
 DEFAULT_OUTPUT = DEFAULT_AP_ROOT / "worlds" / "doometernal" / "generated_content.py"
 
 
@@ -336,9 +337,11 @@ def _slot_finite_rules(kills):
 def _slot_restrictions():
     from doom_eap.content import native_enemy_safety as safety
 
-    names = ('SCRIPTED_BOSS_ACTORS', 'CINEMATIC_BOSS_ACTORS', 'FLYING_SPAWN_POINTS', 'FLYING_SUMMONS')
+    names = ('SCRIPTED_BOSS_ACTORS', 'CINEMATIC_BOSS_ACTORS', 'FLYING_SPAWN_POINTS', 'FLYING_SUMMONS',
+             'SPIRIT_DENIED_SPAWN_POINTS')
     result = {name.lower(): {key: sorted(value) for key, value in getattr(safety, name).items()} for name in names}
     result['flying_replacements'] = sorted(safety.FLYING_REPLACEMENTS)
+    result['safety_replacements'] = dict(safety.SAFETY_REPLACEMENTS)
     result['ground_encounters'] = [dict(map_key=key, owner=owner, species=sorted(species))
         for (key, owner), species in sorted(safety.GROUND_ENCOUNTERS.items())]
     return result
