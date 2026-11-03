@@ -11,6 +11,9 @@ from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_re
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
 from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
 
+MAX_POSITION_DIAGNOSTICS_PER_MAP = 512
+MAX_POSITION_DIAGNOSTICS = MAX_POSITION_DIAGNOSTICS_PER_MAP * 64
+
 
 def _functional_token(name):
     value = 14695981039346656037
@@ -334,6 +337,10 @@ def _body_definitions(recipe, settings):
 
 def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
     stage = plan["maps"][map_key]
+    diagnostic_limit = 0
+    if diagnostics is not None:
+        remaining = max(0, MAX_POSITION_DIAGNOSTICS_PER_MAP - sum(row['map'] == map_key for row in diagnostics))
+        diagnostic_limit = min(len(diagnostics) + remaining, MAX_POSITION_DIAGNOSTICS)
     settings = {**stage, "revision": enemy_revision}
     if re.fullmatch(r"[a-z0-9_]+", map_key) is None:
         raise ValueError("Invalid native recipe map key")
@@ -400,7 +407,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                 visited.add(name)
                 row = records[name]
                 original = row['edit'].get('spawnPosition')
-                if original is not None and len(diagnostics) < 512:
+                if original is not None and len(diagnostics) < diagnostic_limit:
                     final = {axis: landing_positions.get(name, original).get(axis, 0) for axis in ('x', 'y', 'z')}
                     diagnostics.append({'map': map_key, 'recipe': recipe['origin'], 'source': name[:160],
                                         'position': final, 'relocated': final != {axis: original.get(axis, 0) for axis in ('x', 'y', 'z')}})
@@ -409,7 +416,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
                         if isinstance(value, str) and value in records:
                             record_positions(value)
             record_positions(reference)
-            if len(diagnostics) == initial_count and len(diagnostics) < 512:
+            if len(diagnostics) == initial_count and len(diagnostics) < diagnostic_limit:
                 diagnostics.append({'map': map_key, 'recipe': recipe['origin'], 'source': str(reference)[:160],
                                     'position': None, 'relocated': None, 'reason': 'runtime_selected_position'})
         source_names = sorted(reachable(reference)) if recipe["family"] != "summon" else []

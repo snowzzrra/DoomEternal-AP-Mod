@@ -125,6 +125,29 @@ def test_spawn_diagnostics_leave_materialized_map_unchanged():
                and row['relocated'] is False for row in diagnostics)
 
 
+@pytest.mark.parametrize('positioned', [False, True])
+def test_spawn_diagnostics_cap_each_map_across_calls(positioned):
+    source = SOURCE.replace('edit = { entityDefs', 'edit = { spawnPosition = { x = 4; } entityDefs') if positioned else SOURCE
+    plan = frozen_plan(source)
+    diagnostics = [{'map': 'other'} for _ in range(512)] + [{'map': 'map'} for _ in range(511)]
+    for _ in range(2):
+        materialize_native_recipe_definitions(source, 'map', plan, {'map': source}, diagnostics=diagnostics)
+    assert sum(row['map'] == 'map' for row in diagnostics) == 512
+    assert sum(row['map'] == 'other' for row in diagnostics) == 512
+    assert diagnostics[-1]['position'] == ({'x': 4, 'y': 0, 'z': 0} if positioned else None)
+
+
+def test_spawn_diagnostics_total_stays_bounded():
+    from tools.maps.native_recipe_materializer import MAX_POSITION_DIAGNOSTICS
+
+    plan = frozen_plan()
+    diagnostics = [{'map': f'other_{index // 512}'} for index in range(MAX_POSITION_DIAGNOSTICS - 1)]
+    for _ in range(2):
+        materialize_native_recipe_definitions(SOURCE, 'map', plan, {'map': SOURCE}, diagnostics=diagnostics)
+    assert len(diagnostics) == MAX_POSITION_DIAGNOSTICS
+    assert diagnostics[-1]['map'] == 'map'
+
+
 def test_shared_spawn_parent_keeps_map_bindings_without_foreign_species_state():
     source = SOURCE.replace('name = "original";', 'name = "lostsoul";') + dedent('''
     entity { entityDef lostsoul { inherit = "ai/fodder/lostsoul"; class = "idAI2"; edit = {

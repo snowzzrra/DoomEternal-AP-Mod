@@ -50,6 +50,7 @@ from .launcher_platform import (
 SUPPORT_LOG_TAIL_BYTES = 256 * 1024
 SUPPORT_LOG_MAX_BYTES = 1024 * 1024
 SUPPORT_DIAGNOSTIC_MAX_BYTES = 256 * 1024
+SUPPORT_SPAWN_DIAGNOSTIC_MAX_BYTES = 16 * 1024 * 1024
 SUPPORT_DIAGNOSTIC_MAX_ITEMS = 24
 SUPPORT_BUNDLE_MAX_BYTES = 10 * 1024 * 1024
 _CREDENTIAL_FIELDS = frozenset({
@@ -1828,7 +1829,7 @@ def write_support_bundle(
         try:
             with zipfile.ZipFile(staged) as room:
                 member = room.getinfo("enemy_spawn_diagnostics.json")
-                if member.file_size <= SUPPORT_DIAGNOSTIC_MAX_BYTES:
+                if member.file_size <= SUPPORT_SPAWN_DIAGNOSTIC_MAX_BYTES:
                     compiled_positions = {"status": "available", "report": json.loads(room.read(member))}
                 else:
                     compiled_positions["reason"] = "room_diagnostic_exceeds_limit"
@@ -1991,7 +1992,7 @@ def write_support_bundle(
 
 
 class LauncherDoctor:
-    VERSION = "0.7.2"
+    VERSION = "0.7.3"
 
     def __init__(
         self,

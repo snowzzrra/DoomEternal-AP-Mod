@@ -99,9 +99,13 @@ def test_crash_evidence_only_reads_small_reports_and_lists_dumps(tmp_path, monke
 
 def test_bundle_includes_sanitized_compiled_positions(tmp_path, monkeypatch):
     room = tmp_path / "room.zip"
+    positions = [{"map": name, "source": "point_" + "x" * 150,
+                  "position": {"x": 1, "y": 2, "z": 3}, "relocated": True}
+                 for name in ("map_a", "map_b", "map_c") for _ in range(512)]
+    assert len(json.dumps(positions).encode()) > doctor.SUPPORT_DIAGNOSTIC_MAX_BYTES
     with zipfile.ZipFile(room, "w") as archive:
         archive.writestr("enemy_spawn_diagnostics.json", json.dumps({
-            "positions": [{"position": {"x": 1, "y": 2, "z": 3}, "relocated": True}],
+            "positions": positions,
             "password": "report-canary"}))
     monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({}, {}))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
@@ -111,6 +115,7 @@ def test_bundle_includes_sanitized_compiled_positions(tmp_path, monkeypatch):
     with zipfile.ZipFile(result) as archive:
         report = json.loads(archive.read("compiled_spawn_positions.json"))
         assert report["report"]["positions"][0]["relocated"] is True
+        assert report["report"]["positions"] == positions
         assert b"report-canary" not in archive.read("compiled_spawn_positions.json")
 
 
