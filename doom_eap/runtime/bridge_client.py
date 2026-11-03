@@ -4514,7 +4514,7 @@ class DoomEternalContext(CommonContext):
                 row["slayer_gate"] = gate_key is not None and row["revealed"]
                 row["gate_key"] = row["slayer_gate"] and gate_key in owned
                 row["gate_complete"] = row["slayer_gate"] and gate_checks.get(
-                    row["title"] + " - Slayer Gate Complete") in self.checked_locations
+                    row["title"] + " - Slayer Gate Complete") in self.session_state.get("physical_slayer_gates", ())
             (await self.synchronize_fortress_phase(projection))
             from doom_eap.runtime.mission_presentation import MissionPresentations
             if not hasattr(self, "_mission_presentations"):
@@ -6547,14 +6547,18 @@ class DoomEternalContext(CommonContext):
         return CheckPublication(self.send_msgs, self.locations_checked.add, ClientStatus.CLIENT_GOAL)
 
     async def evaluate_campaign_goal(self, source_description):
-        if not hasattr(self, "unified_campaign") or not self.unified_campaign.goal_admitted(
-                self.checked_locations, self.items_received):
-            return False
+        campaign = getattr(self, "unified_campaign", None)
+        admitted = campaign.goal_admitted(self.checked_locations, self.items_received) if campaign else None
+        admission_missing = tuple(
+            key for key in campaign.plan["sequence"]
+            if key != campaign.plan["goal_stage"] and STAGES[key]["completion_id"] not in self.checked_locations
+        ) if campaign else ()
         observation = DoomEternalContext.check_observation(self)
         return await self.goals.evaluate(
             source_description,
             GOAL_POLICY.objective_ids(getattr(self, "_connected_slot_data", {}), observation.server_locations),
             observation, DoomEternalContext.check_publication(self),
+            admitted=admitted, admission_missing=admission_missing,
         )
 
     async def execute_publisher(self, publisher, trigger_strategy, source_description):
@@ -6931,6 +6935,21 @@ class DoomEternalContext(CommonContext):
             )
 
         facts = self.check_observation()
+        gate_completions = set(self.session_state.get("physical_slayer_gates", ()))
+        observed_gates = {
+            location_id for location_id in event_paths_by_location
+            if location_id in facts.server_locations
+            and DOOM_LOCATION_NAMES.get(location_id, "").endswith(" - Slayer Gate Complete")
+        }
+        if observed_gates - gate_completions:
+            if not self.item_state_ready:
+                return
+            self.session_state["physical_slayer_gates"] = sorted(gate_completions | observed_gates)
+            try:
+                self.persist_session_state()
+            except Exception:
+                self.session_state["physical_slayer_gates"] = sorted(gate_completions)
+                raise
         pending_locations = []
         for location_id, paths in event_paths_by_location.items():
             disposition = self.physical_checks.disposition(location_id, facts, self.item_state_ready)

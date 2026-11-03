@@ -719,6 +719,11 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
     if not isinstance(session, Mapping):
         session = {}
     normalized = copy.deepcopy(dict(session))
+    if "physical_slayer_gates" in normalized:
+        gates = normalized["physical_slayer_gates"]
+        normalized["physical_slayer_gates"] = (
+            sorted({gate for gate in gates if type(gate) is int}) if isinstance(gates, list) else []
+        )
     processed = _safe_nonnegative_int(normalized.get("processed_items"), 0)
     normalized["processed_items"] = processed
     frag = normalized.get("deferred_frag_items")
