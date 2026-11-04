@@ -1,9 +1,24 @@
 """Save candidates and native handshake values; neither implies active-slot proof."""
 
-from pathlib import Path
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
+from pathlib import Path
 from typing import NamedTuple
+
+
+class CheckpointRecoveryState(Enum):
+    READY = "ready"
+    RECOVERING = "recovering"
+    RESUME_PENDING = "resume_pending"
+    BLOCKED = "blocked"
+
+
+@dataclass(frozen=True)
+class CheckpointRecovery:
+    state: CheckpointRecoveryState
+    reason: str
+    token: tuple[str, int] | None = None
 
 
 class PrimarySaveSelection(NamedTuple):

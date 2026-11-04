@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from time import monotonic
 
+from .ui.strings import text
+
 
 class SetupStep(Enum):
     CHECKING = auto()
@@ -25,21 +27,10 @@ class SetupAction(Enum):
 
 
 STEP_TEXT = {
-    SetupStep.CHECKING: "Checking the room mod",
-    SetupStep.PREPARING: "Preparing the room mod",
-    SetupStep.CONNECTION: "Preparing game connection files",
-    SetupStep.BUILDING: "Building the room mod",
-    SetupStep.STAGING: "Copying the room mod",
-    SetupStep.INSTALLING: "Installing the room mod",
-    SetupStep.INSTALLER_INPUT: "Waiting for installation in EternalModInjector",
-    SetupStep.CONFIRMING: "Waiting for installation confirmation",
-    SetupStep.SAVE: "Preparing the save",
+    step: text("launcher.setup", "step_" + step.name.lower()) for step in SetupStep
 }
 ACTION_TEXT = {
-    SetupAction.WAIT: "Keep the launcher open.",
-    SetupAction.FINISH_INSTALL: "Finish installation in EternalModInjector, then close its window. Keep this launcher open.",
-    SetupAction.CONFIRM_INSTALL: "Check EternalModInjector, then answer the installation confirmation.",
-    SetupAction.DIAGNOSE: "Open Help and select Check Setup. Keep the launcher open.",
+    action: text("launcher.setup", "action_" + action.name.lower()) for action in SetupAction
 }
 EVENT_STEPS = {
     "connected": SetupStep.CHECKING,
@@ -69,11 +60,11 @@ class SetupProgressView:
     @property
     def text(self) -> str:
         minutes, seconds = divmod(self.elapsed_seconds, 60)
-        lines = [f"{STEP_TEXT[self.step]}. Elapsed: {minutes}:{seconds:02d}."]
+        lines = [text("launcher.setup", "elapsed", step=STEP_TEXT[self.step], minutes=minutes, seconds=f"{seconds:02d}")]
         if self.last_completed is not None:
-            lines.append(f"Last completed step: {STEP_TEXT[self.last_completed]}.")
+            lines.append(text("launcher.setup", "last_completed", step=STEP_TEXT[self.last_completed]))
         if self.long_wait:
-            lines.append("This step has been waiting a long time.")
+            lines.append(text("launcher.setup", "long_wait"))
         lines.append(ACTION_TEXT[self.next_action])
         return "\n".join(lines)
 

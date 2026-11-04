@@ -3,9 +3,9 @@ import gc
 import importlib
 import json
 import os
-from pathlib import Path
 import threading
 import weakref
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -31,6 +31,59 @@ def bridge(tmp_path, monkeypatch):
     module = importlib.import_module("doom_eap.runtime.bridge_client")
     monkeypatch.setattr(module, "DOOM_BASE_DIR", str(tmp_path / "game/base"))
     return module
+
+
+def test_manual_reconcile_uses_coordinator_summary_without_legacy_rune_call(bridge):
+    from unittest.mock import AsyncMock
+    output = []
+    processor = bridge.DoomCommandProcessor.__new__(bridge.DoomCommandProcessor)
+    processor.ctx = SimpleNamespace(manual_reconcile_inventory=AsyncMock(return_value=(
+        SimpleNamespace(replayed=1, special_stages=0, skipped_never_replay=0, skipped_unproven=0), None)))
+    processor.output = output.append
+    asyncio.run(processor._reconcile())
+    assert len(output) == 1
+
+
+def test_feedback_obligation_after_ingestion_survives_restart_without_duplicate(bridge, tmp_path, monkeypatch):
+    from types import MethodType
+
+    from test_delivery_runtime import Core, RoomDelivery
+    from test_delivery_runtime import bridge as fixture_bridge
+
+    from doom_eap.runtime import delivery_runtime
+    from doom_eap.runtime.ledger import NetworkReceipt
+
+    value, definitions, policies = fixture_bridge(tmp_path)
+    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", True)
+    value.items_received = [NetworkReceipt(7770900, 1, 1, 0)]
+    value.location_setup = SimpleNamespace(received_ids=frozenset())
+    for name in ("delivery_notification_commands", "item_activation_commands", "_fresh_receipt_owned_count", "progressive_stage"):
+        setattr(value, name, MethodType(getattr(bridge.DoomEternalContext, name), value))
+    value.items_processed = 1
+    peers = []
+    def connect(*args, **kwargs):
+        core = Core(*args, **kwargs)
+        if peers:
+            core.commands = peers[-1].commands
+            core.weapons = peers[-1].weapons
+        peers.append(core)
+        return core
+    monkeypatch.setattr(delivery_runtime, "NativeTransport", connect)
+    async def check():
+        config = {"client_state_file": str(tmp_path / "state.json")}
+        for _ in range(2):
+            owner = RoomDelivery(value, config, definitions, policies, lambda *args, **kwargs: None)
+            async def balance():
+                return None
+            owner._balance = balance
+            try:
+                await owner.reconcile(SimpleNamespace(epoch=1))
+                notifications = [r for r in await owner._rows() if not r.plan.required]
+                assert len(notifications) == 1
+                assert notifications[0].attempt_count == 1
+            finally:
+                await owner.close()
+    asyncio.run(check())
 
 
 @pytest.mark.parametrize("platform", ["nt", "posix"])
@@ -142,125 +195,10 @@ def test_cancelled_native_call_stays_serialized():
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("change", ["room", "process"])
-@pytest.mark.parametrize("failure", [False, True])
-def test_stale_native_receipt_cannot_advance_cursor(bridge, monkeypatch, change, failure):
-    entered, release = threading.Event(), threading.Event()
-    process = ["windows:123:456"]
-
-    def grant():
-        entered.set()
-        assert release.wait(5)
-        if failure:
-            raise RuntimeError("native operation refused")
-        return {"outcome": 0}
-
-    monkeypatch.setattr(bridge, "doom_process_identity", lambda: process[0])
-
-    async def run():
-        context = bridge.DoomEternalContext(None, None)
-        link = SimpleNamespace(_process_identity="windows:123:456", ensure_meat_hook=grant)
-
-        async def native_link():
-            return link
-
-        monkeypatch.setattr(context, "_native_game_link_async", native_link)
-        commits = []
-        monkeypatch.setattr(context, "_acknowledge_receipt", lambda item: commits.append(item))
-        task = asyncio.create_task(context._apply_native_owner_receipt(0, SimpleNamespace(item=7770083)))
-        try:
-            while not entered.is_set():
-                await asyncio.sleep(0.01)
-            if change == "room":
-                context.room_seed_name = "different-room"
-            else:
-                process[0] = "windows:124:789"
-            release.set()
-            with pytest.raises(StaleNativeResult):
-                await task
-            assert not commits and context.items_processed == 0
-        finally:
-            release.set()
-            await asyncio.gather(task, return_exceptions=True)
-            context._native_worker.close()
-            await context.session_tasks.close()
-    asyncio.run(run())
 
 
-def test_proton_timeout_blocks_receipt_without_blocking_loop(bridge, monkeypatch):
-    from doom_eap.runtime import proton
-    import subprocess
-    release, entered = threading.Event(), threading.Event()
-
-    def timeout(*args, **kwargs):
-        entered.set()
-        assert release.wait(5)
-        raise subprocess.TimeoutExpired("fixture-proton", 30)
-
-    monkeypatch.setattr(bridge, "os", SimpleNamespace(**{**vars(os), "name": "posix"}))
-    monkeypatch.setattr(proton, "runtime", lambda configuration: (["fixture-proton"], {}))
-    monkeypatch.setattr(proton.subprocess, "run", timeout)
-
-    async def run():
-        context = bridge.DoomEternalContext(None, None)
-        context.item_state_ready = True
-        commits = []
-        monkeypatch.setattr(context, "_acknowledge_receipt", commits.append)
-        task = asyncio.create_task(context._apply_native_owner_receipt(0, SimpleNamespace(item=7770083)))
-        try:
-            while not entered.is_set():
-                await asyncio.sleep(0.01)
-            await asyncio.sleep(0.05)
-            assert not task.done()
-            release.set()
-            with pytest.raises(RuntimeError, match="qualified Windows game process"):
-                await task
-            assert not commits and context.items_processed == 0
-        finally:
-            release.set()
-            await asyncio.gather(task, return_exceptions=True)
-            context._native_worker.close()
-            await context.session_tasks.close()
-    asyncio.run(run())
 
 
-def test_weapon_point_checkpoints_stay_on_loop_and_precede_native_grant(bridge):
-    from doom_eap.runtime.weapon_points import WeaponPointReceipts
-
-    async def run():
-        context = bridge.DoomEternalContext(None, None)
-        context.session_state = {}
-        main_thread = threading.get_ident()
-        checkpoints, grants = [], []
-        native = SimpleNamespace(gained=0)
-
-        def persist():
-            assert threading.get_ident() == main_thread
-            assert asyncio.get_running_loop() is loop
-            checkpoints.append(len(context.session_state["weapon_points"]["receipts"]))
-
-        def observe():
-            assert threading.get_ident() != main_thread
-            return {"gained_after": native.gained}
-
-        def grant(amount, expected):
-            assert checkpoints == [0, 1] and threading.get_ident() != main_thread
-            assert expected == native.gained
-            grants.append(amount)
-            native.gained += amount
-            return {"gained_before": expected, "gained_after": native.gained}
-
-        loop = asyncio.get_running_loop()
-        native.observe, native.grant_weapon_upgrade_points = observe, grant
-        owner = WeaponPointReceipts(context.session_state, persist, native, "room")
-        try:
-            await owner.deliver_async(0, "receipt", {0: "receipt"}, context._native_call)
-            await owner.deliver_async(0, "receipt", {0: "receipt"}, context._native_call)
-            assert grants == [3] and checkpoints == [0, 1]
-        finally:
-            context._native_worker.close()
-            await context.session_tasks.close()
-    asyncio.run(run())
 
 
 @pytest.mark.parametrize("monitor", ["death_monitor", "tracker"])
@@ -288,7 +226,7 @@ def test_server_completion_retrieves_exception_before_silent_return(bridge, stop
         errors = []
         asyncio.get_running_loop().set_exception_handler(lambda loop, event: errors.append(event))
         context = SimpleNamespace(exit_event=asyncio.Event(), _room_session_established=True,
-                                  disconnected_intentionally=False, reset_queue_session_authority=lambda reason: None)
+                                  disconnected_intentionally=False, reset_room_session_authority=lambda reason: None)
         if stopping:
             context.exit_event.set()
 

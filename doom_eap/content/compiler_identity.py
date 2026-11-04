@@ -8,7 +8,8 @@ from pathlib import Path
 from doom_eap.contracts.source_bytes import SOURCE_BYTE_CONTRACT, first_party_text_bytes
 
 SOURCE_ROOTS = ("doom_eap/content", "doom_eap/contracts", "tools/decls", "tools/maps")
-SOURCE_FILES = ("doom_eap/launcher/launcher_core.py", "doom_eap/runtime/save_records.py",
+SOURCE_FILES = ("data/player_strings.json", "doom_eap/strings.py", "tools/release/build_string_table.py",
+                "doom_eap/launcher/launcher_core.py", "doom_eap/runtime/save_records.py",
                 "doom_eap/runtime/lifecycle.py",
                 "doom_eap/runtime/context_registry.py", "tools/release/room_payloads.py",
                 "tools/release/build_room_resources.py", "tools/release/stage_room_resources.py",

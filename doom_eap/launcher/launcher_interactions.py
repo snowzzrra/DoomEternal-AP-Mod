@@ -1,8 +1,11 @@
 """Pending launcher questions belong to the application, with explicit job scope."""
-from dataclasses import dataclass, field
+
 import threading
 import time
 import uuid
+from dataclasses import dataclass, field
+
+from doom_eap.launcher.ui.strings import text as player_text
 
 from .launcher_workers import LauncherJob
 
@@ -61,11 +64,11 @@ class LauncherInteractions:
 
     def consent(self, spec, job=None):
         if spec.name == "Meathook":
-            purpose, source = "Game Link runtime library", "GitHub / brongo"
+            purpose, source = player_text('launcher.interactions', 'game_link_runtime_library'), player_text('launcher.interactions', 'github_brongo')
         elif spec.name == "EternalModInjector":
-            purpose, source = "Windows mod installation tools", "GameBanana / DOOM 2016+ Modding Community"
+            purpose, source = player_text('launcher.interactions', 'windows_mod_installation_tools'), player_text('launcher.interactions', 'gamebanana_doom_2016_modding_community')
         else:
-            purpose, source = "Mod installation tool", "GitHub"
+            purpose, source = player_text('launcher.interactions', 'mod_installation_tool'), "GitHub"
         return self.request("dependency_consent_required", {
             "name": spec.name, "version": spec.version, "url": spec.url, "sha256": spec.sha256,
             "purpose": purpose, "source": source,
@@ -73,13 +76,13 @@ class LauncherInteractions:
 
     def confirmation(self, job=None):
         return self.request("installation_confirmation_required", {
-            "message": "Did EternalModInjector install the mod without errors?",
+            "message": player_text('launcher.interactions', 'did_eternalmodinjector_install_the_mod_without_errors'),
         }, job)
 
     def uninstall_confirmation(self, job=None):
         return self.request("uninstall_confirmation_required", {
             "operation": "uninstall",
-            "message": "Did EternalModInjector remove this room's mod without errors?",
+            "message": player_text('launcher.ui', 'did_eternalmodinjector_remove_this_room_s_mod_without_errors'),
         }, job)
 
 

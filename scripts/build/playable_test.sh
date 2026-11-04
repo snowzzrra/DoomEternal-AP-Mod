@@ -349,6 +349,8 @@ import json
 import sys
 from pathlib import Path
 
+from doom_eap.strings import load_catalog
+
 for raw_path in sys.argv[1:]:
     path = Path(raw_path)
     table = json.loads(path.read_text(encoding="utf-8"))
@@ -359,11 +361,11 @@ for raw_path in sys.argv[1:]:
     }
     entries["#str_code__GHOST31004"] = {
         "name": "#str_code__GHOST31004",
-        "text": "DOOM ETERNAL ARCHIPELAGO",
+        "text": load_catalog().text("branding", "campaign_title", locale=path.stem),
     }
     entries["#str_code_mainmenu_campaign_name"] = {
         "name": "#str_code_mainmenu_campaign_name",
-        "text": "DOOM ETERNAL ARCHIPELAGO",
+        "text": load_catalog().text("branding", "campaign_title", locale=path.stem),
     }
     table["strings"] = [entries[name] for name in sorted(entries)]
     path.write_text(json.dumps(table, indent=4, ensure_ascii=False) + "\n", encoding="utf-8")

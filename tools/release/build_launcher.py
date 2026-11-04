@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import importlib.metadata
+import importlib.util
 import os
 import platform
 import ssl
@@ -13,7 +13,6 @@ import sys
 from pathlib import Path
 
 from tools.release.build_cache import content_key, publish, restore
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = REPO_ROOT.parent
@@ -161,8 +160,9 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
 
     build_root = RELEASE_ROOT / "build/launcher" / sys.platform / output_dir.relative_to(RELEASE_ROOT)
     build_root.mkdir(parents=True, exist_ok=True)
-    from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
     import json
+
+    from doom_eap.content.compiler_identity import capture_compiler_sources, compiler_source_document
     source_identity = build_root / "compiler_source_identity.json"
     source_identity.write_text(json.dumps(compiler_source_document(capture_compiler_sources(REPO_ROOT)),
                                           sort_keys=True) + "\n", encoding="utf-8", newline="\n")
@@ -201,6 +201,8 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         f"{REPO_ROOT / 'content'}{data_separator}content",
         "--collect-data",
         "doom_eap.content",
+        "--collect-data",
+        "doom_eap.launcher.ui",
         "--add-data",
         f"{source_identity}{data_separator}data",
         "--collect-data",

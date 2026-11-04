@@ -1,16 +1,59 @@
 """File adapters for save candidates and the native gameplay handshake."""
 
-from pathlib import Path
-import re
+import json
 import os
+import re
 import shutil
 import subprocess
-
-from doom_eap.runtime.save_decrypt import decrypt, steam_id64
-from doom_eap.runtime.connection_diagnostics import timed_sync_call
+from pathlib import Path
 
 from doom_eap.contracts.runtime_context import canonical_map_name
-from doom_eap.contracts.save_observation import GameplaySaveEvidence, PrimarySaveSelection
+from doom_eap.contracts.save_observation import (
+    CheckpointRecovery,
+    CheckpointRecoveryState,
+    GameplaySaveEvidence,
+    PrimarySaveSelection,
+)
+from doom_eap.runtime.connection_diagnostics import timed_sync_call
+from doom_eap.runtime.save_decrypt import decrypt, steam_id64
+
+
+def read_checkpoint_recovery(config, process_identity, namespace):
+    from doom_eap.launcher.sentinel_diagnostics import diagnostics_directory
+
+    blocked = CheckpointRecoveryState.BLOCKED
+    try:
+        _, pid, created = process_identity.split(":")
+        directory = diagnostics_directory(config)
+        with (directory / f"{int(pid)}-{int(created)}.latest.json").open("rb") as stream:
+            raw = stream.read(131073)
+        if len(raw) > 131072:
+            raise ValueError("checkpoint diagnostics too large")
+        record = json.loads(raw)
+        if (record["schema"] != "sentinel-startup-v1" or record["pid"] != int(pid)
+                or record["process_created"] != created
+                or record["admission"]["namespace_id"] != namespace):
+            raise ValueError("checkpoint diagnostics identity mismatch")
+        return _checkpoint_recovery(record, process_identity)
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        return CheckpointRecovery(blocked, f"checkpoint_diagnostics_unavailable: {error}")
+
+
+def _checkpoint_recovery(record, process_identity):
+    recovery = record["b_diagnostics"]["stages"]["checkpoint_recovery"]
+    if recovery is None:
+        return CheckpointRecovery(CheckpointRecoveryState.READY, "none")
+    status, reason = recovery["status"], recovery["predicate"]
+    token = process_identity, recovery["sequence"]
+    if status in (1, 2):
+        return CheckpointRecovery(CheckpointRecoveryState.RECOVERING, reason, token)
+    if status != 3:
+        return CheckpointRecovery(CheckpointRecoveryState.BLOCKED, reason, token)
+    campaign = record["campaign"]
+    verified = (campaign["resumed"] is True and campaign["source_verified"] is True
+                and campaign["parser_completed"] is True and campaign["parser_result"] == 0)
+    state = CheckpointRecoveryState.READY if verified else CheckpointRecoveryState.RESUME_PENDING
+    return CheckpointRecovery(state, reason, token)
 
 
 def primary_save_candidates(remote_directory, steam_id, filename="game_duration.dat", slot_prefix=None):

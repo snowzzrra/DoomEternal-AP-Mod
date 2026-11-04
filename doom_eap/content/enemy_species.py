@@ -5,8 +5,9 @@ from functools import cache
 from importlib.resources import files
 from pathlib import Path
 
-from .enemy_options import SPECIES_IDS
+from doom_eap.strings import text as player_text
 
+from .enemy_options import SPECIES_IDS
 
 AIRBORNE_SPECIES = frozenset({'gargoyle', 'cacodemon', 'pain_elemental', 'lost_soul', 'blood_angel'})
 STATIONARY_SPECIES = frozenset({'buff_pod', 'tentacle', 'super_tentacle', 'turret'})
@@ -132,12 +133,16 @@ def enemy_tracking_suffix(source_type, physical_type):
 
 def validate_enemy_speed_percent(species, speed):
     if type(speed) is not int or not 1 <= speed <= 10000:
-        raise ValueError("speed_percent must be an integer in 1..10000")
+        raise ValueError(player_text("apworld.errors", "enemy_speed_range"))
     capabilities = enemy_speed_capabilities()
     if species not in capabilities:
-        raise ValueError(f"Unknown Speed species: {species}")
+        raise ValueError(player_text("apworld.errors", "unknown_speed_species", species=str(species)))
     if speed != 100 and capabilities[species] != "qualified":
-        raise ValueError(f"Speed changes are not qualified for {species}: {capabilities[species]}; use 100%")
+        raise ValueError(
+            player_text(
+                "apworld.errors", "enemy_speed_unqualified", species=str(species), capability=str(capabilities[species])
+            )
+        )
 
 
 def speed_capability_notice(labels=None):
@@ -146,5 +151,5 @@ def speed_capability_notice(labels=None):
     supported = [labels.get(species, species.replace("_", " ").title())
                  for species, status in capabilities.items() if status == "qualified"]
     if supported:
-        return f"Speed changes affect: {', '.join(supported)}. Other enemies move at normal speed."
-    return "Speed is fixed at 100% (normal) in this build. Your chosen speed ranges are saved in your player file."
+        return player_text("apworld.notices", "speed_supported", species=str(", ".join(supported)))
+    return player_text("apworld.notices", "speed_fixed")

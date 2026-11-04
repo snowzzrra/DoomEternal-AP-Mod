@@ -1,18 +1,21 @@
 """Select and cache the official, compatible Core distribution."""
+
 import contextlib
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import tempfile
 import threading
 import time
 import urllib.error
 import zipfile
+from pathlib import Path
 
 from doom_eap.contracts.core_distribution import validate_manifest, verify_bytes, verify_runtime, version_key
-from .launcher_platform import UrlDownloadTransport, probe_meathook, detect_doom_processes, ProcessInspectionError
+from doom_eap.launcher.ui.strings import text as player_text
+
+from .launcher_platform import ProcessInspectionError, UrlDownloadTransport, detect_doom_processes, probe_meathook
 
 RELEASES_URL = "https://api.github.com/repos/snowzzrra/Sentinel-Core/releases?per_page=100"
 
@@ -60,7 +63,7 @@ class CoreRuntime:
             link = re.search(r'<([^>]+)>; rel="next"', received.get("link", ""))
             next_url = link.group(1) if link else None
             if next_url and not next_url.startswith(RELEASES_URL.split("?")[0] + "?"):
-                raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
             temporary = saved.with_suffix(".incoming")
             temporary.write_text(json.dumps({"value": value, "etag": received.get("etag"), "next": next_url}))
             temporary.replace(saved)
@@ -86,19 +89,19 @@ class CoreRuntime:
                 deferred_until = json.loads(retry.read_text()).get("after", 0) if retry.exists() else 0
             except (OSError, ValueError):
                 deferred_until = 0
-            if isinstance(deferred_until, (int, float)) and deferred_until > time.time():
-                self.emit("core_update_status", state="deferred", message="Update service is busy. Try again later.")
+            if isinstance(deferred_until, int | float) and deferred_until > time.time():
+                self.emit("core_update_status", state="deferred", message=player_text('launcher.core_runtime', 'update_service_is_busy_try_again_later'))
                 return
-            self.emit("core_update_status", state="checking", message="Checking for game connection updates…")
+            self.emit("core_update_status", state="checking", message=player_text('launcher.core_runtime', 'checking_for_game_connection_updates'))
             try:
                 releases, url, visited = [], RELEASES_URL, set()
                 while url:
                     if url in visited:
-                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                        raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
                     visited.add(url)
                     page, url = self._metadata(url)
                     if not isinstance(page, list):
-                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                        raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
                     releases.extend(page)
                 candidates = []
                 for release in releases:
@@ -108,7 +111,7 @@ class CoreRuntime:
                     if "distribution.json" not in assets or "sentinel-runtime.zip" not in assets:
                         continue
                     if any(not assets[name].startswith("https://github.com/snowzzrra/Sentinel-Core/releases/download/") for name in ("distribution.json", "sentinel-runtime.zip")):
-                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                        raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
                     try:
                         manifest, _ = self._metadata(assets["distribution.json"])
                         validate_manifest(manifest)
@@ -116,7 +119,7 @@ class CoreRuntime:
                             candidates.append((manifest, assets))
                     except (ValueError, KeyError, TypeError) as error:
                         self.emit("core_update_status", state="skipped",
-                                  technical_message=f"Game connection release {release.get('tag_name', 'unknown')} skipped: {error}")
+                                  technical_message=player_text('launcher.core_runtime', 'game_connection_release_value_0_skipped_value_1', value_0=f"{release.get('tag_name', 'unknown')}", value_1=f'{error}'))
                 if candidates:
                     manifest, assets = max(candidates, key=lambda row: version_key(row[0]["version"]))
                     self._download(manifest, assets)
@@ -124,9 +127,9 @@ class CoreRuntime:
                         if manifest["build_id"] == preferred_build:
                             self._download(manifest, assets)
                             break
-                self.emit("core_update_status", state="checked", message="Update check finished.")
+                self.emit("core_update_status", state="checked", message=player_text('launcher.core_runtime', 'update_check_finished'))
             except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
-                self.emit("core_update_status", state="deferred", message="Update check failed. Retry later.", technical_message=str(error))
+                self.emit("core_update_status", state="deferred", message=player_text('launcher.core_runtime', 'update_check_failed_retry_later'), technical_message=str(error))
 
     def _download(self, manifest, assets):
         identity = hashlib.sha256(json.dumps(manifest, sort_keys=True).encode()).hexdigest()
@@ -137,7 +140,7 @@ class CoreRuntime:
                 return
             except (OSError, ValueError, zipfile.BadZipFile):
                 pass
-        self.emit("core_update_status", state="downloading", message=f"Downloading game connection files {manifest['version']}…")
+        self.emit("core_update_status", state="downloading", message=player_text('launcher.core_runtime', 'downloading_game_connection_files_value_0', value_0=f"{manifest['version']}"))
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             stage = Path(directory)
             archive = stage / "sentinel-runtime.zip"
@@ -146,10 +149,10 @@ class CoreRuntime:
             verify_bytes(archive.name, archive.read_bytes(), records[archive.name])
             with zipfile.ZipFile(archive) as package:
                 if set(package.namelist()) != set(records) - {archive.name} or len(package.namelist()) != len(records) - 1:
-                    raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                    raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
                 for name in package.namelist():
                     if package.getinfo(name).file_size != records[name]["size"]:
-                        raise ValueError("The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.")
+                        raise ValueError(player_text('launcher.core_runtime', 'the_game_connection_download_could_not_be_checked_retry_later_if'))
                     data = package.read(name)
                     verify_bytes(name, data, records[name])
                     path = stage / name
@@ -206,4 +209,4 @@ class CoreRuntime:
             return candidates[0][1]
         if selected:
             return Path(str(selected))
-        raise RuntimeError("Game connection files are unavailable. Open Help and select Repair Game Connection.")
+        raise RuntimeError(player_text('launcher.core_runtime', 'game_connection_files_are_unavailable_open_help_and_select_repai'))

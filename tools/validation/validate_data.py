@@ -10,13 +10,14 @@ import json
 import re
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from doom_eap.content.automap_visual_registry import build_authorial_registry, load_automap_visual_registry
+from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.item_classification import load_item_classification_identity
+from doom_eap.content.map_registry import load_map_registry, validation_plan
 from doom_eap.contracts.challenge_registry import all_location_entries, load_challenge_registry
 from doom_eap.contracts.foundation import (
     compile_all_item_plans,
@@ -25,12 +26,10 @@ from doom_eap.contracts.foundation import (
     load_primitive_registry,
     validate_primitive_registry,
 )
-from doom_eap.content.item_classification import load_item_classification_identity
-from doom_eap.content.content_catalog import load_content_catalog
-from doom_eap.content.map_registry import load_map_registry, validation_plan
 from doom_eap.contracts.source_bytes import first_party_text_bytes
-from tools.decls.devinv_builder import load_devinv_mapping
+from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from tools.content.compile_start_inventory_catalog import compile_catalog
+from tools.decls.devinv_builder import load_devinv_mapping
 from tools.maps import ap_map_generator
 from tools.maps.ap_map_generator import (
     EVENT_ENTITY_PREFIX,
@@ -1399,10 +1398,6 @@ def main(argv: list[str] | None = None) -> int:
         (ROOT / "native" / "client" / name).read_text(encoding="utf-8", errors="ignore")
         for name in (
             "ap_client_exe.cpp",
-            "command_queue.cpp",
-            "command_queue.h",
-            "command_queue_contracts.h",
-            "command_transport.h",
             "game_state_probe.cpp",
             "game_state_probe.h",
             "sentinel_command_client.cpp",

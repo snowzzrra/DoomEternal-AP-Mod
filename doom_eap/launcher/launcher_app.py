@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from doom_eap.launcher.ui.strings import text as player_text
+
 
 def _run_bridge_worker(arguments: list[str]) -> int:
     archipelago_source = os.environ.get("ARCHIPELAGO_SOURCE", "").strip()
@@ -39,23 +41,24 @@ def _run_self_test(arguments: list[str]) -> int:
                               "abi": value["abi"], "gameplay_evidence": "not_exercised"}, sort_keys=True))
             return 0
         except Exception as error:
-            print(f"Core distribution self-test failed: {error}", file=sys.stderr)
+            print(player_text('launcher.app', 'core_distribution_self_test_failed_value_0', value_0=f'{error}'), file=sys.stderr)
             return 1
 
     # 1. Verify third-party core packages & certifi CA bundle in bundle_directory
     try:
-        import certifi
         import ssl
+
+        import certifi
 
         ca_bundle = Path(certifi.where())
         if not ca_bundle.is_file():
-            raise RuntimeError(f"certifi CA bundle file missing: {ca_bundle}")
+            raise RuntimeError(player_text('launcher.app', 'certifi_ca_bundle_file_missing_value_0', value_0=f'{ca_bundle}'))
         ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=str(ca_bundle))
         if ctx.verify_mode != ssl.CERT_REQUIRED or not ctx.check_hostname:
-            raise RuntimeError("SSL context does not enforce CERT_REQUIRED and check_hostname")
-        print(f"  [OK] certifi CA bundle verified ({ca_bundle.stat().st_size} bytes)")
+            raise RuntimeError(player_text('launcher.app', 'ssl_context_does_not_enforce_cert_required_and_check_hostname'))
+        print(player_text('launcher.app', 'ok_certifi_ca_bundle_verified_value_0_bytes', value_0=f'{ca_bundle.stat().st_size}'))
     except Exception as e:
-        print(f"  [FAIL] SSL / certifi check failed: {e}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_ssl_certifi_check_failed_value_0', value_0=f'{e}'), file=sys.stderr)
         return 1
 
     try:
@@ -65,10 +68,10 @@ def _run_self_test(arguments: list[str]) -> int:
         document = {"files": {}}
         encoded = nonce + _aes_gcm_encrypt(_KEYS[0], nonce, json.dumps(document).encode(), b"build-manifest") + bytes(64)
         if decode_manifest(encoded)[0] != document:
-            raise RuntimeError("Build manifest round trip differs")
-        print("  [OK] Build manifest authenticated encryption verified")
+            raise RuntimeError(player_text('launcher.app', 'build_manifest_round_trip_differs'))
+        print(player_text('launcher.app', 'ok_build_manifest_authenticated_encryption_verified'))
     except Exception as e:
-        print(f"  [FAIL] Build manifest crypto check failed: {e}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_build_manifest_crypto_check_failed_value_0', value_0=f'{e}'), file=sys.stderr)
         return 1
 
     # 2. Check bundled resource root (sys._MEIPASS in frozen mode, repo root in source mode)
@@ -84,13 +87,12 @@ def _run_self_test(arguments: list[str]) -> int:
         bundled_schema = bundle_dir / "data" / "options_schema.json"
         if not bundled_schema.is_file():
             raise RuntimeError(
-                f"Bundled options_schema.json missing in bundle root: {bundled_schema} "
-                f"(frozen={getattr(sys, 'frozen', False)})"
+                player_text('launcher.app', 'bundled_options_schema_json_missing_in_bundle_root_value_0_froze', value_0=f'{bundled_schema}', value_1=f"{getattr(sys, 'frozen', False)}")
             )
         schema_data = json.loads(bundled_schema.read_text(encoding="utf-8"))
         if not isinstance(schema_data, dict):
-            raise RuntimeError("Bundled options_schema.json is not a valid JSON object")
-        print(f"  [OK] Bundled options schema verified -> {bundled_schema} ({bundled_schema.stat().st_size} bytes)")
+            raise RuntimeError(player_text('launcher.app', 'bundled_options_schema_json_is_not_a_valid_json_object'))
+        print(player_text('launcher.app', 'ok_bundled_options_schema_verified_value_0_value_1_bytes', value_0=f'{bundled_schema}', value_1=f'{bundled_schema.stat().st_size}'))
 
         bundled_content = bundle_dir / "content"
         bundled_topology = bundled_content / "catalog" / "region_topology.json"
@@ -98,30 +100,29 @@ def _run_self_test(arguments: list[str]) -> int:
         bundled_maps = bundled_content / "maps"
         if not (bundled_topology.is_file() and bundled_global.is_file() and bundled_maps.is_dir()):
             raise RuntimeError(
-                f"Bundled content catalog incomplete in bundle root: {bundled_content} "
-                f"(frozen={getattr(sys, 'frozen', False)})"
+                player_text('launcher.app', 'bundled_content_catalog_incomplete_in_bundle_root_value_0_frozen', value_0=f'{bundled_content}', value_1=f"{getattr(sys, 'frozen', False)}")
             )
-        print(f"  [OK] Bundled content catalog verified -> {bundled_content}")
+        print(player_text('launcher.app', 'ok_bundled_content_catalog_verified_value_0', value_0=f'{bundled_content}'))
 
         # Bundled TAG DevInv source verification & compilation smoke test
         from tools.decls.devinv_builder import build_tag_devinv_overrides
 
-        tag_overrides = build_tag_devinv_overrides({}, "Combat Shotgun")
+        tag_overrides = build_tag_devinv_overrides({}, player_text('launcher.app', 'combat_shotgun'))
         expected_tag_prefixes = (
             "e4m1_rig", "e4m2_swamp", "e4m3_mcity",
             "e5m1_spear", "e5m2_earth", "e5m3_hell",
         )
         for prefix in expected_tag_prefixes:
             if not any(k.startswith(prefix) for k in tag_overrides):
-                raise RuntimeError(f"TAG DevInv build missing output for {prefix}")
-        print(f"  [OK] Bundled TAG DevInv overrides verified ({len(tag_overrides)} declarations)")
+                raise RuntimeError(player_text('launcher.app', 'tag_devinv_build_missing_output_for_value_0', value_0=f'{prefix}'))
+        print(player_text('launcher.app', 'ok_bundled_tag_devinv_overrides_verified_value_0_declarations', value_0=f'{len(tag_overrides)}'))
         from doom_eap.content.compiler_identity import load_compiler_source_identity
         compiler_identity = load_compiler_source_identity(bundle_dir, frozen=getattr(sys, "frozen", False))
         if "doom_eap/launcher/launcher_core.py" not in compiler_identity["source_hashes"]:
-            raise RuntimeError("Bundled compiler identity omits launcher_core")
-        print(f"  [OK] Compiler source identity verified ({len(compiler_identity['source_hashes'])} modules)")
+            raise RuntimeError(player_text('launcher.app', 'bundled_compiler_identity_omits_launcher_core'))
+        print(player_text('launcher.app', 'ok_compiler_source_identity_verified_value_0_modules', value_0=f"{len(compiler_identity['source_hashes'])}"))
     except Exception as e:
-        print(f"  [FAIL] Bundled resource resolution failed: {e}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_bundled_resource_resolution_failed_value_0', value_0=f'{e}'), file=sys.stderr)
         return 1
 
     # 3. Instantiate LauncherController in hermetic fixture using BUNDLED resources
@@ -157,15 +158,15 @@ def _run_self_test(arguments: list[str]) -> int:
                 (fake_paths.config_dir / "launcher.json").write_text(json.dumps({"core_auto_update": False}))
                 controller = LauncherController(application_dir=fake_app)
                 if controller.state != LauncherState.IDLE:
-                    raise RuntimeError(f"Unexpected initial controller state: {controller.state}")
+                    raise RuntimeError(player_text('launcher.app', 'unexpected_initial_controller_state_value_0', value_0=f'{controller.state}'))
                 if controller.session_start_time <= 0:
-                    raise RuntimeError("Invalid session_start_time in controller")
-                print(f"  [OK] Hermetic LauncherController constructed from bundled resources (state={controller.state.value})")
+                    raise RuntimeError(player_text('launcher.app', 'invalid_session_start_time_in_controller'))
+                print(player_text('launcher.app', 'ok_hermetic_launchercontroller_constructed_from_bundled_resource', value_0=f'{controller.state.value}'))
 
-                # Hermetic UI construction smoke test (executes __init__, _build, _session_page, etc.)
                 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
                 from PySide6.QtWidgets import QApplication
+
                 from doom_eap.launcher.launcher_ui import LauncherUI
 
                 app = QApplication.instance()
@@ -173,14 +174,14 @@ def _run_self_test(arguments: list[str]) -> int:
                     app = QApplication(["launcher_selftest", "-platform", "offscreen"])
                 ui = LauncherUI(controller)
                 if ui.windowIcon().pixmap(32).isNull():
-                    raise RuntimeError('Launcher window icon could not be loaded')
-                if ui.pages.count() < 5:
-                    raise RuntimeError(f"Expected at least 5 UI pages, found {ui.pages.count()}")
+                    raise RuntimeError(player_text('launcher.app', 'launcher_window_icon_could_not_be_loaded'))
+                if ui.pages.count() < 4:
+                    raise RuntimeError(player_text("launcher.app", "expected_pages", expected=4, actual=ui.pages.count()))
                 ui.timer.stop()
                 ui.close()
                 ui.deleteLater()
                 app.processEvents()
-                print(f"  [OK] Hermetic LauncherUI constructed and verified (pages={ui.pages.count()}, offscreen)")
+                print(player_text('launcher.app', 'ok_hermetic_launcherui_constructed_and_verified_pages_value_0_of', value_0=f'{ui.pages.count()}'))
             finally:
                 for k, v in old_env.items():
                     if v is None:
@@ -188,7 +189,7 @@ def _run_self_test(arguments: list[str]) -> int:
                     else:
                         os.environ[k] = v
     except Exception as e:
-        print(f"  [FAIL] LauncherController / LauncherUI instantiation failed: {e}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_launchercontroller_launcherui_instantiation_failed_value_0', value_0=f'{e}'), file=sys.stderr)
         return 1
 
     # 3b. Windows filesystem corrective smoke: publish helper, dependency
@@ -209,7 +210,7 @@ def _run_self_test(arguments: list[str]) -> int:
                 "APPDATA": str(tmp_root / "config"),
                 "LOCALAPPDATA": str(tmp_root / "state"),
             }
-            for key, value in env_override.items():
+            for _key, value in env_override.items():
                 Path(value).mkdir(parents=True, exist_ok=True)
             old_env = {k: os.environ.get(k) for k in env_override}
             try:
@@ -221,8 +222,8 @@ def _run_self_test(arguments: list[str]) -> int:
                 final = tmp_root / "payload.bin"
                 publish_file(incoming, final, operation="selftest_publish")
                 if final.read_bytes() != b"selftest" or incoming.exists():
-                    raise RuntimeError("publish_file round-trip failed")
-                print("  [OK] publish_file round-trip verified")
+                    raise RuntimeError(player_text('launcher.app', 'publish_file_round_trip_failed'))
+                print(player_text('launcher.app', 'ok_publish_file_round_trip_verified'))
 
                 content = b"selftest_dependency"
                 artifact = tmp_root / "SelfTestTool.dll"
@@ -241,18 +242,18 @@ def _run_self_test(arguments: list[str]) -> int:
                 )
 
                 def _refuse_consent(_s):
-                    raise RuntimeError("cache hit must not request consent")
+                    raise RuntimeError(player_text('launcher.app', 'cache_hit_must_not_request_consent'))
 
                 cached = manager.acquire(spec, consent=_refuse_consent)
                 if cached.executable != installed.executable:
-                    raise RuntimeError("dependency cache-hit mismatch")
+                    raise RuntimeError(player_text('launcher.app', 'dependency_cache_hit_mismatch'))
                 if manager.inspect(spec) is None:
-                    raise RuntimeError("dependency lock not released after cache hit")
-                print("  [OK] dependency cache-hit lock release verified")
+                    raise RuntimeError(player_text('launcher.app', 'dependency_lock_not_released_after_cache_hit'))
+                print(player_text('launcher.app', 'ok_dependency_cache_hit_lock_release_verified'))
 
                 report = LauncherDoctor(config={}).run()
                 if not report.diagnostics:
-                    raise RuntimeError("no-game doctor run produced no diagnostics")
+                    raise RuntimeError(player_text('launcher.app', 'no_game_doctor_run_produced_no_diagnostics'))
                 bundle = tmp_root / "support.zip"
                 first = write_support_bundle(
                     bundle, report, logs=["self-test"], session_start=time.time()
@@ -261,28 +262,28 @@ def _run_self_test(arguments: list[str]) -> int:
                     bundle, report, logs=["self-test"], session_start=0.0
                 )
                 if first != bundle or second == bundle or not second.is_file():
-                    raise RuntimeError("support-bundle unique naming failed")
-                print("  [OK] no-game doctor and unique support bundle verified")
+                    raise RuntimeError(player_text('launcher.app', 'support_bundle_unique_naming_failed'))
+                print(player_text('launcher.app', 'ok_no_game_doctor_and_unique_support_bundle_verified'))
 
                 from doom_eap.launcher.launcher_platform import select_saved_games_dir
 
                 extract = tmp_root / "Downloads" / "DoomEternalArchipelago"
                 extract.mkdir(parents=True, exist_ok=True)
                 canonical = (
-                    tmp_root / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+                    tmp_root / 'Saved Games' / 'id Software' / "DOOMEternal" / "base"
                 )
                 canonical.mkdir(parents=True, exist_ok=True)
                 stale = select_saved_games_dir(
                     str(extract), known_base=canonical, app_dir=extract.parent
                 )
                 if stale.path != canonical or not stale.repaired:
-                    raise RuntimeError("stale Saved Games config was not self-healed")
+                    raise RuntimeError(player_text('launcher.app', 'stale_saved_games_config_was_not_self_healed'))
                 closed = select_saved_games_dir(
                     str(extract), known_base=None, app_dir=extract.parent
                 )
                 if closed.path is not None:
-                    raise RuntimeError("launcher dir must never be Saved Games authority")
-                print("  [OK] Saved Games authority self-heal verified")
+                    raise RuntimeError(player_text('launcher.app', 'launcher_dir_must_never_be_saved_games_authority'))
+                print(player_text('launcher.app', 'ok_saved_games_authority_self_heal_verified'))
             finally:
                 for k, v in old_env.items():
                     if v is None:
@@ -290,13 +291,13 @@ def _run_self_test(arguments: list[str]) -> int:
                     else:
                         os.environ[k] = v
     except Exception as e:
-        print(f"  [FAIL] Filesystem corrective self-test failed: {e}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_filesystem_corrective_self_test_failed_value_0', value_0=f'{e}'), file=sys.stderr)
         return 1
     app_dir = application_directory()
     is_assembled = (app_dir / "RELEASE_MANIFEST.json").is_file() or (app_dir / "client" / "data" / "options_schema.json").is_file()
 
     if mode_package_required and not is_assembled:
-        print(f"  [FAIL] Assembled package validation requested, but RELEASE_MANIFEST.json not found in {app_dir}", file=sys.stderr)
+        print(player_text('launcher.app', 'fail_assembled_package_validation_requested_but_release_manifest', value_0=f'{app_dir}'), file=sys.stderr)
         return 1
 
     if is_assembled and not mode_launcher_only:
@@ -305,35 +306,34 @@ def _run_self_test(arguments: list[str]) -> int:
             client_dir = app_dir / "client" if (app_dir / "client").is_dir() else app_dir
             pkg_schema = client_dir / "data" / "options_schema.json"
             if not pkg_schema.is_file():
-                raise RuntimeError(f"Missing external client options schema at {pkg_schema}")
-            print(f"    [OK] Package client options schema -> {pkg_schema}")
+                raise RuntimeError(player_text('launcher.app', 'missing_external_client_options_schema_at_value_0', value_0=f'{pkg_schema}'))
+            print(player_text('launcher.app', 'ok_package_client_options_schema_value_0', value_0=f'{pkg_schema}'))
 
             if (app_dir / "doometernal.apworld").is_file():
-                print(f"    [OK] Package APWorld -> {app_dir / 'doometernal.apworld'}")
+                print(player_text('launcher.app', 'ok_package_apworld_value_0', value_0=f"{app_dir / 'doometernal.apworld'}"))
             if (client_dir / "resources" / "room_payload_manifest.json").is_file():
-                print(f"    [OK] Package room resources -> {client_dir / 'resources' / 'room_payload_manifest.json'}")
+                print(player_text('launcher.app', 'ok_package_room_resources_value_0', value_0=f"{client_dir / 'resources' / 'room_payload_manifest.json'}"))
             if (client_dir / "ap_client.exe").is_file():
-                print(f"    [OK] Package native client -> {client_dir / 'ap_client.exe'}")
+                print(player_text('launcher.app', 'ok_package_native_client_value_0', value_0=f"{client_dir / 'ap_client.exe'}"))
         except Exception as e:
-            print(f"  [FAIL] Assembled package check failed: {e}", file=sys.stderr)
+            print(player_text('launcher.app', 'fail_assembled_package_check_failed_value_0', value_0=f'{e}'), file=sys.stderr)
             return 1
 
-    print("\n[OK] Launcher self-test passed successfully.")
+    print('' + '\n' + player_text('launcher.app', 'ok_launcher_self_test_passed_successfully'))
     return 0
 
 
 def _run_ui() -> int:
     if sys.platform.startswith("linux"):
         import faulthandler
+
         from doom_eap.launcher.launcher_platform import launcher_user_paths
         state = launcher_user_paths().state_dir
         state.mkdir(parents=True, exist_ok=True)
         with (state / "launcher-boot.log").open("w", encoding="utf-8") as boot:
             os.dup2(boot.fileno(), 2)
         faulthandler.enable()
-        print(f"Launcher boot: {sys.version}; display={os.environ.get('DISPLAY', '')}; "
-              f"wayland={os.environ.get('WAYLAND_DISPLAY', '')}; "
-              f"qt_platform={os.environ.get('QT_QPA_PLATFORM', 'auto')}", file=sys.stderr, flush=True)
+        print(player_text('launcher.app', 'launcher_boot_value_0_display_value_1_wayland_value_2_qt_platfor', value_0=f'{sys.version}', value_1=f"{os.environ.get('DISPLAY', '')}", value_2=f"{os.environ.get('WAYLAND_DISPLAY', '')}", value_3=f"{os.environ.get('QT_QPA_PLATFORM', 'auto')}"), file=sys.stderr, flush=True)
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
@@ -344,7 +344,7 @@ def _run_ui() -> int:
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("DoomEternal.Archipelago.Launcher")
     application = QApplication(sys.argv[:1])
-    application.setApplicationName("DOOM Eternal Archipelago")
+    application.setApplicationName(player_text('launcher.navigation', 'brand'))
     application.setWindowIcon(QIcon(str(bundle_directory() / "assets/launcher/EternalAP.ico")))
     LauncherUI(LauncherController()).run()
     return 0

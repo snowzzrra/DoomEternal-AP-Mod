@@ -1,25 +1,30 @@
 import struct
-from pathlib import Path
 from types import SimpleNamespace
 
 from doom_eap.runtime.campaign_menu import CampaignMenu
-from doom_eap.runtime.mission_presentation import MissionPresentations
+from doom_eap.runtime import sentinel_protocol_generated as codec
 
 
 class NativeLink:
     namespace = "a" * 64
     pid = 7
 
+    def __init__(self):
+        self.requests = []
+
     def admitted_save_root(self):
         pass
 
-    def _run(self, args, message=None):
-        if message is None:
-            return dict(availability="enabled", target_pid=7, process_created=8,
-                        instance_id="b" * 32, lifecycle_generation=1, build_id="fixture")
-        revision = struct.unpack_from("<Q", message, 153)[0]
-        return dict(namespace=self.namespace, request_id=struct.unpack_from("<Q", message, 60)[0],
-                    build_id="fixture", status=0, committed_revision=revision,
+    def _run(self, args):
+        return dict(availability="enabled", target_pid=7, process_created=8,
+                    instance_id="b" * 32, lifecycle_generation=1, build_id="fixture")
+
+    def request(self, operation, *, payload):
+        encoded = codec.encode_variant(operation, 4, 0, payload)
+        _, decoded = codec.decode_variant(operation, 4, encoded)
+        self.requests.append((operation, decoded))
+        return dict(namespace=self.namespace, build_id="fixture", status=0,
+                    committed_revision=payload.get('revision', 0),
                     selected_id=1, loaded_id=1)
 
 
@@ -46,3 +51,27 @@ def test_static_tiers_old_relative_contract_and_hidden_privacy():
     snapshot["ratings"][stage] = {"skull_tier": 99}
     menu.synchronize(link, snapshot)
     assert struct.unpack_from("<I", menu.rows[1][1], 12)[0] == 0
+
+
+def test_upload_preserves_selection_and_unknown_rewards():
+    link = NativeLink()
+    stage = "e1m1_intro"
+    row = dict(stage=stage, map="game/sp/e1m1_intro/e1m1_intro", title="Hell on Earth",
+               revealed=True, unlocked=True)
+    snapshot = dict(fortress_phase=0, hub_map="game/hub/hub", rows=[row], selected=stage,
+                    challenge_rewards={})
+    menu = CampaignMenu()
+    menu.synchronize(link, snapshot)
+    assert [operation for operation, _ in link.requests] == [24, 22, 22, 23]
+    hub, mission, commit = [payload for _, payload in link.requests[1:]]
+    assert hub['rewards_known'] == 1
+    assert mission['rewards_known'] == 0 and mission['rewards'] == []
+    assert commit['count'] == 2 and commit['selected_id'] == mission['row']['id']
+    assert hub['revision'] == mission['revision'] == commit['revision']
+    link.requests.clear()
+    menu.synchronize(link, snapshot)
+    assert [operation for operation, _ in link.requests] == [24]
+    snapshot['challenge_rewards'][stage] = SimpleNamespace(
+        namespace=link.namespace, runtime_map=row['map'], known=True, challenges=(), aggregate=None)
+    menu.synchronize(link, snapshot)
+    assert link.requests[-2][1]['rewards_known'] == 1

@@ -1,13 +1,12 @@
-"""Explicit native baseline/health reads and transient scope/spool publication."""
+"""Explicit native baseline/health reads and transient command publication."""
 import os
 import time
 from pathlib import Path
 
-from doom_eap.contracts.command_publication import TRANSIENT_EFFECT, stable_spool_id
+from doom_eap.contracts.command_publication import stable_command_key
 from doom_eap.runtime.transient_effects import TransientRuntime
 
 TRANSIENT_EFFECT_BASELINE_FILE = "ap_effect_baseline.state"
-TRANSIENT_SCOPE_PATH = "active_transient_scope"
 
 
 def _read_key_value_file(path: Path) -> dict[str, str]:
@@ -58,26 +57,14 @@ def read_transient_runtime(base_directory, state_key, native_ready):
 
 
 class TransientPublication:
-    def __init__(self, base_directory, send):
-        self._base = Path(base_directory)
+    def __init__(self, send):
         self._send = send
 
-    def send(self, cvar, command, state_key, scope, *, room_scoped):
-        command_id = stable_spool_id("effect", state_key, scope, cvar, command)
-        return self._send(command, coalesce_key=command_id, arm_rpc=False, already_queued_ok=True,
-                          state_key=state_key, room_scoped=room_scoped,
-                          execution_class=TRANSIENT_EFFECT, transient_scope=scope)
+    async def send(self, cvar, command, state_key, scope, *, room_scoped, receipt_index=None):
+        command_id = (f"temporary-{receipt_index}-{cvar}" if receipt_index is not None
+                      else stable_command_key("effect", state_key, scope, cvar, command))
+        return await self._send(command, coalesce_key=command_id, state_key=state_key,
+                                receipt_index=receipt_index)
 
     def publish_scope(self, scope: str | None) -> None:
-        path = self._base / "ap_queue" / TRANSIENT_SCOPE_PATH
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = path.with_suffix(".tmp")
-            if scope is None:
-                temporary.unlink(missing_ok=True)
-                path.unlink(missing_ok=True)
-            else:
-                temporary.write_text(scope + "\n", encoding="ascii")
-                os.replace(temporary, path)
-        except OSError:
-            return
+        self.scope = scope

@@ -10,6 +10,7 @@ import time
 import types
 from enum import Enum
 from functools import cache
+from hashlib import sha256
 from pathlib import Path
 from typing import Union, get_args, get_origin, get_type_hints
 from uuid import uuid4
@@ -30,14 +31,19 @@ from .ledger_records import (
     CommandPlan,
     CommandState,
     Context,
+    EffectSource,
     InvalidRecord,
+    ManualResolution,
     NetworkReceipt,
     Observation,
     ReceiptDecision,
     ReceiptState,
     ReplayPolicy,
+    Resolution,
     RoomKey,
+    SaveEpochState,
     SchemaError,
+    SourceKind,
     StorageError,
     WriterBusy,
 )
@@ -63,6 +69,7 @@ _COMMAND_FIELDS = (
     "replay",
     "required",
     "retry_limit",
+    "local_source_id",
 )
 
 
@@ -208,16 +215,16 @@ def _create_indexes(connection: sqlite3.Connection) -> None:
         f"CREATE UNIQUE INDEX ammo_unresolved ON ammo_operations ({_ROOM_COLUMNS}, kind) WHERE state IN ('prepared','requested','unknown')",
     )
     for statement in indexes:
-        connection.execute(statement)
+        connection.execute(statement.replace("INDEX ", "INDEX IF NOT EXISTS ", 1))
 
 
-def _create_triggers(connection: sqlite3.Connection) -> None:
+def _create_triggers(connection: sqlite3.Connection, version: int = 1, tables=None) -> None:
     room_fields = tuple(_ROOM_COLUMNS.split(", "))
     identities = {
         "profile": ("singleton", "database_id", "created_at"),
         "rooms": (*room_fields, "compatibility_revision", "authority", "activation_event_sequence"),
         "receipts": (*room_fields, "ap_index", "item", "location", "player", "flags", "received_at"),
-        "commands": (*room_fields, *_COMMAND_FIELDS, "payload_hash"),
+        "commands": (*room_fields, *_COMMAND_FIELDS[:-1], "payload_hash"),
         "contexts": (
             *room_fields,
             "context_id",
@@ -259,19 +266,104 @@ def _create_triggers(connection: sqlite3.Connection) -> None:
         "checks_outbox": (*room_fields, "location_id", "observation"),
         "ammo_totals": room_fields,
     }
+    if version >= 2:
+        identities["commands"] += ("local_source_id",)
+        identities["contexts"] += ("save_binding_id",)
+        identities["attempts"] += ("reference", "envelope_hash")
+        identities["effect_sources"] = (*room_fields, "source_id", "kind", "source_key", "evidence")
     for table, columns in identities.items():
-        _immutable(connection, table, columns)
-    for action in ("UPDATE", "DELETE"):
-        connection.execute(f"""CREATE TRIGGER events_no_{action.lower()} BEFORE {action} ON events
-            BEGIN SELECT RAISE(ABORT, 'events are append only'); END""")
+        if tables is None or table in tables:
+            _immutable(connection, table, columns)
+    _revision_triggers(connection, tables)
+    if tables is None:
+        for action in ("UPDATE", "DELETE"):
+            connection.execute(f"""CREATE TRIGGER events_no_{action.lower()} BEFORE {action} ON events
+                BEGIN SELECT RAISE(ABORT, 'events are append only'); END""")
+        connection.execute("""CREATE TRIGGER profile_epoch BEFORE UPDATE ON profile
+            WHEN NEW.writer_epoch<>OLD.writer_epoch+1 BEGIN SELECT RAISE(ABORT, 'writer epoch must advance once'); END""")
+
+
+def _revision_triggers(connection, tables):
     for table in ("rooms", "receipts", "commands", "attempts", "ammo_operations", "ammo_totals", "checks_outbox"):
+        if tables is not None and table not in tables:
+            continue
         connection.execute(f"""CREATE TRIGGER {table}_revision BEFORE UPDATE ON {table}
             WHEN NEW.revision<>OLD.revision+1 BEGIN SELECT RAISE(ABORT, 'revision must advance once'); END""")
-    connection.execute("""CREATE TRIGGER profile_epoch BEFORE UPDATE ON profile
-        WHEN NEW.writer_epoch<>OLD.writer_epoch+1 BEGIN SELECT RAISE(ABORT, 'writer epoch must advance once'); END""")
 
 
-_MIGRATIONS = {1: _create_schema}
+def _extend_delivery(connection: sqlite3.Connection) -> None:
+    connection.execute(f"""CREATE TABLE effect_sources (
+        source_id TEXT PRIMARY KEY NOT NULL, {_ROOM_FIELDS},
+        kind TEXT NOT NULL {_enum_check("kind", SourceKind)}, source_key TEXT NOT NULL, evidence BLOB NOT NULL,
+        UNIQUE ({_ROOM_COLUMNS}, source_id), UNIQUE ({_ROOM_COLUMNS}, kind, source_key), {_ROOM_FK}
+    ) STRICT""")
+    connection.execute("ALTER TABLE contexts ADD COLUMN save_binding_id TEXT")
+    connection.execute("ALTER TABLE attempts ADD COLUMN reference BLOB NOT NULL DEFAULT X''")
+    connection.execute("ALTER TABLE attempts ADD COLUMN envelope_hash TEXT NOT NULL "
+                       f"DEFAULT '{'0' * 64}' CHECK(length(envelope_hash)=64)")
+    connection.execute("DROP TRIGGER attempts_revision")
+    for command_id, number, envelope in connection.execute("SELECT command_id, attempt_no, envelope FROM attempts"):
+        connection.execute("UPDATE attempts SET envelope_hash=? WHERE command_id=? AND attempt_no=?",
+                           (sha256(envelope).hexdigest(), command_id, number))
+    _extend_commands(connection)
+    for table in ("contexts", "attempts"):
+        connection.execute(f"DROP TRIGGER {table}_immutable")
+    _create_triggers(connection, 2, {"commands", "contexts", "attempts", "effect_sources"})
+    _create_indexes(connection)
+    for statement in (
+        f"CREATE INDEX commands_state ON commands ({_ROOM_COLUMNS}, state, command_id)",
+        f"CREATE INDEX commands_local ON commands ({_ROOM_COLUMNS}, local_source_id, command_id)",
+        f"CREATE INDEX sources_room ON effect_sources ({_ROOM_COLUMNS}, source_id)",
+    ):
+        connection.execute(statement)
+    connection.execute("""CREATE TRIGGER commands_resolution BEFORE UPDATE ON commands
+        WHEN OLD.resolution IS NOT NULL AND (NEW.resolution IS NOT OLD.resolution
+            OR NEW.replacement_id IS NOT OLD.replacement_id OR NEW.resolution_revision IS NOT OLD.resolution_revision
+            OR NEW.state IS NOT OLD.state OR NEW.result IS NOT OLD.result OR NEW.reason IS NOT OLD.reason)
+        BEGIN SELECT RAISE(ABORT, 'resolved command evidence is immutable'); END""")
+
+
+def _extend_commands(connection: sqlite3.Connection) -> None:
+    original = next(sql for sql in _SCHEMA if sql.startswith("CREATE TABLE commands ("))
+    expanded = original.replace("CREATE TABLE commands (", "CREATE TABLE commands_new (")
+    expanded = expanded.replace("ammo_operation_id TEXT,", "ammo_operation_id TEXT, local_source_id TEXT,")
+    expanded = expanded.replace("ELSE 'ammo:'||ammo_operation_id END",
+                                "WHEN ammo_operation_id IS NOT NULL THEN 'ammo:'||ammo_operation_id "
+                                "ELSE 'local:'||local_source_id END")
+    expanded = expanded.replace("CHECK((receipt_index IS NULL)<>(ammo_operation_id IS NULL))",
+                                "CHECK((receipt_index IS NOT NULL)+(ammo_operation_id IS NOT NULL)"
+                                "+(local_source_id IS NOT NULL)=1)")
+    expanded = expanded.replace("result BLOB NOT NULL, reason TEXT,", f"""
+        resolution TEXT {_enum_check("resolution", Resolution)}, replacement_id TEXT,
+        resolution_revision INTEGER CHECK(resolution_revision>=0), result BLOB NOT NULL, reason TEXT,""")
+    expanded = expanded.replace(f"UNIQUE ({_ROOM_COLUMNS}, command_id),", f"""
+        CHECK((resolution IS NULL)=(resolution_revision IS NULL)),
+        CHECK((resolution IS 'replaced')=(replacement_id IS NOT NULL)),
+        {_reference("local_source_id", "effect_sources", "source_id")},
+        {_reference("replacement_id", "commands", "command_id")},
+        UNIQUE ({_ROOM_COLUMNS}, command_id),""")
+    connection.execute(expanded)
+    columns = [row[1] for row in connection.execute("PRAGMA table_info(commands)")]
+    names = ",".join(columns)
+    connection.execute(f"INSERT INTO commands_new ({names}) SELECT {names} FROM commands")
+    connection.execute("DROP TABLE commands")
+    connection.execute("ALTER TABLE commands_new RENAME TO commands")
+
+
+def _save_epochs(connection: sqlite3.Connection) -> None:
+    connection.execute("CREATE INDEX commands_supersedes ON commands(supersedes_id)")
+    connection.execute(f"""CREATE TABLE save_epochs (
+        {_ROOM_FIELDS}, epoch_id TEXT NOT NULL, receipt_boundary INTEGER NOT NULL CHECK(receipt_boundary>=0),
+        evidence BLOB NOT NULL, created_at INTEGER NOT NULL CHECK(created_at>=0),
+        state TEXT NOT NULL {_enum_check("state", SaveEpochState)},
+        PRIMARY KEY ({_ROOM_COLUMNS}, epoch_id), {_ROOM_FK}
+    ) STRICT""")
+    _immutable(connection, "save_epochs", (*_ROOM_COLUMNS.split(", "), "epoch_id", "receipt_boundary", "evidence", "created_at"))
+    connection.execute("""CREATE TRIGGER save_epoch_terminal BEFORE UPDATE ON save_epochs
+        WHEN OLD.state<>'prepared' BEGIN SELECT RAISE(ABORT, 'save epoch is terminal'); END""")
+
+
+_MIGRATIONS = {1: _create_schema, 2: _extend_delivery, 3: _save_epochs}
 
 
 def _now() -> int:
@@ -347,12 +439,14 @@ _record_classes = {
     Binding,
     NetworkReceipt,
     Context,
+    EffectSource,
     CommandPlan,
     ReceiptDecision,
     CommandChange,
     Attempt,
     AttemptChange,
     Observation,
+    ManualResolution,
     AmmoOperation,
     AmmoChange,
     AmmoTotals,
@@ -417,7 +511,11 @@ def _migrate(connection: sqlite3.Connection, path: Path, create: bool, read_only
         raise SchemaError("database needs a writer to upgrade it")
     if not create:
         _backup(connection, path, version)
-    _run_migrations(connection, version, latest, create)
+    connection.execute("PRAGMA foreign_keys=OFF")
+    try:
+        _run_migrations(connection, version, latest, create)
+    finally:
+        connection.execute("PRAGMA foreign_keys=ON")
 
 
 def _backup(connection: sqlite3.Connection, path: Path, version: int) -> None:
@@ -438,6 +536,8 @@ def _run_migrations(connection: sqlite3.Connection, version: int, latest: int, c
         if create:
             connection.execute("INSERT INTO profile VALUES(1, ?, 0, ?)", (str(uuid4()), _now()))
         connection.execute(f"PRAGMA application_id={_APPLICATION_ID}")
+        if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
+            raise SchemaError("migration damaged database references")
         connection.commit()
     except BaseException:
         connection.rollback()

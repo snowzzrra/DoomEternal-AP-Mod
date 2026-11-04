@@ -3,8 +3,8 @@
 import asyncio
 import json
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from websockets.legacy.server import serve
 
@@ -19,40 +19,73 @@ class Server:
         self.values = json.loads(self.path.read_text()) if self.path.exists() else {}
         self.socket = None
         self.pending = []
+        self.ammo_fault = ""
 
     async def connect(self, socket):
         self.socket = socket
         signal("connected")
         async for raw in socket:
             for packet in json.loads(raw):
-                await self.receive(packet)
+                await self.receive(packet, socket)
 
-    async def receive(self, packet):
+    async def receive(self, packet, socket):
         print("AP_RECEIVE " + json.dumps(packet), flush=True)
         if packet["cmd"] == "Set":
-            self.debit(packet)
+            reply = self.debit(packet)
+            if reply is None:
+                return
+            operations = packet["operations"]
+            if operations and operations[0]["operation"] == "add":
+                self.pending.append(reply)
+            else:
+                await socket.send(json.dumps([reply]))
+                if self.ammo_fault == "duplicate" and "ammo/ops/" in packet["key"]:
+                    await socket.send(json.dumps([self.debit(packet)]))
         elif packet["cmd"] == "Get":
-            await self.socket.send(json.dumps([{
-                "cmd": "Retrieved", "keys": {key: self.values.get(key, 0) for key in packet["keys"]},
+            await socket.send(json.dumps([{
+                "cmd": "Retrieved", "keys": {key: self.values.get(key) for key in packet["keys"]},
             }]))
 
     def debit(self, packet):
         key = packet["key"]
+        operation_key = "ammo/ops/" in key
+        if operation_key and self.ammo_fault == "refused":
+            return {"cmd": "SetReply", "key": key, "value": None}
         old = self.values.get(key, packet["default"])
         value = old
         for operation in packet["operations"]:
-            if operation["operation"] != "add":
+            if operation["operation"] == "add":
+                value += operation["value"]
+            elif operation["operation"] == "max":
+                value = max(value, operation["value"])
+            else:
                 raise ValueError(operation)
-            value += operation["value"]
         self.values[key] = value
+        self.save()
+        if any(operation["operation"] == "add" for operation in packet["operations"]):
+            signal("debit", key=key, value=value)
+        if operation_key and self.ammo_fault == "lost":
+            return None
+        if operation_key and self.ammo_fault == "foreign":
+            key += "/foreign"
+        return {"cmd": "SetReply", "key": key, "value": value, "original_value": old}
+
+    def save(self):
         with self.path.open("w", encoding="utf-8") as stream:
             json.dump(self.values, stream)
             stream.flush()
             os.fsync(stream.fileno())
-        self.pending.append({"cmd": "SetReply", "key": key, "value": value, "original_value": old})
-        signal("debit", key=key, value=value)
 
     async def control(self, request):
+        if request["action"] == "store":
+            self.values.update(request["values"])
+            self.save()
+            signal("stored")
+            return
+        if request["action"] == "ammo_fault":
+            self.ammo_fault = request["fault"]
+            signal("configured")
+            return
         packets = request.get("packets", [])
         if request["action"] == "release":
             packets = self.pending + packets

@@ -1,30 +1,58 @@
-# Build a release
+# Building a release
 
-Run commands from the mod repository. Use matching MOD, APWorld and Sentinel Core
-sources. Windows builds need the installed x64 MSVC tools, Windows SDK, CMake and
-the project's Windows Python environment. Reuse its installed dependencies.
-Map builds also need the verified retail inputs in `vanillamaps/` and
+A release is three things built from matching sources: the mod package (launcher,
+bridge, native client, APWorld), the frozen room resources it compiles rooms from,
+and a Sentinel Core distribution. This page explains why it's split that way and
+how to build each part. Run commands from the mod repository with the project's
+Windows Python (`../.venv-windows/Scripts/python.exe`); reuse its installed packages.
+
+You need the x64 MSVC tools, the Windows SDK and CMake for native code. Rebuilding
+room resources also needs the verified retail maps in `vanillamaps/` and
 `../Tools/idFileDeCompressor`.
 
-## Check the sources
+## Why the build looks like this
+
+**Rooms are compiled on the player's machine, not shipped prebuilt.** Every room
+has its own items, checks and enemies, so the launcher builds a room mod when a
+player connects. To do that without the developer's map folder, the release
+carries *frozen room resources*: snapshots of the retail map sources plus the base
+mod (`base_mod.zip`, `room_payloads.zip`, `room_payload_manifest.json`). The
+compiler only reads those snapshots and checks their hashes before using them.
+
+**Frozen means reproducible.** The bundle in `packaging/room_resources/<version>/`
+records exactly which commits and files built it
+(`ROOM_RESOURCES_PROVENANCE.json`) and carries a fingerprint. The APWorld and the
+launcher both check it, so a room generated against one compiler is never built
+with another. Whenever the compiler or the authored content changes, rebuild the
+bundle; the `--check` below tells you when it's stale.
+
+**Sentinel Core ships on its own.** Core is the DLL inside the game. It has its own
+version (2.x for this mod line), its own tests and its own distribution. The
+launcher downloads it, checks its hashes, its ABI and that it declares support for
+this launcher version, and refuses anything else. That lets us fix the mod without
+touching Core, and the other way round, while never mixing incompatible pieces.
+
+**Nothing is published from a local machine.** Building a ZIP locally is only a
+candidate. Publishing is a separate step after the candidate passes review.
+
+## 1. Check the sources
 
 ```powershell
 ../.venv-windows/Scripts/python.exe -m tools.content.compile_content_catalog --source-only --check
 ../.venv-windows/Scripts/python.exe -m tools.content.compile_options_schema --check
+../.venv-windows/Scripts/python.exe -m tools.content.compile_player_strings --check
 ../.venv-windows/Scripts/python.exe -m tools.validation.authorial --check-authorial
 ./scripts/build/windows_release.ps1 -Preflight -Python ../.venv-windows/Scripts/python.exe -CoreSource ../Sentinel-Core
 ```
 
-The checks must finish without stale projections or invalid content. Run focused
-tests for changed behavior, then the mod suite, the `doometernal` APWorld suite
-and Core's CTest harnesses before delivering a candidate. See each repository's
-development instructions for the installed test environment.
+All of these must pass: no stale generated files, no invalid content. Then run the
+mod test suite, the `doometernal` APWorld tests and Core's CTest. If a generated
+file is stale, regenerate it (see [Generated files](DEVELOPMENT.md#generated-files))
+and commit it with the change that caused it.
 
-## Rebuild room resources
+## 2. Rebuild the room resources
 
-Choose unused output directories. Preserve the current bundle if it contains
-uncommitted work. These commands prepare the authored mod tree, record the exact
-input files and compile a fresh resource bundle:
+Use fresh output folders so a failed build can't leave half a bundle behind.
 
 ```powershell
 ../.venv-windows/Scripts/python.exe -m tools.release.stage_room_resources --repo-root . --output-dir build/review-authorial --compressor ../Tools/idFileDeCompressor
@@ -33,68 +61,71 @@ input files and compile a fresh resource bundle:
 ../.venv-windows/Scripts/python.exe -m tools.release.source_provenance --repo-root . --archipelago-source ../Archipelago --output build/review-inputs.json --verify
 ```
 
-`build/review-resources/` must contain `base_mod.zip`, `room_payloads.zip` and
-`room_payload_manifest.json`. The final command checks that compiler inputs did
-not change during the build. The file named `review-inputs.json` records those
-inputs, hashes and ancestor commits, including local changes.
+The first command prepares the authored mod tree, the second records every input
+file and commit, the third compiles the bundle, and the last one confirms nothing
+changed while it was building. `build/review-resources/` should now contain
+`base_mod.zip`, `room_payloads.zip` and `room_payload_manifest.json`.
 
-Validate the resources and compile representative rooms from packaged source
-snapshots before selecting them for release. Then update the local canonical
-bundle, replacing the commit placeholders with the source commits used:
+Compile a few representative rooms from these snapshots before accepting them.
+Then copy the bundle into the repository, with the commits you built from:
 
 ```powershell
-../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --publish-from build/review-resources --repo-root . --bundle-dir packaging/room_resources/v0.8.0 --version 0.8.0 --mod-commit <mod-commit> --apworld-commit <apworld-commit> --source-state build/review-inputs.json
-../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --check --repo-root . --bundle-dir packaging/room_resources/v0.8.0 --version 0.8.0
+../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --publish-from build/review-resources --repo-root . --bundle-dir packaging/room_resources/<version> --version <version> --mod-commit <mod-commit> --apworld-commit <apworld-commit> --source-state build/review-inputs.json
+../.venv-windows/Scripts/python.exe -m tools.release.prebuilt_room_resources --check --repo-root . --bundle-dir packaging/room_resources/<version> --version <version>
 ```
 
-Despite its `--publish-from` name, this command only updates local
-`packaging/room_resources/v0.8.0/`. It writes checksums and
-`ROOM_RESOURCES_PROVENANCE.json`, the record of which inputs built the bundle.
-Select the validated bundle with `ROOM_RESOURCES_VERSION` in
-`tools/release/prebuilt_room_resources.py`. Product and resource versions can differ.
+`--publish-from` only writes the local `packaging/room_resources/<version>/`
+folder (checksums and provenance included); it doesn't upload anything. Point the
+release at it with `ROOM_RESOURCES_VERSION` in `tools/release/prebuilt_room_resources.py`
+and update the pinned hashes in `tests/fixtures/generation_cases.json`. The
+resource version can stay behind the product version when the compiler didn't change.
 
-## Assemble Windows
+## 3. Build Sentinel Core
+
+In the `Sentinel-Core` repository: build, run CTest, then assemble the distribution
+with `tools/distribute.py` and verify it with `tools/verify_distribution.py`
+(`--help` lists the paths). A build from a working tree with uncommitted changes
+needs `--dirty` and is only for local testing; CI qualification requires clean
+sources. This mod line needs Core 2.0.x (protocol v2, automap ABI 2).
+
+For a local test package, include the whole Core distribution folder so testers
+can pick its `distribution.json` with **LOCAL BUILD…** in the launcher.
+
+## 4. Assemble the Windows package
 
 ```powershell
 ./scripts/build/windows_release.ps1 -Python ../.venv-windows/Scripts/python.exe -CoreSource ../Sentinel-Core
 ```
 
-The script builds the native client, session helper, launcher and APWorld, runs
-the headless launcher check and assembles `build/final-release/`. It checks the
-canonical room bundle before packaging. `-SkipValidation` skips the broad suite;
-use it only after recording an integrated test run for these sources.
+This builds the native client, the session helper, the launcher and the APWorld,
+runs a headless launcher check, checks the room bundle and writes
+`build/final-release/`. `-SkipValidation` skips the broad test suite; only use it
+when you already have a full test run recorded for exactly these sources.
 
-Sentinel Core has its own distribution. Build and test it in its repository,
-assemble with `tools/distribute.py`, and verify with `tools/verify_distribution.py`.
-Use `--help` for required paths. A local dirty build must use `--dirty`; CI
-qualification requires clean source. Include the complete Core distribution
-for local candidates so testers can select its `distribution.json`.
+## 5. Linux and CI
 
-## Linux and CI
+`.github/workflows/cross-platform-build.yml` builds both launchers, the Windows
+native client (Linux players run it under Proton) and the APWorld, from the exact
+commits you select for the mod, the APWorld and Core. `scripts/pipeline.sh release --build`
+does the same build locally on Linux.
 
-`.github/workflows/cross-platform-build.yml` builds both launcher platforms,
-the Windows native client used under Proton, and the APWorld. Select exact source
-commits for MOD, APWorld and Core. `scripts/pipeline.sh release --build` runs the
-local shell build.
-
-To assemble existing build outputs, use:
+To assemble a package from existing build outputs:
 
 ```text
-python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v0.8.0 --repo-root . --output-dir <new-output>
+python scripts/release/assemble_ci_artifact.py --handoff <build-outputs> --room-resources-dir <resources> --platform windows --version v<version> --repo-root . --output-dir <new-output>
 ```
 
-Use `--platform linux` for Linux. Here `--handoff` means a directory containing
-the launcher, shared native client, APWorld and their checksum manifest. Build
-scripts create this layout. The assembler verifies executables, checksums,
-resource membership and the final ZIP contents.
+`--handoff` is a folder with the launcher, the native client, the APWorld and their
+checksum list, as the build scripts produce it. Use `--platform linux` for Linux.
+The assembler checks executables, checksums, the room resources and the final ZIP.
 
-## Check the delivery before publishing
+## 6. Check the package before publishing
 
-Extract the actual ZIP into a clean directory. Check its hashes, required package
-data, bundled player guides and headless self-test. Compile the test rooms using
-the packaged resources. Preserve their chosen presets and campaign settings;
-regenerate seeds only if generation changes make it necessary.
+Extract the real ZIP into an empty folder and test that copy, not your build folder:
+hashes, packaged data, player guides, the headless self-test, and a few rooms
+compiled from the packaged resources. Keep the test rooms' presets and campaign
+settings; only regenerate seeds if generation changed.
 
-Record the ZIP's actual path and SHA-256. State which offline checks passed and
-which gameplay or Linux/Proton checks remain. Local assembly does not publish a
-release. Uploading or publishing is a separate maintainer action after review.
+Write down the ZIP path and SHA-256, which offline checks passed, and what still
+needs testing in the game on Windows and on Linux/Proton. Then hand it over for
+review and publishing.

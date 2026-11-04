@@ -1,23 +1,23 @@
 """Persistent inventory planning from supplied ownership, context and catalogs."""
 from dataclasses import dataclass
+from enum import Enum
 
-from doom_eap.contracts.foundation import MASTERY_ITEM_BITS, compile_item_delivery_plan
-from doom_eap.contracts.command_publication import stable_spool_id
 from doom_eap.contracts.inventory_domain import (
-    CAPACITY_ITEM_IDS,
-    MAX_CAPACITY_TIER,
-    MISSING,
-    OWNED,
-    UNKNOWN,
     InventoryObservation,
 )
 from doom_eap.contracts.materialization import (
-    MaterializationScope, context_item_ids, support_rune_commands,
-    SUPPORT_RUNE_IDS, TAG_SPECIAL_CAPABILITY,
+    MaterializationScope,
 )
-from doom_eap.runtime.item_reconciliation import ReconciliationCommand, ReconciliationPlan, compile_reconciliation_plan
-from doom_eap.contracts.receipt_delivery import ReceiptPlan
-from doom_eap.runtime.receipt_delivery import ReceiptDelivery
+from doom_eap.runtime.item_reconciliation import ReconciliationPlan
+from doom_eap.strings import text
+
+
+class ReconciliationBlock(str, Enum):
+    RUNTIME_NOT_READY = text("activity", "runtime_not_ready")
+    NATIVE_APPLICATION_PENDING = text("activity", "materialization_pending")
+
+    def __str__(self):
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -36,327 +36,30 @@ class MaterializationPlanError(ValueError):
         self.blocked = blocked
 
 
-async def apply_starting_currencies(ctx, definitions, publication):
-    facts = ctx.receipt_session.resolved_starting_ownership
-    for fact in facts:
-        definition = definitions.get(fact.item_id)
-        if isinstance(definition, dict) and definition.get("type") == "currency":
-            await _apply_starting_currency(ctx, fact, definitions, publication)
 
 
-async def _apply_starting_currency(ctx, fact, definitions, publication):
-    state, completed, count = _starting_currency_progress(ctx.session_state, fact)
-    if count == fact.quantity:
-        return
-    if not ctx._queue_session_authoritative:
-        raise MaterializationPlanError("starting currency requires a bound queue session")
-    context = ctx._refresh_runtime_context(ctx._connected_slot_data)
-    lease = await ctx._active_materialization_lease(context)
-    if context is None or lease is None:
-        raise MaterializationPlanError("starting currency requires a ready game context")
-    scope = ctx.receipt_publication_scope(materialization_lease=lease, context_identity=context.identity)
-    delivery = ReceiptDelivery(None)
-    delivery.bind(state)
-    plan = compile_item_delivery_plan(fact.item_id, definitions)
-    plan = ReceiptPlan(tuple(command.command for command in plan.commands), plan.description)
-    for ordinal in range(count, fact.quantity):
-        # AP deliveries use nonnegative indices.
-        index = -(fact.item_id * 0x80000000 + ordinal + 1)
-        accepted, error = delivery.spool(
-            plan, fact.item_id, index, "Starting currency", scope, publication,
-            lambda reason: _persist_starting_currency(ctx, completed, fact.item_id, ordinal, reason),
-        )
-        if not accepted:
-            raise MaterializationPlanError(error)
 
 
-def _starting_currency_progress(session_state, fact):
-    state = session_state.setdefault("starting_currency", {})
-    if not isinstance(state, dict):
-        raise MaterializationPlanError("stored starting currency must be an object")
-    completed = state.setdefault("completed", {})
-    if not isinstance(completed, dict):
-        raise MaterializationPlanError("stored starting currency progress must be an object")
-    count = completed.get(str(fact.item_id), 0)
-    if type(count) is not int or not 0 <= count <= fact.quantity:
-        raise MaterializationPlanError("stored starting currency count is invalid")
-    return state, completed, count
 
 
-def _persist_starting_currency(ctx, completed, item_id, ordinal, reason):
-    if reason != "item_command_group_complete":
-        ctx.persist_session_state()
-        return
-    key = str(item_id)
-    previous = completed.get(key, 0)
-    completed[key] = ordinal + 1
-    try:
-        ctx.persist_session_state()
-    except Exception:
-        completed[key] = previous
-        raise
 
 
 def compile_materialization_plan(
     ownership, context, scope, item_definitions, replay_policies, special_mode,
     *, observation: InventoryObservation | None = None, selected_item_ids=None,
 ):
-    valid_obs = (
-        observation is not None
-        and not observation.is_stale_for(
-            room_seed_name=scope.room_seed_name,
-            epoch=scope.evidence_epoch,
-            context_identity=context.identity,
-            campaign=context.campaign,
-        )
-    )
-    if not valid_obs:
-        raise MaterializationPlanError("fresh native observation required; UNKNOWN is not missing")
-    received = set(ownership.reconciliation_item_ids)
-    materialization_lease = scope.materialization_lease
-    received_counts = {}
-    for item_id in ownership.reconciliation_item_ids:
-        received_counts[item_id] = received_counts.get(item_id, 0) + 1
-    materializable_ids = context_item_ids(context, received)
-    if 7770011 not in received:
-        materializable_ids = tuple(item_id for item_id in materializable_ids
-                                   if item_id not in {7770111, 7770112, 7770113, 7770114})
-    allowed_replay_policies = {"replay_idempotent", "replay_manual_only"}
-    selected_special_ids = {
-        "progressive_special_weapon": {7770901},
-        "Progressive Special Weapon": {7770901},
-        "progressive_sentinel_hammer": {7770902},
-        "Progressive Sentinel Hammer": {7770902},
-        "the_crucible": {7770007},
-        "The Crucible": {7770007},
-    }.get(special_mode)
-    if selected_special_ids is None:
-        raise MaterializationPlanError(f"unsupported special weapon option: {special_mode!r}", blocked=False)
-    all_special_ids = {7770007, 7770009, 7770901, 7770902}
-    capacity_ids = {7770017, 7770088, 7770092}
-    materializable_ids = tuple(
-        item_id for item_id in materializable_ids
-        if item_id not in all_special_ids or item_id in selected_special_ids
-    )
-    selected_ids = tuple(
-        item_id for item_id in materializable_ids
-        if item_id not in MASTERY_ITEM_BITS and (
-            item_id in SUPPORT_RUNE_IDS
-            or (
-                replay_policies.get(item_id) is not None
-                and replay_policies[item_id].policy in allowed_replay_policies
-            )
-            or item_id in {7770007, 7770009, 7770901, 7770902}
-            or (
-                item_id in capacity_ids
-                and materialization_lease is not None
-            )
-        )
-    )
-    selected_ids = tuple(sorted(set(selected_ids)))
-    if selected_item_ids is not None:
-        selected_ids = tuple(item_id for item_id in selected_ids if item_id in selected_item_ids)
-    selected_receipts = tuple(
-        item_id for item_id in ownership.reconciliation_item_ids if item_id in selected_ids
-    )
-    special_ids = selected_special_ids
-    plan_ids = tuple(
-        item_id for item_id in selected_receipts
-        if item_id not in SUPPORT_RUNE_IDS and item_id not in special_ids
-    )
-    definitions = {item_id: item_definitions[item_id] for item_id in set(plan_ids)}
-    policies = {item_id: replay_policies[item_id] for item_id in set(plan_ids)}
-    reconciliation_slot_identity = stable_spool_id(
-        "context", scope.room_seed_name, scope.team, scope.slot, context.identity
-    )
-    plan = compile_reconciliation_plan(
-        plan_ids, definitions, policies,
-        reconciliation_slot_identity,
-        scope.evidence_epoch,
-        include_manual_replay=True,
-    )
-    plan_commands = list(plan.commands)
-    if valid_obs:
-        diff_commands = []
-        for cmd in plan_commands:
-            item_id = cmd.item_id
-            if item_id in capacity_ids:
-                if observation.get_state(item_id) == UNKNOWN:
-                    continue
-                desired_tier = min(MAX_CAPACITY_TIER, received_counts.get(item_id, 0))
-                observed_tier = (
-                    observation.get_observed_stage(item_id)
-                    if observation.is_owned(item_id)
-                    else 0
-                )
-                if observed_tier <= cmd.stage < desired_tier:
-                    diff_commands.append(cmd)
-            else:
-                if observation.is_proven_missing(item_id) and (item_id != 7770006 or cmd.stage == 0):
-                    diff_commands.append(cmd)
-        plan_commands = diff_commands
-    # Special ownership is one physical state: materialize highest selected intent.
-    special_candidates = []
-    special_definitions = {
-        item_id: item_definitions[item_id]
-        for item_id in selected_ids
-        if item_id in special_ids
-    }
-    special_policies = {
-        item_id: replay_policies[item_id]
-        for item_id in selected_ids
-        if item_id in special_ids
-    }
-    for item_id in sorted(special_definitions):
-        count = received_counts.get(item_id, 0)
-        if count < 1:
-            continue
-        if item_id == 7770007:
-            physical_stage = 1
-            deliveries = compile_item_delivery_plan(item_id, special_definitions)
-        elif item_id == 7770009:
-            physical_stage = 2
-            deliveries = compile_item_delivery_plan(item_id, special_definitions)
-        else:
-            perks = special_definitions[item_id].get("perks", [])
-            stage = min(count, len(perks)) - 1
-            physical_stage = stage + 1
-            deliveries = compile_item_delivery_plan(
-                item_id, special_definitions, stage=stage
-            )
-        special_candidates.append((physical_stage, item_id, deliveries))
-    special_commands = []
-    selected_special_stage = 0
-    if special_candidates:
-        physical_stage, item_id, deliveries = max(
-            special_candidates, key=lambda candidate: (candidate[0], candidate[1])
-        )
-        selected_special_stage = physical_stage
-        policy = special_policies[item_id]
-        for delivery in deliveries.commands:
-            special_commands.append(
-                ReconciliationCommand(
-                    item_id,
-                    policy.name,
-                    policy.policy,
-                    physical_stage,
-                    stable_spool_id(
-                        "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                        context.identity, "special", physical_stage, delivery.index,
-                    ),
-                    delivery.command,
-                    deliveries.description,
-                )
-            )
-        has_hammer = (item_id == 7770009) or (item_id == 7770901 and physical_stage >= 2) or (item_id == 7770902 and physical_stage >= 1)
-        if has_hammer and context.campaign in ("TAG2", "Dark Lord") and context.supports(TAG_SPECIAL_CAPABILITY):
-            hammer_upgrades = (
-                ("ammo_drops_upgraded", "perk/player/weapons/hammer/ammo_drops_upgraded"),
-                ("armor_and_health_drops_upgraded", "perk/player/weapons/hammer/armor_and_health_drops_upgraded"),
-                ("debuff_duration_increase", "perk/player/weapons/hammer/debuff_duration_increase"),
-            )
-            existing_cmd_strings = {cmd.command for cmd in special_commands}
-            for upgrade_key, perk_path in hammer_upgrades:
-                cmd_str = f"ai_ScriptCmdEnt player1 givePlayerPerk {perk_path}"
-                if cmd_str not in existing_cmd_strings:
-                    special_commands.append(
-                        ReconciliationCommand(
-                            item_id,
-                            policy.name,
-                            policy.policy,
-                            physical_stage,
-                            stable_spool_id(
-                                "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                                context.identity, "special", physical_stage, f"hammer-upgrade-{upgrade_key}",
-                            ),
-                            cmd_str,
-                            f"Sentinel Hammer upgrade: {upgrade_key}",
-                        )
-                    )
-    if special_commands and valid_obs and special_candidates:
-        is_owned = observation.is_owned(item_id)
-        observed_stage = observation.get_observed_stage(item_id)
-        if is_owned and observed_stage >= selected_special_stage:
-            special_commands = []
-        elif not observation.is_proven_missing(item_id) and not (is_owned and observed_stage < selected_special_stage):
-            special_commands = []
-    special_diagnostic = (item_id, count, selected_special_stage, context.identity, len(special_commands)) if special_candidates else None
-    support_commands = []
-    for item_id in support_rune_commands(received, context):
-        if valid_obs:
-            if observation.is_owned(item_id) or not observation.is_proven_missing(item_id):
-                continue
-        support_delivery = compile_item_delivery_plan(
-            item_id, {item_id: item_definitions[item_id]}
-        )
-        if len(support_delivery.commands) != 1:
-            raise MaterializationPlanError(f"invalid support rune plan {item_id}")
-        policy = replay_policies[item_id]
-        delivery = support_delivery.commands[0]
-        support_commands.append(
-            ReconciliationCommand(
-                item_id,
-                policy.name,
-                policy.policy,
-                0,
-                stable_spool_id(
-                    "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                    context.identity, "support-rune", item_id,
-                ),
-                delivery.command,
-                support_delivery.description,
-            )
-        )
-    blood_punch_commands = []
-    if context.campaign != "Base" and 7770014 in received and (selected_item_ids is None or 7770014 in selected_item_ids):
-        if not (valid_obs and (observation.is_owned(7770014) or not observation.is_proven_missing(7770014))):
-            for upgrade in ownership.blood_punch_upgrades:
-                blood_punch_commands.append(
-                    ReconciliationCommand(
-                        7770014,
-                        "Blood Punch",
-                        "replay_idempotent",
-                        upgrade.location_id,
-                        stable_spool_id(
-                            "reconcile", scope.room_seed_name, scope.team, scope.slot,
-                            context.identity, "blood-punch-upgrade", upgrade.location_id,
-                        ),
-                        f"ai_ScriptCmdEnt player1 givePlayerPerk {upgrade.perk_path}",
-                        f"Blood Punch upgrade from {upgrade.mission_name}",
-                    )
-                )
+    from doom_eap.runtime.inventory import InventoryOwnership, compare_inventory
 
-    raw_commands = (
-        tuple(plan_commands)
-        + tuple(special_commands)
-        + tuple(support_commands)
-        + tuple(blood_punch_commands)
+    result = compare_inventory(
+        InventoryOwnership(ownership.reconciliation_item_ids, ownership.blood_punch_upgrades),
+        definitions=item_definitions, policies=replay_policies,
+        observation=observation, context=context, scope=scope, special_mode=special_mode,
+        selected_item_ids=selected_item_ids,
     )
-    commands = []
-    semantic_operations = set()
-    for command in raw_commands:
-        semantic_key = (command.item_id, command.stage, command.command)
-        if semantic_key in semantic_operations:
-            continue
-        semantic_operations.add(semantic_key)
-        commands.append(command)
-    commands = tuple(commands)
-    plan = type(plan)(
-        commands=commands,
-        selections=plan.selections,
-        replayed=plan.replayed,
-        special_stages=1 if special_commands else 0,
-        skipped_never_replay=plan.skipped_never_replay,
-        skipped_unproven=plan.skipped_unproven,
-        skipped_manual_replay=plan.skipped_manual_replay,
-    )
-    if not commands and any(observation.get_state(item_id) == UNKNOWN for item_id in selected_ids):
-        unresolved = sorted(item_id for item_id in selected_ids if observation.get_state(item_id) == UNKNOWN)
-        raise MaterializationPlanError("empty plan has unresolved native observations: " + ", ".join(map(str, unresolved)))
-    return MaterializationPlan(
-        scope, plan, len(raw_commands), len(support_commands), selected_special_stage,
-        special_diagnostic,
-    )
+    if not result.reconciliation.commands and result.unresolved_item_ids:
+        raise MaterializationPlanError("empty plan has unresolved native observations: "
+                                       + ", ".join(map(str, result.unresolved_item_ids)))
+    return result.materialization
 
 
 def authored_effects_allowed(*, evidence, campaign, epoch, lease, process_running,
@@ -376,7 +79,7 @@ def reconciliation_session_block(*, item_ready, require_connection, connected, t
     if team is None or slot is None:
         return "current AP team/slot identity is incomplete"
     if not seed or not re.fullmatch(r"[A-Za-z0-9_.-]+", str(seed)):
-        return "seed identity is missing or unsafe for deterministic spool IDs"
+        return "seed identity is missing or unsafe for deterministic command keys"
     return None
 
 
@@ -387,7 +90,7 @@ def reconciliation_runtime_block(*, evidence, marker, runtime_ready, campaign, a
     if marker is None:
         return "active AP map marker is unavailable"
     if not runtime_ready:
-        return "runtime effects are not level-ready"
+        return ReconciliationBlock.RUNTIME_NOT_READY
     if campaign in {None, "Base"}:
         if active_slot != evidence.slot_directory:
             return "gameplay evidence does not match the active save slot"

@@ -1,29 +1,37 @@
 #pragma once
-#include "command_transport.h"
+#include <windows.h>
 #include "sentinel_inspection.h"
+#include "protocol_v2.h"
 #include <functional>
+#include <string>
 
-class SentinelCommandClient : public CommandTransport {
+enum ApRpcResult { AP_RPC_NONE, AP_RPC_PIPE_MISSING, AP_RPC_PIPE_BUSY,
+    AP_RPC_WAIT_TIMEOUT, AP_RPC_DELIVERED, AP_RPC_EXCEPTION, AP_RPC_UNKNOWN,
+    AP_RPC_AMBIGUOUS, AP_RPC_REJECTED };
+const char* RpcCallResultName(ApRpcResult result);
+
+class SentinelCommandClient {
 public:
     using LogCallback = std::function<void(const std::string&)>;
     void SetLogCallback(LogCallback callback) { log_ = std::move(callback); }
     void SetTargetProcess(DWORD pid);
     DWORD TargetProcess() const { return pid_; }
-    bool Initialize() { return PollHealth(); }
     bool PollHealth();
-    bool Ready() const override { return ready_; }
-    bool ExecuteConsoleCommand(const std::string& command) override;
+    bool Ready() const { return ready_; }
+    bool ExecuteConsoleCommand(const std::string& command);
     unsigned long long AttachmentEpoch() const { return epoch_; }
-    void SetCurrentCommandId(const std::string& id) override { command_id_ = id; result_ = AP_RPC_NONE; status_ = 0; }
-    std::string CurrentCommandId() const { return command_id_; }
-    ApRpcResult LastResult() const override { return result_; }
-    DWORD LastTransportStatus() const override { return status_; }
+    ApRpcResult LastResult() const { return result_; }
+    DWORD LastTransportStatus() const { return status_; }
+    sentinel::Inspection SaveAdmission();
 private:
+    template<class T> bool Read(uint16_t type, const sentinel::generated::Bytes& payload, T& value);
     DWORD pid_ = 0, status_ = ERROR_FILE_NOT_FOUND;
     bool ready_ = false;
     unsigned long long epoch_ = 0;
     sentinel::Snapshot identity_{};
-    std::string command_id_ = "-";
+    sentinel::V2Connection connection_;
+    sentinel::generated::scope scope_{};
+    std::array<uint8_t, 16> binding_{};
     ApRpcResult result_ = AP_RPC_NONE;
     LogCallback log_;
 };

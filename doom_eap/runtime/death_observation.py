@@ -18,9 +18,14 @@ class DeathObservation:
     def bind(self, namespace):
         if self._namespace == namespace:
             return False
-        self.__init__(self._logger)
+        self.reset()
         self._namespace = namespace
         return True
+
+    def reset(self):
+        namespace = self._namespace
+        self.__init__(self._logger)
+        self._namespace = namespace
 
     def start_empty_slot(self, slot):
         self._initialized.add(slot)

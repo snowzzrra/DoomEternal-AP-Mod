@@ -169,3 +169,20 @@ def test_working_tree_origin_is_exact_and_does_not_claim_its_ancestor_as_built_c
     state["mod"]["fingerprint"] = "0" * 64
     with pytest.raises(ValueError, match="source evidence"):
         source_origin("ancestor", state["mod"])
+
+
+@pytest.mark.parametrize("relative", [
+    "data/player_strings.json", "doom_eap/strings.py", "tools/release/build_string_table.py",
+])
+def test_player_text_changes_invalidate_room_resource_and_compiler_caches(tmp_path, relative):
+    from doom_eap.content.compiler_identity import SOURCE_FILES, load_compiler_source_identity
+
+    for name in SOURCE_FILES:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"original\n")
+    resources_before = compute_room_resource_input_fingerprint(tmp_path)[0]
+    compiler_before = load_compiler_source_identity(tmp_path, frozen=False)["fingerprint"]
+    (tmp_path / relative).write_bytes(b"changed\n")
+    assert compute_room_resource_input_fingerprint(tmp_path)[0] != resources_before
+    assert load_compiler_source_identity(tmp_path, frozen=False)["fingerprint"] != compiler_before

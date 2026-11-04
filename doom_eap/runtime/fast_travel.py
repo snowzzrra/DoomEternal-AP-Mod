@@ -1,18 +1,18 @@
 """Fast Travel visit eligibility and publication state, consuming canonical map facts."""
-from collections.abc import Mapping
-from types import MappingProxyType
 import re
 import time
+from collections.abc import Mapping
+from types import MappingProxyType
 
+from doom_eap.contracts.command_publication import FAST_TRAVEL_UNLOCK, MAP_ENTITY_SAFE, stable_command_key
 from doom_eap.contracts.runtime_context import canonical_map_name
-from doom_eap.contracts.command_publication import stable_spool_id, MAP_ENTITY_SAFE, FAST_TRAVEL_UNLOCK
 
 FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
 
 
 def valid_fast_travel_delivery_key(value):
-    if not isinstance(value, (list, tuple)) or len(value) != 3:
+    if not isinstance(value, list | tuple) or len(value) != 3:
         return None
     if not all(isinstance(component, str) and component for component in value):
         return None
@@ -104,7 +104,7 @@ class FastTravel:
             return "map_mismatch"
         return None
 
-    def reconcile(self, trigger, *, map_identity, room_identity, state_key, runtime_ready, item_ready, rpc_ready, send):
+    async def reconcile(self, trigger, *, map_identity, room_identity, state_key, runtime_ready, item_ready, rpc_ready, send):
         """Activate native Fast Travel once per room/map/load epoch."""
         snapshot = getattr(self, "_eligibility", None)
         state = getattr(self, "_epoch_state", None)
@@ -144,16 +144,16 @@ class FastTravel:
             return False
         now = time.monotonic()
         retry_deadline = state.get("retry_deadline")
-        retry_waiting = isinstance(retry_deadline, (int, float)) and now < retry_deadline
+        retry_waiting = isinstance(retry_deadline, int | float) and now < retry_deadline
         if retry_waiting:
             state["status"] = "pending"
             return False
         if retry_deadline is None:
             self._fast_travel_transition("READY", trigger=trigger)
         command = "ai_ScriptCmdEnt ap_fast_travel_unlock activate"
-        if not send(
+        if not await send(
             command,
-            coalesce_key=stable_spool_id(
+            coalesce_key=stable_command_key(
                 "fast-travel", identity, map_key, epoch
             ),
             already_queued_ok=True,
@@ -210,7 +210,7 @@ class FastTravel:
         if marker_data.get("map_key") != map_key:
             return None
         mission_id = self._mission_ids.get(map_key)
-        history_available = isinstance(checked, (set, frozenset, list, tuple))
+        history_available = isinstance(checked, set | frozenset | list | tuple)
         completed_before_epoch = bool(history_available and mission_id in checked)
         ineligible_reason = None
         if not identity:

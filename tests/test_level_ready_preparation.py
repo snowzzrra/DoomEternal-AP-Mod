@@ -2,9 +2,9 @@ import asyncio
 import importlib
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -40,6 +40,48 @@ assert lifecycle.classify_native_load(evidence, bridge.MATERIALIZATION_MAPS) is 
     subprocess.run([sys.executable, '-c', script], cwd=tmp_path, env=env, check=True, timeout=30)
 
 
+def test_tracker_passes_newest_telemetry_path_to_level_ready(tmp_path):
+    from delivery_scenario_support import environment, prepare
+
+    prepare(tmp_path)
+    script = '''
+import asyncio
+from pathlib import Path
+from types import SimpleNamespace
+import Utils
+Utils.user_path.cached_path = str(Path.cwd())
+from doom_eap.runtime import bridge_client as bridge
+
+class Context(bridge.DoomEternalContext):
+    async def process_level_ready(self, newest_path=None):
+        self.observed_path = newest_path
+        self.exit_event.set()
+        return True
+
+async def exercise():
+    context = Context(None, None)
+    context.item_state_ready = True
+    context.server = SimpleNamespace(socket=SimpleNamespace(closed=False))
+    context.reconnect_resync_attempted = True
+    bridge.doom_process_identity = lambda: 'fixture'
+    bridge.read_gameplay_save_evidence = lambda: SimpleNamespace(state='not_running')
+    paths = [Path('older.txt'), Path('newest.txt')]
+    for path in paths:
+        path.write_text('AP_ACTIVE_MAP_V1 map_key=e1m1_intro runtime_map=game/sp/e1m1_intro/e1m1_intro marker=AP_MAP_START_E1M1_INTRO')
+    bridge.discover_telemetry_markers = lambda: [(index + 1, str(path)) for index, path in enumerate(paths)]
+    try:
+        await asyncio.wait_for(context.tracker_loop(), 5)
+        assert context.observed_path == str(paths[-1])
+        assert all(not path.exists() for path in paths)
+    finally:
+        context._blocking_native_worker().close()
+
+asyncio.run(exercise())
+'''
+    subprocess.run([sys.executable, '-B', '-c', script], cwd=tmp_path,
+                   env=environment(tmp_path), check=True, timeout=30)
+
+
 def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[1]
     if not (Path(os.environ.get("ARCHIPELAGO_SOURCE", root.parent / "Archipelago")) / "CommonClient.py").is_file():
@@ -57,7 +99,6 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
     monkeypatch.syspath_prepend(str(Path(os.environ.get("ARCHIPELAGO_SOURCE", root.parent / "Archipelago"))))
     monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
     bridge = importlib.import_module("doom_eap.runtime.bridge_client")
-    monkeypatch.setattr(bridge, "QUEUE_DIR", str(tmp_path / "game/base/ap_queue"))
     from doom_eap.contracts.runtime_context import RuntimeContext
 
     async def exercise():
@@ -67,7 +108,6 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
         context.runtime_lifecycle.accept_marker(marker, 1)
         evidence = SimpleNamespace(state="GAMEPLAY_READY")
         monkeypatch.setattr(bridge, "read_gameplay_save_evidence", lambda: evidence)
-        monkeypatch.setattr(bridge, "rpc_execution_enabled", lambda: True)
         monkeypatch.setattr(context, "read_active_map_identity", AsyncMock(return_value=marker))
         monkeypatch.setattr(context, "snapshot_fast_travel_eligibility", lambda: None)
         monkeypatch.setattr(context, "runtime_effects_ready", AsyncMock(return_value=True))
@@ -75,12 +115,7 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
         monkeypatch.setattr(context, "_refresh_runtime_context", lambda _: runtime)
         published = []
         def publish(name):
-            result = bridge.command_spool().publish("ai_ScriptCmdEnt ap_fixture activate",
-                coalesce_key=name, room_scoped=False, arm_rpc=False)
-            assert result.accepted
             published.append(name)
-        monkeypatch.setattr(context, "advance_reconciliation_epoch", lambda _: published.append("epoch") or 1)
-        monkeypatch.setattr(context, "reconcile_owned_runes", AsyncMock(return_value=(None, None)))
         monkeypatch.setattr(context, "advance_automap_cleanup_epoch", lambda: published.append("cleanup_epoch"))
         monkeypatch.setattr(context, "reconcile_checked_automap_cleanup", AsyncMock(side_effect=lambda _: publish("cleanup")))
         monkeypatch.setattr(context, "reconcile_fast_travel_unlock", AsyncMock(side_effect=lambda _: publish("fast_travel")))
@@ -92,10 +127,10 @@ def test_pending_observation_does_not_repeat_preparation(tmp_path, monkeypatch):
         context.level_ready.queue("42:1", None)
         for _ in range(5):
             assert not await context.process_level_ready()
-        assert published == ["epoch", "cleanup_epoch", "cleanup"]
+        assert published == ["cleanup_epoch", "cleanup"]
         observation[0] = None
         assert await context.process_level_ready()
-        assert published == ["epoch", "cleanup_epoch", "cleanup", "fast_travel"]
+        assert published == ["cleanup_epoch", "cleanup", "fast_travel"]
         assert not await context.process_level_ready()
 
     asyncio.run(exercise())

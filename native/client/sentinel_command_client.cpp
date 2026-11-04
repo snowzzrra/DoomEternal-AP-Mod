@@ -1,82 +1,129 @@
 #include "sentinel_command_client.h"
 #include "commands.h"
-#include "sentinel_version.h"
+#include <algorithm>
 #include <bcrypt.h>
 #include <cstring>
+#include <sstream>
 
+namespace g = sentinel::generated;
+const char* RpcCallResultName(ApRpcResult result) {
+    static const char* names[] = {"NONE", "PIPE_NOT_FOUND", "PIPE_BUSY", "TIMEOUT", "DISPATCHED",
+        "EXCEPTION", "UNKNOWN", "EFFECT_UNKNOWN", "REFUSED"};
+    return result >= AP_RPC_NONE && result <= AP_RPC_REJECTED ? names[result] : "UNKNOWN";
+}
 void SentinelCommandClient::SetTargetProcess(DWORD pid) {
-    if (pid_ != pid) { pid_ = pid; ready_ = false; identity_ = {}; }
+    if (pid_ != pid) { connection_.close(); pid_ = pid; ready_ = false; identity_ = {}; }
+}
+template<class T> bool SentinelCommandClient::Read(uint16_t type, const g::Bytes& payload, T& value) {
+    g::read_envelope input{};
+    input.scope = scope_;
+    input.namespace_id.fill('0');
+    input.command_type = type;
+    input.payload_revision = 1;
+    g::Bytes body;
+    if (!g::encode(input, body)) return false;
+    body.insert(body.end(), payload.begin(), payload.end());
+    const auto reply = connection_.exchange(1, body, 500);
+    status_ = reply.win32_error;
+    if (reply.transport != sentinel::ProbeResult::ok || reply.wire != sentinel::WireResult::ok || reply.body.size() < 36) return false;
+    g::scope actual{};
+    if (!g::decode(g::Bytes(reply.body.begin(), reply.body.begin() + 36), actual)
+            || actual.pid != scope_.pid || actual.process_created != scope_.process_created || actual.instance_id != scope_.instance_id) return false;
+    return g::decode(g::Bytes(reply.body.begin() + 36, reply.body.end()), value);
 }
 bool SentinelCommandClient::PollHealth() {
-    if (!pid_) { ready_ = false; result_ = AP_RPC_PIPE_MISSING; status_ = ERROR_FILE_NOT_FOUND; return false; }
-    const auto observation = sentinel::query_native(pid_, 250);
-    ready_ = observation.result == sentinel::ProbeResult::ok &&
-        observation.native.availability == SC_NATIVE_ENABLED;
-    status_ = observation.win32_error;
-    if (ready_) {
-        if (identity_.process_created != observation.snapshot.process_created ||
-            identity_.instance != observation.snapshot.instance) ++epoch_;
-        identity_ = observation.snapshot; result_ = AP_RPC_DELIVERED;
-    } else result_ = observation.result == sentinel::ProbeResult::endpoint_absent ? AP_RPC_PIPE_MISSING : AP_RPC_UNKNOWN;
-    return ready_;
-}
-bool SentinelCommandClient::ExecuteConsoleCommand(const std::string& command) {
-    sc_command_request request{};
-    if (!sentinel::commands::parse(command, request)) {
-        result_ = AP_RPC_REJECTED; status_ = ERROR_INVALID_DATA; return false;
-    }
-    const auto native = sentinel::query_native(pid_, 500);
-    if (native.result != sentinel::ProbeResult::ok) {
-        result_ = AP_RPC_REJECTED; status_ = ERROR_NOT_READY; return false;
-    }
-    request.execution.expected = native.native.scope;
-    if (sentinel::commands::process_scoped(request)) {
-        std::memcpy(request.namespace_id, SC_COMMAND_PROCESS_NAMESPACE, sizeof(request.namespace_id));
-    } else {
-        const auto admission = sentinel::query_save_admission(pid_, 500);
-        if (admission.result != sentinel::ProbeResult::ok || admission.admission.state != SC_SAVE_SESSION_ADMITTED ||
-            !(admission.admission.flags & SC_SAVE_SESSION_ACCEPTING) ||
-            native.snapshot.process_created != admission.snapshot.process_created ||
-            native.snapshot.instance != admission.snapshot.instance) {
-            result_ = AP_RPC_REJECTED; status_ = ERROR_NOT_READY; return false;
+    if (!pid_) { ready_ = false; result_ = AP_RPC_PIPE_MISSING; return false; }
+    if (connection_.identity().pid != pid_) {
+        if (connection_.connect(pid_, 500) != sentinel::ProbeResult::ok) {
+            connection_.close(); ready_ = false; result_ = AP_RPC_PIPE_MISSING; return false;
         }
-        std::memcpy(request.namespace_id, admission.admission.namespace_id, sizeof(request.namespace_id));
     }
-    request.execution.deadline_ms = 2000;
-    if (BCryptGenRandom(nullptr, request.execution.nonce, sizeof(request.execution.nonce), BCRYPT_USE_SYSTEM_PREFERRED_RNG) != 0) {
-        result_ = AP_RPC_REJECTED; status_ = ERROR_GEN_FAILURE; return false;
-    }
-    std::memcpy(&request.execution.request_id, request.execution.nonce, sizeof(request.execution.request_id));
-    if (!request.execution.request_id || !sentinel::commands::valid(request)) {
-        result_ = AP_RPC_REJECTED; status_ = ERROR_INVALID_DATA; return false;
-    }
+    const auto& native = connection_.identity();
+    scope_.pid = native.pid; scope_.process_created = native.process_created;
+    std::copy_n(native.instance_id, 16, scope_.instance_id.begin());
+    scope_.generation = native.lifecycle_generation;
+    g::Bytes payload;
+    g::encode(g::native_payload{g::native_native_payload{}}, payload);
+    g::sc_native_snapshot snapshot{};
+    ready_ = Read(4, payload, snapshot) && snapshot.availability == SC_NATIVE_ENABLED;
+    if (!ready_) { connection_.close(); result_ = AP_RPC_UNKNOWN; return false; }
+    scope_.generation = snapshot.scope.lifecycle_generation;
+    if (identity_.process_created != scope_.process_created || identity_.instance != scope_.instance_id) ++epoch_;
+    identity_.pid = pid_; identity_.process_created = scope_.process_created; identity_.instance = scope_.instance_id;
+    result_ = AP_RPC_DELIVERED;
+    return true;
+}
+sentinel::Inspection SentinelCommandClient::SaveAdmission() {
+    sentinel::Inspection out{};
+    g::Bytes payload;
+    g::encode(g::save_admission_payload{g::save_admission_save_admission_payload{}}, payload);
+    g::save_admission_result value{};
+    if (!PollHealth() || !Read(12, payload, value)) return out;
+    out.result = sentinel::ProbeResult::ok;
+    out.snapshot = identity_;
+    out.admission.state = value.observation.state;
+    out.admission.flags = value.observation.flags;
+    std::copy(value.observation.namespace_id.begin(), value.observation.namespace_id.end(), out.admission.namespace_id);
+    std::copy(value.observation.native_root.begin(), value.observation.native_root.end(), out.admission.native_root);
+    binding_ = value.save_binding;
+    return out;
+}
+bool SentinelCommandClient::ExecuteConsoleCommand(const std::string& text) {
+    sc_command_request checked{};
+    if (!sentinel::commands::parse(text, checked) || !PollHealth()) { result_ = AP_RPC_REJECTED; return false; }
+    const auto admission = SaveAdmission();
+    if (admission.result != sentinel::ProbeResult::ok || !(admission.admission.flags & SC_SAVE_SESSION_ACCEPTING)) return false;
+    g::command_payload payload;
+    std::istringstream words(text);
+    std::string first, second, third;
+    words >> first >> second >> third;
+    if (checked.kind == SC_COMMAND_ACTIVATE) payload = g::command_activate_payload{second};
+    else if (checked.kind == SC_COMMAND_ECHO) payload = g::command_echo_payload{text.substr(5)};
+    else if (checked.kind == SC_COMMAND_TRANSIENT_POLICY) {
+        const uint32_t variable = first == "g_damageScaleAllToAI" ? 0 : first == "g_damageScaleAllToSlayer" ? 1 : 2;
+        payload = g::command_transient_policy_payload{variable, second};
+    } else { result_ = AP_RPC_REJECTED; return false; }
+    g::submission input{};
+    input.reference.scope = scope_;
+    std::copy_n(admission.admission.namespace_id, 64, input.reference.namespace_id.begin());
+    std::array<uint8_t, 16> random{};
+    if (BCryptGenRandom(nullptr, random.data(), 16, BCRYPT_USE_SYSTEM_PREFERRED_RNG)) return false;
+    std::ostringstream id;
+    for (const auto byte : random) id << std::hex << static_cast<unsigned>(byte) << '-';
+    input.reference.command_id = id.str();
+    input.reference.command_type = 46; input.reference.payload_revision = 1;
+    input.save_binding = binding_; input.deadline_ms = 2000;
+    g::Bytes encoded, body, reference;
+    g::command_reference ref{};
+    if (!g::encode(payload, encoded) || !sentinel::v2_reference(input, encoded, ref)
+            || !g::encode(ref, reference) || !g::encode(input, body)) return false;
+    body.insert(body.end(), encoded.begin(), encoded.end());
+    auto response = connection_.exchange(2, body, 500);
     const auto deadline = GetTickCount64() + 4000;
-    auto reply = sentinel::query_command(pid_, 500, sentinel::command_submit_operation, request);
     for (;;) {
-        if (reply.result == sentinel::ProbeResult::ok) {
-            const auto& execution = reply.command.execution;
-            if (execution.state >= SC_DIAGNOSTIC_EXECUTED)
-                sentinel::query_command(pid_, 500, sentinel::command_release_operation, request);
-            if (execution.state == SC_DIAGNOSTIC_EXECUTED) {
-                status_ = reply.command.native_exception;
-                result_ = reply.command.outcome == SC_COMMAND_DISPATCHED ? AP_RPC_DELIVERED :
-                    reply.command.outcome == SC_COMMAND_NATIVE_FAILED ? AP_RPC_AMBIGUOUS : AP_RPC_REJECTED;
-                if (log_) log_("CORE_COMMAND command_id=" + command_id_ +
-                    " request_id=" + std::to_string(request.execution.request_id) +
-                    " outcome=" + std::to_string(reply.command.outcome) +
-                    " native_exception=" + std::to_string(reply.command.native_exception) + " gameplay_effect=unverified");
-                return result_ == AP_RPC_DELIVERED;
-            }
-            if (execution.state >= SC_DIAGNOSTIC_REJECTED) {
-                result_ = AP_RPC_REJECTED; status_ = execution.reason; return false;
-            }
+        g::command_reply reply{};
+        sentinel::v2::CommandError error{};
+        g::sc_diagnostic_result execution{};
+        g::Bytes result;
+        if (response.transport != sentinel::ProbeResult::ok || response.wire != sentinel::WireResult::ok
+                || !sentinel::v2::command_response(response.body, reply, error, execution, result)
+                || error != sentinel::v2::CommandError::none || reply.actual_instance_id != scope_.instance_id) break;
+        g::Bytes returnedReference;
+        if (!g::encode(reply.reference, returnedReference) || returnedReference != reference) break;
+        if (reply.dimensions.progress == 2) {
+            g::sc_command_result value{};
+            if (!g::decode(result, value)) break;
+            g::Bytes ack;
+            g::encode(g::ack{ref, reply.dimensions.result_token}, ack);
+            connection_.exchange(5, ack, 500);
+            result_ = value.outcome == SC_COMMAND_DISPATCHED ? AP_RPC_DELIVERED : AP_RPC_REJECTED;
+            status_ = value.native_exception;
+            return result_ == AP_RPC_DELIVERED;
         }
         if (GetTickCount64() >= deadline) break;
         Sleep(10);
-        // Query the same identity after an uncertain submit; never resubmit it.
-        reply = sentinel::query_command(pid_, 500, sentinel::command_result_operation, request);
+        response = connection_.exchange(3, reference, 500);
     }
     result_ = AP_RPC_AMBIGUOUS; status_ = ERROR_TIMEOUT;
-    if (log_) log_("CORE_COMMAND command_id=" + command_id_ + " outcome=ambiguous automatic_replay=disabled");
     return false;
 }

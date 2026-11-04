@@ -25,7 +25,6 @@
 #include "game_state_probe.h"
 #include "sentinel_command_client.h"
 #include "ap_rpc_health_state.h"
-#include "command_queue.h"
 #include "ammo_hotkey.h"
 
 SentinelCommandClient* g_ApRpc = nullptr;
@@ -423,11 +422,9 @@ std::string CurrentWorkingDirectory() {
 
 
 std::string RpcGateReason(
-    bool rpcArmed,
     bool rpcTransportReady,
     const GameStateProbe& gameStateProbe
 ) {
-    if (!rpcArmed) return "rpc_disarmed";
     if (!rpcTransportReady) return "rpc_unavailable";
     if (gameStateProbe.IsLoading()) return "loading";
     if (!gameStateProbe.IsGameplayLoaded()) return "menu_or_no_active_map";
@@ -453,7 +450,6 @@ void LogStartupHeader(
     const std::string& executablePath,
     const std::string& workingDirectory,
     const std::string& doomExecutablePath,
-    const QueueSnapshot& queueSnapshot,
     const CorePreflightResult& preflight,
     const RuntimePathInfo& runtimePaths
 ) {
@@ -518,30 +514,12 @@ void LogStartupHeader(
     LogDebug("Client directory: " + runtimePaths.clientDir.string());
     LogDebug("DOOMEternalx64vk.exe path: " + doomExecutablePath);
     LogDebug("base path: " + std::filesystem::absolute(workingDirectory).string());
-    LogDebug(
-        "queue path: "
-        + std::filesystem::absolute(std::filesystem::path(kQueueDirectory)).string()
-    );
-    LogDebug(
-        "gate path: "
-        + std::filesystem::absolute(std::filesystem::path(kRpcGatePath)).string()
-    );
-    LogDebug(
-        "Queue snapshot: pending=" + std::to_string(queueSnapshot.pending)
-        + " processing=" + std::to_string(queueSnapshot.processing)
-        + " failed=" + std::to_string(queueSnapshot.failed)
-    );
     LogDebug("Another ap_client.exe instance detected: no (single-instance mutex acquired).");
     LogDebug(
         "Other DOOM processes detected: "
         + std::to_string(CountProcessesNamed("DOOMEternalx64vk.exe"))
     );
     LogDebug("Offset profile: dynamic-build-profiles");
-    LogDebug(
-        "RPC_ENTITY_CONTRACT_REVISION: "
-        + std::to_string(kRpcEntityContractRevision)
-    );
-    LogDebug(std::string("RPC_ENTITY_PREFIX: ") + kRpcEntityPrefix);
     LogDebug(
         "NATIVE_COMMAND_POLICY_REVISION: "
         + std::to_string(kNativeCommandPolicyRevision)
@@ -705,7 +683,7 @@ public:
         if (!EnsureConfigured()) {
             return;
         }
-        const auto admission = sentinel::query_save_admission(g_ApRpc ? g_ApRpc->TargetProcess() : 0, 250);
+        const auto admission = g_ApRpc ? g_ApRpc->SaveAdmission() : sentinel::Inspection{};
         if (admission.result != sentinel::ProbeResult::ok
                 || admission.admission.state != SC_SAVE_SESSION_ADMITTED
                 || !(admission.admission.flags & SC_SAVE_SESSION_ACCEPTING)
@@ -1251,17 +1229,12 @@ int main(int argc, char** argv) {
     }
     ApRpcHealthStatePublisher healthStatePublisher(runtimePaths.gameRootDir / "base");
     healthStatePublisher.PublishStarting();
-    DeleteFileA(kTransientScopePath);
 
-    NativeCommandQueue commandQueue(LogDebug);
-    commandQueue.Initialize();
-    const QueueSnapshot startupQueueSnapshot = CountQueueFiles();
     const CorePreflightResult preflight = InspectCoreInstallation(runtimePaths);
     LogStartupHeader(
         executablePath,
         workingDirectory,
         doomExecutablePath,
-        startupQueueSnapshot,
         preflight,
         runtimePaths
     );
@@ -1277,8 +1250,7 @@ int main(int argc, char** argv) {
         + " launcher_game_link_verification=authoritative"
     );
     LogDebug(
-        "RPC execution starts disarmed and auto-arms when eligible work is pending; "
-        "safe gameplay is still required."
+        "Native delivery requires the ledger and safe gameplay."
     );
 
     GameStateProbe gameStateProbe(LogDebug);
@@ -1288,8 +1260,7 @@ int main(int argc, char** argv) {
         healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
         LogDebug(
             "Meathook preflight failed. No valid XINPUT1_3.dll candidate was accepted. "
-            "Queued commands will remain pending until the client is restarted "
-            "with a valid install."
+            "A valid install is required for native delivery."
         );
     } else {
         g_ApRpcOwner = std::make_unique<SentinelCommandClient>();
@@ -1305,7 +1276,6 @@ int main(int argc, char** argv) {
         DWORD lastWaitTransport = MAXDWORD;
         unsigned long long rpcWaitAttempts = 0;
         auto logRpcWait = [&](const char* reason) {
-            const QueueSnapshot snapshot = CountQueueFiles();
             LogDebug(
                 "RPC_SERVER_WAIT reason=" + std::string(reason)
                 + " elapsed_ms=" + std::to_string(GetTickCount() - rpcWaitStarted)
@@ -1320,9 +1290,6 @@ int main(int argc, char** argv) {
                 + " gameplay_loaded="
                 + std::string(gameStateProbe.IsGameplayLoaded() ? "yes" : "no")
                 + " native_safe=" + std::string(gameStateProbe.IsSafeForRpc() ? "yes" : "no")
-                + " queue_pending=" + std::to_string(snapshot.pending)
-                + " queue_processing=" + std::to_string(snapshot.processing)
-                + " queue_failed=" + std::to_string(snapshot.failed)
             );
         };
         logRpcWait("initial");
@@ -1398,21 +1365,11 @@ int main(int argc, char** argv) {
         );
     }
 
-    bool lastRpcArmed = false;
     bool lastRpcEnabled = false;
     bool transientBaselineReady = false;
     unsigned long long transientBaselineEpoch = 0;
     std::string lastGateReason;
     AmmoHotkeyHandler ammoHotkey(LogDebug);
-    {
-        const QueueSnapshot runtimeQueue = CountQueueFiles();
-        LogDebug(
-            "QUEUE_RUNTIME_READY pending=" + std::to_string(runtimeQueue.pending)
-            + " processing=" + std::to_string(runtimeQueue.processing)
-            + " failed=" + std::to_string(runtimeQueue.failed)
-        );
-    }
-
     while (true) {
         gameStateProbe.Poll();
         if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
@@ -1429,20 +1386,18 @@ int main(int argc, char** argv) {
             gameStateProbe.IsLoading(),
             gameStateProbe.IsSafeForRpc()
         );
-        const auto activeNamespace = commandQueue.Import();
+        const auto admission = g_ApRpc ? g_ApRpc->SaveAdmission() : sentinel::Inspection{};
+        const bool roomBound = admission.result == sentinel::ProbeResult::ok && (admission.admission.flags & SC_SAVE_SESSION_ACCEPTING);
 
         const DWORD now = GetTickCount();
-        const bool rpcArmed = commandQueue.ArmIfPending();
         const bool rpcTransportReady =
             meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
         if (!rpcTransportReady) {
             transientBaselineReady = false;
-            DeleteFileA(kTransientScopePath);
             healthStatePublisher.PublishEffectBaseline(false, 0);
         } else if (g_ApRpc->AttachmentEpoch() != transientBaselineEpoch) {
             transientBaselineEpoch = g_ApRpc->AttachmentEpoch();
             transientBaselineReady = false;
-            DeleteFileA(kTransientScopePath);
             healthStatePublisher.PublishEffectBaseline(false, transientBaselineEpoch);
         }
         if (rpcTransportReady && g_ApRpc->Ready() && gameStateProbe.IsSafeForRpc()
@@ -1464,43 +1419,33 @@ int main(int argc, char** argv) {
             );
         }
         healthStatePublisher.PublishHealth(
-            rpcTransportReady && !commandQueue.PublicationBlocked(),
-            commandQueue.PublicationBlocked() ? AP_RPC_NONE :
+            rpcTransportReady,
                 g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
-            commandQueue.PublicationBlocked() ? commandQueue.PublicationError() :
                 g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
         );
         const bool rpcEnabled =
-            rpcArmed && rpcTransportReady && gameStateProbe.IsSafeForRpc();
+            rpcTransportReady && gameStateProbe.IsSafeForRpc();
         const std::string gateReason = RpcGateReason(
-            rpcArmed, rpcTransportReady, gameStateProbe
+            rpcTransportReady, gameStateProbe
         );
-        if (rpcArmed != lastRpcArmed) {
-            LogDebug(rpcArmed
-                ? "RPC command execution ARMED; waiting for safe gameplay."
-                : "RPC command execution DISARMED.");
-            lastRpcArmed = rpcArmed;
-        }
         if (rpcEnabled != lastRpcEnabled) {
             LogDebug(rpcEnabled
                 ? "RPC memory gate OPEN; command execution ENABLED."
-                : "RPC memory gate CLOSED; queued commands are preserved.");
+                : "RPC memory gate CLOSED.");
             lastRpcEnabled = rpcEnabled;
         }
         if (gateReason != lastGateReason) {
             LogDebug(
                 "GATE_TRANSITION state=" + std::string(rpcEnabled ? "open" : "closed")
                 + " reason=" + gateReason
-                + DeliveryContextFields()
             );
             lastGateReason = gateReason;
         }
-        commandQueue.DiscardInvalidScopes(rpcEnabled);
         ammoHotkey.Poll(
             gameStateProbe.GetProcessId(),
-            activeNamespace.has_value(),
+            roomBound,
             rpcTransportReady,
-            rpcArmed,
+            true,
             gameStateProbe.IsSafeForRpc(),
             [](const std::string& command) {
                 if (!g_ApRpc) return false;
@@ -1509,13 +1454,7 @@ int main(int argc, char** argv) {
             g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : 0,
             g_ApRpc ? g_ApRpc->LastTransportStatus() : 0
         );
-        if (commandQueue.Dispatch(now, rpcArmed, rpcTransportReady,
-                {gameStateProbe.IsSafeForRpc(), gameStateProbe.IsMapEntitySafe()},
-                transientBaselineReady, gateReason, g_ApRpc)) {
-            continue;
-        }
-
-        commandQueue.Wait();
+        Sleep(25);
     }
 
     ReleaseMutex(singleInstance);

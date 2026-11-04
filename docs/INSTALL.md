@@ -1,136 +1,174 @@
-# Install and connect
+# Installing DOOM Eternal Archipelago
 
-## Before you start
+This guide takes you from a fresh download to playing in an Archipelago room.
+If something goes wrong, jump to [Common problems](#common-problems) at the end.
 
-- Install DOOM Eternal through Steam. Install The Ancient Gods if your room uses
-  DLC missions, equipment or enemies.
-- Download the DOOM Eternal Archipelago release that matches the room's APWorld.
-  Extract the whole archive into its own folder. Keep `client/` beside the launcher.
-- Have the room's server address, player name and password, if required.
-- Close DOOM Eternal during mod installation, updates and repairs.
+## What you need
 
-The launcher installs Sentinel Core and downloads the mod installer after asking
-for your consent. It checks downloaded files before using them. A local development
-package can include a separate Core folder: select its `distribution.json` with
-**HELP → LOCAL CORE…** before setup. Keep that folder intact.
+- **DOOM Eternal on Steam.** If your room uses DLC missions, enemies or equipment,
+  you also need **The Ancient Gods** (Part One and Two).
+- **This mod's release ZIP**, the same version as the APWorld used to make the room.
+  Extract the whole ZIP into its own folder and keep the files together.
+- **Your room details**: server address (like `archipelago.gg:38281`), your player
+  name, and the password if the room has one.
+- **DOOM Eternal closed** whenever the launcher installs, updates or repairs something.
 
-If you have Meathook's `XINPUT1_3.dll` in the game folder, keep a backup and move
-that known Meathook file out before setup. For a file from another mod, follow that
-mod's uninstall instructions. The launcher preserves files it cannot identify.
+The launcher downloads the rest for you (the mod installer and Sentinel Core, the
+part that talks to the game). It asks before downloading and checks every file.
 
-## Get an AP room
+> Using **Meathook**? Move its `XINPUT1_3.dll` out of the game folder (keep a copy)
+> before setting up. The launcher won't touch files it doesn't recognize.
 
-If someone has already generated and hosted your room, go to [Join the room](#join-the-room).
+## Step 1 — Get a room
 
-To create one:
+If someone already made the room, skip to [Step 2](#step-2--connect).
 
-1. Open `doometernal.apworld` with Archipelago Launcher and restart Archipelago Launcher.
-2. Open `DoomEternalArchipelagoLauncher.exe` on Windows, or
-   `DoomEternalArchipelagoLauncher` on Linux. Choose **CREATE PLAYER**.
-3. Enter your player name, choose options and save the player YAML.
-4. Generate and host a room using that YAML in Archipelago, or give it to your host.
+To make your player file:
 
-Use the APWorld bundled with this release. The room fixes your campaign options
-during generation; editing your YAML afterward does not change a running room.
+1. Install the bundled `doometernal.apworld`: double-click it, or open it from the
+   Archipelago Launcher, then restart the Archipelago Launcher.
+2. Open the DOOM launcher (`DoomEternalArchipelagoLauncher.exe` on Windows,
+   `DoomEternalArchipelagoLauncher` on Linux) and go to **Create player**.
+3. Pick your options and choose **CREATE PLAYER YAML**.
+4. Generate the room in Archipelago with that file, or send it to whoever hosts.
 
-## Join the room
+Your options are fixed when the room is generated. Changing the YAML later doesn't
+change a room that already exists.
 
-1. Open the DOOM launcher and choose **JOIN ROOM**.
-2. Confirm the detected game and save folders. Use **CHOOSE GAME FOLDER** and
-   **BROWSE** if detection fails. Select the installation containing `DOOMEternalx64vk.exe`.
-3. Enter the server address, player name and optional password, then connect.
-4. Wait for **SESSION** to show your player and room. If it requests setup,
-   choose **INSTALL ROOM PACKAGE** or **UPDATE ROOM PACKAGE**.
+## Step 2 — Connect
 
-The launcher prepares a mod for this room and your player. Do not copy a mod from
-another room, even if its options look the same.
+1. In the launcher, go to **Play** and choose **JOIN ROOM**.
+2. Check the game and save folders the launcher found. If it got them wrong, use
+   **CHOOSE GAME FOLDER** and pick the folder that has `DOOMEternalx64vk.exe`.
+3. Type the server, your player name and the password (if any), then **CONNECT**.
 
-## Windows installation
+The Play screen shows three steps: **Game found**, **Room connected** and
+**Ready to play**. If it asks for setup, choose **INSTALL ROOM MOD** (or
+**UPDATE ROOM MOD** if you played this room before).
 
-1. Approve the EternalModInjector download, or select a verified local copy when prompted.
-2. Wait for the injector command window. Complete its prompts and close it after
-   it reports a successful installation.
-3. Return to the launcher and confirm that installation succeeded.
-4. Wait for **SETUP READY**. Start DOOM Eternal through Steam and keep the launcher open.
-   Choose the normal game launch, not Steam's **Play DOOM Eternal with mods** option.
+Each room gets its own mod, built for you. Don't copy a mod from another room, even
+if the options look the same.
 
-The launcher places the room mod in the game's `Mods/` folder and installs the
-matching `sentinel_core.dll` and `msimg32.dll`. You do not need to copy DLLs by hand.
-If automatic installation fails, use the manual steps below.
+## Step 3 — Install the room mod
 
-### Windows manual installation
+### On Windows
 
-1. Open the [Windows EternalModInjector page](https://gamebanana.com/tools/7475).
-   Download the installer version requested by the launcher.
-2. Extract its contents into the DOOM Eternal installation folder.
-   `EternalModInjector.bat` and `EternalModManager.exe` belong beside the game executable;
-   its supporting files belong in `base/`. Do not put the installer ZIP in `Mods/`.
-3. Let the launcher prepare and stage your room mod in `Mods/`.
-4. Set `:AUTO_LAUNCH_GAME=0` in `EternalModInjector Settings.txt` so installation
-   finishes before the game starts.
-5. Run `EternalModInjector.bat`, complete its prompts and wait for success.
-6. Return to the launcher. Choose **I COMPLETED MANUAL INSTALLATION** and confirm.
-7. Wait for **SETUP READY**, then start the game through Steam.
+1. Approve the **EternalModInjector** download when the launcher asks.
+2. A black command window opens. That's the mod installer. Answer what it asks,
+   and **press a key when it says "Press any key"**. Don't close it with the X:
+   the launcher only knows it finished when you press the key.
+3. Back in the launcher, confirm the installation worked.
+4. Wait for **SETUP READY**.
 
-## Linux / Steam / Proton installation
+The launcher puts the room mod and Sentinel Core in the right places. You don't
+copy any DLL by hand.
 
-Run the Linux launcher outside Proton. Steam runs the Windows game inside Proton.
+### On Linux (Steam + Proton)
 
-1. In Steam, choose the Proton version under **DOOM Eternal → Properties → Compatibility**.
-2. If detection fails, use **JOIN ROOM → PROTON EXECUTABLE → BROWSE** and select
-   that version's file named `proton`.
-3. Approve the EternalModInjectorShell download or supply a verified local copy.
-   Complete the installer prompts and confirm success.
-4. In **SESSION**, copy the Steam launch option into
-   **DOOM Eternal → Properties → Launch Options**. It has this form:
+Run the Linux launcher normally, outside Proton. The game runs inside Proton as usual.
+
+1. In Steam, check which Proton DOOM Eternal uses: **DOOM Eternal → Properties →
+   Compatibility**. If the launcher can't find it, go to **PROTON PROGRAM →
+   BROWSE** and select the file named `proton` inside that Proton version.
+   Proton Experimental usually lives in
+   `~/.local/share/Steam/steamapps/common/Proton - Experimental/`;
+   GE-Proton in `~/.local/share/Steam/compatibilitytools.d/`.
+2. Approve the **EternalModInjectorShell** download. It runs in the background and
+   the launcher shows the result.
+3. Choose **COPY OPTION** next to **STEAM LAUNCH OPTION** and paste it into
+   **DOOM Eternal → Properties → Launch Options**. It looks like:
 
    ```text
-   WINEDLLOVERRIDES="msimg32=n,b" "/absolute/path/to/client/run_bridge.sh" %command%
+   WINEDLLOVERRIDES="msimg32=n,b" "/path/to/client/run_bridge.sh" %command%
    ```
 
-5. Check that the path points to the extracted release's `client/run_bridge.sh`.
-   Wait for **SETUP READY** and start DOOM Eternal through Steam.
+4. Wait for **SETUP READY**.
 
-Proton Experimental often stores `proton` under
-`~/.local/share/Steam/steamapps/common/Proton - Experimental/`.
-GE-Proton installations often use `~/.local/share/Steam/compatibilitytools.d/`.
-Use the version selected in Steam. This candidate still needs testing on a real
-Linux/Proton installation.
+## Step 4 — Play
 
-## Start, stop and resume
+1. Keep the launcher open.
+2. Start DOOM Eternal from Steam with the normal **Play** button, not "Play DOOM
+   Eternal with mods".
+3. Turn off tutorials in the game settings.
+4. Use the campaign the launcher prepared for this room.
 
-Wait for the launcher to finish preparing the AP save before starting the game.
-Disable tutorials in the game settings and use the campaign prepared for your connected player. Check **SESSION** for the
-game connection and item activity after loading a level.
+Items you receive appear in the launcher's **Items** tab, and what happened in the
+session is in **Activity**. For how items, options and goals work in the game, see
+[Gameplay and options](GAMEPLAY.md).
 
-Exit DOOM Eternal normally before disconnecting. On your next session, choose
-**RESUME**, enter the room password if asked, and wait for setup checks before
-starting the game. Use one launcher/bridge for each game profile.
+When you're done, quit DOOM normally first, then close the launcher. Next time,
+open the launcher, choose **RESUME**, and wait for the checks before starting the game.
 
-Use **AP SAVE…** to inspect or back up the room's AP campaign. Do not replace it
-with a save from another room. See [Gameplay and options](GAMEPLAY.md) for inventory recovery.
+Use one launcher per game profile. Only the first computer that spent something in
+a room (like an Ammo Refill) can spend in that room; other computers still receive items.
 
-**Details / Copy details** shows the room's metadata and native save paths, including
-missing or inaccessible files. **Back up local files** copies available files for
-this room with DOOM closed and verifies the archive. **Create backup** requires an
-active AP game session. **Restore compatible backup** accepts a matching backup.
-**New DOOM save in this room** requires confirmation and a verified local backup;
-server progress stays intact. A local file copy does not verify that DOOM can load it.
+### Your saves
 
-## Fix a problem
+Each room has its own DOOM save. **AP SAVE…** lets you look at it, back it up or
+restore a backup made for the same room. Don't put a save from another room there.
 
-| Problem | What to do |
-|---|---|
-| Cannot connect | Check the server address, player name and password with the host. Use the player name from generation. |
-| Game or saves not found | Browse to the Steam game installation and its Windows save directory, or the save directory inside the selected Proton prefix. |
-| Setup requests an update | Close DOOM and choose **UPDATE ROOM PACKAGE**. Check that the host generated with the matching APWorld. |
-| Core missing or mismatched | Close DOOM. Open **HELP → REPAIR CORE**. For a local candidate, choose its `distribution.json` with **LOCAL CORE…** first. |
-| Installer failed | Read the installer window's error, close DOOM and retry. On Windows, follow the manual installation steps if download or automation fails. |
-| Game starts but does not connect | Keep the launcher open and connected. On Proton, check the copied Steam launch option. Run **HELP → CHECK SETUP**. |
-| AP save needs attention | Close DOOM. Open **AP SAVE…** and inspect the reported problem or restore a matching backup before retrying. |
-| An item seems missing | Load a level, choose **RESYNC INVENTORY**, return to DOOM and unpause. See the gameplay guide. |
+If DOOM crashed or closed while saving, the launcher notices on the next start.
+It keeps a copy of your files and recovers the last good save when it can prove
+it's intact. If it can't, it stops and tells you what it found, so nothing is
+overwritten.
 
-If the problem continues, use **HELP → SAVE SUPPORT REPORT** or **Report a Problem**.
-Reports exclude save contents and redact secrets; review the report before sharing it.
-**FIX SETUP** previews the repairs it can apply. **UNINSTALL MOD** removes the room mod;
-keep backups before changing a working installation.
+## Windows manual installation
+
+Use this if the automatic install keeps failing on Windows.
+
+1. Download EternalModInjector from its
+   [GameBanana page](https://gamebanana.com/tools/7475), the version the launcher asks for.
+2. Extract it into the DOOM Eternal folder: `EternalModInjector.bat` and
+   `EternalModManager.exe` go next to the game's `.exe`, the rest in `base/`.
+   Don't put the injector ZIP in `Mods/`.
+3. Let the launcher prepare the room mod (it goes into `Mods/`).
+4. In `EternalModInjector Settings.txt`, set `:AUTO_LAUNCH_GAME=0`.
+5. Run `EternalModInjector.bat`, answer it, and press a key when it asks.
+6. In the launcher, choose **INSTALLATION FINISHED** and confirm.
+7. Wait for **SETUP READY** and play.
+
+## Common problems
+
+**Can't connect to the room**
+Check the server address, player name and password with the host. The player name
+must be exactly the one used when the room was generated.
+
+**The launcher can't find the game or the saves**
+Use **CHOOSE GAME FOLDER** for the Steam install folder. On Linux, point the save
+folder to the one inside the Proton prefix of DOOM Eternal.
+
+**It asks to update the room mod**
+Close DOOM and choose **UPDATE ROOM MOD**. If it keeps asking, make sure the host
+generated the room with the same APWorld version as your release.
+
+**The mod installer failed**
+Close DOOM and choose **INSTALL AGAIN**. On Windows, if the download or the
+installer keeps failing, use the [manual steps](#windows-manual-installation).
+
+**It says the installer from the last attempt is still running, or it couldn't confirm it finished**
+This happens if the launcher was closed during installation. Let the installer
+window finish (press a key when it asks), then choose **INSTALL AGAIN**.
+
+**The game starts but doesn't connect**
+Keep the launcher open and connected to the room. On Linux, check the Steam launch
+option you pasted. Then try **Help → CHECK SETUP**.
+
+**Sentinel Core is missing or wrong**
+Close DOOM and choose **REPAIR GAME CONNECTION** in Help.
+
+**An item seems missing**
+Load a level, choose **REPAIR INVENTORY**, then go back to the game and unpause.
+
+**An item shows "Try again" / "Mark as received" in Items**
+The launcher sent it but couldn't confirm the game applied it. Check in the game.
+If you don't have it, choose **Try again**. If you do, choose **Mark as received**.
+Trying again when you already have it may give you a second copy.
+
+**The save needs attention**
+Close DOOM, open **AP SAVE…** and follow what it says, or restore a backup of the
+same room.
+
+**Still stuck?**
+Go to **Help → SAVE SUPPORT REPORT** and share the report with the developers. It
+doesn't include your save files, and passwords are removed; you can read it
+before sharing. **FIX SETUP** shows what it can repair before doing it.

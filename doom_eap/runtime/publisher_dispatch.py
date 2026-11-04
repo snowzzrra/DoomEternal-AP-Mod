@@ -1,8 +1,9 @@
 """Publisher effects own pending dispatch and server-confirmed acknowledgements."""
 from dataclasses import replace
-from doom_eap.runtime.ledger_shadow import ignore
+
 from doom_eap.contracts.check_observation import CheckObservation, CheckPublicationPort
 from doom_eap.contracts.publisher_contracts import publisher_acknowledged
+from doom_eap.runtime.event_observer import ignore
 
 
 class PublisherDispatch:

@@ -1,7 +1,8 @@
 """Persistent inventory observation contracts, domains, and lifecycle states."""
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from enum import Enum, IntEnum
+from typing import Protocol
 
 # observation states
 OWNED = "owned"
@@ -9,6 +10,180 @@ MISSING = "missing"
 UNKNOWN = "unknown"
 
 OBSERVATION_STATES = frozenset({OWNED, MISSING, UNKNOWN})
+
+
+class Currency(IntEnum):
+    WEAPON_POINTS = 0
+    PRAETOR = 1
+    MASTERY = 2
+    SENTINEL_BATTERY = 4
+
+
+class CurrencyOutcome(IntEnum):
+    NOT_EXECUTED = 0
+    OBSERVED = 1
+    GRANTED = 2
+    PRECONDITION = 3
+    READ_FAILED = 4
+    UNKNOWN = 5
+
+
+class SuitPerkStage(IntEnum):
+    WEAPON_CHANGE_SPEED = 0
+    DASH_REGEN_DELAY = 1
+    LEDGE_GRAB_SPEED = 2
+    INCREASE_PICKUP_RADIUS = 3
+    REDUCE_HAZARD_DAMAGE = 4
+    REDUCE_SELF_WEAPON_DAMAGE = 5
+
+
+class SaveReadiness(str, Enum):
+    UNKNOWN = "unknown"
+    READY = "ready"
+    RECOVERING = "recovering"
+
+
+class EffectProof(str, Enum):
+    UNPROVEN = "unproven"
+    PRESENT = "present"
+    ABSENT = "absent"
+
+
+@dataclass(frozen=True)
+class EvidenceScope:
+    pid: int
+    process_created: int
+    core_instance: str
+    namespace: str
+    save_binding: str
+    generation: int
+    map_name: str
+    readiness: SaveReadiness = SaveReadiness.UNKNOWN
+
+
+@dataclass(frozen=True)
+class CurrencyValue:
+    balance: int | None = None
+    gained: int | None = None
+
+
+@dataclass(frozen=True)
+class CurrencyObservation:
+    before_scope: EvidenceScope
+    after_scope: EvidenceScope
+    values: Mapping[Currency, CurrencyValue] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class CurrencyGrant:
+    currency: Currency
+    amount: int
+    expected_gained: int
+
+
+@dataclass(frozen=True)
+class CurrencyGrantResult:
+    reference: bytes
+    before_scope: EvidenceScope
+    after_scope: EvidenceScope
+    currency: Currency
+    before: CurrencyValue
+    after: CurrencyValue
+    writer_entered: bool = False
+    native_exception: int = 0
+    outcome: CurrencyOutcome = CurrencyOutcome.GRANTED
+
+
+@dataclass(frozen=True)
+class PerkStages:
+    known: int = 0
+    owned: int = 0
+
+
+@dataclass(frozen=True)
+class MasterySlot:
+    host: str
+    mod: str
+    component_before: int
+    component_after: int
+    selected: bool = False
+    proof: EffectProof = EffectProof.UNPROVEN
+
+
+@dataclass(frozen=True)
+class ProgressionObservation:
+    before_scope: EvidenceScope
+    after_scope: EvidenceScope
+    suit: PerkStages = field(default_factory=PerkStages)
+    slayer_key_quantity: int | None = None
+    meat_hook: EffectProof = EffectProof.UNPROVEN
+    masteries: Mapping[int, MasterySlot] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SuitStage:
+    stage: SuitPerkStage
+
+
+@dataclass(frozen=True)
+class SlayerKey:
+    map_name: str
+
+
+@dataclass(frozen=True)
+class MasteryEffect:
+    item_id: int
+    host: str
+    mod: str
+
+
+@dataclass(frozen=True)
+class MeatHookPerk:
+    pass
+
+
+@dataclass(frozen=True)
+class MissionAccess:
+    revision: int
+    stage_id: int
+    map_name: str
+
+
+@dataclass(frozen=True)
+class MissionAccessObservation:
+    menu_scope: EvidenceScope
+    revision: int
+    stage_id: int
+    map_name: str
+    entry_usable: bool = False
+    destination_scope: EvidenceScope | None = None
+    destination_revision: int | None = None
+    destination_stage_id: int | None = None
+    destination_ready: bool = False
+
+
+@dataclass(frozen=True)
+class InventoryEffect:
+    item_id: int
+    stage: int
+
+
+@dataclass(frozen=True)
+class InventoryReadback:
+    before_scope: EvidenceScope
+    after_scope: EvidenceScope
+    observation: "InventoryObservation"
+
+
+EffectPostcondition = CurrencyGrant | SuitStage | SlayerKey | MasteryEffect | MeatHookPerk | MissionAccess | InventoryEffect
+NativeEffectEvidence = CurrencyGrantResult | ProgressionObservation | MissionAccessObservation | InventoryReadback
+
+
+@dataclass(frozen=True)
+class EffectExpectation:
+    reference: bytes
+    scope: EvidenceScope
+    postcondition: EffectPostcondition
 
 # lifecycle / execution states
 PLANNED = "planned"
@@ -165,13 +340,29 @@ class InventoryObservation:
     process_id: int | None = None
     provider_namespace: str | None = None
     timestamp_ns: int = 0
+    native_scope: tuple[str, ...] | None = None
+    stage_masks: Mapping[int, int] = field(default_factory=dict)
+    progression: ProgressionObservation | None = None
+    currencies: CurrencyObservation | None = None
+
+    def progression_ready(self) -> bool:
+        return bool(self.progression and self.progression.before_scope == self.progression.after_scope
+                    and self.progression.after_scope.readiness is SaveReadiness.READY)
 
     def get_state(self, item_id: int) -> str:
         """Return observation state for item. Defaults to UNKNOWN."""
+        if item_id == 7770021:
+            return self._suit_state()
         obs = self.items.get(item_id)
         if obs is None:
             return UNKNOWN
         return obs.state
+
+    def _suit_state(self) -> str:
+        progression = self.progression
+        if progression is None or not self.progression_ready() or progression.suit.known != 63:
+            return UNKNOWN
+        return OWNED if progression.suit.owned == 63 else MISSING
 
     def get_observed_stage(self, item_id: int) -> int:
         """Return observed stage/tier for item. Defaults to 0."""
@@ -192,6 +383,15 @@ class InventoryObservation:
         return self.get_state(item_id) == MISSING
 
     def confirms_repair(self, item_id: int, stage: int) -> bool:
+        if item_id == 7770904:
+            return bool(self.stage_masks.get(7770904, 0) & (1 << stage))
+        if item_id == 7770014 and stage in {7770162, 7770290, 7770411}:
+            bit = {7770162: 2, 7770290: 4, 7770411: 8}[stage]
+            return bool(self.stage_masks.get(7770904, 0) & bit)
+        if item_id == 7770021:
+            progression = self.progression
+            return bool(progression and self.progression_ready()
+                        and progression.suit.known & progression.suit.owned & (1 << stage))
         if not self.is_owned(item_id):
             return False
         if item_id in CAPACITY_ITEM_IDS:

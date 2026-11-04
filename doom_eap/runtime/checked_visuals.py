@@ -1,12 +1,15 @@
 """Checked visual reconciliation owns map-scoped repair and retry state."""
+import time
 from collections.abc import Mapping
 from types import MappingProxyType
-import time
 
-from doom_eap.contracts.runtime_context import canonical_map_name
 from doom_eap.contracts.command_publication import (
-    stable_spool_id, valid_materialization_epoch, MAP_ENTITY_SAFE, CHECKED_VISUAL_HIDE,
+    CHECKED_VISUAL_HIDE,
+    MAP_ENTITY_SAFE,
+    stable_command_key,
+    valid_materialization_epoch,
 )
+from doom_eap.contracts.runtime_context import canonical_map_name
 
 AUTOMAP_CLEANUP_RETRY_BASE_SECONDS = 1.0
 AUTOMAP_CLEANUP_RETRY_MAX_SECONDS = 8.0
@@ -56,7 +59,7 @@ class CheckedVisuals:
             self._local_observed.clear()
         return self._epoch
 
-    def reconcile(self, trigger, *, map_identity, room_identity, state_key, checked, checked_ready, runtime_ready, rpc_ready, send):
+    async def reconcile(self, trigger, *, map_identity, room_identity, state_key, checked, checked_ready, runtime_ready, rpc_ready, send):
         """Remove only isolated AP visuals for server-checked map locations."""
         marker = map_identity.cached_marker
         self.advance_epoch(marker.get("gameplay_epoch") if isinstance(marker, Mapping) else None)
@@ -94,7 +97,7 @@ class CheckedVisuals:
                 trigger=trigger,
             )
             return False
-        if not checked_ready or not isinstance(checked, (set, frozenset, list, tuple)):
+        if not checked_ready or not isinstance(checked, set | frozenset | list | tuple):
             self._automap_cleanup_transition(
                 (epoch, room_identity, map_name, ""),
                 "PENDING",
@@ -129,7 +132,7 @@ class CheckedVisuals:
                     trigger=trigger,
                 )
                 continue
-            command_id = stable_spool_id(
+            command_id = stable_command_key(
                 "automap-cleanup",
                 getattr(self, "_session", "session"),
                 room_identity,
@@ -138,8 +141,8 @@ class CheckedVisuals:
                 self._epoch,
                 retry["attempt"],
             )
-            command = f"ai_ScriptCmdEnt {entity_name} activate player1"
-            if not send(
+            command = f"ai_ScriptCmdEnt {entity_name} activate"
+            if not await send(
                 command,
                 coalesce_key=command_id,
                 already_queued_ok=True,
@@ -212,7 +215,7 @@ class CheckedVisuals:
         self._status[delivery_key] = status
         self._logger.info(
             "[Automap] cleanup lifecycle map=%s epoch=%s location=%s "
-            "trigger=%s status=%s previous=%s spool_skip_reason=%s",
+            "trigger=%s status=%s previous=%s skip_reason=%s",
             delivery_key[2] if len(delivery_key) > 2 else "<unknown>",
             delivery_key[0] if delivery_key else "<unknown>",
             delivery_key[3] if len(delivery_key) > 3 else "<unknown>",

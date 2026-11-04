@@ -1,7 +1,9 @@
 """Enemy recipes and option normalization shared with standalone generation."""
+
 from dataclasses import dataclass
 from math import gcd
 
+from doom_eap.strings import text as player_text
 
 ENEMY_OPTIONS_REVISION = 9
 SPECIES_GROUPS = {
@@ -78,14 +80,16 @@ BALANCE_PRESETS = {
 
 def _integer(value, name, minimum=0, maximum=10000):
     if type(value) is not int or not minimum <= value <= maximum:
-        raise ValueError(f"{name} must be an integer between {minimum} and {maximum}")
+        raise ValueError(
+            player_text("apworld.errors", "enemy_integer_range", option=str(name), minimum=minimum, maximum=maximum)
+        )
     return value
 
 
 def _toggle(raw, key, default):
     value = raw.get(key, default)
     if type(value) is not bool:
-        raise ValueError(f"{key} must be a boolean")
+        raise ValueError(player_text("apworld.errors", "enemy_boolean", option=str(key)))
     return value
 
 
@@ -101,17 +105,17 @@ def _curve(values):
 def _attribute(raw, name, automatic, progressive):
     values = raw.get(f"enemy_{name}", {})
     if not isinstance(values, dict):
-        raise ValueError(f"enemy_{name} must be an object")
+        raise ValueError(player_text("apworld.errors", "enemy_attribute_object", attribute=str(name)))
     bounds = {"minimum", "maximum", "early_minimum", "early_maximum", "late_minimum", "late_maximum"}
     groups = {}
     for key, value in values.items():
         if not isinstance(key, str):
-            raise ValueError(f"enemy_{name} range names must be text")
+            raise ValueError(player_text("apworld.errors", "enemy_range_name_text", attribute=str(name)))
         species, separator, bound = key.rpartition(".")
         if not separator:
             species, bound = "global", key
         if bound not in bounds or (species != "global" and species not in SPECIES_IDS):
-            raise ValueError(f"enemy_{name} has unknown range {key!r}")
+            raise ValueError(player_text("apworld.errors", "enemy_unknown_range", attribute=str(name), range=repr(key)))
         groups.setdefault(species, {})[bound] = _integer(value, f"enemy_{name}.{key}", 1)
     result = {"global": _curve(automatic), "species": {}}
     for species, entries in groups.items():
@@ -120,9 +124,13 @@ def _attribute(raw, name, automatic, progressive):
         elif set(entries) == bounds - {"minimum", "maximum"}:
             ends = [entries[key] for key in ("early_minimum", "early_maximum", "late_minimum", "late_maximum")]
         else:
-            raise ValueError(f"enemy_{name}.{species} needs both fixed bounds or all four Early/Late bounds")
+            raise ValueError(
+                player_text("apworld.errors", "enemy_range_bounds", attribute=str(name), species=str(species))
+            )
         if ends[0] > ends[1] or ends[2] > ends[3]:
-            raise ValueError(f"enemy_{name}.{species} minimum exceeds maximum")
+            raise ValueError(
+                player_text("apworld.errors", "enemy_inverted_range", attribute=str(name), species=str(species))
+            )
         if species == "global":
             result["global"] = _curve(ends)
         else:
@@ -136,12 +144,12 @@ def _attribute(raw, name, automatic, progressive):
 def normalize_enemy_options(raw):
     revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
     if revision not in (2, 3, 4, 5, 6, 7, 8, ENEMY_OPTIONS_REVISION):
-        raise ValueError("Unsupported enemy options revision")
+        raise ValueError(player_text("apworld.errors", "enemy_options_revision"))
     preset = raw.get("enemy_preset", "slayers_path")
     if preset == "custom":
         preset = "slayers_path"
     if not isinstance(preset, str) or preset not in ENEMY_RECIPES:
-        raise ValueError(f"Unknown Enemy Preset: {preset!r}")
+        raise ValueError(player_text("apworld.errors", "unknown_enemy_preset", preset=repr(preset)))
     recipe = ENEMY_RECIPES[preset]
     balance = BALANCE_PRESETS.get(preset) if revision >= 6 else None
     enabled = _toggle(raw, "enemy_randomizer", True)
@@ -151,7 +159,7 @@ def normalize_enemy_options(raw):
     if count_mode == "preset":
         count_mode = "multiplier" if preset == "oops_all_imps" else "auto"
     if count_mode not in ("auto", "multiplier"):
-        raise ValueError("Enemy Count must be Auto or Multiplier")
+        raise ValueError(player_text("apworld.errors", "enemy_count_mode"))
     intensity = [_recipe_number(raw, f"enemy_intensity_{end}", recipe.intensity[index], 1)
                  for index, end in enumerate(("early", "late"))]
     if not progressive:
@@ -182,14 +190,14 @@ def normalize_enemy_options(raw):
     weights['chaingun_soldier'] //= 5
     overrides = raw.get("enemy_weights", {})
     if not isinstance(overrides, dict):
-        raise ValueError("Enemy Weights must be an object")
+        raise ValueError(player_text("apworld.errors", "enemy_weights_object"))
     for species, weight in overrides.items():
         if species not in SPECIES_IDS:
-            raise ValueError(f"Unknown Enemy Weight: {species!r}")
-        weights[species] = _integer(weight, f"Enemy Weight {species}")
+            raise ValueError(player_text("apworld.errors", "unknown_enemy_weight", species=repr(species)))
+        weights[species] = _integer(weight, player_text("apworld.errors", "enemy_weight_label", species=str(species)))
     weights = {species: weights[species] for species in eligible}
     if enabled and not any(weights.values()):
-        raise ValueError("Enemy Weights exclude every eligible random combat species")
+        raise ValueError(player_text("apworld.errors", "enemy_weights_empty"))
     divisor = gcd(*weights.values()) or 1
     weights = {species: weight // divisor for species, weight in weights.items()}
     attributes = {}
@@ -213,11 +221,13 @@ def normalize_enemy_options(raw):
     limits = {"marauder": 1, "archvile": 1, "spirit": 1, "combined_special": recipe.combined_special}
     overrides = raw.get("enemy_special_limits", {})
     if not isinstance(overrides, dict):
-        raise ValueError("Special Enemy Limits must be an object")
+        raise ValueError(player_text("apworld.errors", "enemy_limits_object"))
     for key, value in overrides.items():
         if key not in limits:
-            raise ValueError(f"Unknown Special Enemy Limit: {key!r}")
-        limits[key] = _integer(value, f"Special Enemy Limit {key}", maximum=2147483647)
+            raise ValueError(player_text("apworld.errors", "unknown_enemy_limit", limit=repr(key)))
+        limits[key] = _integer(
+            value, player_text("apworld.errors", "enemy_limit_label", limit=str(key)), maximum=2147483647,
+        )
     late_limits = {"marauder": max(1, recipe.combined_special),
                    "archvile": max(1, recipe.combined_special),
                    "spirit": max(1, recipe.combined_special),

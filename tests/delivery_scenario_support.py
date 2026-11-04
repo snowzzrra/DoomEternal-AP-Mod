@@ -1,14 +1,16 @@
 """Own subprocess lifetimes and delivery barriers; production writes remain delegated unchanged."""
 
-from contextlib import ExitStack
+import asyncio
 import json
 import os
-from pathlib import Path
 import queue
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
+from contextlib import ExitStack, closing
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures"
@@ -82,7 +84,7 @@ class Child:
 
     def next(self):
         try:
-            event = self.events.get(timeout=8)
+            event = self.events.get(timeout=30)
         except queue.Empty as error:
             raise RuntimeError("Barrier timed out:\n" + "\n".join(self.output)) from error
         if event["event"] == "eof":
@@ -105,19 +107,25 @@ class Child:
 
 
 class Scenario:
-    def __init__(self, root, executable=None):
+    def __init__(self, root, *, backend="v2"):
+        if backend != "v2":
+            raise ValueError(backend)
         prepare(root)
         self.root = root
-        self.executable = executable
+        self.backend = backend
         self.stack = ExitStack()
+        self.reader_loop = asyncio.new_event_loop()
+        self.stack.callback(self.reader_loop.close)
         self.ap = self.child("fake_ap_server.py", str(root))
+        self.bridge = None
+        self.status = None
+        self.core = None
         try:
             self.port = self.ap.expect("ready")["port"]
+            self.start_core()
         except RuntimeError:
             self.stack.close()
             raise
-        self.bridge = None
-        self.status = None
 
     def child(self, script, *arguments):
         child = Child([sys.executable, "-B", str(FIXTURES / script), *arguments], self.root)
@@ -125,7 +133,10 @@ class Scenario:
         return child
 
     def start(self, stop=""):
-        self.bridge = self.child("delivery_bridge_worker.py", f"ws://127.0.0.1:{self.port}", stop)
+        script = "delivery_v2_worker.py"
+        arguments = [f"ws://127.0.0.1:{self.port}", stop]
+        arguments.append(f"ws://127.0.0.1:{self.core_port}")
+        self.bridge = self.child(script, *arguments)
         self.status = self.bridge.expect("ready")
         self.ap.expect("connected")
         return self.status
@@ -133,6 +144,14 @@ class Scenario:
     def kill_bridge(self):
         # Popen.kill uses TerminateProcess on Windows; no child unwinding can commit state.
         self.bridge.close()
+
+    def start_core(self, stop=""):
+        self.core = self.child("fake_delivery_core.py", str(self.root), stop)
+        ready = self.core.expect("ready")
+        self.core_port, self.core_instance = ready["port"], ready["instance"]
+
+    def kill_core(self):
+        self.core.close()
 
     def begin_packet(self, packets):
         self.bridge.send({"action": "collect"})
@@ -145,8 +164,8 @@ class Scenario:
         self.status = self.bridge.expect("done")
         return self.status
 
-    def action(self, action):
-        self.bridge.send({"action": action})
+    def action(self, action, **fields):
+        self.bridge.send({"action": action, **fields})
         self.status = self.bridge.expect("done")
         return self.status
 
@@ -158,53 +177,14 @@ class Scenario:
         self.status = self.bridge.expect("done")
         return self.status
 
-    def namespace(self):
-        return (self.root / "base/ap_queue/active_session_namespace").read_text().strip()
 
     def effects(self):
         path = self.root / "effects.jsonl"
         rows = path.read_text().splitlines() if path.exists() else []
         return [json.loads(line)["command"] for line in rows]
 
-    def native(self, stop=""):
-        with ExitStack() as stack:
-            probe = Child([sys.executable, "-B", str(FIXTURES / "fake_sentinel_probe.py"), str(self.root)], self.root)
-            stack.callback(probe.close)
-            probe.expect("ready")
-            native = Child([str(self.executable), "--scenario", self.namespace()], self.root)
-            stack.callback(native.close)
-            result = self.drive_native(native, probe, stop)
-            self.checkpoint(stop or "native-done")
-            return result
 
-    def drive_native(self, native, probe, stop):
-        while True:
-            event = native.next()
-            name = event["event"]
-            if name == stop:
-                return name
-            if name == "done":
-                if stop:
-                    raise RuntimeError(f"Native queue never reached {stop}")
-                return name
-            if name == "execute":
-                if self.effect(native, probe, event, stop):
-                    return stop
-            else:
-                native.send("continue")
 
-    @staticmethod
-    def effect(native, probe, event, stop):
-        probe.send(event)
-        for name in ("external_effect:before", "external_effect:after"):
-            probe.expect(name)
-            if name == stop:
-                return True
-            probe.send("continue")
-        probe.expect("result")
-        native.process.stdin.write("ok\n")
-        native.process.stdin.flush()
-        return False
 
     def close(self):
         self.stack.close()
@@ -220,6 +200,10 @@ class Scenario:
             source = self.root / name
             if source.exists():
                 shutil.copyfile(source, target / name)
+        source = self.root / "delivery.sqlite3"
+        if source.exists():
+            with closing(sqlite3.connect(source)) as database, closing(sqlite3.connect(target / source.name)) as backup:
+                database.backup(backup)
 
 
 def history(item=7770025):

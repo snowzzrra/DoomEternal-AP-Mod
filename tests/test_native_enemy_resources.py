@@ -1,20 +1,19 @@
 import hashlib
 import json
-from pathlib import Path
-import zipfile
 
 import pytest
 
 from doom_eap.launcher import campaign_resources, launcher_platform
 from doom_eap.launcher.native_enemy_resources import prepare_native_resource_banks
 
-
 TARGET = "game/sp/e1m1_intro/e1m1_intro"
 @pytest.fixture
 def bank_room(tmp_path, monkeypatch):
-    from test_resource_bank import write_bank
-    from doom_eap.launcher import resource_bank
     from importlib.resources import files
+
+    from test_resource_bank import write_bank
+
+    from doom_eap.launcher import resource_bank
     catalog = json.loads(files("doom_eap.content").joinpath("native_enemy_catalog.json").read_bytes())["maps"]
     donor = catalog["e5m1_spear"]["runtime_map"]
     base = tmp_path / "base"
@@ -48,21 +47,23 @@ def bank_order(spec, map_index):
 @pytest.mark.parametrize('family', ['recipes', 'compatibility_recipes', 'counter_recipes'])
 def test_native_donor_closure_keeps_destination_priority_and_restores_between_rooms(bank_room, family):
     base, original, plan = bank_room
+    before = {path: path.read_bytes() for path in base.rglob('*') if path.is_file()}
     if family != 'recipes':
         stage = plan['maps']['e1m1_intro']
         stage[family] = stage['recipes']
         stage['recipes'] = [{'bodies': [{'species': 'zombie', 'ai': {'map_key': 'e1m1_intro'}}]}]
-    updates, report = prepare_native_resource_banks(base, plan, ROOTS)
+    updates, report = prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')
+    assert before == {path: path.read_bytes() for path in base.rglob('*') if path.is_file()}
     projected = json.loads(updates["packagemapspec.json"])
     bank, = report['consolidated']
     assert bank_order(projected, 0) == ["base.resources", "shared.resources", bank]
     assert bank_order(projected, 1) == bank_order(original, 1)
     assert report["maps"][TARGET] == [bank]
     (base / "packagemapspec.json").write_bytes(updates["packagemapspec.json"])
-    assert prepare_native_resource_banks(base, plan, ROOTS)[0] == {}
+    assert prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')[0] == {}
     reordered = {**projected, "mapFileRefs": list(reversed(projected["mapFileRefs"]))}
     (base / "packagemapspec.json").write_text(json.dumps(reordered), encoding="utf-8")
-    restored, _ = prepare_native_resource_banks(base, None)
+    restored, _ = prepare_native_resource_banks(base, None, staging=base.parent / 'staging')
     normalized = json.loads(restored["packagemapspec.json"])
     assert normalized["files"] == original["files"] and normalized["maps"] == original["maps"]
     assert sorted(normalized["mapFileRefs"], key=lambda ref: (ref["map"], ref["file"])) == original["mapFileRefs"]
@@ -79,25 +80,28 @@ def test_native_resource_preparation_refuses_missing_banks_or_external_changes(b
         spec["files"][2]["name"] = "../outside.resources"
         (base / "packagemapspec.json").write_text(json.dumps(spec), encoding="utf-8")
     else:
-        updates, _ = prepare_native_resource_banks(base, plan, ROOTS)
+        updates, _ = prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')
         spec = json.loads(updates["packagemapspec.json"])
         spec["mapFileRefs"].pop(0)
         (base / "packagemapspec.json").write_text(json.dumps(spec), encoding="utf-8")
     before = (base / "packagemapspec.json").read_bytes()
     with pytest.raises(ValueError):
-        prepare_native_resource_banks(base, plan, ROOTS)
+        prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')
     assert (base / "packagemapspec.json").read_bytes() == before
 
 
 
 
-def test_bank_publication_failure_rolls_back_other_resource_metadata(tmp_path, monkeypatch):
+@pytest.mark.parametrize('after', [False, True])
+def test_bank_publication_failure_rolls_back_other_resource_metadata(tmp_path, monkeypatch, after):
     names = ("meta.resources", "idRehash.map", "packagemapspec.json")
     originals = {name: name.encode() for name in names}
     for name, payload in originals.items():
         (tmp_path / name).write_bytes(payload)
     def publish(source, destination, *, operation):
         if destination.name == "packagemapspec.json" and operation == "resource_activation":
+            if after:
+                source.replace(destination)
             raise OSError("injected bank publication failure")
         source.replace(destination)
     monkeypatch.setattr(launcher_platform, "publish_file", publish)

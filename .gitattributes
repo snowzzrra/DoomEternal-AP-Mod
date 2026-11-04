@@ -4,6 +4,9 @@ data/automap_native_decl_sources/**/*.decl text eol=lf
 # captured campaign declarations keep the bytes recorded in their manifest
 data/campaign_sources/*.decl -text
 packaging/mod_assets/**/*.decl text eol=lf
+packaging/shell_menu_assetsinfo.json text eol=lf
+packaging/hub_world_text_assetsinfo.json text eol=lf
 packaging/room_resources/*/room_payload_manifest.json text eol=lf
 doom_eap/content/slot_catalog.json text eol=lf
 content/catalog/**/*.decl text eol=lf
+tests/fixtures/notification_strings/*.json text eol=lf

@@ -29,7 +29,7 @@ function Invoke-NativeBuild {
     $coreRoot = $CoreRoot
     $compileCxx = @("/nologo", "/std:c++17", "/O2", "/MT", "/EHsc", "/guard:cf", "/D_M_AMD64", "/DNOMINMAX", "/I$RepositoryRoot", "/I$coreRoot\\include", "/I$coreRoot\\src", "/I$coreRoot\\build\\generated", "/c")
     $sources = @(
-        "ap_client_exe.cpp", "command_queue.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
+        "ap_client_exe.cpp", "ap_client_path_utils.cpp", "game_state_probe.cpp",
         "sentinel_command_client.cpp", "ap_rpc_health_state.cpp", "ammo_hotkey.cpp"
     )
     $objects = @()
@@ -39,12 +39,17 @@ function Invoke-NativeBuild {
         if ($LASTEXITCODE -ne 0) { throw "MSVC failed compiling $source" }
         $objects += $object
     }
-    foreach ($source in @("inspection_client.cpp", "protocol.cpp", "commands.cpp")) {
-        $object = Join-Path $BuildDirectory (([IO.Path]::GetFileNameWithoutExtension($source)) + ".obj")
-        & cl.exe @compileCxx (Join-Path $coreRoot "src\\$source") "/Fo$object"
-        if ($LASTEXITCODE -ne 0) { throw "MSVC failed compiling $source" }
-        $objects += $object
+    $cmake = Get-Command cmake.exe -ErrorAction SilentlyContinue
+    $cmakePath = if ($cmake) { $cmake.Source } else {
+        Join-Path $env:SC_CMAKE "cmake.exe"
     }
+    $transportBuild = Join-Path $BuildDirectory "transport"
+    & $cmakePath -S (Join-Path $RepositoryRoot "native\\probes") -B $transportBuild -G Ninja "-DSENTINEL_CORE_SOURCE=$coreRoot" -DCMAKE_BUILD_TYPE=Release
+    if ($LASTEXITCODE -ne 0) { throw "CMake failed configuring the native transport" }
+    & $cmakePath --build $transportBuild --target save_death_probe
+    if ($LASTEXITCODE -ne 0) { throw "CMake failed building save_death_probe.exe" }
+    $objects += Join-Path $transportBuild "core\\sentinel_inspection_client.lib"
+    $objects += Join-Path $transportBuild "core\\sentinel_protocol.lib"
 
     $resourceObject = Join-Path $BuildDirectory "ap_client.res"
     & rc.exe /nologo "/fo$resourceObject" (Join-Path $clientDirectory "ap_client.rc")
@@ -55,9 +60,7 @@ function Invoke-NativeBuild {
     if ($LASTEXITCODE -ne 0) { throw "MSVC linker failed creating ap_client.exe" }
 
     $probeOutput = Join-Path $BuildDirectory "save_death_probe.exe"
-    $probeObject = Join-Path $BuildDirectory "save_death_probe.obj"
-    & cl.exe /nologo /std:c++17 /O2 /MT /EHsc (Join-Path $RepositoryRoot "native\\probes\\save_death_probe.cpp") "/Fe$probeOutput" "/Fo$probeObject"
-    if ($LASTEXITCODE -ne 0) { throw "MSVC failed creating save_death_probe.exe" }
+    Copy-Item -LiteralPath (Join-Path $transportBuild "save_death_probe.exe") -Destination $probeOutput
 
     foreach ($output in $clientOutput, $probeOutput) {
         $bytes = [IO.File]::ReadAllBytes($output)

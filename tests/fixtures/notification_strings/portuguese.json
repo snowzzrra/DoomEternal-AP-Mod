@@ -1,0 +1,64 @@
+{
+    "strings": [
+        {
+            "name": "#str_ap_item_received",
+            "text": "ITEM AP RECEBIDO"
+        },
+        {
+            "name": "#str_ap_location_101",
+            "text": "Room - Entrada 日本語"
+        },
+        {
+            "name": "#str_ap_location_sent",
+            "text": "LOCALIZAÇÃO AP ENVIADA"
+        },
+        {
+            "name": "#str_ap_location_sent_102",
+            "text": "FOUND YOUR CANHÃO <&>"
+        },
+        {
+            "name": "#str_ap_location_sent_103",
+            "text": "SENT PRAETOR POINT TO SLÁYER <&>"
+        },
+        {
+            "name": "#str_ap_notify_item_1",
+            "text": "YOUR CANHÃO <&>"
+        },
+        {
+            "name": "#str_ap_notify_item_2",
+            "text": "PRAETOR POINT FOR SLÁYER <&>"
+        },
+        {
+            "name": "#str_ap_notify_item_3",
+            "text": "A TRAP FOR SOMEONE"
+        },
+        {
+            "name": "#str_ap_notify_item_4",
+            "text": "Unassigned"
+        },
+        {
+            "name": "#str_ap_notify_item_7770017_0",
+            "text": "Progressive Dash"
+        },
+        {
+            "name": "#str_ap_notify_item_7770017_1",
+            "text": "Progressive Dash"
+        },
+        {
+            "name": "#str_ap_notify_item_received_1",
+            "text": "Canhão <&> RECEBIDO"
+        },
+        {
+            "name": "#str_ap_notify_item_received_3",
+            "text": "Surprise RECEBIDO"
+        },
+        {
+            "name": "#str_ap_notify_item_received_7770017_0",
+            "text": "Dash (1/2) RECEBIDO"
+        },
+        {
+            "name": "#str_ap_notify_item_received_7770017_1",
+            "text": "Dash (2/2) RECEBIDO"
+        }
+    ]
+}

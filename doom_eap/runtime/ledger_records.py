@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -81,9 +82,47 @@ class ItemStatus(str, Enum):
     BLOCKED = "blocked"
 
 
+class ItemReason(str, Enum):
+    PLANNING = "planning"
+    EXECUTION = "execution"
+    CONTEXT = "context"
+    DEPENDENCY = "dependency"
+    CONFIRMATION = "confirmation"
+    REJECTED = "rejected"
+    EFFECT_UNKNOWN = "effect_unknown"
+    ROOM_BLOCKED = "room_blocked"
+    PLAYER_RESOLVED = "player_resolved"
+    NONE = "none"
+
+
 class Authority(str, Enum):
     SHADOW = "shadow"
     LEDGER = "ledger"
+
+
+
+
+class SourceKind(str, Enum):
+    STARTING_GRANT = "starting_grant"
+    DERIVED_FACT = "derived_fact"
+    BOOTSTRAP = "bootstrap"
+    TEMPORARY_CLEANUP = "temporary_cleanup"
+
+
+class SaveEpochState(str, Enum):
+    PREPARED = "prepared"
+    APPLIED = "applied"
+    ABORTED = "aborted"
+
+
+class ResolutionAction(str, Enum):
+    TRY_AGAIN = "try_again"
+    MARK_AS_RECEIVED = "mark_as_received"
+
+
+class Resolution(str, Enum):
+    ACCEPTED_BY_PLAYER = "accepted_by_player"
+    REPLACED = "replaced"
 
 
 class AmmoKind(str, Enum):
@@ -141,6 +180,15 @@ class Context:
     save_id: str
     load_id: str
     native_generation: int
+    save_binding_id: str | None = None
+
+
+@dataclass(frozen=True)
+class EffectSource:
+    source_id: str
+    kind: SourceKind
+    source_key: str
+    evidence: bytes
 
 
 @dataclass(frozen=True)
@@ -160,6 +208,16 @@ class CommandPlan:
     replay: ReplayPolicy
     required: bool
     retry_limit: int
+    local_source_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ManualResolution:
+    command_id: str
+    expected_revision: int
+    action: ResolutionAction
+    replacement: CommandPlan | None = None
+    evidence: bytes = b""
 
 
 @dataclass(frozen=True)
@@ -191,6 +249,18 @@ class Attempt:
     envelope: bytes
     deadline_at: int
     expected_revision: int = 0
+    reference: bytes = b""
+
+
+@dataclass(frozen=True)
+class AttemptRow:
+    attempt: Attempt
+    envelope_fingerprint: str
+    prepared_at: int
+    acceptance: bytes
+    result: bytes
+    completed_at: int | None
+    revision: int
 
 
 @dataclass(frozen=True)
@@ -234,6 +304,15 @@ class AmmoChange:
 
 
 @dataclass(frozen=True)
+class AmmoOperationRow:
+    operation: AmmoOperation
+    state: AmmoState
+    revision: int
+    evidence: bytes
+    reason: str | None
+
+
+@dataclass(frozen=True)
 class AmmoTotals:
     expected_revision: int
     credited: int
@@ -268,8 +347,30 @@ class ItemRow:
     sender: int
     status: ItemStatus
     reason: str | None
-    actions: tuple[str, ...]
+    actions: tuple[ItemAction, ...]
     event_sequence: int
+    reason_code: ItemReason = ItemReason.NONE
+    revision: int = 0
+    resolution: Resolution | None = None
+
+
+@dataclass(frozen=True)
+class ItemAction:
+    kind: ResolutionAction
+    command_id: str
+    expected_revision: int
+
+
+@dataclass(frozen=True)
+class ItemPage(Sequence[ItemRow]):
+    rows: tuple[ItemRow, ...]
+    watermark: int
+
+    def __getitem__(self, index):
+        return self.rows[index]
+
+    def __len__(self):
+        return len(self.rows)
 
 
 @dataclass(frozen=True)
@@ -286,6 +387,14 @@ class Room:
 
 
 @dataclass(frozen=True)
+class SaveEpoch:
+    epoch_id: str
+    receipt_boundary: int
+    evidence: bytes
+    state: SaveEpochState = SaveEpochState.APPLIED
+
+
+@dataclass(frozen=True)
 class CommandRow:
     plan: CommandPlan
     state: CommandState
@@ -294,3 +403,5 @@ class CommandRow:
     next_eligible_at: int | None
     result: bytes
     reason: str | None
+    resolution: Resolution | None = None
+    replacement_id: str | None = None

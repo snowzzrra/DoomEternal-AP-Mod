@@ -27,7 +27,7 @@ def test_waiting_phase_reports_elapsed_and_next_action():
     assert view.next_action is SetupAction.FINISH_INSTALL
     assert "1:12" in view.text
     assert "Last completed step: Copying the room mod" in view.text
-    assert "EternalModInjector, then close its window" in view.text
+    assert "press a key when EternalModInjector asks" in view.text
     progress.observe(event("setup_started"))
     assert progress.present().elapsed_seconds == 0
     assert progress.present().last_completed is None

@@ -1,15 +1,16 @@
 """Windows process-session owner shared by the native and Proton launchers."""
+
 import errno
 import json
-import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
-from doom_eap.launcher.launcher_session import SESSION_PIPE_LIMIT, APSessionOwner
 from doom_eap.launcher.launcher_core import RoomSnapshot
 from doom_eap.launcher.launcher_platform import restore_standard_streams
+from doom_eap.launcher.launcher_session import SESSION_PIPE_LIMIT, APSessionOwner
+from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 
 
@@ -22,6 +23,14 @@ def respond(document):
             raise
         sys.stdout = None
         raise SystemExit(1) from None
+
+
+def failure_response(owner, error):
+    from doom_eap.launcher.launcher_integration import setup_failure_payload
+
+    return {"error": str(error), "failure": setup_failure_payload(error),
+            "status": owner.status if owner else {"state": "not_prepared", "ready": False},
+            "can_close": owner.can_close() if owner else True}
 
 
 def main():
@@ -40,16 +49,16 @@ def main():
     try:
         while raw := sys.stdin.buffer.readline(SESSION_PIPE_LIMIT + 1):
             if len(raw) > SESSION_PIPE_LIMIT:
-                raise ValueError("Session request is too large")
+                raise ValueError(player_text('launcher.session_owner_app', 'session_request_is_too_large'))
             try:
                 request = json.loads(raw)
                 action = request["action"]
                 if action == "prepare":
                     if owner is not None:
-                        raise RuntimeError("A session owner is already prepared")
+                        raise RuntimeError(player_text('launcher.session_owner_app', 'a_session_owner_is_already_prepared'))
                     executable = Path(request["client_dir"]) / "ap_client.exe"
                     if not executable.is_file():
-                        raise RuntimeError("The packaged Windows integration helper is unavailable")
+                        raise RuntimeError(player_text('launcher.session_owner_app', 'the_packaged_windows_integration_helper_is_unavailable'))
                     owner = APSessionOwner(Path(request["client_dir"]), Path(request["data_dir"]), Path(request["state_dir"]))
                     snapshot = RoomSnapshot.from_event(request["room"])
                     status = owner.prepare(snapshot, request["config"], recover_prelaunch=bool(request.get("recover_prelaunch")))
@@ -58,7 +67,7 @@ def main():
                                               stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
                     respond({"status": status, "can_close": owner.can_close()})
                 elif owner is None:
-                    raise RuntimeError("Prepare a session before observing it")
+                    raise RuntimeError(player_text('launcher.session_owner_app', 'prepare_a_session_before_observing_it'))
                 elif action == "observe":
                     respond({"status": owner.observe(), "can_close": owner.can_close()})
                 elif action == "can_close":
@@ -68,10 +77,9 @@ def main():
                     respond({"status": owner.status, "can_close": True})
                     return 0
                 else:
-                    raise ValueError("Unsupported session action")
+                    raise ValueError(player_text('launcher.session_owner_app', 'unsupported_session_action'))
             except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as error:
-                from doom_eap.launcher.launcher_integration import setup_failure_payload
-                respond({"error": str(error), "failure": setup_failure_payload(error), "can_close": False})
+                respond(failure_response(owner, error))
     finally:
         if owner is not None:
             while not owner.can_close():

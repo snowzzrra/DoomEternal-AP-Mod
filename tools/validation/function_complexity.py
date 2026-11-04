@@ -226,13 +226,27 @@ def scan(root, directories):
             raise ScanError(f"source directory does not exist: {directory}")
         for path in sorted(directory.rglob("*.py")):
             with tokenize.open(path) as source:
-                tree = ast.parse(source.read(), filename=str(path))
+                contents = source.read()
+            if generated_source(contents):
+                continue
+            tree = ast.parse(contents, filename=str(path))
             visitor = Functions(path.relative_to(root).as_posix())
             visitor.visit(tree)
             functions.update(visitor.functions)
     if not functions:
         raise ScanError(f"no Python functions found under {root}")
     return functions
+
+
+def generated_source(contents):
+    for line in contents.splitlines():
+        if not line.strip():
+            continue
+        if not line.startswith("#"):
+            return False
+        if line.startswith("# Generated ") and "DO NOT EDIT" in line:
+            return True
+    return False
 
 
 def parse_exception(line):
@@ -341,7 +355,8 @@ def arguments(argv):
             "boolean operators, comprehension generators/filters, assert, match choices "
             "and guards; nested definitions are separate. Nesting measures flow depth; "
             "body length spans the first through last body line, including blanks/comments. "
-            "All .py files in each scope, including APWorld tests, are scanned. "
+            "All .py files in each scope, including APWorld tests, are scanned except files "
+            "with a leading '# Generated ... DO NOT EDIT' generator header. "
             "Keys use relative POSIX paths and dotted class/function names; duplicate "
             "qualified names are errors. Unlisted functions must have cognitive <= 15 and "
             "cyclomatic <= 10. Listed functions cannot exceed either recorded score and must "

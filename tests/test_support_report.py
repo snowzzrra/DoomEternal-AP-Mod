@@ -4,6 +4,7 @@ import sys
 import threading
 import zipfile
 from contextlib import nullcontext
+from dataclasses import asdict
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
@@ -14,6 +15,10 @@ from doom_eap.launcher import launcher_reporting as reporting
 from doom_eap.launcher import sentinel_diagnostics as sentinel
 from doom_eap.launcher.launcher_controller import LauncherController
 from tests.test_core_distribution import fixture as core_distribution_fixture
+from tests.test_delivery_coordinator import command
+from tests.test_delivery_coordinator import owner as owner_fixture
+
+owner = owner_fixture
 
 
 @pytest.fixture(autouse=True)
@@ -44,24 +49,30 @@ def test_encounter_console_keeps_middle_context_with_size_and_secret_bounds(tmp_
     assert "fragment-canary" not in text and "SECRET encounter reset" in text and "current-tail" in text
 
 
-def test_queue_diagnostics_dates_active_and_historical_failures_without_touching_spool(tmp_path):
+@pytest.mark.parametrize("uncertain", [False, True])
+def test_delivery_diagnostics_reads_ledger_and_ignores_old_spool(tmp_path, owner, uncertain):
+    room = {}
+
+    async def check(delivery, transport):
+        room.update(asdict(delivery.binding.room))
+        transport.effect = 2 if uncertain else 1
+        await delivery.plan((command(delivery.context),))
+        await delivery.prepare("grant", b"a" * 64)
+        await delivery.send("grant")
+        await delivery.recover("grant")
+
+    owner(check)
     queue = tmp_path / "ap_queue"
     queue.mkdir()
-    active, old = "1" * 16, "2" * 16
-    (queue / "active_session_namespace").write_text(active)
-    files = {f"recv-{active}-item.cmd": "current", f"recv-{old}-refill.failed": "quarantined",
-             f"recv-{old}-item.processing": "old", "unscoped.failed": "unknown"}
+    files = {"old" + suffix: "grant something" for suffix in (".cmd", ".processing", ".attempt", ".failed")}
     for name, content in files.items():
         (queue / name).write_text(content)
-    result = doctor._queue_diagnostics(tmp_path)
-    assert (result["pending"], result["processing"], result["failed"]) == (1, 0, 0)
-    assert result["historical"]["failed"] == result["historical"]["processing"] == 1
-    assert result["unscoped"]["failed"] == 1
-    assert result["historical"]["items"]["failed"][0]["modified_utc"].endswith("+00:00")
-    (queue / "active_session_namespace").unlink()
-    unknown = doctor._queue_diagnostics(tmp_path)
-    assert unknown["active_session"]["status"] == "unavailable" and unknown["pending"] == 0
-    assert unknown["historical"]["pending"] == 1
+    result = doctor._delivery_diagnostics({}, live={"delivery_ledger": {
+        "path": str(tmp_path / "delivery.sqlite3"), "room": room}})
+    assert result["status"] == "available" and result["authority"] == "ledger"
+    assert result["counts"]["blocked" if uncertain else "delivered"] == 1
+    assert doctor._delivery_verdict(result) is (not uncertain)
+    assert all(name not in json.dumps(result) for name in files)
     assert {name: (queue / name).read_text() for name in files} == files
 
 
@@ -157,7 +168,8 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
     support = doctor.build_support_diagnostics(config, tmp_path / "launcher.json", paths, [], {}, {}, live=live)
     support["session"] = {"connected": False, "identity_source": "last_known", "seed_name": "test-room", "slot": 2,
                           "slot_data": {"apworld_revision": "0.7.0"}}
-    support["game_link"].update(queue={"status": "available", "pending": 3, "processing": 1, "failed": 2},
+    support["game_link"].update(delivery={"status": "available", "authority": "ledger",
+                                           "counts": {"blocked": 2, "waiting": 3}, "truncated": False},
                                  telemetry_safety={"safety": {"status": "blocked"}})
     console = game / "base/qconsole.log"
     console.write_text("old console\n" * 30000 + '2026-10-27T14:30:00Z ERROR password=password-canary\n')
@@ -188,7 +200,7 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
                                     "sha256": hashlib.sha256(mod.read_bytes()).hexdigest()}]
         summary = archive.read("summary.txt").decode()
         assert "FAIL Core installed and compatible" in summary
-        assert "FAIL Item delivery: blocked=yes, pending=3, processing=1, .failed=2" in summary
+        assert "FAIL Item delivery: ledger=available" in summary and "'blocked': 2" in summary
         assert "core_runtime | Update refused" in summary
         assert "Room seed: test-room | Slot: 2" in summary and "Core 1.0.0" in summary
         assert "full stdout and stderr" in summary
@@ -246,3 +258,67 @@ def test_issue_url_prefills_summary_or_copies_full_report_under_budget():
     assert "summary" not in parse_qs(urlsplit(url).query)
     assert clipboard == reporting.report_text(payload)
     assert "password-canary" not in clipboard
+
+
+def test_support_timeline_is_bounded_scoped_and_excludes_payloads(tmp_path, owner):
+    from doom_eap.launcher.support_evidence import ledger_timeline
+    from doom_eap.runtime.ledger import Authority, Observation, RoomKey
+
+    metadata = {"path": str(tmp_path / "delivery.sqlite3")}
+
+    async def check(delivery, transport):
+        metadata["room"] = asdict(delivery.binding.room)
+        observations = tuple(Observation("support-run", index, "support_event", None, None, b"payload-canary")
+                             for index in range(140))
+        await delivery.ledger.observe(delivery.binding, observations)
+        foreign = await delivery.ledger.bind(RoomKey("other", 0, 1, "fixture"), "other", compatibility_revision=1,
+                                             authority=Authority.LEDGER)
+        await delivery.ledger.observe(foreign, (Observation("foreign", 1, "foreign_event", None, None, b"foreign-canary"),))
+
+    owner(check)
+    result = ledger_timeline(metadata)
+    assert result["status"] == "available" and result["truncated"]
+    assert len(result["events"]) == 128
+    assert [row["sequence"] for row in result["events"]] == sorted(row["sequence"] for row in result["events"])
+    assert {row["kind"] for row in result["events"]} == {"support_event"}
+    assert "canary" not in json.dumps(result)
+    assert ledger_timeline({**metadata, "path": str(tmp_path / "absent.sqlite3")})["status"] == "missing"
+    assert not (tmp_path / "absent.sqlite3").exists()
+
+
+def test_support_evidence_allowlist_and_injector_share_budget(tmp_path, monkeypatch):
+    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({}, {}))
+    game = tmp_path / "game"
+    (game / "base").mkdir(parents=True)
+    executable = game / "DOOMEternalx64vk.exe"
+    executable.write_bytes(b"fixture executable")
+    journal = {"status": "available", "phase": "ROLLED_BACK", "revision": 8,
+               "phase_times": {"PREPARING": 10, "ROLLING_BACK": 20, "ROLLED_BACK": 23},
+               "failure": {"code": "verify_failed", "message": "Verification failed", "extra": "failure-canary"},
+               "evidence": {"recovery_error": "password=secret-canary", "command": ["command-canary"]},
+               "files": ["backup-canary"]}
+    support = {"installation": journal, "ap_session": {"checkpoint": 12, "native_generation": 4,
+               "checkpoint_state": "confirmed", "payload": "session-canary"}}
+    support["native_diagnostics"] = {"records": [
+        {"correlation": {"build_matches": True, "namespace_matches": True},
+         "campaign": {"generation_before": 3, "generation_after": 4, "checkpoint_generation": 4, "extra": "native-canary"}},
+        {"correlation": {"build_matches": True, "namespace_matches": False},
+         "campaign": {"checkpoint_generation": 999}},
+    ]}
+    result = doctor.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
+        config={"game_root": str(game)}, support_diagnostics=support,
+        injector_output="bounded injector output\n" * 600000)
+    with zipfile.ZipFile(result) as archive:
+        assert sum(row.file_size for row in archive.infolist()) < doctor.SUPPORT_BUNDLE_MAX_BYTES
+        assert result.stat().st_size < doctor.SUPPORT_BUNDLE_MAX_BYTES
+        evidence = json.loads(archive.read("installation_journal.json"))
+        assert evidence["phase"] == "ROLLED_BACK" and evidence["failure"]["code"] == "verify_failed"
+        assert evidence["timings"][0]["elapsed_seconds"] == 10
+        assert "canary" not in json.dumps(evidence)
+        checkpoint = json.loads(archive.read("checkpoint_generations.json"))
+        assert checkpoint["checkpoint"] == 12 and checkpoint["native_generation"] == 4
+        assert checkpoint["native"] == [{"generation_before": 3, "generation_after": 4, "checkpoint_generation": 4}]
+        assert "payload" not in checkpoint
+        identity = json.loads(archive.read("executable_identity.json"))
+        assert identity["sha256"] == hashlib.sha256(executable.read_bytes()).hexdigest()
+        assert "truncated" in archive.read("summary.txt").decode()

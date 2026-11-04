@@ -6,6 +6,8 @@ import struct
 import zipfile
 from pathlib import Path, PurePosixPath
 
+from doom_eap import __version__ as MOD_VERSION
+
 ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
        "admission": 1, "backup": 1, "installation": 1, "weapon_points": 1,
        "campaign_menu": 1, "inventory": 8, "arsenal": 1, "runes": 1,
@@ -14,7 +16,6 @@ ABI = {"base": 1, "wire": 1, "engine": 1, "context": 1, "native": 1, "save": 1,
 REQUIRED = {"sentinel_core.dll", "msimg32.dll", "sentinel_probe.exe",
             "notices/LICENSE.txt", "notices/MinHook-LICENSE.txt", "notices/MinHook-NOTICE.txt"}
 HELPERS = {"prepare_vanilla_backup.py"}
-from doom_eap import __version__ as MOD_VERSION
 SUPPORTED_CAPABILITIES = {2097152, 4194304, 8388608}
 REQUIRED_ABIS = {"base", "wire", "engine", "context", "native", "save", "admission", "backup", "installation", "inventory", "automap", "commands", "combat", "combat_presentation", "enemy_movement", "enemy_supply", "enemy_limits", "enemy_tracking"}
 
@@ -70,7 +71,7 @@ def validate_manifest(value, *, require_compatible=True):
         raise ValueError("Inconsistent version fields")
     if value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
-    if require_compatible and (key[:2] != (1, 1) or not mod_compatible(value)):
+    if require_compatible and (key[:2] != (2, 0) or not mod_compatible(value)):
         raise ValueError("Incompatible runtime")
     if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list):
         raise ValueError("Incompatible ABI or capability")

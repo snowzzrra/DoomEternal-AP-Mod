@@ -7,6 +7,15 @@ from types import MappingProxyType
 from typing import Protocol
 
 from doom_eap.runtime.deathlink_receive import ReceiveState
+from doom_eap.strings import text
+
+DEATHLINK_MESSAGES = tuple(
+    text("deathlink", key, player="{player}")
+    for key in (
+        "causes.insufficient_ripping", "causes.back_to_fortress", "causes.lost_to_hell",
+        "causes.privileges_revoked", "causes.uncontrolled_buttons",
+    )
+)
 
 
 class DeathLinkPublicationPort(Protocol):
@@ -171,7 +180,7 @@ class DeathLinkSession:
                 return
         elif self._state.pop("death_link_grace", None) is not None:
             persist()
-        player = player or "The Doom Slayer"
+        player = player or text("deathlink", "local_player_fallback")
         cause = random.choice(self._messages).format(player=player)
         self._logger.info("[DeathLink] DEATHLINK_OUTBOUND_ACCEPTED cause=%s", cause)
         generation = self._generation

@@ -214,8 +214,6 @@ class DeathLinkReceiver:
             if event.attempts:
                 event.state = ReceiveState.COMMAND_IN_FLIGHT
                 return self._result(event.event_id, event.state, "awaiting_delivery", now)
-            # Consumer ownership keeps the existing .processing file bound to
-            # its original event.
             return self._result(event.event_id, event.state, "foreign_command_in_flight", now)
         if not safe_gameplay:
             event.unsafe_pauses += 1

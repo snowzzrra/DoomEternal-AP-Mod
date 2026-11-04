@@ -1,4 +1,7 @@
 """CommonClient name/Hint/PrintJSON presentation adapters, loaded after AP bootstrap."""
+
+from doom_eap.strings import text as player_text
+
 from dataclasses import dataclass
 from collections.abc import Callable, Mapping
 from NetUtils import Hint, HintStatus, JSONMessagePart, JSONTypes
@@ -45,7 +48,7 @@ def _bounded_event_text(value, limit):
 def _fallback_archipelago_segment(part):
     raw_text = part.get("text") if isinstance(part, dict) else None
     if not isinstance(raw_text, str):
-        raw_text = "[unavailable]"
+        raw_text = player_text("hints", "unavailable")
     return {"type": "text", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
 
 
@@ -166,7 +169,7 @@ def format_archipelago_event(context, args):
         except Exception:
             segment, raw_text = _fallback_archipelago_segment(part)
         segments.append(segment)
-        plain_parts.append(raw_text if isinstance(raw_text, str) else "[unavailable]")
+        plain_parts.append(raw_text if isinstance(raw_text, str) else player_text("hints", "unavailable"))
     return {
         "schema": ARCHIPELAGO_EVENT_SCHEMA,
         "plain": _bounded_event_text("".join(plain_parts), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
@@ -230,11 +233,11 @@ def emit_hints(key, source, names, emit, logger, update_kind="DATA_RECEIVED") ->
             try:
                 item_name = names.item_names.lookup_in_slot(hint.item, hint.receiving_player)
             except (KeyError, LookupError, AttributeError):
-                item_name = f"Unknown item ({hint.item})"
+                item_name = player_text("hints", "unknown_item", item_id=str(hint.item))
             try:
                 location_name = names.location_names.lookup_in_slot(hint.location, hint.finding_player)
             except (KeyError, LookupError, AttributeError):
-                location_name = f"Unknown location ({hint.location})"
+                location_name = player_text("hints", "unknown_location", location_id=str(hint.location))
             records.append({
                 "receiving_player": hint.receiving_player,
                 "receiving_player_name": names.player_names.get(hint.receiving_player, str(hint.receiving_player)),

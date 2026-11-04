@@ -12,10 +12,16 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
+from doom_eap.content.automap_visual_registry import (
+    load_automap_visual_registry,
+)
+from doom_eap.content.automap_visual_registry import (
+    validate_generated_visuals as _validate_generated_visuals,
+)
 from doom_eap.content.content_catalog import (
     ContentCatalog,
     load_content_catalog,
@@ -23,28 +29,32 @@ from doom_eap.content.content_catalog import (
 )
 from tools.content.compile_content_catalog import (
     check_catalog as check_compiled_catalog,
+)
+from tools.content.compile_content_catalog import (
     materialize_catalog as materialize_content_catalog,
 )
 from tools.content.compile_options_schema import (
     check_schema as check_compiled_options_schema,
+)
+from tools.content.compile_options_schema import (
     materialize_schema as materialize_options_schema,
 )
 from tools.content.compile_start_inventory_catalog import (
     check_catalog as check_start_inventory_catalog,
+)
+from tools.content.compile_start_inventory_catalog import (
     materialize_catalog as materialize_start_inventory_catalog,
 )
-from doom_eap.content.automap_visual_registry import (
-    load_automap_visual_registry,
-    validate_generated_visuals as _validate_generated_visuals,
+from tools.maps.ap_map_generator import (
+    extract_target_names,
+    find_entity_block_bounds,
+    generate_map,
+    load_item_notification_policies,
 )
-from tools.maps.ap_map_generator import generate_map, load_item_notification_policies, extract_target_names, find_entity_block_bounds
 from tools.maps.map_semantic_baseline import (
     assert_map_baseline,
 )
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-from tools.validation.audit_resource_packages import (
-    audit_source_asset_dependencies,
-)
 from tools.release.apworld_cache import apworld_fingerprint
 from tools.release.release_manifest import (
     build_release_manifest,
@@ -53,6 +63,10 @@ from tools.release.release_manifest import (
     validate_release_manifest,
     validate_source_layout,
 )
+from tools.validation.audit_resource_packages import (
+    audit_source_asset_dependencies,
+)
+
 
 def validate_generated_visuals(document, map_key, content):
     if map_key == "hub":
@@ -92,6 +106,8 @@ WORKSPACES_ROOT = CACHE_ROOT / "workspaces"
 IDENTITY_PATH = ROOT / "data" / "content_identity.json"
 PIPELINE_VERSION = "5"
 CORE_MAP_INPUTS = (
+    "data/player_strings.json",
+    "doom_eap/strings.py",
     "data/items.json",
     "data/item_replay_policies.json",
     "data/mission_complete_map_contracts.json",
@@ -133,21 +149,17 @@ PREFLIGHT_PYTHON = (
     "doom_eap/contracts/receipt_delivery.py",
             "doom_eap/contracts/source_bytes.py",
     "doom_eap/runtime/receipt_delivery.py",
-    "doom_eap/runtime/receipt_publication.py",
     "doom_eap/runtime/save_check_observation.py",
     "doom_eap/runtime/deathlink_session.py",
     "doom_eap/runtime/deathlink_publication.py",
     "doom_eap/runtime/ammo_adapters.py",
     "doom_eap/runtime/rune_reconciliation.py",
-    "doom_eap/runtime/materialization_coordinator.py",
-    "doom_eap/runtime/reconciliation_publication.py",
     "doom_eap/contracts/runtime_context.py",
     "doom_eap/runtime/lifecycle.py",
     "doom_eap/runtime/context_registry.py",
     "doom_eap/contracts/tag_prerequisites.py",
     "doom_eap/contracts/ownership.py",
     "doom_eap/contracts/command_publication.py",
-    "doom_eap/runtime/command_spool.py",
     "doom_eap/runtime/client_state_store.py",
     "doom_eap/content/publisher_loader.py",
     "doom_eap/contracts/ap_visual_contract.py",
@@ -867,7 +879,7 @@ class Pipeline:
     def package_preflight(self, package_root: Path | None = None) -> None:
         """Cheap source/package contract audit; never generates maps or seeds."""
         with self.timed("package-preflight"):
-            catalog = self.catalog or self.preflight()
+            self.catalog or self.preflight()
             root = self._package_root(package_root)
             if root is None:
                 synthetic = build_release_manifest(
@@ -920,7 +932,6 @@ class Pipeline:
                     }
                 if actual_value != expected_value:
                     raise ValueError(f"component=package field=manifest_disagreement value={field}")
-            packaged_options = root / "client" / "data" / "options_schema.json"
             client_dir = root / "client"
             if client_dir.is_dir():
                 presentation_path = client_dir / "doom_eap" / "presentation.py"
@@ -1046,19 +1057,15 @@ class Pipeline:
         "doom_eap/runtime/physical_checks.py",
         "doom_eap/runtime/location_names.py",
         "doom_eap/runtime/protocol_feed_format.py",
-            "doom_eap/runtime/receipt_publication.py",
             "doom_eap/runtime/save_check_observation.py",
             "doom_eap/runtime/deathlink_session.py",
             "doom_eap/runtime/deathlink_publication.py",
             "doom_eap/runtime/ammo_adapters.py",
             "doom_eap/runtime/rune_reconciliation.py",
-            "doom_eap/runtime/materialization_coordinator.py",
-            "doom_eap/runtime/reconciliation_publication.py",
             "doom_eap/runtime/lifecycle.py",
             "doom_eap/runtime/context_registry.py",
             "doom_eap/contracts/ownership.py",
             "doom_eap/contracts/command_publication.py",
-            "doom_eap/runtime/command_spool.py",
             "doom_eap/runtime/client_state_store.py",
             "doom_eap/content/publisher_loader.py",
             "doom_eap/runtime/bridge_client.py",
@@ -1084,6 +1091,23 @@ class Pipeline:
             "doom_eap/launcher/launcher_platform.py",
             "doom_eap/launcher/launcher_supervisor.py",
             "doom_eap/launcher/launcher_ui.py",
+            "doom_eap/launcher/events.py",
+            "doom_eap/launcher/items.py",
+            "doom_eap/launcher/items_reader.py",
+            "doom_eap/launcher/ledger_preservation.py",
+            "doom_eap/launcher/presenters/items_presenter.py",
+            "doom_eap/launcher/presenters/play_presenter.py",
+            "doom_eap/launcher/ui/app_window.py",
+            "doom_eap/launcher/ui/play_view.py",
+            "doom_eap/launcher/ui/settings_view.py",
+            "doom_eap/launcher/ui/items_view.py",
+            "doom_eap/launcher/ui/theme.qss",
+            "doom_eap/launcher/ui/strings.py",
+            "doom_eap/runtime/ledger.py",
+            "doom_eap/runtime/ledger_records.py",
+            "doom_eap/runtime/delivery_control.py",
+            "doom_eap/strings.py",
+            "data/player_strings.json",
             "doom_eap/runtime/publisher_runtime.py",
             "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
             "doom_eap/runtime/__init__.py", "doom_eap/runtime/save_decrypt.py",

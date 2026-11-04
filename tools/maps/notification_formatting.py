@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from doom_eap.strings import GAME_LOCALES, load_catalog
+
 _AP_COLOR_CODE = re.compile(r"(?:\{[^{}]*\}|\^[0-9A-Fa-f])")
 _CONTROL_CHARACTER = re.compile(r"[\x00-\x1f\x7f]")
 ITEM_NOTIFICATION_HEADER_KEY = "#str_ap_item_received"
@@ -19,16 +21,12 @@ PROGRESSIVE_NOTIFICATION_ITEM_IDS = frozenset({
 })
 
 ITEM_NOTIFICATION_TITLE = {
-    "english": "AP ITEM RECEIVED",
-    "portuguese": "ITEM AP RECEBIDO",
-}
-MAJOR_NOTIFICATION_SUFFIX = {
-    "english": "RECEIVED",
-    "portuguese": "RECEBIDO",
+    locale: load_catalog().text("notifications", "item_received_title", locale=GAME_LOCALES[locale])
+    for locale in GAME_LOCALES
 }
 LOCATION_NOTIFICATION_TITLE = {
-    "english": "AP LOCATION SENT",
-    "portuguese": "LOCALIZAÇÃO AP ENVIADA",
+    locale: load_catalog().text("notifications", "location_sent_title", locale=GAME_LOCALES[locale])
+    for locale in GAME_LOCALES
 }
 
 
@@ -100,8 +98,6 @@ def notification_text(
     *,
     stage: int | None = None,
 ) -> str:
-    # Validate item identity and style metadata even though subtitle text is
-    # intentionally independent of progressive/currency presentation details.
     notification_key(item_id, definition, stage=stage)
     name = _sanitized_name(item_name)
     progressive_count = _progressive_stage_count(item_id, definition, stage)
@@ -125,10 +121,8 @@ def major_notification_text(
 ) -> str:
     """Return localized major receipt text: ``<ITEM> RECEIVED``."""
     notification_text(item_id, definition, item_name, stage=stage)
-    try:
-        suffix = MAJOR_NOTIFICATION_SUFFIX[locale]
-    except KeyError as error:
-        raise ValueError(f"unsupported notification locale: {locale}") from error
+    if locale not in GAME_LOCALES:
+        raise ValueError(f"unsupported notification locale: {locale}")
     name = _sanitized_name(item_name)
     progressive_count = _progressive_stage_count(item_id, definition, stage)
     if progressive_count is not None:
@@ -136,8 +130,11 @@ def major_notification_text(
             raise ValueError("progressive notification stage is required")
         if name.startswith("Progressive "):
             name = name[len("Progressive "):]
-        name = f"{name} ({stage + 1}/{progressive_count})"
-    return f"{name} {suffix}"
+        name = load_catalog().text(
+            "notifications", "progressive_item", locale=GAME_LOCALES[locale],
+            item=name, stage=str(stage + 1), count=str(progressive_count),
+        )
+    return load_catalog().text("notifications", "major_item_received", locale=GAME_LOCALES[locale], item=name)
 
 
 def location_notification_key(location_id: int) -> str:
@@ -180,8 +177,10 @@ def location_sent_text(placement: Any) -> str:
     """
     item_name, recipient_name, local, _trap = _placement_identity(placement)
     if local:
-        return f"FOUND YOUR {item_name.upper()}"
-    return f"SENT {item_name.upper()} TO {recipient_name.upper()}"
+        return load_catalog().text("notifications", "local_found", item=item_name.upper())
+    return load_catalog().text(
+        "notifications", "sent_to_player", item=item_name.upper(), recipient=recipient_name.upper(),
+    )
 
 
 def item_receipt_text(
@@ -199,10 +198,13 @@ def item_receipt_text(
     """
     item = _sanitized_name(item_name)
     if trap:
-        return "A TRAP FOR SOMEONE" if uppercase else "A trap for someone"
+        return load_catalog().text("notifications", "trap" if uppercase else "trap_sentence")
     if uppercase:
         item = item.upper()
     if local:
-        return f"YOUR {item}"
+        return load_catalog().text("notifications", "local_item", item=item)
     recipient = _sanitized_name(recipient_name)
-    return f"{item} FOR {recipient.upper() if uppercase else recipient}"
+    return load_catalog().text(
+        "notifications", "remote_item", item=item,
+        recipient=recipient.upper() if uppercase else recipient,
+    )

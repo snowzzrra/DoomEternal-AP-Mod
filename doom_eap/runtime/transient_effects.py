@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import time
+from dataclasses import dataclass
+from typing import Protocol
 
 TRANSIENT_EFFECTS = {
     7770156: {"name": "damage_boost", "cvar": "g_damageScaleAllToAI", "factor": 1.50, "duration": 20.0},
@@ -12,8 +14,6 @@ TRANSIENT_EFFECTS = {
     7770159: {"name": "weakness_trap", "cvar": "g_damageScaleAllToAI", "factor": 0.70, "duration": 12.0},
     7770160: {"name": "vulnerability_trap", "cvar": "g_damageScaleAllToSlayer", "factor": 1.35, "duration": 12.0},
 }
-from dataclasses import dataclass
-from typing import Protocol
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ class TransientRuntime:
 
 class TransientPublicationPort(Protocol):
     def publish_scope(self, scope: str | None): ...
-    def send(self, cvar: str, command: str, state_key: str, scope: str, *, room_scoped: bool) -> bool: ...
+    async def send(self, cvar: str, command: str, state_key: str, scope: str, *, room_scoped: bool, receipt_index=None) -> bool: ...
 
 
 class TransientEffectManager:
@@ -35,9 +35,10 @@ class TransientEffectManager:
         self._publication = publication
         self._process_id = process_id
         self._active: dict[str, tuple[float, float, str]] = {}
+        self._receipts = set()
         self._scope_generation = 0
         self._bound_baseline: tuple[str, str] | None = None
-        self._reset_pending = False
+        self._reset_pending = True
 
     def _scope(self, runtime) -> str | None:
         state_key = runtime.state_key
@@ -80,35 +81,41 @@ class TransientEffectManager:
             ("g_infiniteAmmo", f"g_infiniteAmmo {infinite_ammo}"),
         ]
 
-    def _emit(self, now: float, runtime, *, room_scoped: bool = True) -> bool:
+    async def _emit(self, now: float, runtime, *, room_scoped: bool = True, receipt_index=None) -> bool:
         scope = self._scope(runtime)
         if scope is None or not runtime.ready:
             return False
         self._publication.publish_scope(scope)
         for cvar, command in self._commands(now):
-            if not self._publication.send(cvar, command, runtime.state_key, scope, room_scoped=room_scoped):
+            if not await self._publication.send(cvar, command, runtime.state_key, scope, room_scoped=room_scoped, receipt_index=receipt_index):
                 return False
         return True
 
-    def apply_receipt(self, item_id: int, runtime: TransientRuntime) -> tuple[bool, str, bool]:
+    async def apply_receipt(self, item_id: int, runtime: TransientRuntime, *, receipt_index=None) -> tuple[bool, str, bool]:
         effect = TRANSIENT_EFFECTS.get(item_id)
         if effect is None:
             return False, "not a transient effect", False
         now = time.monotonic()
-        self.tick(runtime, now, emit=False)
+        await self.tick(runtime, now, emit=False)
         if not runtime.ready:
             return False, "transient baseline or safe gameplay unavailable", False
+        identity = (runtime.state_key, receipt_index)
+        if receipt_index is not None and identity in self._receipts:
+            return True, effect["name"], False
+        if receipt_index is not None:
+            self._receipts.add(identity)
         current = self._active.get(effect["name"])
         expiry = max(now, current[0] if current is not None else now)
         self._active[effect["name"]] = (
             expiry + effect["duration"], effect["factor"], effect["cvar"]
         )
-        if not self._emit(now, runtime):
-            return False, "transient command spool rejected", True
+        self._reset_pending = True
+        if not await self._emit(now, runtime, receipt_index=receipt_index):
+            return False, "transient command rejected", True
         self._reset_pending = False
         return True, effect["name"], False
 
-    def tick(self, runtime: TransientRuntime, now: float | None = None, *, emit: bool = True) -> bool:
+    async def tick(self, runtime: TransientRuntime, now: float | None = None, *, emit: bool = True) -> bool:
         now = time.monotonic() if now is None else now
         expired = [name for name, (expiry, _factor, _cvar) in self._active.items() if expiry <= now]
         for name in expired:
@@ -118,17 +125,17 @@ class TransientEffectManager:
         if not emit:
             return not expired
         if expired or self._reset_pending:
-            emitted = self._emit(now, runtime)
+            emitted = await self._emit(now, runtime)
             if emitted:
                 self._reset_pending = False
             return emitted
         return True
 
-    def reset(self, reason: str, runtime: TransientRuntime) -> None:
+    async def reset(self, reason: str, runtime: TransientRuntime) -> None:
         self._active.clear()
         self._scope_generation += 1
         self._reset_pending = True
         self._publication.publish_scope(None)
         if runtime.ready:
-            if self._emit(time.monotonic(), runtime, room_scoped=False):
+            if await self._emit(time.monotonic(), runtime, room_scoped=False):
                 self._reset_pending = False

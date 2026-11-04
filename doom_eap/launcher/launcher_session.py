@@ -1,36 +1,62 @@
 """Room-bound prelaunch admission with one live, single-use Windows lease."""
 from __future__ import annotations
 
+import asyncio
 import ctypes
 import datetime
-from dataclasses import asdict
-from ctypes import wintypes
 import hashlib
 import importlib.util
 import json
 import logging
 import os
 import re
-from pathlib import Path
 import secrets
-import shutil
 import selectors
+import shutil
+import stat
 import subprocess
 import sys
 import threading
 import time
-import stat
 import zipfile
+from ctypes import wintypes
+from dataclasses import asdict
+from pathlib import Path
 from types import SimpleNamespace
 
 from doom_eap.contracts.core_distribution import verify_runtime
+from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 from doom_eap.runtime.weapon_points import namespace_id
+
+from .checkpoint import CheckpointPlan, CheckpointState, RecoveryState, recovery_observation
+from .ui.strings import checkpoint_blocked
+
+
+class SessionSupervisorError(RuntimeError):
+    code = "session_supervisor_failed"
+    failure_domain = "campaign_session"
+
+
+class SaveInterruptedError(RuntimeError):
+    code = "save_interrupted"
+    failure_domain = "campaign_session"
+
+    def __init__(self):
+        super().__init__(player_text('launcher.save', 'interrupted'))
+
+
+class CheckpointRecoveryBlockedError(RuntimeError):
+    code = "checkpoint_recovery_blocked"
+    failure_domain = "campaign_session"
+
+    def __init__(self, reason):
+        super().__init__(checkpoint_blocked(reason))
 
 _UNSET = object()
 # Full campaign room snapshots require the same large frame limit at both ends.
 SESSION_PIPE_LIMIT = 256 * 1024 * 1024
-_INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file", "proton_compat_data_dir", "proton_executable")
+_INSTALL_KEYS = ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file", "delivery_ledger_file", "delivery_ledger_expected", "proton_compat_data_dir", "proton_executable")
 
 
 def prelaunch_owner_state(pid, created):
@@ -65,9 +91,9 @@ def archive_prelaunch(path, state_dir, *, explicit=False):
     recognized = match and len(raw) <= 65536 and int(match[1]) <= 0xffffffff and int(match[2]) <= 0xffffffffffffffff
     state = prelaunch_owner_state(int(match[1]), int(match[2])) if recognized else "legacy"
     if state == "alive":
-        raise RuntimeError("Another live launcher owns this game preparation; close that launcher before retrying")
+        raise RuntimeError(player_text('launcher.session', 'another_live_launcher_owns_this_game_preparation_close_that_laun'))
     if state == "unknown" or (state == "legacy" and not explicit):
-        raise RuntimeError("Prelaunch ownership is unknown. Use Repair Session with DOOM closed to inspect or archive this marker")
+        raise RuntimeError(player_text('launcher.session', 'prelaunch_ownership_is_unknown_use_repair_session_with_doom_clos'))
     if state == "legacy":
         api = ctypes.WinDLL("kernel32", use_last_error=True)
         api.OpenSemaphoreW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
@@ -76,14 +102,14 @@ def archive_prelaunch(path, state_dir, *, explicit=False):
         handle = api.OpenSemaphoreW(0x100000, False, "Local\\SentinelA-" + hashlib.sha256(raw).hexdigest())
         if handle:
             api.CloseHandle(handle)
-            raise RuntimeError("A live prelaunch lease exists; its marker was preserved")
+            raise RuntimeError(player_text('launcher.session', 'a_live_prelaunch_lease_exists_its_marker_was_preserved'))
         if ctypes.get_last_error() != 2:
-            raise RuntimeError("Prelaunch lease ownership cannot be inspected; marker preserved")
+            raise RuntimeError(player_text('launcher.session', 'prelaunch_lease_ownership_cannot_be_inspected_marker_preserved'))
     directory = state_dir / "prelaunch-backups"
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / (hashlib.sha256(raw).hexdigest() + "-" + secrets.token_hex(8) + ".txt")
     if path.read_bytes() != raw:
-        raise RuntimeError("Prelaunch marker changed during recovery; retry inspection")
+        raise RuntimeError(player_text('launcher.session', 'prelaunch_marker_changed_during_recovery_retry_inspection'))
     shutil.move(path, target)
     logging.getLogger(__name__).info("AP_PRELAUNCH_ARCHIVED owner_state=%s source=%s destination=%s", state, path, target)
     return target
@@ -97,31 +123,83 @@ def _campaign_native_root(campaign_root, namespace):
         text = stream.read(2049)
     header = f"sentinel-native-root-v1\nnamespace={namespace}\nroot=".encode("ascii")
     if not text.startswith(header) or not re.fullmatch(rb"ap-[0-9a-f]{40}\n", text[len(header):]):
-        raise RuntimeError("AP campaign provider metadata is unreadable")
+        raise RuntimeError(player_text('launcher.session', 'ap_campaign_provider_metadata_is_unreadable'))
     return text[len(header):-1].decode("ascii")
 
 
-def _archive_campaign_files(archive, snapshot, namespace, sources, raw=None):
+def _inspect_save_path(path, kind):
+    result = {"path": str(path), "status": "present"}
+    try:
+        info = path.lstat()
+        if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                or not (stat.S_ISDIR(info.st_mode) if kind == "directory" else stat.S_ISREG(info.st_mode))):
+            result["status"] = "wrong_type"
+        elif kind == "directory":
+            with os.scandir(path) as entries:
+                result["entries"] = [entry.name for _, entry in zip(range(32), entries, strict=False)]
+    except FileNotFoundError:
+        result["status"] = "missing"
+    except OSError as error:
+        result.update(status="inaccessible", error=str(error), errno=error.errno,
+                      winerror=getattr(error, "winerror", None))
+    return result
+
+
+def _inspect_campaign_metadata(directory, paths, expected):
+    entry = paths["campaign.contract"]
+    if entry["status"] != "present":
+        return
+    try:
+        with (directory / "campaign.contract").open("rb") as stream:
+            raw = stream.read(65537)
+        entry["status"] = "present" if raw == expected else "metadata_invalid"
+    except OSError as error:
+        entry.update(status="inaccessible", error=str(error))
+
+
+def _campaign_copy_files(archive, sources):
     files = {}
     for index, source in enumerate(sources):
         if archive.resolve().is_relative_to(source.resolve()):
-            raise RuntimeError("AP backup destination must be outside its sources")
-        pending = [source]
-        while pending:
-            path = pending.pop()
-            info = path.lstat()
-            if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
-                    or stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))):
-                raise RuntimeError("AP backup refuses linked or special save files")
-            if stat.S_ISDIR(info.st_mode):
-                with os.scandir(path) as entries:
-                    pending.extend(Path(entry.path) for entry in entries)
-            if stat.S_ISREG(info.st_mode):
-                name = f"{index}/{path.relative_to(source).as_posix() if source.is_dir() else source.name}"
-                files[name] = (path, hashlib.sha256(path.read_bytes()).hexdigest())
+            raise RuntimeError(player_text('launcher.session', 'ap_backup_destination_must_be_outside_its_sources'))
+        for path in _campaign_source_files(source):
+            name = f"{index}/{path.relative_to(source).as_posix() if source.is_dir() else source.name}"
+            files[name] = (path, hashlib.sha256(path.read_bytes()).hexdigest())
+    return files
+
+
+def _campaign_source_files(source):
+    pending = [source]
+    while pending:
+        path = pending.pop()
+        info = path.lstat()
+        if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                or stat.S_ISLNK(info.st_mode) or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))):
+            raise RuntimeError(player_text('launcher.session', 'ap_backup_refuses_linked_or_special_save_files'))
+        if stat.S_ISDIR(info.st_mode):
+            with os.scandir(path) as entries:
+                pending.extend(Path(entry.path) for entry in entries)
+        else:
+            yield path
+
+
+def _restart_receipt_state(state, keys, state_key, owner, default_session_state):
+    backend = state["sessions"].get(state_key, {}).get("delivery_backend")
+    for key in keys:
+        state["sessions"].pop(key)
+    state["sessions"][state_key] = default_session_state()
+    if owner or backend == "ledger":
+        state["sessions"][state_key]["delivery_backend"] = "ledger"
+        state["sessions"][state_key]["delivery_ledger_expected"] = owner
+
+
+def _archive_campaign_files(archive, snapshot, namespace, sources, raw=None, ledger_snapshot=None):
+    files = _campaign_copy_files(archive, sources)
+    if ledger_snapshot is not None:
+        files["delivery.sqlite3"] = (ledger_snapshot, hashlib.sha256(ledger_snapshot.read_bytes()).hexdigest())
     archive.parent.mkdir(parents=True, exist_ok=False)
     with zipfile.ZipFile(archive, "x", zipfile.ZIP_DEFLATED) as output:
-        for name, (path, digest) in files.items():
+        for name, (path, _digest) in files.items():
             output.write(path, name)
         if raw is not None:
             output.writestr("client_state.json", raw)
@@ -133,9 +211,9 @@ def _archive_campaign_files(archive, snapshot, namespace, sources, raw=None):
     with zipfile.ZipFile(archive) as saved:
         if saved.testzip() is not None or any(hashlib.sha256(saved.read(name)).hexdigest() != digest
                                             for name, (_, digest) in files.items()):
-            raise RuntimeError("AP backup verification failed; existing saves were kept")
+            raise RuntimeError(player_text('launcher.session', 'ap_backup_verification_failed_existing_saves_were_kept'))
         if raw is not None and saved.read("client_state.json") != raw:
-            raise RuntimeError("AP receipt backup verification failed; existing saves were kept")
+            raise RuntimeError(player_text('launcher.session', 'ap_receipt_backup_verification_failed_existing_saves_were_kept'))
     return archive
 
 
@@ -153,32 +231,32 @@ class _ProtonSessionOwner:
 
     def request(self, action, *, timeout=10, **payload):
         if self.process is None or self.process.poll() is not None:
-            raise RuntimeError("The Windows AP session supervisor is unavailable")
+            raise SessionSupervisorError(player_text('launcher.session', 'the_windows_ap_session_supervisor_is_unavailable'))
         self.process.stdin.write(json.dumps({"action": action, **payload}) + "\n")
         self.process.stdin.flush()
         with selectors.DefaultSelector() as selector:
             selector.register(self.process.stdout, selectors.EVENT_READ)
             if not selector.select(timeout):
                 self.closable = False
-                raise RuntimeError("The Windows AP session supervisor did not respond")
+                raise SessionSupervisorError(player_text('launcher.session', 'the_windows_ap_session_supervisor_did_not_respond'))
         raw = self.process.stdout.readline(SESSION_PIPE_LIMIT + 1)
         response = json.loads(raw)
         if not isinstance(response, dict) or type(response.get("can_close")) is not bool:
-            raise RuntimeError("Invalid Windows session supervisor response")
+            raise SessionSupervisorError(player_text('launcher.session', 'invalid_windows_session_supervisor_response'))
         self.closable = response["can_close"]
-        if "error" in response:
-            error = RuntimeError(response["error"])
-            for key, value in response.get("failure", {}).items():
-                if key in {"failure_domain", "stage", "operation", "source_path", "destination_path", "errno", "winerror", "filename", "filename2", "proton_reason", "proton_candidates", "proton_selected"}:
-                    setattr(error, key, value)
-            raise error
         if "status" in response:
             if not isinstance(response["status"], dict):
-                raise RuntimeError("Invalid Windows session status")
+                raise SessionSupervisorError(player_text('launcher.session', 'invalid_windows_session_status'))
             self.status = response["status"]
             if self._runtime_details is not None:
                 self.status["proton_runtime"] = self._runtime_details
             self._game_observed |= bool(self.status.get("pid"))
+        if "error" in response:
+            error = RuntimeError(response["error"])
+            for key, value in response.get("failure", {}).items():
+                if key in {"code", "failure_domain", "stage", "operation", "source_path", "destination_path", "errno", "winerror", "filename", "filename2", "proton_reason", "proton_candidates", "proton_selected"}:
+                    setattr(error, key, value)
+            raise error
         return self.status
 
     def prepare(self, snapshot, config, *, recover_prelaunch=False):
@@ -199,14 +277,14 @@ class _ProtonSessionOwner:
                 self.retire()
         executable = self.client_dir / "APSessionOwner.exe"
         if not executable.is_file():
-            raise RuntimeError("The packaged Windows AP session supervisor is unavailable")
+            raise RuntimeError(player_text('launcher.session', 'the_packaged_windows_ap_session_supervisor_is_unavailable'))
         command, environment = runtime(config)
         self._runtime_details = {"source": "manual" if config.get("proton_executable") else "config_info",
             "executable": command[0], "tool": Path(command[0]).parent.name,
             "compat_data_path": environment["STEAM_COMPAT_DATA_PATH"],
             "wineprefix": environment["WINEPREFIX"], "steam_install": environment["STEAM_COMPAT_CLIENT_INSTALL_PATH"]}
         converted = {key: config[key] for key in _INSTALL_KEYS if key in config}
-        for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file"):
+        for key in ("game_root", "doom_base_dir", "steam_remote_dir", "save_games_dir", "core_runtime_manifest", "selected_core_runtime_manifest", "client_state_file", "delivery_ledger_file"):
             if converted.get(key):
                 converted[key] = windows_path(converted[key])
         if not converted.get("game_root"):
@@ -226,28 +304,20 @@ class _ProtonSessionOwner:
                                 client_dir=windows_path(self.client_dir), data_dir=windows_path(self.data_dir),
                                 state_dir=windows_path(self.state_dir))
         except (OSError, ValueError, RuntimeError) as error:
-            self.status.update(state="supervisor_unavailable", ready=False, first_failure=str(error))
+            self._preparation_channel_failure(error)
             self.process.stdin.close()
-            self.closable = False
             raise
+
+    def _preparation_channel_failure(self, error):
+        if self.status.get("state") != "recovery_blocked":
+            self.status.update(state="supervisor_unavailable", ready=False, first_failure=str(error))
+            self.closable = False
 
     def observe(self):
         if self.process is None:
             return self.status
-        if self.process is not None and (self.process.poll() is not None or self.process.stdin.closed):
-            from doom_eap.runtime.proton import windows_processes
-            self.closable = False
-            self.status.update(state="supervisor_unavailable", ready=False)
-            if time.monotonic() < self._next_process_query:
-                return self.status
-            self._next_process_query = time.monotonic() + 10
-            configuration = dict(zip(_INSTALL_KEYS, self._config_identity))
-            processes = windows_processes(configuration, self.client_dir / "APSessionOwner.exe")
-            self.closable = processes == ()
-            self._game_observed |= bool(processes)
-            if self.closable and self._game_observed:
-                self.status["state"] = "game_exited"
-            return self.status
+        if self.process.poll() is not None or self.process.stdin.closed:
+            return self._observe_disconnected()
         try:
             return self.request("observe")
         except (OSError, ValueError, RuntimeError) as error:
@@ -260,6 +330,23 @@ class _ProtonSessionOwner:
             self.status.update(state="supervisor_unavailable", ready=False)
             return self.status
 
+    def _observe_disconnected(self):
+        if self.status.get("state") == "recovery_blocked" and self.closable:
+            return self.status
+        from doom_eap.runtime.proton import windows_processes
+        self.closable = False
+        self.status.update(state="supervisor_unavailable", ready=False)
+        if time.monotonic() < self._next_process_query:
+            return self.status
+        self._next_process_query = time.monotonic() + 10
+        configuration = dict(zip(_INSTALL_KEYS, self._config_identity, strict=True))
+        processes = windows_processes(configuration, self.client_dir / "APSessionOwner.exe")
+        self.closable = processes == ()
+        self._game_observed |= bool(processes)
+        if self.closable and self._game_observed:
+            self.status["state"] = "game_exited"
+        return self.status
+
     def retire(self):
         if self.process is None:
             return
@@ -267,7 +354,7 @@ class _ProtonSessionOwner:
             self.request("retire")
             self.process.stdin.close()
         elif not self.closable:
-            raise RuntimeError("Confirm DOOM Eternal has exited before retiring its session supervisor")
+            raise RuntimeError(player_text('launcher.session', 'confirm_doom_eternal_has_exited_before_retiring_its_session_supe'))
         self.process.wait(timeout=10)
         self.process = None
         self.closable = True
@@ -288,16 +375,16 @@ class APSessionOwner:
 
     def _probe(self, *arguments: str) -> dict:
         result = subprocess.run([str(self._runtime / "sentinel_probe.exe"), *arguments], capture_output=True,
-                                timeout=6, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                timeout=6, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         try:
             value = json.loads(result.stdout)
         except (ValueError, UnicodeError) as error:
-            raise RuntimeError("Core session probe did not return a valid response") from error
+            raise RuntimeError(player_text('launcher.session', 'core_session_probe_did_not_return_a_valid_response')) from error
         if not isinstance(value, dict):
-            raise RuntimeError("Core session probe returned an invalid object")
+            raise RuntimeError(player_text('launcher.session', 'core_session_probe_returned_an_invalid_object'))
         if result.returncode and "--save-admission" not in arguments:
             outcome = value.get("outcome", value.get("result", "unknown"))
-            refused = RuntimeError(f"Core session refused: {outcome} (error {value.get('win32_error', 0)})")
+            refused = RuntimeError(player_text('launcher.session', 'core_session_refused_value_0_error_value_1', value_0=f'{outcome}', value_1=f"{value.get('win32_error', 0)}"))
             refused.storage_outcome = outcome
             raise refused
         return value
@@ -333,14 +420,14 @@ class APSessionOwner:
             try:
                 result = subprocess.run([document["probe"], "--pid", str(process["pid"]), flag,
                                          "--timeout-ms", "250", "--json"], capture_output=True,
-                                        timeout=1, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                        timeout=1, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
                 query.update(returncode=result.returncode, stderr=result.stderr[:4096].decode("utf-8", errors="replace"))
                 raw = result.stdout[:65536].decode("utf-8", errors="replace")
                 query["truncated"] = len(result.stdout) > 65536
                 try:
                     response = json.loads(raw)
                     if not isinstance(response, dict):
-                        raise ValueError("Core diagnostic returned an invalid object")
+                        raise ValueError(player_text('launcher.session', 'core_diagnostic_returned_an_invalid_object'))
                     query["response"] = response
                     query["identity_matches"] = (response.get("target_pid") == process["pid"]
                         and response.get("server_pid") == process["pid"]
@@ -369,37 +456,41 @@ class APSessionOwner:
         from .launcher_core import _normalize_slot_data
         _normalize_slot_data(snapshot.slot_data)
         try:
-            if os.name != "nt" or not (config.get("game_root") or config.get("doom_base_dir")):
+            if not (config.get("game_root") or config.get("doom_base_dir")):
                 return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
             from .launcher_core_install import game_write_lock
             root = Path(str(config.get("game_root") or config["doom_base_dir"])).resolve()
             if root.name.casefold() == "base":
                 root = root.parent
-            with self._lock, game_write_lock(root):
+            with game_write_lock(root), self._lock:
                 return self._prepare(snapshot, config, recovery_basename=recovery_basename, recover_prelaunch=recover_prelaunch)
         except (RuntimeError, OSError, ValueError) as error:
-            from .launcher_integration import setup_failure_payload
-            if not getattr(error, "failure_domain", None):
-                error.failure_domain = "campaign_session"
-            diagnostic = setup_failure_payload(error, phase="campaign_session")
-            import traceback
-            diagnostic["traceback"] = traceback.format_exc()
-            from datetime import datetime, timezone
-            diagnostic["at_utc"] = datetime.now(timezone.utc).isoformat()
-            diagnostic["metadata"] = getattr(error.__cause__, "private_metadata", None)
-            if snapshot is not None:
-                try:
-                    diagnostic["campaign_inspection"] = self.inspect_campaign(snapshot, config)
-                except (OSError, RuntimeError, ValueError, KeyError) as inspection_error:
-                    diagnostic["campaign_inspection"] = {"status": "unavailable", "reason": str(inspection_error)}
-            try:
-                self.state_dir.mkdir(parents=True, exist_ok=True)
-                (self.state_dir / "session_prepare_failure.json").write_text(
-                    json.dumps(diagnostic, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
-            except OSError:
-                logging.getLogger(__name__).exception("AP_SESSION_DIAGNOSTIC_WRITE_FAILED")
-            logging.getLogger(__name__).exception("AP_SESSION_PREPARATION_REFUSED %s", diagnostic)
+            self._record_preparation_failure(error, snapshot, config)
             raise
+
+    def _record_preparation_failure(self, error, snapshot, config):
+        import traceback
+        from datetime import datetime, timezone
+
+        from .launcher_integration import setup_failure_payload
+        if not getattr(error, "failure_domain", None):
+            error.failure_domain = "campaign_session"
+        diagnostic = setup_failure_payload(error, phase="campaign_session")
+        diagnostic["traceback"] = traceback.format_exc()
+        diagnostic["at_utc"] = datetime.now(timezone.utc).isoformat()
+        diagnostic["metadata"] = getattr(error.__cause__, "private_metadata", None)
+        if snapshot is not None:
+            try:
+                diagnostic["campaign_inspection"] = self.inspect_campaign(snapshot, config)
+            except (OSError, RuntimeError, ValueError, KeyError) as inspection_error:
+                diagnostic["campaign_inspection"] = {"status": "unavailable", "reason": str(inspection_error)}
+        try:
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            (self.state_dir / "session_prepare_failure.json").write_text(
+                json.dumps(diagnostic, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+        except OSError:
+            logging.getLogger(__name__).exception("AP_SESSION_DIAGNOSTIC_WRITE_FAILED")
+        logging.getLogger(__name__).exception("AP_SESSION_PREPARATION_REFUSED %s", diagnostic)
 
     def _prepare(self, snapshot, config: dict, *, recovery_basename=None, recover_prelaunch=False) -> dict:
         with self._lock:
@@ -408,7 +499,7 @@ class APSessionOwner:
                                      snapshot.slot_data["native_generation_fingerprint"])
             if os.name != "nt":
                 if recovery_basename is not None:
-                    raise RuntimeError("Recovery requires a qualified native helper in this environment")
+                    raise RuntimeError(player_text('launcher.session', 'recovery_requires_a_qualified_native_helper_in_this_environment'))
                 if self._remote is None:
                     self._remote = _ProtonSessionOwner(self.client_dir, self.data_dir, self.state_dir)
                 self.status = self._remote.prepare(snapshot, config, recover_prelaunch=recover_prelaunch)
@@ -416,43 +507,43 @@ class APSessionOwner:
                 return dict(self.status)
             processes = windows_game_processes()
             if processes is None:
-                raise RuntimeError("Game process identity is unknown; AP session preparation refused")
+                raise RuntimeError(player_text('launcher.session', 'game_process_identity_is_unknown_ap_session_preparation_refused'))
             if processes:
                 if recovery_basename is not None:
-                    raise RuntimeError("Close DOOM Eternal before restoring a backup.")
+                    raise RuntimeError(player_text('launcher.session', 'close_doom_eternal_before_restoring_a_backup'))
                 if self._handle and namespace == self.namespace and self._config_identity == config_identity:
                     return self.observe(processes)
-                raise RuntimeError("Close DOOM Eternal before preparing this save.")
-            if recovery_basename is None and self._handle and namespace == self.namespace and self._config_identity == config_identity and self.status["state"] == "prelaunch_ready":
+                raise RuntimeError(player_text('launcher.session', 'close_doom_eternal_before_preparing_this_save'))
+            if recovery_basename is None and self._handle and namespace == self.namespace and self._config_identity == config_identity and self.status["state"] in {"prelaunch_ready", "awaiting_recovery"}:
                 return dict(self.status)
             self.retire(processes)
             if any(char in snapshot.seed_name for char in "\r\n\0"):
-                raise ValueError("Room seed contains unsupported control characters")
+                raise ValueError(player_text('launcher.session', 'room_seed_contains_unsupported_control_characters'))
             root = Path(str(config.get("game_root") or config["doom_base_dir"])).resolve()
             if root.name.casefold() == "base":
                 root = root.parent
             self._game_exe = root / "DOOMEternalx64vk.exe"
             runtime_manifest = config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest")
             if not runtime_manifest:
-                raise RuntimeError("Select or download a compatible Core runtime before preparing this session")
+                raise RuntimeError(player_text('launcher.session', 'select_or_download_a_compatible_core_runtime_before_preparing_th'))
             self._runtime = Path(str(runtime_manifest)).resolve()
             if not self._runtime.is_dir():
                 self._runtime = self._runtime.parent
             manifest, contents = verify_runtime(self._runtime / "distribution.json", bootstrap_from_archive=True)
             helper = self._runtime / "prepare_vanilla_backup.py"
             if "prepare_vanilla_backup.py" not in contents or helper.read_bytes() != contents["prepare_vanilla_backup.py"]:
-                raise RuntimeError("Runtime package lacks its verified vanilla-protection helper")
+                raise RuntimeError(player_text('launcher.session', 'runtime_package_lacks_its_verified_vanilla_protection_helper'))
             self._build = manifest["build_id"]
             for name in ("sentinel_core.dll", "msimg32.dll"):
                 if not (root / name).is_file() or (root / name).read_bytes() != contents[name]:
-                    raise RuntimeError("Installed game integration differs from the qualified runtime; prepare setup again")
+                    raise RuntimeError(player_text('launcher.session', 'installed_game_integration_differs_from_the_qualified_runtime_pr'))
             archive_prelaunch(root / "sentinel-prelaunch.txt", self.state_dir, explicit=recover_prelaunch)
             remote = Path(str(config.get("steam_remote_dir", ""))).resolve()
             if remote.name.casefold() != "remote" or remote.parent.name != "782330" or remote.parent.parent.parent.name.casefold() != "userdata":
-                raise RuntimeError("Select the Steam account save provider before preparing the AP session")
+                raise RuntimeError(player_text('launcher.session', 'select_the_steam_account_save_provider_before_preparing_the_ap_s'))
             account = remote.parent.parent.name
             if not account.isdecimal() or not 0 < int(account) <= 0xffffffff:
-                raise RuntimeError("Steam account identity is invalid")
+                raise RuntimeError(player_text('launcher.session', 'steam_account_identity_is_invalid'))
             local = Path(str(config["save_games_dir"])).resolve()
             campaign_root = self.data_dir / "campaigns"
             campaign_root.mkdir(parents=True, exist_ok=True)
@@ -465,21 +556,21 @@ class APSessionOwner:
                 marker = f"sentinel-owner-{namespace}.txt"
                 ownership = (f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
                              f"team={snapshot.team}\nslot={snapshot.slot}\ngeneration_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
-                             "provenance=synthetic-fixture\n").encode("utf-8")
+                             "provenance=synthetic-fixture\n").encode()
                 if all(not path.exists() or (path.is_dir() and all(
                         file.name == marker and file.is_file() and file.read_bytes() == ownership
                         for file in path.iterdir())) for path in native_dirs):
                     native_exists = False
-            if contract.exists() != checkpoint.exists() or (recovery_basename is None and native_exists != contract.exists()):
-                raise RuntimeError("AP campaign metadata and native saves disagree; inspect or recover the campaign before playing")
-            intent = "resume" if native_exists else "create"
+            if not contract.exists() and (checkpoint.exists() or native_exists):
+                raise RuntimeError(player_text('launcher.session', 'ap_campaign_metadata_and_native_saves_disagree_inspect_or_recove'))
+            intent = "resume" if native_exists or contract.exists() else "create"
             if recovery_basename is not None:
                 if not re.fullmatch(r"[a-z0-9-]{1,128}", str(recovery_basename)):
-                    raise ValueError("Invalid AP backup basename")
+                    raise ValueError(player_text('launcher.session', 'invalid_ap_backup_basename'))
                 intent = "recover"
             difficulty = snapshot.slot_data["runtime"]["difficulty"]["engine"]
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
-                raise ValueError("Room campaign difficulty is unsupported")
+                raise ValueError(player_text('launcher.session', 'room_campaign_difficulty_is_unsupported'))
             descriptor = (f"sentinel-test-session-v3\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
                           f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
                           "slot_data_revision=0.7.0\nsession_mod_contract_revision=2\n"
@@ -489,23 +580,22 @@ class APSessionOwner:
                 expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
                             f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty={difficulty}\nslot=AUTOSAVE0\n")
                 if contract.read_bytes() != expected.encode("utf-8"):
-                    raise RuntimeError("AP campaign identity or immutable options differ from this room")
-                if intent == "resume" and not any((path / "GAME-AUTOSAVE0").is_dir() for path in native_dirs):
-                    raise RuntimeError("The AP native campaign is missing; use compatible recovery")
-                if intent == "resume":
-                    archive = self.backup_local_files(snapshot, config)
-                    logging.getLogger(__name__).info("AP_RESUME_LOCAL_COPY path=%s", archive)
+                    raise RuntimeError(player_text('launcher.session', 'ap_campaign_identity_or_immutable_options_differ_from_this_room'))
             self.state_dir.mkdir(parents=True, exist_ok=True)
             descriptor_path = self.state_dir / "ap-session-descriptor.txt"
             if intent == "recover":
                 descriptor += f"backup={recovery_basename}\n"
             descriptor_path.write_text(descriptor, encoding="utf-8", newline="\n")
+            checkpoint_status = self._prepare_checkpoint(snapshot, config, descriptor_path) if intent == "resume" else {}
+            if intent == "recover":
+                checkpoint_status = {"state": "awaiting_recovery", "recovery_state": RecoveryState.RECOVERING.value,
+                                     "preservation_path": str(self.backup_local_files(snapshot, config))}
             mode = "--save-session-prepare" if intent == "create" or not namespace_dir.exists() else "--save-session-reopen"
             plan = self._probe(mode, str(descriptor_path))
             if plan.get("namespace_id") != namespace:
-                raise RuntimeError("Core storage returned a different room namespace")
+                raise RuntimeError(player_text('launcher.session', 'core_storage_returned_a_different_room_namespace'))
             if plan.get("native_root") != _campaign_native_root(campaign_root, namespace):
-                raise RuntimeError("Core storage returned a different campaign provider")
+                raise RuntimeError(player_text('launcher.session', 'core_storage_returned_a_different_campaign_provider'))
             if intent == "recover":
                 self.verify_backup(str(recovery_basename), namespace=namespace)
             spec = importlib.util.spec_from_file_location("_sentinel_vanilla_protection", helper)
@@ -520,7 +610,7 @@ class APSessionOwner:
                     ap_root=str(campaign_root), uninstall_root=[str(self.state_dir)], reference_directory=None,
                     run_backup_parent=None, slot_data_revision="0.7.0", mod_contract_revision=2))
             except (module.Refused, OSError, ValueError) as error:
-                refused = RuntimeError(f"Vanilla protection could not be verified; AP activation refused: {error}")
+                refused = RuntimeError(player_text('launcher.session', 'vanilla_protection_could_not_be_verified_ap_activation_refused_v', value_0=f'{error}'))
                 refused.stage = getattr(error, "stage", "vanilla_protection")
                 metadata = getattr(error, "private_metadata", None) or {}
                 refused.operation = metadata.get("operation", refused.stage)
@@ -544,7 +634,7 @@ class APSessionOwner:
                 raise ctypes.WinError(ctypes.get_last_error())
             created = (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
             if os.environ.get("SENTINEL_AP_TEST_SESSION"):
-                raise RuntimeError("A conflicting native session environment is present")
+                raise RuntimeError(player_text('launcher.session', 'a_conflicting_native_session_environment_is_present'))
             text = (f"sentinel-run-v1\nrun={secrets.token_hex(16)}\nprotection={protection['reference_manifest_sha256']}\n"
                     f"owner={os.getpid()}\ncreated={created}\n" + descriptor).encode("utf-8")
             control_hash = hashlib.sha256(text).hexdigest()
@@ -552,7 +642,7 @@ class APSessionOwner:
             if not handle or ctypes.get_last_error() == 183:
                 if handle:
                     api.CloseHandle(handle)
-                raise RuntimeError("Could not acquire the one-use AP prelaunch lease")
+                raise RuntimeError(player_text('launcher.session', 'could_not_acquire_the_one_use_ap_prelaunch_lease'))
             control = root / "sentinel-prelaunch.txt"
             try:
                 with control.open("xb") as stream:
@@ -568,16 +658,35 @@ class APSessionOwner:
             self._config_identity = config_identity
             self.status = {"state": "prelaunch_ready", "ready": False, "namespace_id": namespace,
                            "control_sha256": control_hash, "intent": intent, "build_id": self._build,
-                           "backup_directory": str(backup)}
+                           "backup_directory": str(backup), **checkpoint_status}
             return dict(self.status)
+
+    def _prepare_checkpoint(self, snapshot, config, descriptor):
+        archive = self.backup_local_files(snapshot, config)
+        self.status = {"state": "recovery_blocked", "ready": False, "preservation_path": str(archive),
+                       "namespace_id": namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
+                           snapshot.slot_data["native_generation_fingerprint"])}
+        try:
+            plan = CheckpointPlan.decode(self._probe("--save-session-checkpoint-plan", str(descriptor)))
+        except (RuntimeError, OSError, ValueError, subprocess.SubprocessError) as cause:
+            self.status.update(recovery_state=RecoveryState.BLOCKED.value, recovery_reason=str(cause))
+            raise CheckpointRecoveryBlockedError(str(cause)) from cause
+        status = {**plan.projection(), "preservation_path": str(archive),
+                  "new_save_available": plan.state is CheckpointState.INTERRUPTED and plan.checkpoint == 0}
+        if not plan.resume_allowed and not plan.recoverable:
+            self.status.update(status, recovery_reason=plan.state.value, recovery_state=RecoveryState.BLOCKED.value)
+            raise CheckpointRecoveryBlockedError(plan.state.value)
+        if plan.recoverable:
+            status.update(state="awaiting_recovery", recovery_state=RecoveryState.RECOVERING.value)
+        return status
 
     def verify_backup(self, basename: str, *, namespace=None) -> dict:
         if not re.fullmatch(r"[a-z0-9-]{1,128}", basename):
-            raise ValueError("Invalid AP backup basename")
+            raise ValueError(player_text('launcher.session', 'invalid_ap_backup_basename'))
         result = self._probe("--save-session-verify-backup", str(self.state_dir / "ap-session-descriptor.txt"), basename)
         if (result.get("archive_verified") is not True or result.get("owner_bound") is not True
                 or result.get("quarantine") is not False or result.get("namespace") != (namespace or self.namespace)):
-            raise RuntimeError("Backup lacks compatible AP identity and native owner proof")
+            raise RuntimeError(player_text('launcher.session', 'backup_lacks_compatible_ap_identity_and_native_owner_proof'))
         return result
 
     def game_processes(self, config: dict):
@@ -592,24 +701,7 @@ class APSessionOwner:
         campaign_root = self.data_dir / "campaigns"
         directory = campaign_root / namespace
 
-        def inspect_path(path, kind):
-            result = {"path": str(path), "status": "present"}
-            try:
-                info = path.lstat()
-                if (getattr(info, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
-                        or not (stat.S_ISDIR(info.st_mode) if kind == "directory" else stat.S_ISREG(info.st_mode))):
-                    result["status"] = "wrong_type"
-                elif kind == "directory":
-                    with os.scandir(path) as entries:
-                        result["entries"] = [entry.name for _, entry in zip(range(32), entries)]
-            except FileNotFoundError:
-                result["status"] = "missing"
-            except OSError as error:
-                result.update(status="inaccessible", error=str(error), errno=error.errno,
-                              winerror=getattr(error, "winerror", None))
-            return result
-
-        paths = {name: inspect_path(directory / name, "file")
+        paths = {name: _inspect_save_path(directory / name, "file")
                  for name in ("native.root", "campaign.contract", "campaign.checkpoint")}
         result = {"namespace_id": namespace, "seed": snapshot.seed_name, "team": snapshot.team,
                   "slot": snapshot.slot, "paths": paths, "native_root_source": "derived",
@@ -632,23 +724,14 @@ class APSessionOwner:
         for name, key in (("steam_native", "steam_remote_dir"), ("local_native", "save_games_dir")):
             if config.get(key):
                 root = Path(str(config[key])).expanduser().resolve() / native
-                paths[name] = inspect_path(root, "directory")
-                paths[name + "_autosave"] = inspect_path(root / "GAME-AUTOSAVE0", "directory")
+                paths[name] = _inspect_save_path(root, "directory")
+                paths[name + "_autosave"] = _inspect_save_path(root / 'GAME-AUTOSAVE0', "directory")
             else:
                 paths[name] = {"status": "not_configured", "path": None}
         expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
                     f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\n"
                     f"difficulty={snapshot.slot_data['runtime']['difficulty']['engine']}\nslot=AUTOSAVE0\n").encode()
-        for name in ("campaign.contract", "campaign.checkpoint"):
-            if paths[name]["status"] == "present":
-                try:
-                    with (directory / name).open("rb") as stream:
-                        raw = stream.read(65537)
-                    if len(raw) > 65536 or (raw != expected if name.endswith("contract") else not (
-                            raw.startswith(expected) and raw.endswith(b"state=native_saved_readback_verified\n"))):
-                        paths[name]["status"] = "metadata_invalid"
-                except OSError as error:
-                    paths[name].update(status="inaccessible", error=str(error))
+        _inspect_campaign_metadata(directory, paths, expected)
         statuses = {item["status"] for item in paths.values()}
         metadata = [paths[name]["status"] == "present" for name in ("campaign.contract", "campaign.checkpoint")]
         autosave = any(paths.get(name + "_autosave", {}).get("status") == "present"
@@ -670,38 +753,37 @@ class APSessionOwner:
         descriptor = self.state_dir / "ap-session-descriptor.txt"
         if os.name == "nt" and descriptor.is_file() and hasattr(self, "_runtime"):
             text = descriptor.read_text(encoding="utf-8")
-            identity = (f"seed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
-                        f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n")
+            identity = (''.join((f"seed_hex={snapshot.seed_name.encode('utf-8').hex()}", '', '\n', 'team=', player_text('launcher.ui', 'value_0', value_0=f'{snapshot.team}'), '', '\n', 'slot=', player_text('launcher.ui', 'value_0', value_0=f'{snapshot.slot}'), '', '\n', 'generation_fingerprint=', player_text('launcher.ui', 'value_0', value_0=f"{snapshot.slot_data['native_generation_fingerprint']}"), '', '\n', '')))
             if identity in text and f"root={campaign_root}\n" in text:
                 try:
                     result["storage"] = self._probe("--save-session-plan", str(descriptor))
+                    checkpoint = self._probe("--save-session-checkpoint-plan", str(descriptor))
+                    plan = CheckpointPlan.decode(checkpoint)
+                    result.update(plan.projection())
+                    result["status"] = plan.state.value
+                    result["new_save_available"] = plan.state is CheckpointState.INTERRUPTED and plan.checkpoint == 0
                 except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
                     result["storage"] = {"status": "refused", "reason": str(error)}
                     if getattr(error, "storage_outcome", None) == "busy":
                         result["status"] = "session_busy"
-        if self.status.get("namespace_id") == namespace and self.status.get("state") in {"admitted", "awaiting_admission"}:
+        if self.status.get("namespace_id") == namespace and self.status.get("state") in {"admitted", "awaiting_admission", "recovering"}:
             result["status"] = "session_busy"
         return result
 
     def backup_local_files(self, snapshot, config):
+        from .ledger_preservation import delivery_backup, room_key
+
         with self._lock:
             if self.game_processes(config) != ():
-                raise RuntimeError("Close DOOM Eternal before copying saves.")
+                raise RuntimeError(player_text('launcher.session', 'close_doom_eternal_before_copying_saves'))
             inspection = self.inspect_campaign(snapshot, config)
             if inspection["status"] in {"inaccessible", "wrong_type", "metadata_invalid", "not_configured", "session_busy"}:
-                raise RuntimeError("Inspect AP save details before copying local files: " + inspection["status"])
+                raise RuntimeError(player_text('launcher.session', 'inspect_ap_save_details_before_copying_local_files') + inspection["status"])
             namespace = inspection["namespace_id"]
             directory = self.data_dir / "campaigns" / namespace
-            sources = [directory] if directory.is_dir() else []
-            for name in ("steam_native", "local_native"):
-                entry = inspection["paths"][name]
-                if entry["status"] == "present":
-                    root = Path(entry["path"])
-                    if inspection["native_root_source"] != "native.root":
-                        raise RuntimeError("The native save provider is derived; its room association is unconfirmed")
-                    sources.append(root)
+            sources = self._preservation_sources(snapshot, inspection, directory)
             if not sources:
-                raise RuntimeError("No local files are available for this room")
+                raise RuntimeError(player_text('launcher.session', 'no_local_files_are_available_for_this_room'))
             raw = None
             if config.get("client_state_file"):
                 try:
@@ -711,101 +793,123 @@ class APSessionOwner:
                     contents = None
                 if contents is not None:
                     if len(contents) > 16 * 1024 * 1024:
-                        raise RuntimeError("Local AP receipt state is too large to back up")
+                        raise RuntimeError(player_text('launcher.session', 'local_ap_receipt_state_is_too_large_to_back_up'))
                     state = json.loads(contents)
                     if not isinstance(state, dict) or not isinstance(state.get("sessions"), dict):
-                        raise RuntimeError("Local AP receipt state is unreadable")
+                        raise RuntimeError(player_text('launcher.session', 'local_ap_receipt_state_is_unreadable'))
                     prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
                     raw = json.dumps({"version": state.get("version"), "sessions": {
                         key: value for key, value in state["sessions"].items()
                         if key in {prefix, prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]}
                     }}).encode("utf-8")
             archive = self.data_dir / "campaigns/local-copies" / secrets.token_hex(16) / "campaign.zip"
-            _archive_campaign_files(archive, snapshot, namespace, list(dict.fromkeys(sources)), raw)
+            with delivery_backup(config, room_key(snapshot), archive.parent.parent) as ledger_snapshot:
+                _archive_campaign_files(archive, snapshot, namespace, list(dict.fromkeys(sources)), raw, ledger_snapshot)
             if self.game_processes(config) != ():
-                raise RuntimeError("DOOM Eternal started during the copy; its completeness is unconfirmed")
+                raise RuntimeError(player_text('launcher.session', 'doom_eternal_started_during_the_copy_its_completeness_is_unconfi'))
             return archive
+
+    def _preservation_sources(self, snapshot, inspection, directory):
+        sources = [directory] if directory.is_dir() else []
+        sources.extend(self.data_dir / "campaigns" / name for name in self.list_backups(snapshot))
+        for name in ("steam_native", "local_native"):
+            entry = inspection["paths"][name]
+            if entry["status"] == "present":
+                if inspection["native_root_source"] != "native.root":
+                    raise RuntimeError(player_text('launcher.session', 'the_native_save_provider_is_derived_its_room_association_is_unco'))
+                sources.append(Path(entry["path"]))
+        return sources
 
     def restart_campaign(self, snapshot, config: dict) -> Path:
         from doom_eap.contracts.command_publication import queue_session_namespace
         from doom_eap.runtime.client_state_store import ClientStateStore
-        from doom_eap.runtime.item_reconciliation import CLIENT_STATE_VERSION, default_session_state, migrate_client_state
+        from doom_eap.runtime.item_reconciliation import (
+            CLIENT_STATE_VERSION,
+            default_session_state,
+            migrate_client_state,
+        )
+
+        from .ledger_preservation import audit_new_save, delivery_backup, delivery_restart, finish_new_save, room_key
 
         with self._lock:
             processes = self.game_processes(config)
             if processes != ():
-                raise RuntimeError("Exit DOOM Eternal before creating a new AP game save; its process must be confirmed closed")
-            self.retire(processes)
-            root = Path(config["doom_base_dir"]).resolve()
-            if (root.parent / "sentinel-prelaunch.txt").exists():
-                raise RuntimeError("Another launcher owns an AP session; close it before restarting")
-            remote = Path(config["steam_remote_dir"]).resolve()
-            if remote.name.casefold() != "remote" or remote.parent.name != "782330" or remote.parent.parent.parent.name.casefold() != "userdata":
-                raise RuntimeError("Select the Steam account save provider before restarting")
-            local = Path(config["save_games_dir"]).resolve()
-            namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
-                                     snapshot.slot_data["native_generation_fingerprint"])
-            prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
-            state_key = prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]
-            state_file = Path(config["client_state_file"]).resolve()
-            raw = None
-            if state_file.exists():
-                with state_file.open("rb") as stream:
-                    raw = stream.read(16 * 1024 * 1024 + 1)
-            if raw is not None and len(raw) > 16 * 1024 * 1024:
-                raise RuntimeError("Local AP receipt state is too large to back up")
-            state = json.loads(raw) if raw is not None else {"version": CLIENT_STATE_VERSION, "sessions": {}}
-            if not isinstance(state, dict) or not isinstance(state.get("sessions"), dict):
-                raise RuntimeError("Local AP receipt state is unreadable; restart refused")
-            logger = logging.getLogger(__name__)
-            store = ClientStateStore(state_file, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
-                logger=logger, log_event=lambda kind, **details: logger.info("%s %s", kind, details))
-            keys = {key for key in state["sessions"] if key == prefix or key.startswith(prefix + ":")}
-            native_name = _campaign_native_root(self.data_dir / "campaigns", namespace)
-            sources = [remote / native_name, local / native_name,
-                       self.data_dir / "campaigns" / namespace]
-            sources.extend(self.data_dir / "campaigns" / name for name in self.list_backups(snapshot))
-            queue = root / "ap_queue"
-            for key in keys | {state_key}:
-                sources.extend(queue.glob(f"recv-{queue_session_namespace(key)}-*"))
-            event_key = None
-            event_session = local / "ap_event_session.json"
-            if event_session.is_file():
-                event_key = json.loads(event_session.read_text(encoding="utf-8")).get("ap_state_key")
-            if event_key is None or event_key in keys | {state_key}:
-                for pattern in ("ap_event_*.txt", "ap_active_map*.txt", "ap_telemetry*.txt", "ap_condump*.txt", "ap_event_session.json"):
-                    sources.extend(local.glob(pattern))
-                sources.extend(root.glob("ap_transition_*.evt"))
-                from doom_eap.content.publisher_loader import load_publisher_contracts
-                sources.extend(local / trigger["filename"] for publisher in load_publisher_contracts()
-                               for trigger in publisher.triggers_for("map_event_file"))
-            sources = list(dict.fromkeys(path for path in sources if path.exists() or path.is_symlink()))
-            token = secrets.token_hex(16)
-            backup = self.data_dir / "campaigns" / "restarts" / token
-            archive = backup / "campaign.zip"
-            _archive_campaign_files(archive, snapshot, namespace, sources, raw)
-            if self.game_processes(config) != ():
-                raise RuntimeError("DOOM Eternal started during backup; existing saves were kept")
-            moved = []
-            try:
-                for source in sources:
-                    target = source.with_name("." + source.name + "-restart-" + token)
-                    os.replace(source, target)
-                    moved.append((source, target))
-                for key in keys:
-                    state["sessions"].pop(key)
-                state["sessions"][state_key] = default_session_state()
-                store.commit(state, reason="campaign_restart")
-            except BaseException:
-                for source, target in reversed(moved):
-                    os.replace(target, source)
-                if raw is not None:
-                    store.commit(json.loads(raw), reason="campaign_restart_rollback")
-                elif state_file.exists():
-                    state_file.unlink()
-                raise
-            self.namespace = ""
-            return archive
+                raise RuntimeError(player_text('launcher.session', 'exit_doom_eternal_before_creating_a_new_ap_game_save_its_process'))
+            with delivery_restart(config, room_key(snapshot)) as ledger:
+                self.retire(processes)
+                root = Path(config["doom_base_dir"]).resolve()
+                if (root.parent / "sentinel-prelaunch.txt").exists():
+                    raise RuntimeError(player_text('launcher.session', 'another_launcher_owns_an_ap_session_close_it_before_restarting'))
+                remote = Path(config["steam_remote_dir"]).resolve()
+                if remote.name.casefold() != "remote" or remote.parent.name != "782330" or remote.parent.parent.parent.name.casefold() != "userdata":
+                    raise RuntimeError(player_text('launcher.session', 'select_the_steam_account_save_provider_before_restarting'))
+                local = Path(config["save_games_dir"]).resolve()
+                namespace = namespace_id(snapshot.seed_name, snapshot.team, snapshot.slot,
+                                         snapshot.slot_data["native_generation_fingerprint"])
+                prefix = f"{snapshot.seed_name}:{snapshot.team}:{snapshot.slot}"
+                state_key = prefix + ":" + snapshot.slot_data["native_generation_fingerprint"]
+                state_file = Path(config["client_state_file"]).resolve()
+                raw = None
+                if state_file.exists():
+                    with state_file.open("rb") as stream:
+                        raw = stream.read(16 * 1024 * 1024 + 1)
+                if raw is not None and len(raw) > 16 * 1024 * 1024:
+                    raise RuntimeError(player_text('launcher.session', 'local_ap_receipt_state_is_too_large_to_back_up'))
+                state = json.loads(raw) if raw is not None else {"version": CLIENT_STATE_VERSION, "sessions": {}}
+                if not isinstance(state, dict) or not isinstance(state.get("sessions"), dict):
+                    raise RuntimeError(player_text('launcher.session', 'local_ap_receipt_state_is_unreadable_restart_refused'))
+                logger = logging.getLogger(__name__)
+                store = ClientStateStore(state_file, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
+                    logger=logger, log_event=lambda kind, **details: logger.info("%s %s", kind, details))
+                keys = {key for key in state["sessions"] if key == prefix or key.startswith(prefix + ":")}
+                native_name = _campaign_native_root(self.data_dir / "campaigns", namespace)
+                sources = [remote / native_name, local / native_name,
+                           self.data_dir / "campaigns" / namespace]
+                sources.extend(self.data_dir / "campaigns" / name for name in self.list_backups(snapshot))
+                queue = root / "ap_queue"
+                for key in keys | {state_key}:
+                    sources.extend(queue.glob(f"recv-{queue_session_namespace(key)}-*"))
+                event_key = None
+                event_session = local / "ap_event_session.json"
+                if event_session.is_file():
+                    event_key = json.loads(event_session.read_text(encoding="utf-8")).get("ap_state_key")
+                if event_key is None or event_key in keys | {state_key}:
+                    for pattern in ("ap_event_*.txt", "ap_active_map*.txt", "ap_telemetry*.txt", "ap_condump*.txt", "ap_event_session.json"):
+                        sources.extend(local.glob(pattern))
+                    sources.extend(root.glob("ap_transition_*.evt"))
+                    from doom_eap.content.publisher_loader import load_publisher_contracts
+                    sources.extend(local / trigger["filename"] for publisher in load_publisher_contracts()
+                                   for trigger in publisher.triggers_for("map_event_file"))
+                sources = list(dict.fromkeys(path for path in sources if path.exists() or path.is_symlink()))
+                token = secrets.token_hex(16)
+                backup = self.data_dir / "campaigns" / "restarts" / token
+                archive = backup / "campaign.zip"
+                with delivery_backup(config, room_key(snapshot), backup.parent) as ledger_snapshot:
+                    _archive_campaign_files(archive, snapshot, namespace, sources, raw, ledger_snapshot)
+                if self.game_processes(config) != ():
+                    raise RuntimeError(player_text('launcher.session', 'doom_eternal_started_during_backup_existing_saves_were_kept'))
+                moved = []
+                epoch_binding = None
+                try:
+                    epoch_binding = asyncio.run(audit_new_save(ledger, room_key(snapshot), token, archive))
+                    for source in sources:
+                        target = source.with_name("." + source.name + "-restart-" + token)
+                        os.replace(source, target)
+                        moved.append((source, target))
+                    _restart_receipt_state(state, keys, state_key, ledger is not None, default_session_state)
+                    store.commit(state, reason="campaign_restart")
+                    finish_new_save(ledger, epoch_binding, token, applied=True)
+                except BaseException:
+                    for source, target in reversed(moved):
+                        os.replace(target, source)
+                    if raw is not None:
+                        store.commit(json.loads(raw), reason="campaign_restart_rollback")
+                    elif state_file.exists():
+                        state_file.unlink()
+                    finish_new_save(ledger, epoch_binding, token, applied=False)
+                    raise
+                self.namespace = ""
+                return archive
 
     def list_backups(self, snapshot) -> list[str]:
         namespace = namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
@@ -821,11 +925,11 @@ class APSessionOwner:
     def create_backup(self) -> dict:
         scope=self.observe()
         if os.name != "nt" or not scope.get("ready"):
-            raise RuntimeError("Native AP backup requires a fresh qualified game session")
+            raise RuntimeError(player_text('launcher.session', 'native_ap_backup_requires_a_fresh_qualified_game_session'))
         namespace=self.namespace
         run=subprocess.run([str(self._runtime / "sentinel_probe.exe"),"--native-backup",
             "--pid",str(scope["pid"]),"--namespace",namespace,"--campaign","game","--slot","0","--json"],
-            capture_output=True,timeout=18,creationflags=getattr(subprocess,"CREATE_NO_WINDOW",0))
+            capture_output=True,timeout=18,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
         reports=[json.loads(line) for line in run.stdout.splitlines() if line.strip()]
         request=next((value for value in reports if value.get("operation")=="native_backup_request"),{})
         result=reports[-1] if reports else {}
@@ -835,7 +939,7 @@ class APSessionOwner:
                 or request.get("instance_id")!=scope["admission"].get("instance_id")
                 or request.get("namespace")!=namespace or self.namespace!=namespace or run.returncode
                 or result.get("state")!="complete"):
-            raise RuntimeError("Native backup not confirmed; retained archives remain available. No retry was made.")
+            raise RuntimeError(player_text('launcher.session', 'native_backup_not_confirmed_retained_archives_remain_available_n'))
         self.verify_backup(result["basename"],namespace=namespace)
         return result
 
@@ -852,7 +956,7 @@ class APSessionOwner:
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes is None:
                 self.status.update(state="process_unknown", ready=False)
-                self._capture_admission_failure(error="Game process identity query failed", processes=None)
+                self._capture_admission_failure(error=player_text('launcher.session', 'game_process_identity_query_failed'), processes=None)
                 return dict(self.status)
             if not processes:
                 if self._process is not None:
@@ -868,14 +972,14 @@ class APSessionOwner:
                     path_error = error
             if not path_matches:
                 self.status.update(state="process_ambiguous", ready=False)
-                self._capture_admission_failure(error=path_error or "Game process count or executable does not match",
+                self._capture_admission_failure(error=path_error or player_text('launcher.session', 'game_process_count_or_executable_does_not_match'),
                                                 processes=processes)
                 return dict(self.status)
             process = processes[0]
             identity = process["pid"], process["created"]
             if self._process is not None and identity != self._process:
                 self.status.update(state="process_changed", ready=False)
-                self._capture_admission_failure(error="The prepared game process identity changed", processes=processes)
+                self._capture_admission_failure(error=player_text('launcher.session', 'the_prepared_game_process_identity_changed'), processes=processes)
                 return dict(self.status)
             self._process = identity
             self.status.update(pid=process["pid"], process_created=process["created"])
@@ -895,9 +999,25 @@ class APSessionOwner:
                 self._instance = instance
             self.status.update(state="admitted" if matches else "admission_refused", ready=matches,
                                pid=process["pid"], process_created=process["created"], admission=admission)
+            self._observe_checkpoint(matches)
             if not matches:
                 self._capture_admission_failure(process, admission)
             return dict(self.status)
+
+    def _observe_checkpoint(self, admitted):
+        if self.status.get("intent") not in {"resume", "recover"}:
+            return
+        config = dict(zip(_INSTALL_KEYS, self._config_identity, strict=True))
+        recovery, verified, reason = recovery_observation(config, self.status)
+        if self.status.get("resume_allowed") is False and recovery is RecoveryState.NONE:
+            recovery = RecoveryState.RECOVERING
+        self.status.update(recovery_state=recovery.value, recovery_reason=reason, resume_verified=verified)
+        if recovery is RecoveryState.BLOCKED:
+            self.status.update(state="recovery_blocked", ready=False)
+        elif admitted and recovery is RecoveryState.RECOVERING:
+            self.status.update(state="recovering", ready=False)
+        elif admitted and not verified:
+            self.status.update(state="awaiting_resume", ready=False)
 
     def can_close(self) -> bool:
         if self._remote is not None:
@@ -909,11 +1029,14 @@ class APSessionOwner:
 
     def retire(self, processes=_UNSET) -> None:
         from .launcher_core_install import game_write_lock
-        with self._lock:
-            if self._control is not None:
-                with game_write_lock(self._control.parent):
+        while True:
+            with self._lock:
+                control = self._control
+                if control is None:
                     return self._retire(processes)
-            return self._retire(processes)
+            with game_write_lock(control.parent), self._lock:
+                if self._control == control:
+                    return self._retire(processes)
 
     def _retire(self, processes=_UNSET) -> None:
         with self._lock:
@@ -925,7 +1048,7 @@ class APSessionOwner:
                 return
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes != ():
-                raise RuntimeError("Close DOOM Eternal before closing this launcher.")
+                raise RuntimeError(player_text('launcher.ui', 'close_doom_eternal_before_closing_this_launcher'))
             self._api.CloseHandle(self._handle)
             self._handle = None
             if self._control.exists() and self._control.read_bytes() == self._control_bytes:

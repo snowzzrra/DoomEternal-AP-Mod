@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import re
 import threading
 import time
+from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
+from doom_eap.launcher.ui.strings import text as player_text
 
 HEALTH_FILE_NAME = "ap_rpc_health.state"
 HEALTH_SCHEMA = 1
@@ -180,7 +182,7 @@ class NativeHealthReader:
 
     def __init__(self, path: Path, *, interval_ms: int = HEALTH_READ_INTERVAL_MS):
         if interval_ms < 250 or interval_ms > 500:
-            raise ValueError("health read interval must be between 250 and 500 ms")
+            raise ValueError(player_text('launcher.native_health', 'health_read_interval_must_be_between_250_and_500_ms'))
         self.path = Path(path)
         self.interval_ms = interval_ms
         self._lock = threading.Lock()

@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import csv
-from contextlib import contextmanager
 import difflib
 import hashlib
+import http.client
 import json
 import os
 import re
 import shlex
 import shutil
-import http.client
 import socket
 import ssl
+import stat
 import struct
 import subprocess
 import sys
@@ -25,17 +25,23 @@ import urllib.error
 import urllib.request
 import webbrowser
 import zipfile
-from collections.abc import Callable, Mapping, Sequence
-from functools import lru_cache
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterator, Protocol
+from typing import ClassVar, Protocol
+
+from doom_eap.launcher.ui.strings import text as player_text
 
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
 STEAM_GAME_URL = f"steam://rungameid/{DOOM_ETERNAL_APP_ID}"
+WINDOWS_MANUAL_INSTALL_GUIDE_URL = (
+    "https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/INSTALL.md#windows-manual-installation"
+)
 
 
 def restore_standard_streams(*, require_pipes=False):
@@ -55,7 +61,7 @@ def restore_standard_streams(*, require_pipes=False):
         handle = kernel.GetStdHandle(number & 0xffffffff)
         if not handle or handle == ctypes.c_void_p(-1).value:
             if require_pipes:
-                raise RuntimeError(f'The session supervisor requires an inherited {name} pipe')
+                raise RuntimeError(player_text('launcher.platform', 'the_session_supervisor_requires_an_inherited_value_0_pipe', value_0=f'{name}'))
             stream = open(os.devnull, mode, encoding='utf-8')
         else:
             descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
@@ -94,7 +100,7 @@ class LauncherUserPaths:
 
 
 class DownloadTransport(Protocol):
-    def fetch(self, url: str, destination: Path) -> "DownloadResult | None": ...
+    def fetch(self, url: str, destination: Path) -> DownloadResult | None: ...
 
 
 @dataclass(frozen=True)
@@ -112,10 +118,10 @@ def is_transient_download_error(exc: Exception) -> bool:
         reason = exc.reason
         if isinstance(reason, ssl.SSLError):
             return False
-        if isinstance(reason, (socket.gaierror, socket.timeout, TimeoutError, ConnectionResetError, ConnectionRefusedError, OSError)):
+        if isinstance(reason, socket.gaierror | socket.timeout | TimeoutError | ConnectionResetError | ConnectionRefusedError | OSError):
             return True
         return False
-    if isinstance(exc, (socket.timeout, TimeoutError, ConnectionResetError, http.client.RemoteDisconnected)):
+    if isinstance(exc, socket.timeout | TimeoutError | ConnectionResetError | http.client.RemoteDisconnected):
         return True
     return False
 
@@ -167,7 +173,7 @@ class UrlDownloadTransport:
                     time.sleep(self.backoff_base * (2 ** (attempt - 1)))
                     continue
                 raise
-        raise RuntimeError("download attempts exhausted")
+        raise RuntimeError(player_text('launcher.platform', 'download_attempts_exhausted'))
 
 
 def launcher_user_paths(
@@ -179,7 +185,7 @@ def launcher_user_paths(
     platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
     if platform_name == "windows":
         root = Path(env.get("LOCALAPPDATA") or (Path.home() / "AppData/Local"))
-        root = root / "Doom Eternal Archipelago"
+        root = root / player_text('launcher.platform', 'doom_eternal_archipelago')
         return LauncherUserPaths(root / "config", root / "state", root / "data")
     root_name = "doom-eternal-archipelago"
     return LauncherUserPaths(
@@ -236,17 +242,17 @@ class DiscoverySentinel:
 def validate_game_root(path: Path) -> Path:
     root = path.expanduser().resolve()
     if not (root / "DOOMEternalx64vk.exe").is_file() or not (root / "base").is_dir():
-        raise ValueError("Choose the folder containing DOOMEternalx64vk.exe.")
+        raise ValueError(player_text('launcher.doctor', 'choose_the_folder_containing_doometernalx64vk_exe'))
     return root
 
 
 def validate_save_directory(path: Path) -> Path:
     root = path.expanduser().resolve()
     if not root.is_dir():
-        raise ValueError("Choose an existing save folder ending in id Software/DOOMEternal/base.")
+        raise ValueError(player_text('launcher.platform', 'choose_an_existing_save_folder_ending_in_id_software_doometernal'))
     if not is_saved_games_base_shape(root):
         raise ValueError(
-            "Choose an existing save folder ending in id Software/DOOMEternal/base."
+            player_text('launcher.platform', 'choose_an_existing_save_folder_ending_in_id_software_doometernal')
         )
     return root
 
@@ -255,7 +261,7 @@ SAVED_GAMES_PROVIDER = "id Software"
 SAVED_GAMES_TITLE = "DOOMEternal"
 SAVED_GAMES_LEAF = "base"
 SAVED_GAMES_LEAF_CHAIN = (SAVED_GAMES_PROVIDER, SAVED_GAMES_TITLE, SAVED_GAMES_LEAF)
-FOLDERID_SAVED_GAMES = "{4C5C32FF-BB9D-43B9-B382-325F2A56FE60}"
+FOLDERID_SAVED_GAMES = '{4C5C32FF-BB9D-43B9-B382-325F2A56FE60}'
 LIVE_WRITER_FRESHNESS_SECONDS = 24.0 * 3600.0
 SAVED_GAMES_MARKER_PREFIXES = ("ap_active_map", "ap_event_", "ap_telemetry")
 
@@ -325,11 +331,10 @@ def known_folder_saved_games(
         import ctypes
         from ctypes import wintypes
 
-        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
         shell32 = ctypes.windll.shell32  # type: ignore[attr-defined]
 
         class _GUID(ctypes.Structure):
-            _fields_ = [
+            _fields_: ClassVar = [
                 ("Data1", wintypes.DWORD),
                 ("Data2", wintypes.WORD),
                 ("Data3", wintypes.WORD),
@@ -368,7 +373,7 @@ def doom_saved_games_base(
         folder = Path(known_folder).expanduser() if known_folder is not None else known_folder_saved_games(platform=target, environ=environ)
         if folder is None:
             base_home = Path(home).expanduser() if home is not None else Path.home()
-            folder = base_home / "Saved Games"
+            folder = base_home / 'Saved Games'
         return folder / SAVED_GAMES_PROVIDER / SAVED_GAMES_TITLE / SAVED_GAMES_LEAF
     if game_root is None:
         return None
@@ -380,7 +385,7 @@ def doom_saved_games_base(
         if parent.name.casefold() == "steamapps":
             return (
                 parent.parent
-                / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games"
+                / player_text('launcher.platform', 'steamapps_compatdata_782330_pfx_drive_c_users_steamuser_saved_ga')
                 / SAVED_GAMES_PROVIDER
                 / SAVED_GAMES_TITLE
                 / SAVED_GAMES_LEAF
@@ -491,7 +496,7 @@ def select_saved_games_dir(
         return SavedGamesSelection(
             path=configured_path,
             source="configured_saved_games_dir",
-            reason="configured Saved Games base has valid shape and exists",
+            reason=player_text('launcher.platform', 'configured_saved_games_base_has_valid_shape_and_exists'),
             rejected=tuple(rejected),
         )
 
@@ -532,7 +537,7 @@ def select_saved_games_dir(
         return SavedGamesSelection(
             path=known_viable,
             source="canonical_saved_games_base",
-            reason="canonical Saved Games base selected over invalid configured path",
+            reason=player_text('launcher.platform', 'canonical_saved_games_base_selected_over_invalid_configured_path'),
             repaired=configured_text is not None,
             previous_path=configured_text,
             rejected=tuple(rejected),
@@ -544,7 +549,7 @@ def select_saved_games_dir(
         return SavedGamesSelection(
             path=only,
             source="live_writer_evidence",
-            reason="single live AP writer candidate selected over invalid configured path",
+            reason=player_text('launcher.platform', 'single_live_ap_writer_candidate_selected_over_invalid_configured'),
             repaired=configured_text is not None,
             previous_path=configured_text,
             rejected=tuple(rejected),
@@ -555,7 +560,7 @@ def select_saved_games_dir(
         return SavedGamesSelection(
             path=only,
             source="single_viable_candidate",
-            reason="no configured path; single viable candidate selected",
+            reason=player_text('launcher.platform', 'no_configured_path_single_viable_candidate_selected'),
             rejected=tuple(rejected),
             live_evidence=live.get(_saved_games_norm(only, platform=target), ()),
         )
@@ -621,7 +626,7 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
     """Verify the Core runtime pair used by Game Link."""
     from ..contracts.core_distribution import read_manifest, verify_build_identity
     if game_root is None:
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "Choose the game folder.")
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, player_text('launcher.platform', 'choose_the_game_folder'))
     try:
         root = validate_game_root(game_root)
         value = read_manifest(root / "sentinel-distribution.json")
@@ -629,15 +634,15 @@ def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
         for name in ("sentinel_core.dll", "msimg32.dll"):
             data = (root / name).read_bytes()
             if len(data) != records[name]["size"] or hashlib.sha256(data).hexdigest() != records[name]["sha256"]:
-                raise ValueError(f"Game connection file {name} is damaged. Open Help and select REPAIR GAME CONNECTION.")
+                raise ValueError(player_text('launcher.platform', 'game_connection_file_value_0_is_damaged_open_help_and_select_rep', value_0=f'{name}'))
             verify_build_identity(name, data, value["build_id"])
         if (root / "XINPUT1_3.dll").exists():
-            raise ValueError("XINPUT1_3.dll conflicts with DoomEAP. Uninstall the mod that installed it, then retry. If you do not know which mod installed it, select Help -> SAVE SUPPORT REPORT.")
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, "Game connection files checked.",
+            raise ValueError(player_text('launcher.platform', 'xinput1_3_dll_conflicts_with_doomeap_uninstall_the_mod_that_inst'))
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.OK, player_text('launcher.platform', 'game_connection_files_checked'),
                                  {"path": str(root / "sentinel_core.dll"), "sha256": records["sentinel_core.dll"]["sha256"],
                                   "version": value["version"], "build_id": value["build_id"]})
-    except (OSError, ValueError, KeyError, TypeError) as error:
-        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, "Game connection files are unavailable. Open Help and select Fix Setup.")
+    except (OSError, ValueError, KeyError, TypeError):
+        return PrerequisiteCheck("meathook", PrerequisiteStatus.MISSING, player_text('launcher.platform', 'game_connection_files_are_unavailable_open_help_and_select_fix_s'))
 
 
 
@@ -654,7 +659,7 @@ def probe_runtime_prerequisites(
         checks.append(PrerequisiteCheck(
             key="game",
             status=PrerequisiteStatus.MISSING,
-            message="DOOM Eternal installation is not configured",
+            message=player_text('launcher.platform', 'doom_eternal_installation_is_not_configured'),
             details={},
         ))
     else:
@@ -663,7 +668,7 @@ def probe_runtime_prerequisites(
             checks.append(PrerequisiteCheck(
                 key="game",
                 status=PrerequisiteStatus.OK,
-                message="DOOM Eternal installation validated",
+                message=player_text('launcher.platform', 'doom_eternal_installation_validated'),
                 details={"path": str(validated_root)},
             ))
         except ValueError as error:
@@ -684,14 +689,14 @@ def probe_runtime_prerequisites(
             checks.append(PrerequisiteCheck(
                 key="client_runtime",
                 status=PrerequisiteStatus.OK,
-                message="Bundled client runtime validated",
+                message=player_text('launcher.platform', 'bundled_client_runtime_validated'),
                 details={"path": str(client_dir)},
             ))
         else:
             checks.append(PrerequisiteCheck(
                 key="client_runtime",
                 status=PrerequisiteStatus.MISSING,
-                message=f"Client runtime bridge is missing: {packaged_bridge}",
+                message=player_text('launcher.platform', 'client_runtime_bridge_is_missing_value_0', value_0=f'{packaged_bridge}'),
                 details={"expected_path": str(packaged_bridge)},
             ))
 
@@ -702,14 +707,14 @@ def probe_runtime_prerequisites(
             checks.append(PrerequisiteCheck(
                 key="linux_steam_override",
                 status=PrerequisiteStatus.OK,
-                message="Steam launch option configured with msimg32 override",
+                message=player_text('launcher.platform', 'steam_launch_option_configured_with_msimg32_override'),
                 details={"configured": True},
             ))
         else:
             checks.append(PrerequisiteCheck(
                 key="linux_steam_override",
                 status=PrerequisiteStatus.NEEDS_USER_ACTION,
-                message=f'Set Steam launch option: WINEDLLOVERRIDES="{REQUIRED_DLL_OVERRIDE}" %command%',
+                message=player_text('launcher.platform', 'set_steam_launch_option_winedlloverrides_value_0_command', value_0=f'{REQUIRED_DLL_OVERRIDE}'),
                 details={"required_override": REQUIRED_DLL_OVERRIDE, "configured": False},
             ))
 
@@ -748,16 +753,9 @@ class FilePublicationError(OSError):
         self.cause_winerror = getattr(cause, "winerror", None) if cause is not None else None
         self.cause_filename = getattr(cause, "filename", None) if cause is not None else None
         self.cause_filename2 = getattr(cause, "filename2", None) if cause is not None else None
-        detail = f"{type(cause).__name__}: {cause}" if cause is not None else "unknown error"
+        detail = f"{type(cause).__name__}: {cause}" if cause is not None else player_text('launcher.platform', 'unknown_error')
         message = (
-            "Windows file publication failed: "
-            f"operation={self.operation} "
-            f"source={self.source_path} "
-            f"destination={self.destination_path} "
-            f"errno={self.cause_errno} "
-            f"winerror={self.cause_winerror} "
-            f"attempts={self.attempt_count} "
-            f"({detail})"
+            player_text('launcher.platform', 'windows_file_publication_failed_operation_value_0_source_value_1', value_0=f'{self.operation}', value_1=f'{self.source_path}', value_2=f'{self.destination_path}', value_3=f'{self.cause_errno}', value_4=f'{self.cause_winerror}', value_5=f'{self.attempt_count}', value_6=f'{detail}')
         )
         super().__init__(message)
         # NOTE: OSError core fields (errno/filename) are deliberately left
@@ -834,7 +832,7 @@ def _acquire_windows_mutex(name: str, timeout_ms: int = _WINDOWS_MUTEX_TIMEOUT_M
     handle = kernel32.CreateMutexW(None, False, name)
     if not handle:
         code = kernel32.GetLastError()
-        error = OSError(f"Windows dependency cache lock creation failed: name={name} winerror={code}")
+        error = OSError(player_text('launcher.platform', 'windows_dependency_cache_lock_creation_failed_name_value_0_winer', value_0=f'{name}', value_1=f'{code}'))
         error.winerror = code  # type: ignore[attr-defined]
         raise error
     result = kernel32.WaitForSingleObject(handle, timeout_ms)
@@ -845,10 +843,10 @@ def _acquire_windows_mutex(name: str, timeout_ms: int = _WINDOWS_MUTEX_TIMEOUT_M
     kernel32.CloseHandle(handle)
     if result == 0x102:
         raise TimeoutError(
-            f"Windows dependency cache lock timeout: name={name} timeout_ms={timeout_ms}"
+            player_text('launcher.platform', 'windows_dependency_cache_lock_timeout_name_value_0_timeout_ms_va', value_0=f'{name}', value_1=f'{timeout_ms}')
         )
     code = kernel32.GetLastError()
-    error = OSError(f"Windows dependency cache lock wait failed: name={name} winerror={code}")
+    error = OSError(player_text('launcher.platform', 'windows_dependency_cache_lock_wait_failed_name_value_0_winerror', value_0=f'{name}', value_1=f'{code}'))
     error.winerror = code  # type: ignore[attr-defined]
     raise error
 
@@ -973,23 +971,16 @@ class GameLinkResult:
 
 
 def _core_file_error(path: Path, error: Exception) -> RuntimeError:
-    message = f"Core runtime file could not be read or installed: {path}. {error}"
+    message = player_text('launcher.platform', 'core_runtime_file_could_not_be_read_or_installed_value_0_value_1', value_0=f'{path}', value_1=f'{error}')
     if sys.platform != "win32":
         return RuntimeError(message)
-    script = r"""$ErrorActionPreference = 'Stop'
-[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
-Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=1116,1117,5007; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 200 | ForEach-Object {
-    $xml = [xml]$_.ToXml(); $data = @{}
-    foreach ($item in $xml.Event.EventData.Data) { $data[$item.Name] = $item.'#text' }
-    @{time=$_.TimeCreated.ToUniversalTime().ToString('o'); id=$_.Id; data=$data}
-} | ConvertTo-Json -Depth 4 -Compress
-"""
+    script = ''.join((player_text('launcher.platform', 'erroractionpreference_stop'), '\n', player_text('launcher.platform', 'console_outputencoding_system_text_utf8encoding_new'), '\n', "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; Id=1116,1117,5007; StartTime=(Get-Date).AddDays(-7)} -MaxEvents 200 | ForEach-Object {", '\n', player_text('launcher.platform', 'xml_xml_toxml_data'), '\n', player_text('launcher.platform', 'foreach_item_in_xml_event_eventdata_data_data_item_name_item_tex'), '\n', player_text('launcher.platform', 'time_timecreated_touniversaltime_tostring_o_id_id_data_data'), '\n', player_text('launcher.platform', 'convertto_json_depth_4_compress'), '\n', ''))
     try:
         result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
                                 capture_output=True, encoding="utf-8", errors="replace", timeout=5,
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         if result.returncode:
-            raise ValueError("Defender history query failed")
+            raise ValueError(player_text('launcher.platform', 'defender_history_query_failed'))
         events = json.loads(result.stdout)
         if isinstance(events, dict):
             events = [events]
@@ -1006,34 +997,38 @@ Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Oper
             setting = next((record for record in events if record["id"] == 5007 and threat_id and
                             f"\\ThreatIDDefaultAction\\{threat_id} =" in record["data"].get("New Value", "")), None)
             allowed = setting and setting["data"]["New Value"].endswith("= 0x6")
-            detail = (f"An allow action is recorded at {setting['time']}. Retry setup to restore the verified file. "
-                      "If it is removed again, check Protection History for this exact path."
-                      if allowed else "Review this detection in Windows Security -> Protection history before retrying.")
-            return RuntimeError(f"{message} Defender detected {data.get('Threat Name', 'this file')} at "
-                                f"{event['time']}. {detail}")
+            detail = (player_text('launcher.platform', 'an_allow_action_is_recorded_at_value_0_retry_setup_to_restore_th', value_0=f"{setting['time']}")
+                      if allowed else player_text('launcher.platform', 'review_this_detection_in_windows_security_protection_history_bef'))
+            return RuntimeError(player_text('launcher.platform', 'value_0_defender_detected_value_1_at_value_2_value_3', value_0=f'{message}', value_1=f"{data.get('Threat Name', 'this file')}", value_2=f"{event['time']}", value_3=f'{detail}'))
     except (OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
-        return RuntimeError(message + " Protection history could not be read. Select Help -> SAVE SUPPORT REPORT.")
-    return RuntimeError(message + " No matching detection was found. Select Help -> SAVE SUPPORT REPORT.")
+        return RuntimeError(message + player_text('launcher.platform', 'protection_history_could_not_be_read_select_help_save_support_re'))
+    return RuntimeError(message + player_text('launcher.platform', 'no_matching_detection_was_found_select_help_save_support_report'))
 
 
 def install_meathook(
     game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
     consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
+    journal=None,
 ) -> GameLinkResult:
     from .launcher_core_install import game_write_lock, recover_interrupted
     root = validate_game_root(game_root)
     with game_write_lock(root):
+        if journal is None:
+            require_installation_idle(root)
+        else:
+            journal.document["evidence"]["core_state_dir"] = str(Path(state_dir).resolve()) if state_dir else None
+            journal.save()
         processes = detect_doom_processes()
         if processes:
             if probe_meathook(root).ok and not force_repair:
                 installed = probe_meathook(root)
                 return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
-            detected = ", ".join(f"{item['name']} (PID {item['pid']})" for item in processes)
-            error = RuntimeError(f"Close DOOM Eternal before repairing its connection files. Detected: {detected}")
+            detected = ", ".join(player_text('launcher.platform', 'value_0_pid_value_1', value_0=f"{item['name']}", value_1=f"{item['pid']}") for item in processes)
+            error = RuntimeError(player_text('launcher.platform', 'close_doom_eternal_before_repairing_its_connection_files_detecte', value_0=f'{detected}'))
             error.processes = processes
             raise error
         recover_interrupted(root, state_dir)
-        return _install_core_pair(root, state_dir, consent, local_artifact, force_repair)
+        return _install_core_pair(root, state_dir, consent, local_artifact, force_repair, journal)
 
 
 def _core_artifact_matches(path, record):
@@ -1057,16 +1052,16 @@ def _owned_core_partial(root, existing, manifest):
         return False
 
 
-def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
+def _install_core_pair(root, state_dir, consent, local_artifact, force_repair, journal=None):
     """Install a verified local Core distribution without replacing foreign providers."""
     from ..contracts.core_distribution import verify_runtime
-    from .launcher_core_install import replace_pair, NAMES
+    from .launcher_core_install import NAMES
     installed = probe_meathook(root)
     if local_artifact is None:
         if installed.ok:
             return GameLinkResult(state="verified", message=installed.message, path=str(root / "sentinel_core.dll"),
                                   sha256=str(installed.details["sha256"]), ownership="verified")
-        raise RuntimeError("Select the matching distribution.json file.")
+        raise RuntimeError(player_text('launcher.platform', 'select_the_matching_distribution_json_file'))
     manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
     try:
         value, contents = verify_runtime(manifest, bootstrap_from_archive=True)
@@ -1082,23 +1077,76 @@ def _install_core_pair(root, state_dir, consent, local_artifact, force_repair):
         if installed.details["build_id"] == value["build_id"] and not force_repair:
             return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
     if (root / "XINPUT1_3.dll").exists():
-        raise RuntimeError("XINPUT1_3.dll conflicts with DoomEAP. Uninstall the mod that installed it, then retry. If you do not know which mod installed it, select Help -> SAVE SUPPORT REPORT.")
+        raise RuntimeError(player_text('launcher.platform', 'xinput1_3_dll_conflicts_with_doomeap_uninstall_the_mod_that_inst'))
     existing = root / "sentinel-distribution.json"
     owned_partial = _owned_core_partial(root, existing, manifest) if not installed.ok else False
     if any((root / name).exists() for name in ("sentinel_core.dll", "msimg32.dll")) and not installed.ok and not owned_partial:
-        spec = DependencySpec("Back up and replace conflicting connection files?", value["version"],
+        spec = DependencySpec(player_text('launcher.platform', 'back_up_and_replace_conflicting_connection_files'), value["version"],
             str(root), value["build_id"], "", "local")
         if not force_repair or not consent(spec):
-            raise RuntimeError("Core/bootstrap ownership cannot be verified; foreign files are preserved.")
+            raise RuntimeError(player_text('launcher.platform', 'core_bootstrap_ownership_cannot_be_verified_foreign_files_are_pr'))
     incoming = {name: contents[name] for name in NAMES[:2]}
     incoming[NAMES[2]] = manifest.read_bytes()
     try:
-        backup = replace_pair(root, state_dir, incoming)
+        backup = _replace_core_pair(root, state_dir, incoming, journal)
     except OSError as error:
         raise _core_file_error(Path(error.filename) if error.filename else root / "sentinel_core.dll", error) from error
-    return GameLinkResult(state="repaired" if owned_partial else "installed", message=f"Game connection files {value['version']} installed.",
+    return GameLinkResult(state="repaired" if owned_partial else "installed", message=player_text('launcher.platform', 'game_connection_files_value_0_installed', value_0=f"{value['version']}"),
                           path=str(root / "sentinel_core.dll"), sha256=hashlib.sha256(contents["sentinel_core.dll"]).hexdigest(),
                           ownership="launcher_installed", backup_path=str(backup))
+
+
+def _replace_core_pair(root, state_dir, incoming, journal):
+    from .launcher_core_install import replace_pair
+    if journal is not None:
+        for name, content in incoming.items():
+            journal.check_space(root / name, len(content))
+            journal.expect(root / name, hashlib.sha256(content).hexdigest())
+    return replace_pair(root, state_dir, incoming, journal=journal)
+
+
+def require_installation_idle(game_root):
+    from .install_journal import InstallationRecoveryRequired, InstallJournal, InstallPhase
+    journal = InstallJournal(game_root)
+    if journal.load() and journal.phase not in {InstallPhase.COMPLETE, InstallPhase.ROLLED_BACK}:
+        raise InstallationRecoveryRequired(player_text('launcher.platform', 'installation_recovery_is_pending'))
+
+
+@contextmanager
+def installation_write(game_root, journal=None):
+    from .launcher_core_install import game_write_lock
+    with game_write_lock(game_root):
+        if journal is None:
+            require_installation_idle(game_root)
+        yield
+
+
+@contextmanager
+def client_config_write(bases):
+    from .install_journal import InstallationRecoveryRequired
+    from .launcher_core_install import game_write_lock
+    roots = _configuration_roots(bases)
+    with ExitStack() as stack:
+        for root in roots:
+            require_installation_idle(root)
+            try:
+                stack.enter_context(game_write_lock(root, blocking=False))
+            except (TimeoutError, BlockingIOError) as error:
+                raise InstallationRecoveryRequired(player_text('launcher.platform', 'game_configuration_is_busy')) from error
+            require_installation_idle(root)
+        yield
+
+
+def _configuration_roots(bases):
+    roots = set()
+    for base in bases:
+        if not base:
+            continue
+        path = Path(str(base)).expanduser().resolve()
+        root = path.parent if path.name.casefold() == "base" else path
+        if root.is_dir():
+            roots.add(root)
+    return sorted(roots)
 
 
 
@@ -1249,10 +1297,10 @@ class DependencyManager:
             with zipfile.ZipFile(archive) as source:
                 for member in source.infolist():
                     if not cls._safe_member(member.filename):
-                        raise ValueError(f"unsafe archive path: {member.filename}")
+                        raise ValueError(player_text('launcher.platform', 'unsafe_archive_path_value_0', value_0=f'{member.filename}'))
                     mode = member.external_attr >> 16
                     if mode & 0o170000 == 0o120000:
-                        raise ValueError(f"archive symlink rejected: {member.filename}")
+                        raise ValueError(player_text('launcher.platform', 'archive_symlink_rejected_value_0', value_0=f'{member.filename}'))
                 source.extractall(destination)
         elif spec.archive_type == "tar.gz":
             with tarfile.open(archive, "r:gz") as source:
@@ -1264,10 +1312,10 @@ class DependencyManager:
                         or member.islnk()
                         or not (member.isfile() or member.isdir())
                     ):
-                        raise ValueError(f"unsafe archive member: {member.name}")
+                        raise ValueError(player_text('launcher.platform', 'unsafe_archive_member_value_0', value_0=f'{member.name}'))
                 source.extractall(destination, members=members)
         else:
-            raise ValueError(f"unsupported archive type: {spec.archive_type}")
+            raise ValueError(player_text('launcher.platform', 'unsupported_archive_type_value_0', value_0=f'{spec.archive_type}'))
 
     @classmethod
     def is_contained(cls, candidate: Path | str, root: Path | str) -> bool:
@@ -1413,7 +1461,7 @@ class DependencyManager:
     ) -> InstalledDependency:
         if not self.platform_supported(spec, platform_name):
             selected = platform_name or self._platform_name()
-            raise RuntimeError(f"dependency {spec.name} is unsupported on platform {selected}")
+            raise RuntimeError(player_text('launcher.platform', 'dependency_value_0_is_unsupported_on_platform_value_1', value_0=f'{spec.name}', value_1=f'{selected}'))
         destination = self._destination(spec)
         with self._cache_lock(spec):
             installed = self._installed(spec, destination)
@@ -1430,7 +1478,7 @@ class DependencyManager:
             self._record_acquisition(spec, "cache_miss", cache_path=str(destination))
             if local_artifact is None and not consent(spec):
                 self._record_acquisition(spec, "declined", failure_reason="consent_declined")
-                raise PermissionError(f"dependency acquisition declined: {spec.name}")
+                raise PermissionError(player_text('launcher.platform', 'dependency_acquisition_declined_value_0', value_0=f'{spec.name}'))
 
             with tempfile.TemporaryDirectory(prefix=f".{spec.name}-", dir=self.root) as temporary_name:
                 temporary = Path(temporary_name)
@@ -1468,21 +1516,21 @@ class DependencyManager:
                         failure_reason="download_size_mismatch", actual_download_size=actual_size,
                         actual_download_sha256=actual, final_url=final_url,
                     )
-                    raise ValueError(f"size mismatch for {spec.name}: expected {spec.expected_size}, got {actual_size}")
+                    raise ValueError(player_text('launcher.platform', 'size_mismatch_for_value_0_expected_value_1_got_value_2', value_0=f'{spec.name}', value_1=f'{spec.expected_size}', value_2=f'{actual_size}'))
                 if actual != spec.sha256:
                     self._record_acquisition(
                         spec, "failed", verification_stage="download_sha256",
                         failure_reason="download_sha256_mismatch", actual_download_size=actual_size,
                         actual_download_sha256=actual, final_url=final_url,
                     )
-                    raise ValueError(f"SHA-256 mismatch for {spec.name}: expected {spec.sha256}, got {actual}")
+                    raise ValueError(player_text('launcher.platform', 'sha_256_mismatch_for_value_0_expected_value_1_got_value_2', value_0=f'{spec.name}', value_1=f'{spec.sha256}', value_2=f'{actual}'))
 
                 extracted = temporary / "extracted"
                 extracted.mkdir()
                 self._extract(spec, archive, extracted)
                 executables = sorted(extracted.glob(spec.executable_glob))
                 if len(executables) != 1:
-                    raise ValueError(f"expected one {spec.executable_glob}, found {len(executables)}")
+                    raise ValueError(player_text('launcher.platform', 'expected_one_value_0_found_value_1', value_0=f'{spec.executable_glob}', value_1=f'{len(executables)}'))
                 executable_relative = executables[0].relative_to(extracted)
                 if os.name != "nt":
                     executables[0].chmod(executables[0].stat().st_mode | 0o100)
@@ -1520,7 +1568,7 @@ class DependencyManager:
                 if previous.exists():
                     shutil.rmtree(previous) if previous.is_dir() else previous.unlink()
                 if not Path(receipt.executable).is_file():
-                    raise RuntimeError("dependency installation failed")
+                    raise RuntimeError(player_text('launcher.platform', 'dependency_installation_failed'))
                 verified = self._installed(spec, destination)
                 if verified is None:
                     _, reason = self._installed_with_reason(spec, destination)
@@ -1536,7 +1584,7 @@ class DependencyManager:
                         executable_canonical=str(Path(receipt.executable).resolve()),
                         containment=self.is_contained(Path(receipt.executable), destination),
                     )
-                    raise RuntimeError(f"dependency installation failed verification: {reason}")
+                    raise RuntimeError(player_text('launcher.platform', 'dependency_installation_failed_verification_value_0', value_0=f'{reason}'))
                 executable = Path(verified.executable)
                 self._record_acquisition(
                     spec, "published", verification_stage="post_publish",
@@ -1624,13 +1672,13 @@ def _packagemapspec_owner(
     maps = document.get("maps")
     refs = document.get("mapFileRefs")
     if not isinstance(files, list) or not isinstance(maps, list) or not isinstance(refs, list):
-        raise ValueError("packagemapspec.json has invalid resource tables")
+        raise ValueError(player_text('launcher.platform', 'packagemapspec_json_has_invalid_resource_tables'))
     map_indices = [
         index for index, record in enumerate(maps)
         if isinstance(record, dict) and record.get("name") == runtime_map
     ]
     if len(map_indices) != 1:
-        raise ValueError(f"runtime map {runtime_map!r} has no unique packagemapspec record")
+        raise ValueError(player_text('launcher.platform', 'runtime_map_value_0_has_no_unique_packagemapspec_record', value_0=f'{runtime_map!r}'))
     map_index = map_indices[0]
     candidates: list[tuple[int, str]] = []
     for relation in refs:
@@ -1638,13 +1686,13 @@ def _packagemapspec_owner(
             continue
         file_index = relation.get("file")
         if not isinstance(file_index, int) or not 0 <= file_index < len(files):
-            raise ValueError(f"runtime map {runtime_map!r} has invalid resource reference")
+            raise ValueError(player_text('launcher.platform', 'runtime_map_value_0_has_invalid_resource_reference', value_0=f'{runtime_map!r}'))
         record = files[file_index]
         name = record.get("name") if isinstance(record, dict) else None
         if _vanilla_resource_name(name):
             candidates.append((file_index, name))
     if not candidates:
-        raise ValueError(f"runtime map {runtime_map!r} has no resource reference")
+        raise ValueError(player_text('launcher.platform', 'runtime_map_value_0_has_no_resource_reference', value_0=f'{runtime_map!r}'))
     return candidates[0][1], candidates[0][0], [name for _, name in candidates]
 
 
@@ -1654,6 +1702,7 @@ def installation_error_details(error: Exception, step: str) -> dict:
         **getattr(error, "details", {}),
         "failure_step": getattr(error, "details", {}).get("failure_step", step),
         "exception_type": type(error).__name__,
+        "code": getattr(error, "code", None),
         "verification_error": str(error),
         "traceback": "".join(traceback.format_exception(type(error), error, error.__traceback__, limit=6)),
     }
@@ -1676,7 +1725,7 @@ def _installation_failure(result: AdapterResult, error: Exception, step: str, ev
             details["required_resources"], _ = _required_linux_resource_specs(staged_mod, game_root / "base/packagemapspec.json")
         except Exception as evidence_error:
             details["resource_evidence_error"] = f"{type(evidence_error).__name__}: {evidence_error}"
-    message = f"Installation failed at {details['failure_step']}: {type(error).__name__}: {error}"
+    message = _injector_failure_message(error, details["failure_step"])
     if event_sink is not None:
         for line in json.dumps(details, indent=2).splitlines():
             event_sink("log", message=line)
@@ -1686,10 +1735,16 @@ def _installation_failure(result: AdapterResult, error: Exception, step: str, ev
                          stderr=result.stderr, returncode=result.returncode, details=details)
 
 
+def _injector_failure_message(error: Exception, step: str) -> str:
+    if isinstance(error, InjectorRecoveryRequired):
+        return str(error)
+    return player_text('launcher.platform', 'installation_failed_at_value_0_value_1_value_2', value_0=f'{step}', value_1=f'{type(error).__name__}', value_2=f'{error}')
+
+
 def injector_state_summary(game_root: Path) -> dict:
     from .campaign_resources import _records
     base = game_root / "base"
-    settings = game_root / "EternalModInjector Settings.txt"
+    settings = game_root / 'EternalModInjector Settings.txt'
     mapping = base / "idRehash.map"
     spec = base / "packagemapspec.json"
     text = settings.read_text(encoding="utf-8-sig", errors="replace") if settings.is_file() else ""
@@ -1698,11 +1753,11 @@ def injector_state_summary(game_root: Path) -> dict:
         row = _records(base / "meta.resources", {"generated/buildgame/container.mask"})["generated/buildgame/container.mask"]
         decoded = row[4] == 0
     except (OSError, ValueError, struct.error) as error:
-        decoded = f"unavailable: {type(error).__name__}: {error}"
+        decoded = player_text('launcher.platform', 'unavailable_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}')
     return {
         "settings": {key: next((line.split("=", 1)[1] for line in text.splitlines()
                                 if line.startswith(f":{key}=")), None)
-                     for key in ("HAS_CHECKED_RESOURCES", "RESET_BACKUPS", "ASSET_VERSION")},
+                     for key in ('HAS_CHECKED_RESOURCES', 'RESET_BACKUPS', 'ASSET_VERSION')},
         "settings_backup_lines": sum(line.rstrip().endswith(".backup") for line in text.splitlines()),
         "backup_files": sum(path.is_file() for path in base.rglob("*.backup")),
         "rehash_lines": len(lines),
@@ -1721,78 +1776,290 @@ def _log_injector_state(game_root: Path, phase: str, event_sink) -> dict:
     if event_sink is not None:
         for key, value in summary.items():
             for line in json.dumps(value, indent=2).splitlines():
-                event_sink("log", message=f"Injector {phase}: {key}={line}")
+                event_sink("log", message=player_text('launcher.platform', 'injector_value_0_value_1_value_2', value_0=f'{phase}', value_1=f'{key}', value_2=f'{line}'))
     return summary
 
 
-def _sanitize_injector_mapping(game_root: Path) -> None:
+def _injector_mask_offsets(base: Path) -> set[int] | None:
     from .campaign_resources import _records
     from .resource_bank import mask_tables
-    base = game_root / "base"
-    mapping = base / "idRehash.map"
-    original = mapping.read_text(encoding="utf-8-sig", errors="replace") if mapping.is_file() else ""
     try:
         mask = _records(base / "meta.resources", {"generated/buildgame/container.mask"})["generated/buildgame/container.mask"][3]
-        offsets = set(mask_tables(mask))
+        return set(mask_tables(mask))
     except (OSError, ValueError, struct.error):
-        offsets = None
+        return None
+
+
+def _mapping_row(line: str) -> tuple[str, int | None]:
+    name, separator, offset = line.rpartition(";")
+    name = PurePosixPath(name.replace("\\", "/")).as_posix()
+    offset = offset.strip()
+    value = int(offset) if separator and len(offset) <= 20 and re.fullmatch(r"[0-9]+", offset) else None
+    return name, value
+
+
+def _clean_injector_mapping(original: str, offsets: set[int] | None) -> tuple[str, bool]:
     kept, names, seen_offsets, bank_offsets = [], set(), set(), set()
     coherent = offsets is not None
     for line in original.splitlines(keepends=True):
-        name, separator, offset = line.rpartition(";")
-        name = name.replace("\\", "/").removeprefix("./")
-        if name.startswith("ap_enemy_resources/"):
-            if offset.strip().isdigit():
-                bank_offsets.add(int(offset))
+        name, value = _mapping_row(line)
+        if name.casefold().startswith("ap_enemy_resources/"):
+            bank_offsets.add(value)
             continue
-        if not separator or not offset.strip().isdigit() or not name.endswith(".resources"):
+        if value is None or not name.endswith(".resources"):
             coherent = False
             continue
-        value = int(offset)
-        if offsets is not None and value not in offsets:
+        if not _mapping_row_allowed(name, value, offsets, names, seen_offsets):
             coherent = False
             continue
-        if name in names or value in seen_offsets:
-            coherent = False
-            continue
-        names.add(name)
+        names.add(name.casefold())
         seen_offsets.add(value)
         kept.append(line)
-    if offsets is not None and seen_offsets != offsets - bank_offsets:
-        coherent = False
-    cleaned = "".join(kept)
+    return "".join(kept), bool(kept) and coherent and offsets is not None and seen_offsets == offsets - bank_offsets
+
+
+def _mapping_row_allowed(name, value, offsets, names, seen_offsets) -> bool:
+    path = PurePosixPath(name)
+    return (not path.is_absolute() and ".." not in path.parts and ":" not in name
+            and (offsets is None or value in offsets) and name.casefold() not in names and value not in seen_offsets)
+
+
+def _injector_mapping_changes(game_root: Path) -> dict[Path, bytes]:
+    base = game_root / "base"
+    mapping = base / "idRehash.map"
+    original = mapping.read_text(encoding="utf-8-sig", errors="replace") if mapping.is_file() else ""
+    cleaned, coherent = _clean_injector_mapping(original, _injector_mask_offsets(base))
+    changes = {}
     if mapping.is_file() and cleaned != original:
-        _atomic_write_bytes(mapping, cleaned.encode("utf-8"))
-    if not kept or not coherent:
-        settings = game_root / "EternalModInjector Settings.txt"
+        changes[mapping] = cleaned.encode("utf-8")
+    if not coherent:
+        settings = game_root / 'EternalModInjector Settings.txt'
         content = settings.read_text(encoding="utf-8-sig") if settings.is_file() else ""
         lines = [line for line in content.splitlines() if not line.startswith(":HAS_CHECKED_RESOURCES=")]
-        lines.append(":HAS_CHECKED_RESOURCES=0")
-        _atomic_write_bytes(settings, ("\n".join(lines) + "\n").encode("utf-8"))
+        lines.append(player_text('launcher.installation_adapters', 'has_checked_resources_0'))
+        changes[settings] = ("\n".join(lines) + "\n").encode("utf-8")
+    return changes
+
+
+INJECTOR_HOLD = ".doomeap-injector-hold"
+INJECTOR_INPUTS = ("base/idRehash.map", "EternalModInjector Settings.txt")
+
+
+class InjectorRecoveryRequired(RuntimeError):
+    code = "injector_recovery_required"
+
+    def __init__(self):
+        super().__init__(player_text('launcher.setup', 'protection_stopped'))
+
+
+class InjectorHoldPhase(str, Enum):
+    HOLDING = "holding"
+    PREPARED = "prepared"
+    INJECTING = "injecting"
+    RESTORING = "restoring"
+    COMPLETE = "complete"
+
+
+def _check_injector_path(path: Path) -> None:
+    if path.is_symlink() or (path.exists() and getattr(path.lstat(), "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT):
+        raise InjectorRecoveryRequired()
+
+
+def _injector_file_hash(path: Path) -> str | None:
+    _check_injector_path(path)
+    if not path.exists():
+        return None
+    if not path.is_file():
+        raise InjectorRecoveryRequired()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _injector_bank_hash(directory: Path) -> str | None:
+    _check_injector_path(directory)
+    if not directory.exists():
+        return None
+    if not directory.is_dir():
+        raise InjectorRecoveryRequired()
+    files = {}
+    pending = [directory]
+    while pending:
+        for path in pending.pop().iterdir():
+            _check_injector_path(path)
+            name = path.relative_to(directory).as_posix()
+            if path.is_dir():
+                files[name] = "directory"
+                pending.append(path)
+            else:
+                files[name] = _injector_file_hash(path)
+    return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
+
+
+def _write_injector_hold(root: Path, record: dict) -> None:
+    payload = json.dumps(record, sort_keys=True).encode()
+    document = {"record": record, "sha256": hashlib.sha256(payload).hexdigest()}
+    _atomic_write_bytes(root / INJECTOR_HOLD / "journal.json", json.dumps(document).encode())
+
+
+def _read_injector_hold(root: Path) -> dict:
+    try:
+        _check_injector_path(root / INJECTOR_HOLD / "journal.json")
+        document = json.loads((root / INJECTOR_HOLD / "journal.json").read_bytes())
+        record = document["record"]
+        digest = hashlib.sha256(json.dumps(record, sort_keys=True).encode()).hexdigest()
+        if (document["sha256"] != digest or record["version"] != 1 or record["game_root"] != str(root)
+                or set(record["files"]) != set(INJECTOR_INPUTS)):
+            raise ValueError(player_text('launcher.platform', 'invalid_injector_hold'))
+        record["phase"] = InjectorHoldPhase(record["phase"])
+        return record
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise InjectorRecoveryRequired() from error
+
+
+def _create_injector_hold(root: Path, changes: dict[Path, bytes]) -> dict:
+    directory = root / INJECTOR_HOLD
+    record = {"version": 1, "game_root": str(root), "phase": InjectorHoldPhase.HOLDING,
+              "banks": _injector_bank_hash(root / "base/ap_enemy_resources"), "files": {}}
+    directory.mkdir()
+    for index, name in enumerate(INJECTOR_INPUTS):
+        path = root / name
+        original = _injector_file_hash(path)
+        if original is not None:
+            _atomic_write_bytes(directory / f"input-{index}.before", path.read_bytes())
+        prepared = hashlib.sha256(changes[path]).hexdigest() if path in changes else original
+        record["files"][name] = {"original": original, "prepared": prepared}
+    _write_injector_hold(root, record)
+    return record
+
+
+def _restore_injector_inputs(root: Path, record: dict) -> None:
+    originals = {}
+    for index, name in enumerate(INJECTOR_INPUTS):
+        saved = root / INJECTOR_HOLD / f"input-{index}.before"
+        entry = record["files"][name]
+        if (_injector_file_hash(saved) != entry["original"]
+                or _injector_file_hash(root / name) not in {entry["original"], entry["prepared"]}):
+            raise InjectorRecoveryRequired()
+        originals[name] = saved.read_bytes() if saved.exists() else None
+    for name, content in originals.items():
+        if content is None:
+            (root / name).unlink(missing_ok=True)
+        else:
+            _atomic_write_bytes(root / name, content)
+
+
+def _publish_injector_inputs(root: Path, changes: dict[Path, bytes], record: dict) -> None:
+    for path in changes:
+        if _injector_file_hash(path) != record["files"][path.relative_to(root).as_posix()]["original"]:
+            raise InjectorRecoveryRequired()
+    for path, content in changes.items():
+        _atomic_write_bytes(path, content)
+
+
+def _restore_injector_banks(root: Path, record: dict) -> None:
+    original = root / "base/ap_enemy_resources"
+    held = root / INJECTOR_HOLD / "ap_enemy_resources"
+    if held.exists():
+        if original.exists() or _injector_bank_hash(held) != record["banks"]:
+            raise InjectorRecoveryRequired()
+        held.rename(original)
+    if _injector_bank_hash(original) != record["banks"]:
+        raise InjectorRecoveryRequired()
+
+
+def _cleanup_injector_hold(root: Path) -> None:
+    directory = root / INJECTOR_HOLD
+    for index in range(len(INJECTOR_INPUTS)):
+        (directory / f"input-{index}.before").unlink(missing_ok=True)
+    (directory / "journal.json").unlink(missing_ok=True)
+    directory.rmdir()
+
+
+def _recover_injector_resources(root: Path) -> bool:
+    directory = root / INJECTOR_HOLD
+    _check_injector_path(root / "base")
+    _check_injector_path(directory)
+    if not directory.exists():
+        return False
+    if not any(directory.iterdir()):
+        directory.rmdir()
+        return True
+    record = _read_injector_hold(root)
+    if record["phase"] is InjectorHoldPhase.INJECTING:
+        raise InjectorRecoveryRequired()
+    if record["phase"] in {InjectorHoldPhase.HOLDING, InjectorHoldPhase.PREPARED}:
+        _restore_injector_inputs(root, record)
+    if record["phase"] is not InjectorHoldPhase.COMPLETE:
+        _restore_injector_banks(root, record)
+        record["phase"] = InjectorHoldPhase.COMPLETE
+        _write_injector_hold(root, record)
+    _cleanup_injector_hold(root)
+    return True
+
+
+def recover_injector_resources(game_root: Path) -> bool:
+    from .launcher_core_install import game_write_lock
+    with game_write_lock(game_root):
+        require_doom_closed(player_text('launcher.platform', 'recovering_injector_resources'))
+        return _recover_injector_resources(game_root.resolve())
+
+
+@dataclass
+class InjectorResourceHold:
+    root: Path
+    record: dict
+
+    def start_injector(self) -> None:
+        self.record["phase"] = InjectorHoldPhase.INJECTING
+        _write_injector_hold(self.root, self.record)
+
+    def finish_injector(self) -> None:
+        self.record["phase"] = InjectorHoldPhase.RESTORING
+        _write_injector_hold(self.root, self.record)
+
+
+def _finish_injector_hold(root, record, failure, event_sink):
+    if record["phase"] is InjectorHoldPhase.INJECTING:
+        if failure is None:
+            raise InjectorRecoveryRequired()
+        failure.details = {**getattr(failure, "details", {}), "recovery_required": True,
+                           "recovery_error": player_text('launcher.setup', 'protection_stopped')}
+        return
+    if record["phase"] is InjectorHoldPhase.PREPARED:
+        record["phase"] = InjectorHoldPhase.RESTORING
+        _write_injector_hold(root, record)
+    _recover_injector_resources(root)
+    _log_injector_state(root, "after", event_sink)
 
 
 @contextmanager
 def prepare_injector_resources(game_root: Path, event_sink=None):
-    _log_injector_state(game_root, "before preparation", event_sink)
-    directory = game_root / "base" / "ap_enemy_resources"
-    temporary = Path(tempfile.mkdtemp(dir=game_root, prefix=".doomeap-injector-"))
-    held = temporary / directory.name
-    try:
-        if directory.exists() or directory.is_symlink():
-            if directory.is_symlink() or directory.resolve() != (game_root / "base").resolve() / directory.name:
-                raise ValueError("Generated resource directory is redirected")
-            directory.rename(held)
+    from .launcher_core_install import game_write_lock
+    game_root = game_root.resolve()
+    with game_write_lock(game_root):
+        require_doom_closed(player_text('launcher.platform', 'preparing_injector_resources'))
+        _recover_injector_resources(game_root)
+        _log_injector_state(game_root, player_text('launcher.platform', 'before_preparation'), event_sink)
+        changes = _injector_mapping_changes(game_root)
+        record = _create_injector_hold(game_root, changes)
+        directory = game_root / "base/ap_enemy_resources"
+        failure = None
         try:
-            _sanitize_injector_mapping(game_root)
+            if directory.exists():
+                directory.rename(game_root / INJECTOR_HOLD / directory.name)
+            _publish_injector_inputs(game_root, changes, record)
+            record["phase"] = InjectorHoldPhase.PREPARED
+            _write_injector_hold(game_root, record)
             _log_injector_state(game_root, "before", event_sink)
-            yield
+            yield InjectorResourceHold(game_root, record)
+        except BaseException as error:
+            failure = error
+            raise
         finally:
-            if held.exists():
-                held.rename(directory)
-            _log_injector_state(game_root, "after", event_sink)
-    finally:
-        if not held.exists():
-            temporary.rmdir()
+            _finish_injector_hold(game_root, record, failure, event_sink)
 
 
 def _tag_resource_candidates(members):
@@ -1915,11 +2182,11 @@ def _required_linux_resource_specs(
             "status": status,
             "failure_reason": "; ".join(reason for reason, present in (
                 (owner_error, not owner_error),
-                ("missing staged member", selected_member is not None),
-                ("missing resource file", resource_path.is_file()),
-                ("missing meta file", meta_path.is_file()),
-                ("resource path missing from container", path_present),
-                ("room payload missing from container", payload_present),
+                (player_text('launcher.platform', 'missing_staged_member'), selected_member is not None),
+                (player_text('launcher.platform', 'missing_resource_file'), resource_path.is_file()),
+                (player_text('launcher.platform', 'missing_meta_file'), meta_path.is_file()),
+                (player_text('launcher.platform', 'resource_path_missing_from_container'), path_present),
+                (player_text('launcher.platform', 'room_payload_missing_from_container'), payload_present),
             ) if not present),
         }
         results.append(result)
@@ -1965,28 +2232,28 @@ def verify_linux_mod_installation(
     root = validate_game_root(game_root)
     staged_input = staged_mod.expanduser()
     if staged_input.is_symlink():
-        raise ValueError("staged room ZIP is a symbolic link")
+        raise ValueError(player_text('launcher.platform', 'staged_room_zip_is_a_symbolic_link'))
     staged = staged_input.resolve()
     mods = (root / "Mods").resolve()
     if staged.parent != mods or not staged.is_file():
-        raise ValueError("staged room ZIP is outside configured game Mods folder")
+        raise ValueError(player_text('launcher.platform', 'staged_room_zip_is_outside_configured_game_mods_folder'))
     if not zipfile.is_zipfile(staged):
-        raise ValueError("staged room ZIP is invalid")
+        raise ValueError(player_text('launcher.platform', 'staged_room_zip_is_invalid'))
     packagemapspec = root / "base" / "packagemapspec.json"
     if not packagemapspec.is_file():
-        raise FileNotFoundError("packagemapspec.json is missing from current game resources")
+        raise FileNotFoundError(player_text('launcher.platform', 'packagemapspec_json_is_missing_from_current_game_resources'))
     results, missing = _required_linux_resource_specs(staged, packagemapspec)
     output_issues = _required_resource_output_issues(
         f"{stdout}\n{stderr}", results
     )
     if output_issues:
         raise LinuxVerificationError(
-            "InjectorShell reported required resource warnings/skips: " + " | ".join(output_issues),
+            player_text('launcher.platform', 'injectorshell_reported_required_resource_warnings_skips') + " | ".join(output_issues),
             {"required_resources": results, "output_issues": output_issues},
         )
     if missing:
         raise LinuxVerificationError(
-            "required resource evidence missing: " + ", ".join(missing),
+            player_text('launcher.platform', 'required_resource_evidence_missing') + ", ".join(missing),
             {"required_resources": results},
         )
     return {
@@ -1999,9 +2266,9 @@ def verify_linux_mod_installation(
 
 
 def _stage_mod(mod_zip: Path, game_root: Path) -> Path:
-    require_doom_closed("staging a room mod")
+    require_doom_closed(player_text('launcher.platform', 'staging_a_room_mod'))
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
-        raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
+        raise ValueError(player_text('launcher.platform', 'mod_is_not_a_valid_zip_value_0', value_0=f'{mod_zip}'))
     mods = game_root / "Mods"
     mods.mkdir(parents=True, exist_ok=True)
     destination = mods / mod_zip.name
@@ -2041,14 +2308,53 @@ def stage_room_mod(
     *,
     manifest_hash: str,
     legacy_removal_sink: Callable[[Path], None] | None = None,
+    journal=None,
+) -> Path:
+    with installation_write(game_root, journal):
+        return _stage_room_mod(mod_zip, game_root, ownership_receipt, manifest_hash=manifest_hash,
+                               legacy_removal_sink=legacy_removal_sink, journal=journal)
+
+
+def _stage_room_mod(
+    mod_zip: Path,
+    game_root: Path,
+    ownership_receipt: Path,
+    *,
+    manifest_hash: str,
+    legacy_removal_sink: Callable[[Path], None] | None = None,
+    journal=None,
 ) -> Path:
     """Atomically replace only recognized DOOM Eternal Archipelago mod ZIPs."""
-    require_doom_closed("staging a room mod")
+    require_doom_closed(player_text('launcher.platform', 'staging_a_room_mod'))
     if not mod_zip.is_file() or not zipfile.is_zipfile(mod_zip):
-        raise ValueError(f"mod is not a valid ZIP: {mod_zip}")
+        raise ValueError(player_text('launcher.platform', 'mod_is_not_a_valid_zip_value_0', value_0=f'{mod_zip}'))
     mods = game_root / "Mods"
     mods.mkdir(parents=True, exist_ok=True)
     destination = mods / mod_zip.name
+    candidates = room_mod_candidates(mods, destination, ownership_receipt)
+    if journal is not None:
+        return _stage_journaled_mod(mod_zip, destination, candidates, journal, legacy_removal_sink)
+    return _replace_room_mod(mod_zip, destination, candidates, ownership_receipt, manifest_hash, legacy_removal_sink)
+
+
+def room_mod_candidates(mods: Path, destination: Path, ownership_receipt: Path) -> list[Path]:
+    previous = _read_mod_receipt(ownership_receipt)
+    previous_path = Path(str(previous["staged_mod"])) if previous.get("staged_mod") else None
+    previous_sha = str(previous.get("staged_sha256", ""))
+    candidates = []
+    for candidate in sorted(mods.glob("*.zip")):
+        owned = _owned_room_mod(candidate, previous_path, previous_sha)
+        if not (is_legacy_doom_ap_mod(candidate) or owned):
+            continue
+        if candidate.is_symlink():
+            raise RuntimeError(player_text('launcher.platform', 'room_mod_is_a_symbolic_link_value_0', value_0=f'{candidate}'))
+        candidates.append(candidate)
+    if destination.exists() and destination not in candidates:
+        raise RuntimeError(player_text('launcher.platform', 'refusing_to_overwrite_an_unowned_room_mod_value_0', value_0=f'{destination}'))
+    return candidates
+
+
+def _read_mod_receipt(ownership_receipt):
     previous: dict[str, object] = {}
     if ownership_receipt.is_file():
         try:
@@ -2057,28 +2363,37 @@ def stage_room_mod(
         except (OSError, json.JSONDecodeError):
             previous = {}
 
-    def digest(path: Path) -> str:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+    return previous
 
-    previous_path = Path(str(previous.get("staged_mod", ""))) if previous.get("staged_mod") else None
-    previous_sha = str(previous.get("staged_sha256", ""))
-    candidates = []
-    for candidate in sorted(mods.glob("*.zip")):
-        owned = False
-        if previous_path is not None and candidate.resolve() == previous_path.resolve():
-            owned = digest(candidate) == previous_sha
-            if not owned:
-                raise RuntimeError(f"Room mod ownership hash does not match: {candidate}")
-        recognized = is_legacy_doom_ap_mod(candidate)
-        if not (recognized or owned):
-            continue
-        if candidate.is_symlink():
-            raise RuntimeError(f"Room mod is a symbolic link: {candidate}")
-        candidates.append(candidate)
-    if destination.exists() and destination not in candidates:
-        raise RuntimeError(f"Refusing to overwrite an unowned room mod: {destination}")
 
-    expected_sha = digest(mod_zip)
+def _owned_room_mod(candidate, previous_path, previous_sha):
+    if previous_path is None or candidate.resolve() != previous_path.resolve():
+        return False
+    if hashlib.sha256(candidate.read_bytes()).hexdigest() != previous_sha:
+        raise RuntimeError(player_text('launcher.platform', 'room_mod_ownership_hash_does_not_match_value_0', value_0=f'{candidate}'))
+    return True
+
+
+def _stage_journaled_mod(source, destination, candidates, journal, removal_sink):
+    content = source.read_bytes()
+    for candidate in candidates:
+        if candidate != destination:
+            journal.expect(candidate, None)
+    journal.expect(destination, hashlib.sha256(content).hexdigest())
+    require_doom_closed(player_text('launcher.platform', 'publishing_a_room_mod'))
+    journal.replace(destination, content, operation="room_mod_stage")
+    for candidate in candidates:
+        if candidate != destination:
+            journal.remove(candidate)
+        if removal_sink is not None:
+            removal_sink(candidate)
+    return destination
+
+
+def _replace_room_mod(mod_zip, destination, candidates, ownership_receipt, manifest_hash, legacy_removal_sink):
+    mods = destination.parent
+    expected_sha = hashlib.sha256(mod_zip.read_bytes()).hexdigest()
+
     with tempfile.NamedTemporaryFile(dir=mods, prefix=".room-mod-", suffix=".incoming", delete=False) as handle:
         incoming = Path(handle.name)
     backups = []
@@ -2092,9 +2407,9 @@ def stage_room_mod(
     }
     try:
         shutil.copy2(mod_zip, incoming)
-        if digest(incoming) != expected_sha or not zipfile.is_zipfile(incoming):
-            raise RuntimeError("Room mod copy verification failed")
-        require_doom_closed("publishing a room mod")
+        if hashlib.sha256(incoming.read_bytes()).hexdigest() != expected_sha or not zipfile.is_zipfile(incoming):
+            raise RuntimeError(player_text('launcher.platform', 'room_mod_copy_verification_failed'))
+        require_doom_closed(player_text('launcher.platform', 'publishing_a_room_mod'))
         for candidate in candidates:
             backup = incoming.with_name(f"{incoming.name}.{candidate.name}.bak")
             publish_file(candidate, backup, operation="room_mod_backup")
@@ -2113,6 +2428,11 @@ def stage_room_mod(
     finally:
         incoming.unlink(missing_ok=True)
         temporary.unlink(missing_ok=True)
+    _cleanup_mod_backups(backups, legacy_removal_sink)
+    return destination
+
+
+def _cleanup_mod_backups(backups, legacy_removal_sink):
     for candidate, backup in backups:
         try:
             backup.unlink()
@@ -2120,21 +2440,20 @@ def stage_room_mod(
             pass  # retained backups stay outside the injector's ZIP scan
         if legacy_removal_sink is not None:
             legacy_removal_sink(candidate)
-    return destination
 
 
-def configure_windows_injector_settings(game_root: Path) -> Path:
+def configure_windows_injector_settings(game_root: Path, *, journal=None) -> Path:
     """Configure EternalModInjector Settings.txt to prevent automatic game launch while preserving existing settings."""
-    settings_file = game_root / "EternalModInjector Settings.txt"
+    settings_file = game_root / 'EternalModInjector Settings.txt'
     if not settings_file.is_file():
-        settings_file.write_text(
+        _write_installer_settings(settings_file,
             "\n".join((
-                ":ASSET_VERSION=2026-04-03",
-                ":AUTO_LAUNCH_GAME=0",
-                ":AUTO_UPDATE=0",
+                player_text('launcher.installation_adapters', 'asset_version_2026_04_03'),
+                player_text('launcher.installation_adapters', 'auto_launch_game_0'),
+                player_text('launcher.installation_adapters', 'auto_update_0'),
                 "",
             )),
-            encoding="utf-8",
+            journal=journal,
         )
         return settings_file
 
@@ -2145,21 +2464,28 @@ def configure_windows_injector_settings(game_root: Path) -> Path:
     for line in lines:
         stripped = line.strip()
         if stripped.startswith(":AUTO_LAUNCH_GAME="):
-            new_lines.append(":AUTO_LAUNCH_GAME=0")
+            new_lines.append(player_text('launcher.installation_adapters', 'auto_launch_game_0'))
             has_auto_launch = True
         elif stripped.startswith(":AUTO_UPDATE="):
-            new_lines.append(":AUTO_UPDATE=0")
+            new_lines.append(player_text('launcher.installation_adapters', 'auto_update_0'))
             has_auto_update = True
         else:
             new_lines.append(line)
 
     if not has_auto_launch:
-        new_lines.append(":AUTO_LAUNCH_GAME=0")
+        new_lines.append(player_text('launcher.installation_adapters', 'auto_launch_game_0'))
     if not has_auto_update:
-        new_lines.append(":AUTO_UPDATE=0")
+        new_lines.append(player_text('launcher.installation_adapters', 'auto_update_0'))
 
-    settings_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    _write_installer_settings(settings_file, "\n".join(new_lines) + "\n", journal=journal)
     return settings_file
+
+
+def _write_installer_settings(path, content, *, journal=None):
+    if journal is None:
+        _atomic_write_bytes(path, content.encode("utf-8"))
+    else:
+        journal.replace(path, content.encode("utf-8"), operation="injector_settings")
 
 
 def stage_windows_injector_toolchain(
@@ -2167,6 +2493,7 @@ def stage_windows_injector_toolchain(
     game_root: Path,
     *,
     state_dir: Path | None = None,
+    journal=None,
 ) -> Path:
     """Safely install and verify the complete Windows EternalModInjector toolchain into game root."""
     dep_root = Path(dependency.root)
@@ -2177,12 +2504,10 @@ def stage_windows_injector_toolchain(
     ]
     if missing_members:
         raise RuntimeError(
-            f"Windows mod injector package is corrupted or incomplete: missing {len(missing_members)} file(s): {', '.join(missing_members)}"
+            player_text('launcher.platform', 'windows_mod_injector_package_is_corrupted_or_incomplete_missing', value_0=f'{len(missing_members)}', value_1=f"{', '.join(missing_members)}")
         )
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_root = (state_dir / "repair-backups" / "windows-injector" / timestamp) if state_dir else None
-    backed_up_records: list[dict[str, str]] = []
+    check_existing_injector_tools(dep_root, game_root, WINDOWS_INJECTOR_REQUIRED_MEMBERS)
 
     for rel_path in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
         src = dep_root / rel_path
@@ -2190,52 +2515,55 @@ def stage_windows_injector_toolchain(
         dest.parent.mkdir(parents=True, exist_ok=True)
         src_bytes = src.read_bytes()
         src_sha = hashlib.sha256(src_bytes).hexdigest()
-
-        if dest.is_file():
-            dest_bytes = dest.read_bytes()
-            dest_sha = hashlib.sha256(dest_bytes).hexdigest()
-            if dest_sha == src_sha:
-                continue
-            if backup_root is not None:
-                backup_file = backup_root / rel_path
-                backup_file.parent.mkdir(parents=True, exist_ok=True)
-                backup_file.write_bytes(dest_bytes)
-                backed_up_records.append({
-                    "path": str(dest),
-                    "original_sha256": dest_sha,
-                    "replacement_version": WINDOWS_MOD_INJECTOR.version,
-                    "replacement_sha256": src_sha,
-                })
-
-        incoming = dest.with_name(f".{dest.name}.incoming")
-        try:
-            incoming.write_bytes(src_bytes)
-            if hashlib.sha256(incoming.read_bytes()).hexdigest() != src_sha:
-                raise RuntimeError(f"staging validation failed for {rel_path}")
-            publish_file(incoming, dest, operation="injector_stage")
-        finally:
-            if incoming.exists():
-                try:
-                    incoming.unlink()
-                except OSError:
-                    pass
+        _stage_windows_tool(dest, src_bytes, src_sha, rel_path, journal)
 
     (game_root / "Mods").mkdir(parents=True, exist_ok=True)
-    configure_windows_injector_settings(game_root)
-
-    if backup_root is not None and backed_up_records:
-        meta = {
-            "timestamp": datetime.now().isoformat(),
-            "replacement_version": WINDOWS_MOD_INJECTOR.version,
-            "backed_up_files": backed_up_records,
-        }
-        (backup_root / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+    configure_windows_injector_settings(game_root, journal=journal)
 
     batch_path = game_root / "EternalModInjector.bat"
     if not batch_path.is_file():
-        raise RuntimeError("EternalModInjector.bat is missing after staging into game root.")
+        raise RuntimeError(player_text('launcher.platform', 'eternalmodinjector_bat_is_missing_after_staging_into_game_root'))
     return batch_path
 
+
+class InjectorInstallationMismatch(RuntimeError):
+    def __init__(self, relative):
+        from .ui.strings import text
+
+        super().__init__(text("launcher.setup", "injector_differs", path=str(relative)))
+        self.details = {"failure_category": "injector_installation_mismatch", "injector_file": str(relative)}
+
+
+def check_existing_injector_tools(source_root, game_root, members):
+    for relative in members:
+        destination = game_root / relative
+        _check_injector_path(destination)
+        if destination.exists() and (
+            not destination.is_file()
+            or DependencyManager._sha256(destination) != DependencyManager._sha256(source_root / relative)
+        ):
+            raise InjectorInstallationMismatch(relative)
+
+
+def _stage_windows_tool(dest, src_bytes, src_sha, rel_path, journal):
+    if dest.is_file():
+        return
+    if journal is not None:
+        journal.replace(dest, src_bytes, operation="injector_stage")
+        return
+
+    incoming = dest.with_name(f".{dest.name}.incoming")
+    try:
+        incoming.write_bytes(src_bytes)
+        if hashlib.sha256(incoming.read_bytes()).hexdigest() != src_sha:
+            raise RuntimeError(player_text('launcher.platform', 'staging_validation_failed_for_value_0', value_0=f'{rel_path}'))
+        publish_file(incoming, dest, operation="injector_stage")
+    finally:
+        if incoming.exists():
+            try:
+                incoming.unlink()
+            except OSError:
+                pass
 
 SANDBOX_DIR_NAME = "doomSandBox"
 SANDBOX_EXE_NAME = "DOOMSandBox64vk.exe"
@@ -2273,7 +2601,7 @@ def hold_sandbox(
                 expected_sha = tx_data.get("sha256")
                 if expected_sha and recovered_sha != expected_sha:
                     raise RuntimeError(
-                        f"Stale sandbox hold recovery integrity failure: expected SHA-256 {expected_sha}, got {recovered_sha}"
+                        player_text('launcher.platform', 'stale_sandbox_hold_recovery_integrity_failure_expected_sha_256_v', value_0=f'{expected_sha}', value_1=f'{recovered_sha}')
                     )
             finally:
                 tx_file.unlink(missing_ok=True)
@@ -2289,8 +2617,7 @@ def hold_sandbox(
     # 2. Ambiguous state check: fail closed without overwriting either file
     if original.exists() and hold.exists():
         raise RuntimeError(
-            f"Ambiguous sandbox state: both '{original}' and hold file '{hold}' exist. "
-            "Manual intervention is required to avoid data loss. Neither file was modified."
+            player_text('launcher.platform', 'ambiguous_sandbox_state_both_value_0_and_hold_file_value_1_exist', value_0=f'{original}', value_1=f'{hold}')
         )
 
     # 3. If sandbox is absent, upstream injector simply skips optional sandbox patching
@@ -2338,8 +2665,7 @@ def hold_sandbox(
 
             if restored_sha != original_sha or restored_size != original_size:
                 raise RuntimeError(
-                    f"Sandbox restoration integrity check failed! Expected SHA-256 {original_sha} ({original_size} bytes), "
-                    f"but restored file has {restored_sha} ({restored_size} bytes)."
+                    player_text('launcher.platform', 'sandbox_restoration_integrity_check_failed_expected_sha_256_valu', value_0=f'{original_sha}', value_1=f'{original_size}', value_2=f'{restored_sha}', value_3=f'{restored_size}')
                 )
 
             if event_sink is not None:
@@ -2364,8 +2690,7 @@ def recover_stale_sandbox_hold(
     tx_file = (state_dir / SANDBOX_TRANSACTION_FILE) if state_dir is not None else None
     if original.exists() and hold.exists():
         raise RuntimeError(
-            f"Ambiguous sandbox state: both '{original}' and hold file '{hold}' exist. "
-            "Manual intervention is required to avoid data loss. Neither file was modified."
+            player_text('launcher.platform', 'ambiguous_sandbox_state_both_value_0_and_hold_file_value_1_exist', value_0=f'{original}', value_1=f'{hold}')
         )
     if original.exists() or not hold.is_file():
         return
@@ -2378,7 +2703,7 @@ def recover_stale_sandbox_hold(
             expected_sha = tx_data.get("sha256")
             if expected_sha and recovered_sha != expected_sha:
                 raise RuntimeError(
-                    f"Stale sandbox hold recovery integrity failure: expected SHA-256 {expected_sha}, got {recovered_sha}"
+                    player_text('launcher.platform', 'stale_sandbox_hold_recovery_integrity_failure_expected_sha_256_v', value_0=f'{expected_sha}', value_1=f'{recovered_sha}')
                 )
         finally:
             tx_file.unlink(missing_ok=True)
@@ -2392,398 +2717,36 @@ def recover_stale_sandbox_hold(
         )
 
 
-class WindowsModInjectorAdapter:
-    """Stage verified EternalModInjector toolchain, launch visible batch console, track process lifetime, and request player confirmation."""
-
-    def __init__(
-        self,
-        dependency: InstalledDependency,
-        *,
-        state_dir: Path | None = None,
-        opener: Callable[[Sequence[str], Path], Any] | None = None,
-        confirmer: Callable[[], bool] | None = None,
-        event_sink: Callable[..., None] | None = None,
-    ):
-        self.dependency = dependency
-        self.state_dir = state_dir
-        self.opener = opener or self._default_opener
-        self.confirmer = confirmer or (lambda: False)
-        self.event_sink = event_sink
-
-    @staticmethod
-    def _default_opener(command: Sequence[str], cwd: Path) -> subprocess.Popen:
-        flags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-        return subprocess.Popen(command, cwd=cwd, creationflags=flags)
-
-    def _run_process(self, game_root: Path, command: tuple[str, ...], staged_mod: str = "") -> AdapterResult:
-        if self.event_sink is not None:
-            self.event_sink(
-                "injector_started",
-                command=list(command),
-                staged_mod=staged_mod,
-                message=(
-                    "Follow the instructions in the EternalModInjector window. Keep this launcher open. When installation finishes, close the installer window to continue."
-                ),
-            )
-
-        try:
-            process = self.opener(command, game_root)
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message="", command=command),
-                                         error, "injector", self.event_sink)
-
-        try:
-            if hasattr(process, "wait"):
-                process.wait()
-            returncode = getattr(process, "returncode", 0)
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message="", command=command),
-                                         error, "injector", self.event_sink)
-
-        if self.event_sink is not None:
-            self.event_sink("injector_closed", command=list(command), returncode=returncode)
-
-        return AdapterResult(
-            state="applied" if returncode == 0 else "failed",
-            message=(
-                "Installation finished."
-                if returncode == 0
-                else f"Installation failed at injector: exit code {returncode}. Select Help -> SAVE SUPPORT REPORT."
-            ),
-            command=command,
-            returncode=returncode,
-        )
-
-    def _run_prepared_process(self, game_root, command, staged_mod):
-        try:
-            with prepare_injector_resources(game_root, self.event_sink):
-                return self._run_process(game_root, command, staged_mod)
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message="", command=command),
-                                         error, "prepare banks", self.event_sink)
-
-    def run(
-        self,
-        game_root: Path,
-        *,
-        staged_mod: str = "",
-        operation: str = "install",
-        uninstall_confirmation: Callable[[], bool] | None = None,
-    ) -> AdapterResult:
-        require_doom_closed("running EternalModInjector")
-        try:
-            recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
-        try:
-            batch_executable = stage_windows_injector_toolchain(
-                self.dependency,
-                game_root,
-                state_dir=self.state_dir,
-            )
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
-
-        comspec = os.environ.get("COMSPEC", "cmd.exe")
-        target_name = batch_executable.name if batch_executable.parent.resolve() == game_root.resolve() else str(batch_executable)
-        command = (comspec, "/d", "/c", target_name)
-        # The current Windows injector supports doomSandBox/DOOMSandBox64vk.exe
-        # directly, so the sandbox stays in place for the whole invocation.
-        result = self._run_prepared_process(game_root, command, staged_mod)
-        if operation != "uninstall" or result.state != "applied":
-            return result
-
-        confirmed = False
-        confirmation_error = ""
-        try:
-            confirmed = uninstall_confirmation is not None and bool(uninstall_confirmation())
-        except Exception as error:
-            confirmation_error = str(error)
-        if self.event_sink is not None:
-            self.event_sink(
-                "injector_post_run_confirmation",
-                operation=operation,
-                confirmed=confirmed,
-                message=confirmation_error or "uninstall confirmation received",
-            )
-        details = {
-            **result.details,
-            "operation": operation,
-            "post_run_confirmed": confirmed,
-        }
-        if confirmation_error:
-            details["post_run_error"] = confirmation_error
-        if not confirmed:
-            return AdapterResult(
-                state="failed",
-                message=(
-                    "Removal could not be confirmed. Select Help -> SAVE SUPPORT REPORT."
-                    + (f" {confirmation_error}" if confirmation_error else "")
-                ),
-                command=result.command,
-                stdout=result.stdout,
-                stderr=result.stderr,
-                returncode=result.returncode,
-                details=details,
-            )
-        return AdapterResult(
-            state=result.state,
-            message="Removal finished.",
-            command=result.command,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            returncode=result.returncode,
-            details=details,
-        )
-
-    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        staged = _stage_mod(mod_zip, game_root)
-        result = self.run(game_root, staged_mod=staged.name)
-        if result.state != "applied":
-            return AdapterResult(
-                state="manual_install_required",
-                message=f"{result.message} Follow manual installation steps in INSTALL.md.",
-                command=result.command,
-                returncode=result.returncode,
-                details={
-                    "installation_mode": "windows_injector_assisted",
-                    **result.details,
-                    **({"batch_returncode": result.returncode} if result.returncode is not None else {}),
-                },
-            )
-
-        confirmed = self.confirmer()
-        if confirmed:
-            try:
-                from doom_eap.launcher.campaign_resources import enable_campaign_resources
-                campaign_resources = enable_campaign_resources(game_root, staged)
-            except Exception as error:
-                return _installation_failure(result, error, "prepare banks", self.event_sink, game_root, staged)
-            return AdapterResult(
-                state="applied",
-                message="Mod installed. Start DOOM Eternal normally through Steam and keep this launcher open.",
-                command=result.command,
-                returncode=0,
-                details={
-                    "installation_mode": "windows_injector_assisted",
-                    "user_confirmed": True,
-                    "campaign_resources": campaign_resources,
-                },
-            )
-
-        if self.event_sink is not None:
-            self.event_sink("installation_declined", command=list(result.command))
-
-        return AdapterResult(
-            state="manual_install_required",
-            message="Installation was not confirmed. Follow Windows manual installation in INSTALL.md.",
-            command=result.command,
-            returncode=1,
-            details={
-                "installation_mode": "windows_injector_assisted",
-                "user_confirmed": False,
-            },
-        )
+def finalize_mod_installation(game_root, staged, result, *, event_sink=None, journal=None):
+    try:
+        from .campaign_resources import enable_campaign_resources
+        resources = enable_campaign_resources(game_root, staged, journal=journal)
+    except Exception as error:
+        return _installation_failure(result, error, player_text('launcher.campaign_resources', 'prepare_banks'), event_sink, game_root, staged)
+    return AdapterResult(state="applied", message=result.message, command=result.command,
+        returncode=result.returncode, stdout=result.stdout, stderr=result.stderr,
+        details={**result.details, "campaign_resources": resources})
 
 
-# compatibility alias
-WindowsModManagerAdapter = WindowsModInjectorAdapter
+def verify_mod_installation(game_root, staged, result, *, platform_name, event_sink=None):
+    try:
+        from .campaign_resources import installed_resource_fingerprints
+        from .native_enemy_resources import verify_native_resource_banks
+        verify_native_resource_banks(game_root / 'base', result.details.get('campaign_resources', {}).get('banks', {}))
+        verification = verify_linux_mod_installation(game_root, staged, stdout=result.stdout, stderr=result.stderr)
+        verification["installed_resources"] = installed_resource_fingerprints(game_root)
+    except Exception as error:
+        return _installation_failure(result, error, "verify", event_sink, game_root, staged)
+    return AdapterResult(state="applied", message=result.message, command=result.command,
+        returncode=result.returncode, stdout=result.stdout, stderr=result.stderr,
+        details={**result.details, **verification, "post_install_verification": verification["state"]})
 
 
-def _loader_symbol_failure(completed):
-    return completed.returncode == 127 and any(
-        marker in (completed.stderr or "").casefold()
-        for marker in ("symbol lookup error", "undefined symbol: rl_print_keybinding")
-    )
-
-
-class LinuxModManagerAdapter:
-    """Stage bundled InjectorShell tools and apply mods without launching Steam."""
-
-    TIMEOUT_SECONDS = 15 * 60
-    LOADER_ENVIRONMENT_KEYS = ("LD_LIBRARY_PATH", "LD_PRELOAD", "LD_AUDIT")
-
-    def __init__(
-        self,
-        dependency: InstalledDependency,
-        *,
-        state_dir: Path | None = None,
-        event_sink: Callable[..., None] | None = None,
-    ):
-        self.dependency = dependency
-        self.state_dir = state_dir
-        self.event_sink = event_sink
-
-    def _prepare_tools(self, game_root: Path) -> Path:
-        source_root = Path(self.dependency.root)
-        executable = Path(self.dependency.executable)
-        relative_executable = executable.relative_to(source_root)
-        for source in sorted(source_root.rglob("*")):
-            if not source.is_file() or source.name == DependencyManager.RECEIPT:
-                continue
-            relative = source.relative_to(source_root)
-            destination = game_root / relative
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            if destination.is_file():
-                if hashlib.sha256(destination.read_bytes()).digest() != hashlib.sha256(source.read_bytes()).digest():
-                    raise RuntimeError(f"Installer tool differs from the bundled copy: {relative}")
-                continue
-            shutil.copy2(source, destination)
-        prepared = game_root / relative_executable
-        prepared.chmod(prepared.stat().st_mode | 0o100)
-        return prepared
-
-    @staticmethod
-    def _configure_first_run(game_root: Path) -> None:
-        """Configure InjectorShell for explicit launcher-controlled startup."""
-        config = game_root / "EternalModInjector Settings.txt"
-        if not config.is_file():
-            config.write_text(
-                "\n".join(
-                    (
-                        ":ASSET_VERSION=2026-04-03",
-                        ":AUTO_LAUNCH_GAME=0",
-                        ":GAME_PARAMETERS=",
-                        ":HAS_CHECKED_RESOURCES=0",
-                        ":HAS_READ_FIRST_TIME=1",
-                        ":RESET_BACKUPS=0",
-                        ":AUTO_UPDATE=0",
-                        ":VERBOSE=0",
-                        ":SLOW=0",
-                        ":COMPRESS_TEXTURES=0",
-                        ":DISABLE_MULTITHREADING=0",
-                        ":ONLINE_SAFE=0",
-                        "",
-                    )
-                ),
-                encoding="utf-8",
-            )
-            return
-
-        content = config.read_text(encoding="utf-8")
-        lines = content.splitlines()
-        has_auto_update, has_auto_launch = False, False
-        new_lines = []
-        for line in lines:
-            if line.startswith(":AUTO_UPDATE="):
-                new_lines.append(":AUTO_UPDATE=0")
-                has_auto_update = True
-            elif line.startswith(":AUTO_LAUNCH_GAME="):
-                new_lines.append(":AUTO_LAUNCH_GAME=0")
-                has_auto_launch = True
-            else:
-                new_lines.append(line)
-
-        if not has_auto_update:
-            new_lines.append(":AUTO_UPDATE=0")
-        if not has_auto_launch:
-            new_lines.append(":AUTO_LAUNCH_GAME=0")
-
-        config.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-
-    def run(self, game_root: Path) -> AdapterResult:
-        require_doom_closed("running InjectorShell")
-        try:
-            recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
-            executable = self._prepare_tools(game_root)
-            self._configure_first_run(game_root)
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message=""), error, "prepare banks", self.event_sink)
-        environment = os.environ.copy()
-        stripped_loader_environment = [
-            key for key in self.LOADER_ENVIRONMENT_KEYS if environment.pop(key, None) is not None
-        ]
-        environment.update({"skip": "1", "skip_debug_check": "1"})
-        command = (str(executable),)
-        try:
-            with prepare_injector_resources(game_root, self.event_sink):
-                completed = subprocess.run(
-                    command,
-                    cwd=game_root,
-                    env=environment,
-                    text=True,
-                    capture_output=True,
-                    timeout=self.TIMEOUT_SECONDS,
-                    check=False,
-                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                )
-        except subprocess.TimeoutExpired as error:
-            return AdapterResult(
-                state="timed_out",
-                message="Installation failed at injector: timed out. Select Help -> SAVE SUPPORT REPORT.",
-                command=command,
-                stdout=(error.stdout.decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout or ""),
-                stderr=(error.stderr.decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr or ""),
-                details={
-                    "injector_version": self.dependency.version,
-                    "mods_path": str((game_root / "Mods").resolve()),
-                    "post_install_verification": "not_run",
-                    "loader_environment_removed": stripped_loader_environment,
-                },
-            )
-        except Exception as error:
-            return _installation_failure(AdapterResult(state="failed", message="", command=command),
-                                         error, "prepare banks", self.event_sink)
-        state = "applied" if completed.returncode == 0 else "failed"
-        loader_symbol_failure = _loader_symbol_failure(completed)
-        return AdapterResult(
-            state=state,
-            message=(
-                "Mod installed. Start through Steam and keep the launcher open."
-                if state == "applied"
-                else (
-                    "Installation failed at injector: loader symbol lookup failed. Select Help -> SAVE SUPPORT REPORT."
-                    if loader_symbol_failure
-                    else f"Installation failed at injector: exit code {completed.returncode}. Select Help -> SAVE SUPPORT REPORT."
-                )
-            ),
-            command=command,
-            stdout=completed.stdout,
-            stderr=completed.stderr,
-            returncode=completed.returncode,
-            details={
-                "injector_version": self.dependency.version,
-                "mods_path": str((game_root / "Mods").resolve()),
-                "post_install_verification": "not_run",
-                "loader_environment_removed": stripped_loader_environment,
-                "failure_category": "linux_loader_symbol_failure" if loader_symbol_failure else None,
-            },
-        )
-
-    def activate(self, game_root: Path, mod_zip: Path) -> AdapterResult:
-        staged = _stage_mod(mod_zip, game_root)
-        result = self.run(game_root)
-        if result.state != "applied":
-            return result
-        step = "prepare banks"
-        try:
-            from doom_eap.launcher.campaign_resources import enable_campaign_resources
-            campaign_resources = enable_campaign_resources(game_root, staged)
-            step = "verify"
-            verification = verify_linux_mod_installation(
-                game_root,
-                staged,
-                stdout=result.stdout,
-                stderr=result.stderr,
-            )
-        except Exception as error:
-            return _installation_failure(result, error, step, self.event_sink, game_root, staged)
-        return AdapterResult(
-            state="applied",
-            message="Mod installed and checked. Start through Steam.",
-            command=result.command,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            returncode=result.returncode,
-            details={
-                **result.details,
-                "post_install_verification": verification["state"],
-                "campaign_resources": campaign_resources,
-                "required_resources": verification["required_resources"],
-                "packagemapspec_path": verification["packagemapspec_path"],
-                "packagemapspec_sha256": verification["packagemapspec_sha256"],
-            },
-        )
+def __getattr__(name):
+    if name in {"WindowsModInjectorAdapter", "WindowsModManagerAdapter", "LinuxModManagerAdapter"}:
+        from . import installation_adapters
+        return getattr(installation_adapters, name)
+    raise AttributeError(name)
 
 
 @dataclass(frozen=True)
@@ -2859,7 +2822,7 @@ class SteamInstallationLocator:
         roots: list[Path] = []
         if platform_name == "windows":
             roots.extend(query_windows_registry_steam_roots(registry_query))
-            for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES", "PROGRAMW6432"):
+            for variable in (player_text('launcher.platform', 'programfiles_x86'), 'PROGRAMFILES', 'PROGRAMW6432'):
                 value = env.get(variable)
                 if value:
                     roots.append(Path(value) / "Steam")
@@ -2884,7 +2847,7 @@ class SteamInstallationLocator:
             parsed_paths: list[Path] = []
             try:
                 document = ValveVdfParser.parse(text)
-                for top_key, top_val in document.items():
+                for _top_key, top_val in document.items():
                     if isinstance(top_val, dict):
                         for item_key, item_val in top_val.items():
                             if isinstance(item_val, dict):
@@ -2917,7 +2880,7 @@ class SteamInstallationLocator:
         installdir: str | None = None
         try:
             document = ValveVdfParser.parse(text)
-            for top_key, top_val in document.items():
+            for _top_key, top_val in document.items():
                 if isinstance(top_val, dict):
                     for prop_key, prop_val in top_val.items():
                         if prop_key.casefold() == "installdir" and isinstance(prop_val, str):
@@ -2956,7 +2919,7 @@ class SteamInstallationLocator:
             if not valid:
                 return (), DiscoverySentinel(
                     DiscoveryStatus.INVALID.value,
-                    reason=f"invalid DOOM Eternal installation: {game_root}",
+                    reason=player_text('launcher.platform', 'invalid_doom_eternal_installation_value_0', value_0=f'{game_root}'),
                     trace=tuple(trace),
                 )
             installations.append(SteamInstallation(game_root.parent, game_root, Path()))
@@ -3010,7 +2973,7 @@ class SteamInstallationLocator:
                             check["has_base"] = (candidate_game / "base").is_dir()
                         else:
                             check["valid"] = False
-                            check["error"] = "installdir missing from manifest"
+                            check["error"] = player_text('launcher.platform', 'installdir_missing_from_manifest')
                 lib_checks.append(check)
 
             root_info["checks"] = lib_checks
@@ -3021,38 +2984,38 @@ class SteamInstallationLocator:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.FOUND.value,
                 path=inst_roots[0],
-                reason="Game folder found.",
+                reason=player_text('launcher.doctor', 'game_folder_found'),
                 trace=tuple(trace),
             )
         elif len(inst_roots) > 1:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.AMBIGUOUS.value,
                 candidates=inst_roots,
-                reason="More than one game folder was found. Choose the one used by Steam.",
+                reason=player_text('launcher.platform', 'more_than_one_game_folder_was_found_choose_the_one_used_by_steam'),
                 trace=tuple(trace),
             )
         elif not any_root_exists:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason="Steam was not found. Choose your DOOM Eternal folder.",
+                reason=player_text('launcher.platform', 'steam_was_not_found_choose_your_doom_eternal_folder'),
                 trace=tuple(trace),
             )
         elif not any_manifest_exists:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason="DOOM Eternal was not found in Steam's libraries. Choose its game folder.",
+                reason=player_text('launcher.platform', 'doom_eternal_was_not_found_in_steam_s_libraries_choose_its_game'),
                 trace=tuple(trace),
             )
         elif any_installdir_found and not installations:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.INVALID.value,
-                reason="Game files are missing. Verify DOOM Eternal in Steam.",
+                reason=player_text('launcher.platform', 'game_files_are_missing_verify_doom_eternal_in_steam'),
                 trace=tuple(trace),
             )
         else:
             sentinel = DiscoverySentinel(
                 DiscoveryStatus.NOT_FOUND.value,
-                reason="Steam was not found. Choose the game folder.",
+                reason=player_text('launcher.platform', 'steam_was_not_found_choose_the_game_folder'),
                 trace=tuple(trace),
             )
 
@@ -3088,8 +3051,8 @@ class ProcessInspectionError(RuntimeError):
 def require_doom_closed(operation: str) -> None:
     processes = detect_doom_processes()
     if processes:
-        detected = ", ".join(f"{item['name']} (PID {item['pid']})" for item in processes)
-        error = RuntimeError(f"Close DOOM Eternal before {operation}. Detected: {detected}")
+        detected = ", ".join(player_text('launcher.platform', 'value_0_pid_value_1', value_0=f"{item['name']}", value_1=f"{item['pid']}") for item in processes)
+        error = RuntimeError(player_text('launcher.platform', 'close_doom_eternal_before_value_0_detected_value_1', value_0=f'{operation}', value_1=f'{detected}'))
         error.processes = processes
         raise error
 
@@ -3124,7 +3087,7 @@ def detect_doom_processes(
                 process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
             except (OSError, subprocess.SubprocessError, IndexError, UnicodeError) as error:
                 raise ProcessInspectionError(
-                    "Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry."
+                    player_text('launcher.platform', 'could_not_inspect_running_processes_cannot_safely_change_game_fi')
                 ) from error
         else:
             try:
@@ -3143,7 +3106,7 @@ def detect_doom_processes(
                 )
             except (OSError, subprocess.SubprocessError, UnicodeError) as error:
                 raise ProcessInspectionError(
-                    "Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry."
+                    player_text('launcher.platform', 'could_not_inspect_running_processes_cannot_safely_change_game_fi')
                 ) from error
     for row in process_list:
         values = tuple(row)
@@ -3221,7 +3184,7 @@ class ValveVdfParser:
             if match is None:
                 if not text[position:].strip():
                     break
-                raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+                raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
             position = match.end()
             quoted, brace, bare = match.groups()
             if quoted is not None:
@@ -3238,13 +3201,13 @@ class ValveVdfParser:
             while index < len(tokens):
                 if tokens[index] == "}":
                     if not expect_close:
-                        raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+                        raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
                     index += 1
                     return result
                 key = tokens[index]
                 index += 1
                 if index >= len(tokens):
-                    raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+                    raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
                 if tokens[index] == "{":
                     index += 1
                     result[key] = mapping(True)
@@ -3252,12 +3215,12 @@ class ValveVdfParser:
                     result[key] = tokens[index]
                     index += 1
             if expect_close:
-                raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+                raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
             return result
 
         document = mapping(False)
         if index != len(tokens):
-            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+            raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
         return document
 
 
@@ -3274,7 +3237,7 @@ class SteamLaunchOptionsManager:
             text = localconfig.read_text(encoding="utf-8", errors="strict")
             document = ValveVdfParser.parse(text)
         except (OSError, UnicodeError, ValueError) as error:
-            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.") from error
+            raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep')) from error
         current: object = document
         for key in ("UserLocalConfigStore", "Software", "Valve", "Steam", "apps", DOOM_ETERNAL_APP_ID):
             if not isinstance(current, dict):
@@ -3292,7 +3255,7 @@ class SteamLaunchOptionsManager:
     @classmethod
     def compose(cls, current: str) -> str:
         if "%command%" not in current:
-            raise ValueError("Keep exactly one %command% in the launch option.")
+            raise ValueError(player_text('launcher.platform', 'keep_exactly_one_command_in_the_launch_option'))
         match = cls.ASSIGNMENT.search(current)
         values: list[str] = []
         if match:
@@ -3301,7 +3264,7 @@ class SteamLaunchOptionsManager:
             current = f"{current[: match.start()]} {current[match.end() :]}".strip()
         filtered = [value for value in values if value.split("=", 1)[0].casefold() != "xinput1_3"]
         filtered.append(REQUIRED_DLL_OVERRIDE)
-        override = f'WINEDLLOVERRIDES="{";".join(filtered)}"'
+        override = player_text('launcher.platform', 'winedlloverrides_value_0', value_0=f"{';'.join(filtered)}")
         return f"{override} {current}".strip()
 
 
@@ -3309,13 +3272,13 @@ class SteamLaunchOptionsManager:
     def compose_bridge(cls, current: str, bridge_script: Path, *, delay: int = 5) -> str:
         """Place Linux bridge wrapper before %command% while preserving command arguments."""
         if delay < 0:
-            raise ValueError("Enter a launch delay of 0 or more.")
+            raise ValueError(player_text('launcher.platform', 'enter_a_launch_delay_of_0_or_more'))
         try:
             tokens = shlex.split(current, posix=True)
         except ValueError as error:
-            raise ValueError("The Steam launch option has unmatched quotation marks. Check the option or select Help -> SAVE SUPPORT REPORT.") from error
+            raise ValueError(player_text('launcher.platform', 'the_steam_launch_option_has_unmatched_quotation_marks_check_the')) from error
         if tokens.count("%command%") != 1:
-            raise ValueError("Keep exactly one %command% in the launch option.")
+            raise ValueError(player_text('launcher.platform', 'keep_exactly_one_command_in_the_launch_option'))
         script = str(bridge_script)
         override_tokens = [token for token in tokens if token.startswith("WINEDLLOVERRIDES=")]
         delay_tokens = [token for token in tokens if token.startswith("AP_CLIENT_DELAY=")]
@@ -3353,7 +3316,7 @@ class SteamLaunchOptionsManager:
         remaining = [
             token
             for token in tokens
-            if not token.startswith(("WINEDLLOVERRIDES=", "AP_CLIENT_DELAY="))
+            if not token.startswith((player_text('launcher.platform', 'winedlloverrides'), player_text('launcher.platform', 'ap_client_delay')))
             and Path(token).name != "run_bridge.sh"
         ]
         command_index = remaining.index("%command%")
@@ -3363,8 +3326,8 @@ class SteamLaunchOptionsManager:
         while before_command and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", before_command[0]):
             leading_environment.append(before_command.pop(0))
         rendered = [
-            f'WINEDLLOVERRIDES="{";".join(filtered_overrides)}"',
-            f"AP_CLIENT_DELAY={delay}",
+            player_text('launcher.platform', 'winedlloverrides_value_0', value_0=f"{';'.join(filtered_overrides)}"),
+            player_text('launcher.platform', 'ap_client_delay_value_0', value_0=f'{delay}'),
             *(shlex.quote(token) for token in leading_environment),
             shlex.quote(script),
             *(shlex.quote(token) for token in before_command),
@@ -3401,7 +3364,7 @@ class SteamLaunchOptionsManager:
     @staticmethod
     def backup(plan: LaunchOptionPlan, backup_path: Path, *, consent: bool) -> str:
         if not consent:
-            raise PermissionError("Steam launch option change cancelled.")
+            raise PermissionError(player_text('launcher.platform', 'steam_launch_option_change_cancelled'))
         backup_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {"app_id": DOOM_ETERNAL_APP_ID, "launch_options": plan.previous}
         temporary = backup_path.with_suffix(f"{backup_path.suffix}.tmp")
@@ -3413,7 +3376,7 @@ class SteamLaunchOptionsManager:
     def restore(backup_path: Path) -> str:
         payload = json.loads(backup_path.read_text(encoding="utf-8"))
         if payload.get("app_id") != DOOM_ETERNAL_APP_ID:
-            raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+            raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
         return str(payload["launch_options"])
 
 
@@ -3429,7 +3392,7 @@ def redact_secrets(text: str, secrets: Sequence[str] = ()) -> str:
 
 
 AMMO_REFILL_BIND_COMMAND = "condump AP_REFILL_REQUEST.txt"
-AMMO_HOTKEY_STATE_HEADER = "AP_AMMO_REFILL_HOTKEY_V1"
+AMMO_HOTKEY_STATE_HEADER = 'AP_AMMO_REFILL_HOTKEY_V1'
 AMMO_HOTKEY_STATE_FILENAME = "ammo_refill_hotkey.state"
 
 
@@ -3437,7 +3400,7 @@ def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | N
     if base is None:
         return None
     name = "special_toggle_hotkey.state" if special else AMMO_HOTKEY_STATE_FILENAME
-    header = "AP_SPECIAL_TOGGLE_HOTKEY_V1" if special else AMMO_HOTKEY_STATE_HEADER
+    header = 'AP_SPECIAL_TOGGLE_HOTKEY_V1' if special else AMMO_HOTKEY_STATE_HEADER
     path = base / "ap_queue" / name
     legacy = False
     if not path.exists():
@@ -3450,8 +3413,8 @@ def read_ap_hotkey_state(base: Path | None, *, special: bool = False) -> str | N
     tokens = raw.decode("ascii").split()
     if legacy and (len(tokens) != 2 or tokens[0] != header):
         return None
-    if len(raw) >= 128 or len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header):
-        raise ValueError("Steam settings could not be updated. Select Help -> SAVE SUPPORT REPORT.")
+    if len(raw) >= 128 or (len(tokens) != 1 and (len(tokens) != 2 or tokens[0] != header)):
+        raise ValueError(player_text('launcher.platform', 'steam_settings_could_not_be_updated_select_help_save_support_rep'))
     return tokens[-1]
 
 
@@ -3464,16 +3427,16 @@ def write_ap_hotkey_states(base: Path | None, refill: str, special: str) -> Path
     paths = [queue / AMMO_HOTKEY_STATE_FILENAME, queue / "special_toggle_hotkey.state"]
     previous = [path.read_bytes() if path.exists() else None for path in paths]
     try:
-        for path, header, token in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1"), (refill, special)):
+        for path, header, token in zip(paths, (AMMO_HOTKEY_STATE_HEADER, 'AP_SPECIAL_TOGGLE_HOTKEY_V1'), (refill, special), strict=False):
             _atomic_write_bytes(path, f"{header} {token or 'UNBOUND'}\n".encode("ascii"))
     except OSError:
-        for path, content in zip(paths, previous):
+        for path, content in zip(paths, previous, strict=False):
             if content is None:
                 path.unlink(missing_ok=True)
             else:
                 _atomic_write_bytes(path, content)
         raise
-    for path, header in zip(paths, (AMMO_HOTKEY_STATE_HEADER, "AP_SPECIAL_TOGGLE_HOTKEY_V1")):
+    for path, header in zip(paths, (AMMO_HOTKEY_STATE_HEADER, 'AP_SPECIAL_TOGGLE_HOTKEY_V1'), strict=False):
         legacy = base / path.name
         try:
             tokens = legacy.read_bytes().decode("ascii").split()
@@ -3506,7 +3469,7 @@ def resolve_doom_config_path(config: Mapping[str, object]) -> Path | None:
                 if parent.name.casefold() == "steamapps":
                     proton_path = (
                         parent.parent
-                        / "steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base"
+                        / player_text('launcher.doctor', 'steamapps_compatdata_782330_pfx_drive_c_users_steamuser_saved_ga')
                     )
                     cfg = proton_path / "DOOMEternalConfig.cfg"
                     if cfg.is_file():
@@ -3518,7 +3481,7 @@ def resolve_doom_config_path(config: Mapping[str, object]) -> Path | None:
             pass
 
     try:
-        win_path = Path.home() / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+        win_path = Path.home() / 'Saved Games' / 'id Software' / "DOOMEternal" / "base"
         cfg = win_path / "DOOMEternalConfig.cfg"
         if cfg.is_file():
             return cfg
@@ -3581,7 +3544,7 @@ def cleanup_stale_doom_config_bind(config: Mapping[str, object], *, is_game_runn
     new_lines: list[str] = []
     for line in lines:
         stripped = line.strip()
-        if (stripped.startswith("bind ") or stripped.startswith("bindSecondary ")) and AMMO_REFILL_BIND_COMMAND in stripped:
+        if (stripped.startswith(("bind ", "bindSecondary "))) and AMMO_REFILL_BIND_COMMAND in stripped:
             modified = True
             continue
         new_lines.append(line)
@@ -3608,7 +3571,7 @@ def cleanup_legacy_doomeap_cfg(base_dir: Path | None) -> bool:
         content = target.read_text(encoding="utf-8", errors="replace")
         lines = [line.strip() for line in content.splitlines() if line.strip()]
         for line in lines:
-            if line.startswith("//") or line.startswith("#"):
+            if line.startswith(("//", "#")):
                 continue
             if line.startswith("unbind "):
                 continue

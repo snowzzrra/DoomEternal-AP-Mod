@@ -198,7 +198,7 @@ def test_retired_setup_cannot_publish_result_or_complete_new_room(tmp_path, fail
         def for_job(self, job, sink, prompts):
             return self
 
-        def execute(self, snapshot, endpoint):
+        def execute(self, snapshot, endpoint, *, retry_injector=False):
             assert snapshot.seed_name == "install-seed"
             entered.set()
             assert release.wait(3)
@@ -241,7 +241,7 @@ def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(t
         def for_job(self, job, sink, prompts):
             return self
 
-        def execute(self, snapshot, endpoint):
+        def execute(self, snapshot, endpoint, *, retry_injector=False):
             self.calls += 1
             return SimpleNamespace(
                 adapter_state="applied", manifest_hash="current", randomize_dash=False,

@@ -9102,11 +9102,11 @@
     },
     {
       "default": 100,
-      "description": "Send one check at each multiple of this many enemy deaths.\n\nFor example, 100 gives rewards at 100, 200, 300 kills and so on.",
+      "description": "Send one check at each multiple of this many enemy deaths.\n\nChoose 1..1000 deaths per check. The default, 100, rewards 100, 200, 300 kills and so on.",
       "display_name": "Kills per Check",
       "group": "Game Options",
       "key": "kills_per_check",
-      "maximum": 2147483647,
+      "maximum": 1000,
       "minimum": 1,
       "source_class": "KillsPerCheck",
       "ui_type": "range"
@@ -9318,5 +9318,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "ce669c9eac41e5fabec5555711f0bdf176a4277016157f352949d3897d401d2a"
+  "source_sha256": "20549e9465f7705167121dfd8f5def6e16740d3df91fbb691feb73d58f991052"
 }

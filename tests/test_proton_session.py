@@ -1,10 +1,9 @@
-from unittest.mock import Mock, patch
-import io
 import json
+from unittest.mock import Mock, patch
 
 import pytest
 
-from doom_eap.launcher.launcher_session import _ProtonSessionOwner, _INSTALL_KEYS
+from doom_eap.launcher.launcher_session import _INSTALL_KEYS, SessionSupervisorError, _ProtonSessionOwner
 
 
 def test_lost_supervisor_requires_positive_guest_exit(tmp_path):
@@ -41,8 +40,8 @@ def test_failed_preparation_does_not_report_game_exit_or_repeat_helpers(tmp_path
 
 
 def test_proton_selection_precedes_campaign_routing(tmp_path):
-    from doom_eap.runtime.proton import ProtonSelectionError, runtime
     from doom_eap.launcher.launcher_integration import setup_failure_payload
+    from doom_eap.runtime.proton import ProtonSelectionError, runtime
     prefix = tmp_path / "compatdata/782330"
     (prefix / "pfx").mkdir(parents=True)
     with pytest.raises(ProtonSelectionError) as refused:
@@ -53,7 +52,7 @@ def test_proton_selection_precedes_campaign_routing(tmp_path):
 
 
 def test_guest_identity_query_receives_the_selected_executable(tmp_path):
-    from doom_eap.runtime.proton import windows_processes, windows_path
+    from doom_eap.runtime.proton import windows_path, windows_processes
     configuration = {'game_root': str(tmp_path / 'game')}
     response = Mock(returncode=0, stdout=json.dumps({'processes': [dict(
         pid=123, created=456, path='S:\\steamapps\\common\\DOOMEternal\\DOOMEternalx64vk.exe',
@@ -66,8 +65,8 @@ def test_guest_identity_query_receives_the_selected_executable(tmp_path):
     assert command[command.index('--expected-game-exe') + 1] == windows_path(tmp_path / 'game/DOOMEternalx64vk.exe')
 
 
-@pytest.mark.parametrize("error", [BrokenPipeError(), EOFError(), RuntimeError("The Windows AP session supervisor is unavailable"),
-                                  RuntimeError("The Windows AP session supervisor exited")])
+@pytest.mark.parametrize("error", [BrokenPipeError(), EOFError(), SessionSupervisorError("The Windows AP session supervisor is unavailable"),
+                                  SessionSupervisorError("The Windows AP session supervisor exited")])
 @pytest.mark.parametrize("processes", [None, ()])
 def test_supervisor_failure_guidance_does_not_claim_game_is_running(error, processes):
     from doom_eap.launcher.launcher_integration import setup_failure_payload

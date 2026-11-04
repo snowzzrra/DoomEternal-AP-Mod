@@ -124,6 +124,59 @@ See the [Windows and Linux/Proton installation guide](docs/INSTALL.md).
 For development, read [Content and builds](docs/DEVELOPMENT.md) and
 [Build a release](docs/RELEASING.md).
 
+### Changing a text
+
+Every message the player sees, in the launcher or in the game, is in one file:
+[`data/player_strings.json`](data/player_strings.json). The messages are grouped by
+where they show up, like `notifications`, `deathlink` or `launcher.settings`.
+
+A message looks like this:
+
+```json
+"major_item_received": {
+  "parameters": {"item": "str"},
+  "en": "{item} RECEIVED",
+  "pt-BR": "{item} RECEBIDO"
+}
+```
+
+To change what a message says, edit its text and send a pull request.
+
+- Words in braces, like `{item}` or `{player}`, are filled in by the game. Keep them
+  exactly the same in every language.
+- If you don't know a translation, write `null`. The English text is shown instead.
+- Item, location and player names come from Archipelago, so they aren't in this file.
+
+Before sending, check the file:
+
+```sh
+python -m tools.content.compile_player_strings --check
+```
+
+It tells you if something is wrong, such as a misspelled `{word}` or a text too long
+to fit on the game screen. Developers adding new messages: see
+[Player text and languages](docs/DEVELOPMENT.md#player-text-and-languages).
+
+### Adding a language
+
+1. In [`data/player_strings.json`](data/player_strings.json), add your language to
+   `languages` at the top, for example `"fr": {"name": "Français"}`.
+2. Add a `"fr"` line to each message with your translation. Use `null` for any you
+   haven't translated yet; those show in English.
+3. Run the check above.
+4. Open the launcher, click the flag button, pick your language and restart it.
+
+A flag is optional: without one, the button shows the language code (`FR`). If you
+add one, put the SVG in `assets/launcher/flags/`, add `"flag": "fr.svg"` to your
+language, and credit where it came from. Flags must come from a public source with
+a license that allows reuse, like [flag-icons](https://github.com/lipis/flag-icons);
+don't use AI-generated images.
+
+The language button changes the launcher only. Text inside the game follows the
+language set in DOOM Eternal.
+
+Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
+
 ## 5. Version scope
 
 ## 0.1.1 — Runtime stabilization — DONE

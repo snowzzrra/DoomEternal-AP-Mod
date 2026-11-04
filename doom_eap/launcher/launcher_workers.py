@@ -1,9 +1,9 @@
 """Application worker lifetime, serialization and connection cancellation."""
-from dataclasses import dataclass, field
-from collections.abc import Callable, Hashable
 import threading
 import time
+from collections.abc import Callable, Hashable
 from contextlib import nullcontext
+from dataclasses import dataclass, field
 
 
 class LauncherWorkCancelled(Exception):

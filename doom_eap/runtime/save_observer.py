@@ -148,6 +148,7 @@ class SaveObserver:
 
     def invalidate_proof(self):
         self._proof_revision += 1
+        self._duration_cache_key = None
         self._readiness = SaveReadinessSnapshot()
 
     def activate_slot(self, slot):

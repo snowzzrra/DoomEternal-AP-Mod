@@ -1,21 +1,18 @@
 """Persistent planning and spool evidence without CommonClient/game discovery."""
 import copy
-from dataclasses import FrozenInstanceError, replace
 import json
 import logging
+from dataclasses import FrozenInstanceError, replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from doom_eap.contracts.inventory_domain import MISSING, OWNED, UNKNOWN, InventoryObservation, ItemObservation
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
-from doom_eap.contracts.inventory_domain import InventoryObservation, ItemObservation, MISSING, OWNED, UNKNOWN
 from doom_eap.contracts.runtime_context import RuntimeContext
-from doom_eap.runtime.command_spool import CommandSpool
 from doom_eap.runtime.item_reconciliation import effective_ownership, load_policy_registry
 from doom_eap.runtime.materialization import MaterializationPlanError, compile_materialization_plan
-from doom_eap.runtime.materialization_coordinator import MaterializationCoordinator
-from doom_eap.runtime.reconciliation_publication import ReconciliationPublisher
 
 
 @pytest.fixture
@@ -115,105 +112,12 @@ def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, 
         plan.scope.state_key = "other-room"
 
 
-def test_failed_publication_retries_and_disappearance_stays_unverified(inputs, tmp_path, caplog):
-    definitions, policies, context, scope = inputs
-    log = logging.getLogger("materialization-contract")
-    spool = CommandSpool(tmp_path, arm_rpc=lambda *a: None, log_delivery=lambda *a, **k: None, logger=log)
-    attempt = 0
-
-    def send(command, **kwargs):
-        nonlocal attempt
-        attempt += 1
-        if attempt == 2:
-            return False
-        return spool.publish(command, **kwargs).accepted
-
-    publisher = ReconciliationPublisher(send, spool.exists, log)
-    coordinator = MaterializationCoordinator(log)
-    state = {}
-    coordinator.bind(state)
-    coordinator.trigger("reload")
-    persisted = []
-    owned = ownership((7770901, 7770901))
-
-    def reconcile():
-        return coordinator.reconcile(scope, context, owned, None, definitions, policies,
-                                     "progressive_special_weapon", publisher,
-                                     lambda: persisted.append(copy.deepcopy(state)),
-                                     observation=missing_special(scope, context))
-
-    failed = reconcile()
-    assert failed.error and not failed.complete_transition
-    assert "completed_key" not in state and not persisted
-    assert not coordinator.poll_completion(publisher)
-    completed = reconcile()
-    assert completed.plan and completed.complete_transition
-    assert len(persisted) == 2 and "pending_plan" in persisted[0] and "pending_plan" not in persisted[1]
-    assert state["completed_key"].startswith("dedupe-room:")
-    assert state["completion_criterion"] == "durable_spool_publication"
-    files = list(tmp_path.glob("*.cmd"))
-    assert len(files) == len(completed.plan.commands)  # retry kept the already-published first command
-    assert all(path.name.startswith("recv-") for path in files)
-    assert {path.stem for path in files} == {
-        spool.scoped_id(command.spool_id, scope.state_key) for command in completed.plan.commands
-    }
-    assert not coordinator.poll_completion(publisher)
-    for path in files:
-        path.unlink()
-    with caplog.at_level(logging.INFO, logger=log.name):
-        assert coordinator.poll_completion(publisher)
-    assert "semantic_state=command_consumed_unverified" in caplog.text
-    assert not coordinator.poll_completion(publisher)
-    assert reconcile().plan is not None
 
 
-def test_rebind_discards_old_room_completion_and_triggers(inputs):
-    definitions, policies, context, scope = inputs
-    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
-    publisher = SimpleNamespace(publish=lambda *a, **k: (True, None), exists=lambda *a: False)
-    old_state = {}
-    coordinator.bind(old_state)
-    coordinator.reconcile(scope, context, ownership((7770901,)), None, definitions, policies,
-                          "progressive_special_weapon", publisher, lambda: None)
-    original = copy.deepcopy(old_state)
-    coordinator.trigger("old-room")
-    coordinator.bind({})
-    assert not coordinator.snapshot.triggers
-    assert not coordinator.poll_completion(publisher)
-    assert old_state == original
 
 
-def test_fortress_terminal_result_requires_same_lease(tmp_path):
-    spool = CommandSpool(tmp_path, arm_rpc=lambda *a: None, log_delivery=lambda *a, **k: None,
-                         logger=logging.getLogger("fortress-contract"))
-    scoped = spool.scoped_id("fortress-phase1", "seed:0:1:generation")
-    (tmp_path / (scoped + ".result")).write_text("outcome=stale_lease\nlease=1:2\n")
-    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:2") == "stale_lease"
-    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:3") is None
-    (tmp_path / (scoped + ".result")).write_text("outcome=command_consumed_unverified\nlease=1:2\n")
-    assert spool.fortress_outcome("fortress-phase1", "seed:0:1:generation", "1:2") == "command_consumed_unverified"
 
 
-def test_automatic_history_ledger_remains_separate_from_receipt_and_save_epochs():
-    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
-    document = {}
-    coordinator.bind({}, document)
-    plan = SimpleNamespace(commands=("published",))
-    coordinator.record_automatic_failure("repair", 7, "history-a")
-    assert not coordinator.automatic_already_applied(7, "history-a")
-    assert coordinator.record_automatic_success(plan, "repair", 7, "history-a", 12) == "dispatched"
-    assert not coordinator.automatic_already_applied(7, "history-a")
-    coordinator.record_automatic_observation("UNKNOWN item 7770011", 7, "history-a")
-    assert not coordinator.automatic_already_applied(7, "history-a")
-    coordinator.record_automatic_observation(None, 7, "history-b")
-    assert not coordinator.automatic_already_applied(7, "history-a")
-    coordinator.record_automatic_observation(None, 7, "history-a")
-    assert coordinator.automatic_already_applied(7, "history-a")
-    assert not coordinator.automatic_already_applied(8, "history-a")
-    assert not coordinator.automatic_already_applied(7, "history-b")
-    assert document["processed_boundary"] == 12
-    coordinator.reset_automatic()
-    assert document == {}
 
 
 @pytest.fixture
@@ -319,13 +223,9 @@ def test_selected_owned_mod_resync_ignores_unselected_unknown_capacity(inputs):
     context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
     observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, context.campaign,
         {7770059: ItemObservation(7770059, OWNED)})
-    coordinator = MaterializationCoordinator(logging.getLogger(__name__))
-    coordinator.bind({})
-    publisher = SimpleNamespace(publish=lambda *args, **kwargs: (True, None), exists=lambda *args: False)
-    result = coordinator.reconcile(scope, context, ownership((7770059, 7770017)), None, definitions, policies,
-        "the_crucible", publisher, lambda: None, observation=observation, selected_item_ids=frozenset((7770059,)))
-    assert result.error is None and result.plan.entitlement_item_ids == (7770059,)
-    assert not result.plan.commands
+    result = compile_materialization_plan(ownership((7770059, 7770017)), context, scope, definitions, policies,
+        "the_crucible", observation=observation, selected_item_ids=frozenset((7770059,)))
+    assert not result.reconciliation.commands
 
 
 
@@ -356,7 +256,8 @@ def test_fixed_dash_repair_accepts_independent_native_generation_in_the_same_map
     identity = ('created', 'instance', 'build', '99')
     link.observe_inventory = lambda: {'weapons_after': 0, 'ice_bomb_after': 0, 'dash_after': 0,
         '_observation_scope': identity, '_observation_map': native_map}
-    link.observe_special_inventory = lambda: {'_observation_scope': identity, 'native_state_known': 0}
+    link.observe_special_inventory = lambda: {'_observation_scope': identity, 'native_state_known': 0,
+                                              '_observation_map': native_map}
     observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
         context_identity=context.identity, campaign=context.campaign)
     assert (observation is not None) == accepted

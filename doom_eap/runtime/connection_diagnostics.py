@@ -1,19 +1,18 @@
 """Low-volume transport and bridge-loop timing, without packet contents."""
 import asyncio
-from functools import partial, wraps
 import json
 import logging
 import os
 import re
 import socket
 import time
+from functools import partial, wraps
 from urllib.parse import parse_qsl, unquote, urlsplit
 
 from websockets.frames import OP_PONG
 from websockets.legacy.client import WebSocketClientProtocol
 
 from doom_eap.launcher.launcher_platform import redact_secrets
-
 
 logger = logging.getLogger("doom_eternal_ap.bridge")
 _slow_calls = {}
@@ -125,6 +124,7 @@ class ConnectionDiagnostics:
             await asyncio.gather(self.dns_task, return_exceptions=True)
 
     async def connect(self, uri, **kwargs):
+        self.context._launcher_transport_code = "connection_failed"
         self.attempt += 1
         self.protocol = None
         self.connected_at = None
@@ -162,6 +162,9 @@ class ConnectionDiagnostics:
                      peer=self.protocol.remote_address, exception_class=None, message=None)
             return self.protocol
         except Exception as error:
+            from doom_eap.launcher.connection_errors import connection_error_code
+
+            self.context._launcher_transport_code = connection_error_code(error)
             if self.tls_started is not None and self.tls_ms is None:
                 self.tls_ms = (time.monotonic() - self.tls_started) * 1000 if self.target.get("scheme") == "wss" else 0
             if self.tcp_dns_ms is None and self.transport_started >= started:

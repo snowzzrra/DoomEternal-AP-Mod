@@ -22,6 +22,14 @@ jobs:
           path: Archipelago
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with: {python-version: '3.12.10'}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: snowzzrra/Sentinel-Core
+          ref: 3ed7cdb932207df458069be6e9225eddfa16546e
+          path: Sentinel-Core
+          persist-credentials: false
+      - name: Check packaged protocol projection
+        run: python -B tools/content/project_transport_protocol.py --check --core-root ../Sentinel-Core
       - name: Install Qt runtime libraries
         run: |
           sudo apt-get update
@@ -38,6 +46,8 @@ jobs:
         run: python -m compileall -q doom_eap tools/content tools/validation
       - name: Check Python function complexity (development)
         run: python -m tools.validation.function_complexity
+      - name: Check player display literals
+        run: python -m tools.validation.player_literals
       - name: Validate authorial content
         run: python -m tools.validation.authorial --check-authorial
       - name: Validate frozen room resources
@@ -61,8 +71,9 @@ jobs:
     runs-on: windows-2022
     env:
       CORE_REPO: snowzzrra/Sentinel-Core
-      CORE_REF: 86a04096e4083a8ae5e8ee722048fe7fcad03a3a
+      CORE_REF: 3ed7cdb932207df458069be6e9225eddfa16546e
       SENTINEL_CORE_SOURCE: ${{ github.workspace }}/Sentinel-Core
+      SENTINEL_TRANSPORT_RELAY: ${{ github.workspace }}/.tmp/native-transport-ci/save_death_probe.exe
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Checkout pinned Core source
@@ -87,11 +98,18 @@ jobs:
           if errorlevel 1 exit /b 1
           cmake -S Sentinel-Core -B Sentinel-Core/build -G Ninja -DCMAKE_BUILD_TYPE=Release
           if errorlevel 1 exit /b 1
+          python -B tools/content/project_transport_protocol.py --check --core-root Sentinel-Core
+          if errorlevel 1 exit /b 1
+          cmake -S native/probes -B .tmp/native-transport-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DSENTINEL_CORE_SOURCE="%SENTINEL_CORE_SOURCE%"
+          if errorlevel 1 exit /b 1
+          cmake --build .tmp/native-transport-ci --target save_death_probe --parallel 2
+          if errorlevel 1 exit /b 1
           if not exist Sentinel-Core\build\generated\sentinel_version.h exit /b 1
           python -m pip install --requirement requirements-ci.txt
           if errorlevel 1 exit /b 1
           set "DELIVERY_TESTS="
           if exist tests\test_delivery_scenarios.py set "DELIVERY_TESTS=tests/test_delivery_scenarios.py"
-          python -m pytest tests/test_native_queue.py tests/test_ap_client_timing.py %DELIVERY_TESTS% -q --junitxml=native-client-results.xml
+          set "SENTINEL_TRANSPORT_RELAY=%CD%\.tmp\native-transport-ci\save_death_probe.exe"
+          python -m pytest tests/test_native_features.py tests/test_native_transport.py tests/test_native_transport_pipe.py %DELIVERY_TESTS% -q --basetemp=.tmp/native-client-tests -p no:cacheprovider --junitxml=native-client-results.xml
           if errorlevel 1 exit /b 1
           python -c "import xml.etree.ElementTree as ET; root = ET.parse('native-client-results.xml').getroot(); assert list(root.iter('testcase')), 'Native-client gate collected zero tests'; assert not [node for node in root.iter('skipped') if node.get('type') != 'pytest.xfail'], 'Native-client gate contains unexpected skipped tests'"

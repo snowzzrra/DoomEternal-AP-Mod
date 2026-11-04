@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
-import time
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping
+from typing import Any
 
 from doom_eap.runtime.item_reconciliation import ReconciliationCommand
 
@@ -87,7 +85,7 @@ class RuneNativeState:
         *,
         save_slot: str,
         evidence_epoch: int | str,
-    ) -> "RuneNativeState":
+    ) -> RuneNativeState:
         source = details if isinstance(details, Mapping) else {}
         return cls(
             available_perks=_field_values(source, "availablePerkDeclName"),
@@ -143,7 +141,7 @@ def compile_rune_reconciliation_commands(
     """Compile one existing generated effect activation per repair candidate."""
     if not isinstance(slot_identity, str) or not slot_identity:
         raise ValueError("Rune reconciliation requires slot identity")
-    if isinstance(epoch, bool) or not isinstance(epoch, (int, str)):
+    if isinstance(epoch, bool) or not isinstance(epoch, int | str):
         raise ValueError("Rune reconciliation requires an evidence epoch")
     return tuple(
         ReconciliationCommand(
@@ -151,7 +149,7 @@ def compile_rune_reconciliation_commands(
             name=entry.perk.rsplit("/", 1)[-1],
             policy="rune_visual_repair",
             stage=0,
-            spool_id=f"rune-reconcile-{slot_identity}-e{epoch}-item{entry.item_id}",
+            command_key=f"rune-reconcile-{slot_identity}-e{epoch}-item{entry.item_id}",
             command=f"ai_ScriptCmdEnt ap_rpc_v3_{entry.item_id} activate",
             description="reapply one AP-owned Rune perk without changing equipped slots",
         )
@@ -203,6 +201,8 @@ def compile_rune_reconciliation_plan(
     *,
     expected_rune_item_ids: Iterable[int] | None = None,
 ) -> RuneReconciliationPlan:
+    from doom_eap.runtime.inventory import InventoryOwnership, compare_inventory
+
     owned = set(ap_owned_item_ids)
     expected = set(mapping) if expected_rune_item_ids is None else set(expected_rune_item_ids)
     unknown = sorted((owned & expected) - set(mapping))
@@ -211,132 +211,7 @@ def compile_rune_reconciliation_plan(
     if any(isinstance(item_id, bool) or not isinstance(item_id, int) for item_id in owned):
         raise ValueError("AP Rune ownership contains a non-integer item ID")
 
-    entries: list[RunePlanEntry] = []
-    for item_id in sorted(owned & expected):
-        perk = mapping[item_id]
-        available = perk in native.available_perks
-        active = perk in native.active_perks
-        registered = perk in native.registered_runes
-        equipped = perk in native.equipped_slots
-        if registered and available:
-            reason = "registered_and_available"
-            if equipped:
-                reason = "equipped_player_choice_preserved"
-            entries.append(RunePlanEntry(item_id, perk, "noop", reason))
-            continue
-        if not native.observed:
-            reason = "native_snapshot_unavailable"
-        elif not registered and (available or active or equipped):
-            reason = "manager_registration_missing"
-        elif registered:
-            reason = "perk_availability_missing"
-        else:
-            reason = "perk_and_manager_registration_missing"
-        entries.append(RunePlanEntry(item_id, perk, "repair_candidate", reason))
-
-    payload = {
-        "owned": sorted(owned & expected),
-        "available": sorted(native.available_perks),
-        "active": sorted(native.active_perks),
-        "registered": sorted(native.registered_runes),
-        "slots": list(native.equipped_slots),
-        "page": native.page_unlocked,
-        "save_slot": native.save_slot,
-        "evidence_epoch": native.evidence_epoch,
-    }
-    fingerprint = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-    status = "repair_needed" if any(
-        entry.disposition == "repair_candidate" for entry in entries
-    ) else "noop"
-    return RuneReconciliationPlan(tuple(entries), fingerprint, status)
-
-
-class RuneReconciliation:
-    """Own the legacy perk clock and bounded Rune repair publication ledger."""
-    def __init__(self, logger):
-        self._logger = logger
-        self._state = {}
-        self._perk = {"epoch": 1, "delivered": {}}
-
-    def bind(self, state, perk):
-        self._state = state
-        self._perk = perk
-        raw_epoch = perk.get("epoch", 0)
-        if isinstance(raw_epoch, bool) or not isinstance(raw_epoch, int):
-            raw_epoch = 0
-        perk["epoch"] = raw_epoch + 1
-        if not isinstance(perk.get("delivered"), dict):
-            perk["delivered"] = {}
-
-    def reset(self):
-        self._state.clear()
-        self._perk.clear()
-        self._perk.update(epoch=1, delivered={})
-
-    @property
-    def epoch(self):
-        return int(self._perk["epoch"])
-
-    def advance(self, trigger):
-        self._perk["epoch"] = int(self._perk.get("epoch", 0)) + 1
-        self._perk.update(trigger=trigger, timestamp=time.time())
-        return self.epoch
-
-    def compile(self, owned_ids, native, item_definitions, expected_ids):
-        mapping = rune_item_perk_mapping(item_definitions, expected_ids)
-        return compile_rune_reconciliation_plan(
-            owned_ids, native, mapping, expected_rune_item_ids=expected_ids,
-        )
-
-    def reconcile(self, plan, trigger, *, slot_identity, state_key, publisher, persist, force=False):
-        """Queue bounded corrections for each owned Rune with missing state."""
-        state = self._state
-        if not force and rune_plan_already_recorded(state, plan):
-            self._logger.info(
-                "RUNE_RECONCILE_NOOP trigger=%s detail=already_planned fingerprint=%s",
-                trigger,
-                plan.fingerprint,
-            )
-            return plan, None
-        if plan.repairs:
-            try:
-                command_plan = with_rune_reconciliation_commands(
-                    plan,
-                    slot_identity,
-                    self.epoch,
-                )
-            except ValueError as error:
-                return None, str(error)
-            queued, queue_error = publisher.publish(
-                command_plan, state_key=state_key,
-                reason=f"rune:{trigger}",
-            )
-            if not queued:
-                return None, queue_error
-        state.update(
-            fingerprint=plan.fingerprint,
-            status=plan.status,
-            trigger=trigger,
-            timestamp=time.time(),
-            repair_candidates=len(plan.repairs),
-        )
-        persist()
-        if plan.repairs:
-            self._logger.warning(
-                "RUNE_RECONCILE_QUEUED trigger=%s candidates=%s fingerprint=%s",
-                trigger,
-                len(plan.repairs),
-                plan.fingerprint,
-            )
-        else:
-            self._logger.info(
-                "RUNE_RECONCILE_NOOP trigger=%s detail=native_state_coherent "
-                "owned=%s fingerprint=%s",
-                trigger,
-                len(plan.entries),
-                plan.fingerprint,
-            )
-        return plan, None
-
+    return compare_inventory(
+        InventoryOwnership(tuple(owned)), runes=native, rune_mapping=mapping,
+        expected_rune_item_ids=expected,
+    ).runes

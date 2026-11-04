@@ -21,7 +21,11 @@ DEFAULT_OUTPUT = DEFAULT_AP_ROOT / "worlds" / "doometernal" / "generated_content
 def projected_module(source: Path, root: Path) -> bytes:
     name = source.relative_to(root).as_posix()
     notice = f"# GENERATED from {name}; regenerate: python -m tools.content.compile_content_catalog\n"
-    return notice.encode("ascii") + first_party_text_bytes(source.read_bytes())
+    payload = first_party_text_bytes(source.read_bytes()).replace(
+        b"from doom_eap.strings import text as player_text",
+        b"from .player_strings_generated import text as player_text",
+    )
+    return notice.encode("ascii") + payload
 
 
 def remove_asset_projection(output, check):
@@ -36,8 +40,12 @@ def remove_asset_projection(output, check):
 
 def project_contracts(root, output, staging, payloads, write_bytes, *, check=False):
     from doom_eap.content.slot_data_contract import CATALOG_DEPENDENCIES, catalog_dependency_path, catalog_digest
+    from doom_eap.strings import read_catalog
+    from tools.content.compile_player_strings import project_catalog
 
     removed = remove_asset_projection(output, check)
+    for path, payload in project_catalog(read_catalog(root / "data/player_strings.json"), output).items():
+        write_bytes(path, payload)
     directory = root / "doom_eap/content"
     for name in CATALOG_DEPENDENCIES:
         source = catalog_dependency_path(directory, name)
@@ -418,7 +426,7 @@ def _compile_catalog(
     setup_guide = setup_guide.replace("(GAMEPLAY.md)", "(https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/GAMEPLAY.md)")
     write_artifact(output.parent / "docs/setup_en.md", setup_guide)
     write_bytes_artifact(output.with_name("enemy_options.py"),
-                         (catalog.root / "doom_eap/content/enemy_options.py").read_bytes())
+                         projected_module(catalog.root / "doom_eap/content/enemy_options.py", catalog.root))
     write_bytes_artifact(output.with_name("fortress_economy.py"),
                          (catalog.root / "doom_eap/content/fortress_economy.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_plan.py"),
@@ -450,7 +458,7 @@ def _compile_catalog(
     write_artifact(output.with_name("vanilla_enemy_profiles.json"), vanilla_profiles)
     write_artifact(catalog.root / "doom_eap/content/vanilla_enemy_profiles.json", vanilla_profiles)
     write_bytes_artifact(output.with_name("enemy_species.py"),
-                         (catalog.root / "doom_eap/content/enemy_species.py").read_bytes())
+                         projected_module(catalog.root / "doom_eap/content/enemy_species.py", catalog.root))
     write_bytes_artifact(output.with_name("enemy_species.json"),
                          (catalog.root / "content/catalog/enemy_species.json").read_bytes())
     write_bytes_artifact(catalog.root / "doom_eap/content/enemy_species.json",

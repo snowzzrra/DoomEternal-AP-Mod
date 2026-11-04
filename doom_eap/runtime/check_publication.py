@@ -1,6 +1,6 @@
 """Current CommonClient wire adapter and submitted-location projection."""
 
-from doom_eap.runtime.ledger_shadow import ignore
+from doom_eap.runtime.event_observer import ignore
 
 
 class CheckPublication:

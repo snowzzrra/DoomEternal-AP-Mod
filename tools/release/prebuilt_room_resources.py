@@ -37,6 +37,7 @@ DEPENDENCY_DIRS = (
 )
 
 DEPENDENCY_FILES = (
+    "doom_eap/strings.py",
     "doom_eap/runtime/save_records.py",
     "doom_eap/launcher/launcher_core.py",
     "doom_eap/runtime/context_registry.py",
@@ -46,6 +47,7 @@ DEPENDENCY_FILES = (
     "tools/content/compile_start_inventory_catalog.py",
     "tools/release/room_payloads.py",
     "tools/release/build_room_resources.py",
+    "tools/release/build_string_table.py",
     "tools/release/stage_room_resources.py",
     "tools/release/source_bytes.py",
 )

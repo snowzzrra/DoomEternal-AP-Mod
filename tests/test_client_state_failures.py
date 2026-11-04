@@ -32,10 +32,11 @@ def test_state_load_failure_blocks_receipts_and_reconnect_for_session(bridge, tm
         context = bridge.DoomEternalContext.__new__(bridge.DoomEternalContext)
         context.receipt_session = bridge.ReceiptSession(processed_boundary=12)
         context.state_key = "room"
+        context.room_delivery = None
         context.item_state_ready = True
         context._item_delivery_lock = asyncio.Lock()
         context.items_received = [SimpleNamespace(item=7770024, location=1, player=1, flags=0)]
-        monkeypatch.setattr(context, "reset_queue_session_authority", lambda reason: None)
+        monkeypatch.setattr(context, "reset_room_session_authority", lambda reason: None)
         events = []
         monkeypatch.setattr(bridge, "emit_launcher_event", lambda kind, **data: events.append((kind, data)))
         original = b'{"version": 2, "sessions": {"room": {"processed_items": 12}}}' if unreadable else b'{invalid'
@@ -58,8 +59,7 @@ def test_state_load_failure_blocks_receipts_and_reconnect_for_session(bridge, tm
     asyncio.run(run())
 
 
-@pytest.mark.parametrize("operation", ["acknowledge", "observe"])
-def test_receipt_commit_failure_restores_cursor_and_history_and_blocks(bridge, tmp_path, monkeypatch, operation):
+def test_receipt_observation_failure_retains_original_state_and_blocks(bridge, tmp_path, monkeypatch):
     context = bridge.DoomEternalContext.__new__(bridge.DoomEternalContext)
     context.receipt_session = bridge.ReceiptSession(processed_boundary=7)
     context.item_state_ready = True
@@ -71,19 +71,16 @@ def test_receipt_commit_failure_restores_cursor_and_history_and_blocks(bridge, t
     original = copy.deepcopy(context.session_state)
     bridge.client_state_store().commit(context.client_state)
     persisted = bridge.CLIENT_STATE_FILE.read_bytes()
-    monkeypatch.setattr(context, "reset_queue_session_authority", lambda reason: None)
+    monkeypatch.setattr(context, "reset_room_session_authority", lambda reason: None)
     events = []
     monkeypatch.setattr(bridge, "emit_launcher_event", lambda kind, **data: events.append((kind, data)))
     def denied(*args, **kwargs):
         raise PermissionError("replace denied")
     monkeypatch.setattr("doom_eap.runtime.client_state_store.os.replace", denied)
     with pytest.raises(PermissionError, match="replace denied"):
-        if operation == "acknowledge":
-            context._acknowledge_receipt(SimpleNamespace(item=7770024, location=1, player=1))
-        else:
-            monkeypatch.setattr(context, "validate_item_history_prefix", lambda: True)
-            context.items_received = [SimpleNamespace(item=7770024, location=index, player=1) for index in range(8)]
-            context.observe_received_item_history()
+        monkeypatch.setattr(context, "validate_item_history_prefix", lambda: True)
+        context.items_received = [SimpleNamespace(item=7770024, location=index, player=1) for index in range(8)]
+        context.observe_received_item_history()
     assert context.items_processed == 7 and context.session_state == original
     assert bridge.CLIENT_STATE_FILE.read_bytes() == persisted
     assert not context.item_state_ready and context.item_delivery_blocked

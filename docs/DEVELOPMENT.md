@@ -1,20 +1,22 @@
-# Content and builds
+# Developing DOOM Eternal Archipelago
 
-Edit each system in its owning repository:
+The project lives in three repositories, kept side by side in one folder:
 
-- `Archipelago/worlds/doometernal`: world generation, options, items, regions and access rules.
-- `DoomEternal-AP-Mod`: Python bridge, launcher, map compiler, native AP client and release packaging.
-- `Sentinel-Core`: native game API, hooks, save integration and its independent runtime distribution.
+- **`Archipelago/`**: our Archipelago fork. The DOOM world is in
+  `worlds/doometernal/`: options, items, locations, regions, logic, and the room
+  data handed to the client.
+- **`DoomEternal-AP-Mod/`** (this one): the launcher, the bridge that talks to the
+  AP server, the native client, the map/room compiler and release packaging.
+- **`Sentinel-Core/`**: the DLL loaded into DOOM Eternal. It hooks the game, reads
+  its state, writes saves and runs our commands on the game thread.
 
-Keep `DoomEternal-AP-Mod/`, `Archipelago/` and `Sentinel-Core/` as sibling directories.
-`Archipelago/` is the Archipelago fork that contains `worlds/doometernal/`. The content
-compiler defaults to that sibling; pass `--archipelago-source` for another location.
-`scripts/build/windows_release.ps1` takes `-ArchipelagoSource` and `-CoreSource`.
+The tools assume these three folders are siblings. Pass `--archipelago-source`
+(compiler) or `-ArchipelagoSource` / `-CoreSource` (`scripts/build/windows_release.ps1`)
+if yours aren't.
 
-## First contribution
+## Getting started
 
-Use Python 3.10 or newer for development and CI. From the repository root,
-create a local environment and install the test dependencies:
+You need Python 3.10 or newer. From the repository root:
 
 Windows (PowerShell):
 
@@ -32,197 +34,244 @@ python3 -m venv .venv
 .venv/bin/python -m pytest tests/test_launcher_setup.py::test_room_replacement_failure_preserves_previous -q
 ```
 
-Expect `5 passed`. These checks use temporary game folders. For the full fast
-suite, run the same Python with `-m pytest tests -q`; skips depend on installed
-tools and sibling checkouts. Qt tests skip without PySide6.
+If that passes, your environment works. It uses temporary game folders; nothing
+touches a real install. `-m pytest tests -q` runs the fast suite; some tests skip
+without a compiler, the sibling checkouts or PySide6. For launcher work also
+install `requirements-launcher.txt`. The Windows native client needs x64 MSVC, the
+Windows SDK and a configured `Sentinel-Core` checkout; Core itself is built and
+tested in its own repository.
 
-For launcher or Qt work, also install `requirements-launcher.txt` with the venv's
-Python. The first test needs no native build. Building the Windows native client
-needs x64 MSVC, the Windows SDK and a configured sibling `Sentinel-Core` checkout;
-some native tests skip without a compiler or Core headers. Core builds and tests
-belong in `Sentinel-Core`; see [Build a release](RELEASING.md) for packaging.
+Format only what you changed: `python -m ruff format path/to/file.py` and
+`clang-format -i native/path/to/file.cpp`. `pre-commit install` sets that up as a
+hook if you want it.
 
-Format only changed files: `python -m ruff format path/to/changed.py` and
-`clang-format -i native/path/to/changed.cpp` (include changed headers).
-Hooks are optional: with pre-commit installed and the venv active, run `pre-commit install`.
-
-## Content sources
-
-`content/maps/<map>/` describes map identity, locations, runtime events, publishers,
-assets and onboarding. `content/catalog/` holds shared authored settings and qualified
-enemy templates. The compiler verifies player-supplied retail maps in `vanillamaps/`
-and builds the mod from these inputs. Generated maps and files under `data/` are
-outputs where the compiler provides a source; do not maintain another copy by hand.
-
-Enemy planning uses `native_enemy_catalog.json`, generated from the native map
-inventory and qualified species templates. The planner freezes body choices while
-the game schedules encounters. The compiler changes referenced bodies and preserves
-native event arguments, manager flow and save integration.
-
-`killsanity_estimates.json` holds conservative map estimates, reviewed event counts,
-access points and the separate finite progression guarantee. Event counts are not
-a complete enemy census. The content compiler checks referenced events against the
-native catalog and generates `campaign_kill_sources.json` for both Python packages.
-`secret_encounter_timers.json` supplies timer baselines. Reviewed event sources
-supply Secret Encounter access for mastery logic; compilation checks those names
-against the physical location records.
-
-## Shared code and packaged resources
-
-The content compiler projects planners from `doom_eap/content` into the APWorld.
-Each package contains its required JSON resources and runs without the other checkout.
-Run `python -m tools.content.compile_content_catalog --source-only` after changing
-those sources, then use the same command with `--check` to verify the projections.
-
-APWorld `options.py` supplies option names and help. Run
-`python -m tools.content.compile_options_schema` to update the launcher's option
-schema; add `--check` to verify it. Keep configuration keys and protocol IDs stable
-when editing player-facing text.
-
-The room compiler reads raw source snapshots from `room_payloads.zip`, not a
-developer's map directory. It validates source hashes, plans and archive membership
-before preparing a room mod. Enemy resources come from the native donor-map banks.
-
-## Runtime boundaries
-
-The bridge connects to Archipelago and persists item/check progress per room and
-player. The native AP client calls Core's local API. Core verifies the game build
-and provides observations, save access and queued gameplay operations. A successful
-queued call is not evidence that its gameplay effect has already occurred.
-
-Keep room identity checks, atomic persistence, item receipt indices, reconnect
-handling and save ownership protections when simplifying these paths.
-
-## Item delivery
+## How the pieces fit
 
 ```text
-AP server ─ReceivedItems─► bridge (CommonContext, asyncio)
-                             │ checks the ordered receipt prefix
-                             │ compiles the effect (contracts/foundation.py)
-        ┌────────────────────┴───────────────────┐
-        ▼                                        ▼
- disk spool base/ap_queue                  Sentinel probe (subprocess)
- .cmd → .processing → .attempt → deleted   weapon points, masteries,
-                             └─► .failed   runes, special weapon
-        ▼                                        ▼
- ap_client.exe (50 ms loop) ──────────────► Sentinel Core (game frame)
+ player YAML ──► APWorld generates the room ──► slot data (resolved, digested)
+                                                     │
+ player connects ──► launcher ──► builds the room mod from frozen resources
+                         │        └─► EternalModInjector installs it
+                         ▼
+                      bridge ◄──── AP server (items received, checks sent)
+                         │
+                 ledger ─┴─ delivery coordinator ──► native transport ──► Sentinel Core
+                 (what you own,      (what's missing,       (named pipe,       (runs it on
+                  what happened)      when to send)          protocol v2)       the game frame)
 ```
 
-- `runtime/bridge_client.py` accepts receipts only when the received list extends the
-  stored history for the session (seed, team, slot, generation fingerprint), and keeps
-  the receipt cursor in `client_state.json` (`runtime/client_state_store.py`).
-- Ordinary effects and notifications are spool files (`runtime/command_spool.py`).
-  `native/client/command_queue.cpp` imports, runs and deletes them. An interrupted or
-  ambiguous attempt moves to `.failed` and is never replayed automatically.
-- Typed effects call Sentinel through the probe (`runtime/weapon_points.py`). Weapon
-  points keep their own receipt ledger and rebuild it from AP history and the native
-  earned total, never refunding spent points.
-- Reconciliation (`runtime/materialization.py`, `runtime/rune_reconciliation.py` and
-  typed reconciliation in the bridge) compares ownership with observed inventory and
-  plans what is missing.
-- Location checks stay on disk until the server acknowledges them.
+A few decisions shape everything else. Knowing why they were made saves you from
+undoing them by accident.
 
-The receipt cursor advances when a command reaches the spool, not when the game
-confirms the effect. Publishing a command and advancing the cursor are separate
-writes. Treat both as known limits when changing this path.
+**The generator decides, the client checks.** The APWorld resolves the whole
+campaign at generation time: mission order, enemy recipes, starting items, Kill
+Rewards. The client never re-rolls or "fixes" any of it; it validates digests and
+refuses a room that doesn't match. Two copies of that logic, one on each side,
+would sooner or later disagree, and the disagreement would only show up mid-game.
 
-## Slot data
+**The ledger owns item delivery.** Every received item goes into a SQLite ledger
+(`runtime/ledger*.py`) before anything happens in the game. The coordinator
+(`runtime/delivery.py`) compares what you own with what the game shows
+(`runtime/inventory.py`) and sends only what's missing. An effect counts as
+delivered only when the game proves it: a currency counter moved by exactly the
+right amount, a perk is owned, a key is in the right map. When we can't prove it,
+the item stays "uncertain" and the player chooses **Try again** or **Mark as
+received**. We never resend on our own, because a resend can duplicate an item
+and a refund can take back something the player already used.
 
-`fill_slot_data` in `Archipelago/worlds/doometernal/__init__.py` produces the room
-data; the launcher normalizes it (`launcher/launcher_core.py`, `SeedManifest.from_room`)
-and the runtime validates the campaign (`runtime/unified_campaign.py`). Enemy slot data
-contains a seed, recipe revision, frozen campaign and fingerprint. Clients reconstruct
-the recipes locally with the matching source catalog and verify the fingerprint.
-Complete recipe plans are also accepted. Universal Tracker restores the room's campaign,
-game options and enemy recipes before constructing regions and rules; its room data
-must include `tracker_options`.
-Slot data is versioned by `slot_schema` and revision fields; the generation fingerprint
-excludes `enemy_*`, `progressive_difficulty` and `tracker_options`. Consumers validate
-the frozen campaign rather than selecting a different campaign locally.
+**Commands have identities.** Every command sent to Core carries an ID. If the
+connection drops after sending, the client asks Core about that same ID instead
+of sending it again. Core keeps recent results so that question has an answer.
 
-## Native protocol
+**One computer spends per room.** The first profile that spends (Ammo Refill, for
+example) owns spending for that room. Others still receive items. There's no
+safe way to hand that over while the old computer might still be running.
 
-Sentinel serves a local named pipe per game process, restricted to the logon session.
-Messages carry a 16-byte little-endian header (magic, version, operation, payload
-length, result) and are limited to 16 KiB (`Sentinel-Core/include/sentinel_inspection.h`,
-`src/protocol.cpp`). Requests are admitted against process, context, session and feature
-scope, run on the game frame, and keep their result for 30 seconds. After an uncertain
-submit the client polls the same request identity instead of resubmitting
-(`native/client/sentinel_command_client.cpp`).
+**Saves are written in two generations.** Core never overwrites the last good
+checkpoint. It writes the new one next to it, proves it with hashes, then switches.
+After a crash it keeps the files and recovers the last proven generation, or
+stops and says why.
 
-Automap ABI 2 carries 576 check bits, covering location IDs through 7770575. The
-launcher requires a Core/probe distribution with that ABI before gameplay setup.
+**The injector isn't ours.** EternalModInjector is a third-party tool. The launcher
+writes its settings file, runs it, reports what it did and uses the tools it ships
+with; it never modifies them or takes over their job. The install transaction
+(`launcher/installation.py`, `install_journal.py`) records and can undo only what
+the launcher itself writes.
 
-Use [Build a release](RELEASING.md) for validation and packaging commands. Offline
-harnesses cover protocol and simulated lifecycle behavior. Full gameplay and real
-Linux/Proton checks require a separate test session with the supported game.
+**Hooks install all or nothing.** In Core, each group of hooks installs through a
+`HookSet`: if one hook in a required group fails, the ones already installed are
+removed. A half-hooked game is worse than a game with the feature off.
+
+## Where things are
+
+| Area | Module | What it does |
+|---|---|---|
+| APWorld | `__init__.py`, `options.py`, `logic.py`, `planner.py` | World class, player options, access rules, campaign planning |
+| APWorld | `slot_data.py`, `slot_data_contract.py` | Builds and validates the room data sent to the client |
+| Content | `content/maps/`, `content/catalog/` | Authored map data: locations, events, enemies, onboarding |
+| Content | `tools/content/`, `tools/maps/` | Compilers: catalogs, generated projections, room mods |
+| Launcher | `launcher_controller.py`, `events.py`, `presenters/`, `ui/` | App logic, typed events, what each screen shows, Qt views |
+| Launcher | `installation.py`, `install_journal.py`, `installation_adapters.py` | Install transaction and the Windows/Linux injector runners |
+| Launcher | `campaign_resources.py`, `resource_bank.py` | Enemy resource banks and campaign resources after injection |
+| Launcher | `launcher_session.py`, `checkpoint.py` | Room session, AP save, backup and checkpoint recovery states |
+| Runtime | `bridge_client.py` | Connection to the AP server; receives items, sends checks |
+| Runtime | `ledger.py`, `ledger_records.py`, `ledger_schema.py` | What was received and what happened to it, durable |
+| Runtime | `inventory.py`, `inventory_observation.py` | What you own vs. what the game shows |
+| Runtime | `delivery.py`, `delivery_runtime.py`, `delivery_plans.py` | Deciding what to send and recording the result |
+| Runtime | `native_transport.py` | Persistent pipe to Core (through a relay under Proton) |
+| Shared | `doom_eap/contracts/` | Typed data at boundaries: room data, Core distribution, evidence |
+| Shared | `data/player_strings.json`, `doom_eap/strings.py` | Every player-facing text |
+| Core | `protocol/schema.json`, `tools/generate_protocol.py` | The wire protocol; both sides generate code from it |
+| Core | `src/engine/hooks/`, `src/save_*`, `src/features/expanded/` | HookSet, save checkpoints, encounter and spawn features |
+
+## Fixing a bug: an example
+
+Here's a real one, to show how a fix usually goes.
+
+**The symptom.** Rooms with Kill Rewards enabled failed when the launcher tried
+to accept them: "placement set is incomplete". Rooms without Kill Rewards were fine.
+
+**Find where the two sides disagree.** The launcher checks that it has a placement
+(which item sits where) for every location the server says exists
+(`_normalize_placements` in `launcher/launcher_core.py`). The APWorld includes Kill
+Reward locations in the room's placement digest. The bridge asks the server for
+placements in `runtime/location_setup.py`, and that's where the answer was:
+`begin()` removed the Kill Reward IDs from the list it asked about. Two of the three
+parties expected them; one left them out.
+
+**Decide which side is wrong.** Kill Rewards are real AP locations with real items,
+so the launcher and the APWorld were right. The bridge should ask for them like
+any other location. Changing the launcher and the digest instead would have meant
+changing a contract on two sides to accommodate one bug.
+
+**Write the test first, through the real entry point.**
+`test_kill_reward_placements_are_scouted_with_map_locations` in
+`tests/test_protocol_setup.py` starts a `LocationSetup` with a normal location and
+a Kill Reward, and checks that both are asked for and both must be answered before
+setup completes. It failed before the fix and passes after. It doesn't care how
+`begin()` is written inside; it checks what the player would notice.
+
+**Make the small fix, then look around.** The fix was a few lines in `begin()`.
+Then check who else uses those placements: the room compiler writes "location
+sent" strings and binds notifications by location ID, and with Kill Rewards in the
+list it gained entries for them, which is harmless. The review that followed found
+one real consequence: receipt notifications for local items found at a Kill Reward
+were being hidden as if a map notification had already shown them. That got its
+own test and fix.
+
+**Run the gates.** The tests for what you touched, the complexity gate, `ruff`, and
+`--check` on any generator whose inputs you changed.
+
+In short: find where two parts disagree, decide which one matches the contract,
+prove the bug with a test that goes through the same door the player does, fix it
+where it starts, and check who else reads what you changed.
 
 ## Writing code
 
-Data from outside the program — the AP server, files on disk, the named pipe to
-Core, game memory — is checked once, where it comes in, and turned into a typed
-value (usually a frozen dataclass or an enum). Code past that point can rely on it.
-Checking the same fields again deeper in the code makes changes harder, because
-every check has to be updated when the format changes.
+Data from outside the program (the AP server, files on disk, the pipe to Core,
+game memory) is checked once, where it comes in, and turned into a typed value,
+usually a frozen dataclass or an enum. Code after that point can trust it. Checking
+the same fields again deeper in makes every format change touch many places.
 
-Decide with codes and enums, not with display text. A button's label or an
-exception message can change for a wording fix; that must not change behavior.
+Decide with codes and enums, never with display text. A label or a message can
+change for a wording fix; behavior must not change with it.
 
-Catch the specific exception you expect, near the call that raises it. Catching
+Catch the specific exception you expect, close to where it's raised. Catching
 `Exception` is fine only at the edge of a worker thread or a game hook, where an
-uncaught error would kill the thread or the game. In native code, game-memory
-reads and writes stay inside SEH guards, every MinHook call's result is checked,
-and a hook install that fails halfway removes the hooks it already created.
+uncaught error would kill the thread or the game. In native code, game memory is
+only touched inside SEH guards, every MinHook result is checked, and a failed
+install removes what it already installed.
 
-Give things the name of what they are (`MenuState`, `content_fingerprint`). Never
-rename persisted keys or public IDs: saves and rooms from players depend on them.
+Name things for what they are (`MenuState`, `content_fingerprint`). Never rename
+persisted keys or public IDs: players' saves and rooms depend on them.
 
-A comment is worth writing when the code can't say it: a game quirk, a limit of
-Proton, a reason an order matters. Leave out comments that restate the code.
+Write a comment when the code can't say it: a game quirk, a Proton limit, why an
+order matters. Skip comments that repeat the code.
 
-Text shown to players says what went wrong and what to do next. When the fix isn't
-simple, point to Help → Save Support Report; the technical details go in the report.
+Player-facing text says what went wrong and what to do next. When the fix isn't
+simple, point to **Help → SAVE SUPPORT REPORT**; technical details go in the report.
 
-Tests go through the same entry points the program uses and check what a player
-would notice: saves kept, rooms kept apart, items delivered once, spending,
-recovery after a crash, progression, install and update. A test that checks a
-private attribute, an exact sentence or the order of internal calls breaks on every
-refactor without catching real bugs.
+Tests use the same entry points as the program and check what a player would
+notice: saves kept, rooms kept apart, items delivered once, spending, recovery
+after a crash, progression, install and update. A test that checks a private
+attribute, an exact sentence or the order of internal calls breaks on every
+refactor and doesn't catch real bugs.
+
+### Player text and languages
+
+All player text is in `data/player_strings.json`; code reads it through
+`doom_eap/strings.py`. `languages` declares each language code with a display name
+and an optional flag file. Every entry has a value for each code; `null` means
+"show English". For contributors, the short version is in the README:
+[Changing a text](../README.md#changing-a-text) and
+[Adding a language](../README.md#adding-a-language).
+
+The launcher saves the chosen language as `launcher_language` in `launcher.json`
+and applies it on the next start. It doesn't change the game's language; in-game
+tables are generated for `en`/`pt-BR` and follow the game's own setting.
+
+Rules for entries:
+
+- Keys are stable and meaningful; never reuse one for a different message.
+- Declare each placeholder in `parameters` as `str` or `int`, and use the same names
+  in every language. No conversions, attribute/index access or format specs: format
+  numbers before passing them. Write `{{` and `}}` for literal braces.
+- Plurals are complete messages under `.one` and `.other` (`.zero` only if needed).
+- AP item/location/player names, chat and DeathLink causes from other games are
+  data, not entries. Keep their escaping where they're shown and never format them twice.
+- Telemetry, engine commands, protocol fields, error codes and support-report details
+  stay out of the catalog.
+- APWorld option help stays in `options.py`; other APWorld text comes from the catalog.
+
+The generator writes the APWorld's `player_strings_generated.py`, Sentinel-Core's
+`src/player_strings_generated.h` and the game string tables. Text used by native
+code must be ASCII and fit its buffer, counting the final NUL: 96-byte menu titles,
+32/96-byte HUD fields, 64/80-byte counters, 160-byte controls. The check enforces it.
+
+`python -m tools.validation.player_literals` checks Python display sinks and the
+shipped `scripts/launch/run_bridge.sh`. It follows local captions and option tables
+into Qt text, event message fields and notifications. Use catalog keys for player
+text and codes for decisions. The small allow-list covers separators, HTML markup,
+numeric initialization and the bridge's technical log line; there is no baseline.
+CI runs this check beside the function complexity gate.
 
 ### Generated files
 
-Most of the large JSON files in this repository are not written by hand. Edit the
-source and run the generator; a hand edit is overwritten on the next run and makes
-the provenance hashes disagree.
+Many large files here are generated. Edit the source and run the generator; a hand
+edit gets overwritten and breaks the provenance hashes. Commit the source change
+and the regenerated files together.
 
 | Files | Source | Command |
 |---|---|---|
-| `doom_eap/content/native_enemy_catalog.json`, `vanilla_enemy_profiles.json`, `campaign_kill_sources.json`; `data/checked_location_visuals.json`, `campaign_stages.json`, `foundation_contracts.json`; the APWorld's `generated_content.py` and its copies of these files | `content/maps/`, `content/catalog/` | `python -m tools.content.compile_content_catalog` |
+| `doom_eap/content/native_enemy_catalog.json`, `vanilla_enemy_profiles.json`, `campaign_kill_sources.json`; `data/checked_location_visuals.json`, `campaign_stages.json`, `foundation_contracts.json`; the APWorld's `generated_content.py` and its copies of these files | `content/maps/`, `content/catalog/` | `python -m tools.content.compile_content_catalog --source-only` |
 | `data/options_schema.json` | option classes in the APWorld | `python -m tools.content.compile_options_schema` |
+| APWorld `player_strings_generated.py`, Core `src/player_strings_generated.h`, game string tables | `data/player_strings.json` | `python -m tools.content.compile_player_strings` |
+| `doom_eap/runtime/sentinel_protocol_generated.py` | Core `protocol/schema.json` | `tools/generate_protocol.py` in Core, then the Mod's projection |
 | `content/catalog/native_enemy_assets.json` | the installed game (Windows) | `python tools/content/capture_native_enemy_assets.py` |
-| `packaging/room_resources/<version>/` | compiled room resources | release tooling, see [Build a release](RELEASING.md) |
+| `packaging/room_resources/<version>/` | compiled room resources | see [Building a release](RELEASING.md) |
 
-The content compiler prints the paths it changed. Commit the source change and the
-regenerated files together.
+Add `--check` to any of the Python generators to verify without writing.
 
 ### Function complexity
 
-`python -m tools.validation.function_complexity` measures each Python function.
-A function may have cognitive complexity up to 15 and cyclomatic complexity up to
-10. Functions that were already above that are listed with their current numbers
-in `tools/validation/complexity_exceptions_mod.txt` (and `..._apworld.txt` for the
-APWorld, checked with `--apworld-root ../Archipelago/worlds/doometernal`). A listed
-function may get simpler but not more complex. When you simplify one below the
-limit, delete its line, or run with `--update`.
+`python -m tools.validation.function_complexity` measures every Python function:
+cognitive complexity up to 15, cyclomatic up to 10. Generated files are skipped.
+Functions that were already over the limit are listed with their numbers in
+`tools/validation/complexity_exceptions_mod.txt` (and `..._apworld.txt`, checked
+with `--apworld-root ../Archipelago/worlds/doometernal`). A listed function may get
+simpler, never more complex. When you bring one under the limit, delete its line or
+run with `--update`. Core has the same gate with `tools/complexity_exceptions.txt`.
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
-| Room | An Archipelago multiworld session; identified by seed, team and slot |
-| Room mod | The mod ZIP compiled for one room and player |
-| Receipt | One entry of the server's received-items list, identified by its index |
-| Check | A location the player completed, sent to the server |
-| Core | Sentinel Core, the native DLL loaded into the game |
-| Lease | Identifier of the game context (campaign, map, load) a command was planned for |
-| Spool | The on-disk queue of commands between the bridge and the native client |
+| Room | One Archipelago multiworld session, identified by seed, team and slot |
+| Room mod | The mod ZIP built for one room and one player |
+| Receipt | One entry in the server's list of items you received, identified by its index |
+| Check | A location you completed, sent to the server |
+| Ledger | The local database of what you received and what happened to each item |
+| Evidence | Proof read from the game that an effect really happened |
+| Uncertain | An item sent to the game without proof it landed; the player decides what to do |
+| Core | Sentinel Core, the DLL inside the game |
+| Generation | One of the two save checkpoints Core keeps |

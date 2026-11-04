@@ -9,23 +9,28 @@ import sys
 import threading
 from collections import deque
 from collections.abc import Callable
+from dataclasses import asdict
 from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
 
+from doom_eap.launcher.ui.strings import text as player_text
+
+from .events import EventOrigin, LauncherEvent, adapt_event
+from .items_reader import LedgerReadAdapter as LedgerReadAdapter
 from .launcher_platform import redact_secrets
 
 EVENT_PREFIX = "AP_EVENT "
 
 
 class BridgeState(str, Enum):
-    STOPPED = "STOPPED"
-    STARTING = "STARTING"
-    CONNECTING = "CONNECTING"
-    CONNECTED = "CONNECTED"
-    DISCONNECTED = "DISCONNECTED"
-    STOPPING = "STOPPING"
-    FAILED = "FAILED"
+    STOPPED = 'STOPPED'
+    STARTING = 'STARTING'
+    CONNECTING = player_text('launcher.ui', 'connecting')
+    CONNECTED = player_text('launcher.ui', 'connected')
+    DISCONNECTED = 'DISCONNECTED'
+    STOPPING = 'STOPPING'
+    FAILED = player_text('launcher.ui', 'failed')
 
 
 class BridgeSupervisor:
@@ -41,7 +46,7 @@ class BridgeSupervisor:
         application_dir: Path,
         config_path: Path,
         profile_id: str,
-        event_sink: Callable[[dict[str, Any]], None],
+        event_sink: Callable[[LauncherEvent], None],
         log_sink: Callable[[str], None],
         frozen: bool | None = None,
         archipelago_source: Path | None = None,
@@ -86,10 +91,10 @@ class BridgeSupervisor:
 
     def start(self, *, endpoint: str, player: str, password: str = "") -> None:
         if self.running:
-            raise RuntimeError("Room connection is already running.")
+            raise RuntimeError(player_text('launcher.supervisor', 'room_connection_is_already_running'))
         with self._profiles_lock:
             if self.profile_id in self._profiles:
-                raise RuntimeError("This player already has a room connection. Close the other launcher before retrying.")
+                raise RuntimeError(player_text('launcher.supervisor', 'this_player_already_has_a_room_connection_close_the_other_launch'))
             self._profiles.add(self.profile_id)
         self._password = password
         self._intentional_stop = False
@@ -152,8 +157,8 @@ class BridgeSupervisor:
             if structured and line.startswith(EVENT_PREFIX):
                 try:
                     event = json.loads(line[len(EVENT_PREFIX) :])
-                    if not isinstance(event, dict):
-                        raise ValueError("Room connection stopped. Retry, then select Help -> SAVE SUPPORT REPORT.")
+                    if not isinstance(event, dict) or not isinstance(event.get("type"), str):
+                        raise ValueError(player_text('launcher.supervisor', 'room_connection_stopped_retry_then_select_help_save_support_repo'))
                     self._accept_event(event)
                 except Exception as error:
                     self.last_error = {
@@ -162,7 +167,7 @@ class BridgeSupervisor:
                     }
                     self.state = BridgeState.FAILED
                     self._failure_emitted = True
-                    self.event_sink({"type": "setup_failed", **self.last_error})
+                    self._emit({"type": "setup_failed", **self.last_error})
                 continue
             redacted = self._redact(line)
             self.logs.append(redacted)
@@ -183,17 +188,20 @@ class BridgeSupervisor:
             self._failure_emitted = True
             self.last_error = {
                 "code": str(event.get("code", "bridge_error")),
-                "message": self._redact(str(event.get("message", "Room connection failed. Retry, then select Help -> SAVE SUPPORT REPORT."))),
+                "message": self._redact(str(event.get("message", player_text('launcher.supervisor', 'room_connection_failed_retry_then_select_help_save_support_repor')))),
             }
             event = {**event, **self.last_error}
         elif event_type == "client_stopping":
             self.state = BridgeState.STOPPING
-        self.event_sink(event)
+        self._emit(event)
+
+    def _emit(self, event: dict[str, Any]) -> None:
+        self.event_sink(adapt_event(event, origin=EventOrigin.BRIDGE))
 
     def send_command(self, text: str) -> None:
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError("Connect to a room first.")
+            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
         with self._write_lock:
             process.stdin.write(text.rstrip("\r\n") + "\n")
             process.stdin.flush()
@@ -202,31 +210,41 @@ class BridgeSupervisor:
         """Send raw launcher chat through bridge control channel."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError("Connect to a room first.")
+            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
         control = json.dumps({"type": "say", "text": text}, separators=(",", ":"))
         with self._write_lock:
-            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
             process.stdin.flush()
 
     def request_support_condump(self) -> None:
         """Request one bounded AP_SUPPORT_FILE.txt diagnostic condump."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError("Connect to a room first.")
+            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
         control = json.dumps({"type": "support_condump"}, separators=(",", ":"))
         with self._write_lock:
-            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
             process.stdin.flush()
 
     def request_inventory_resync(self, *, domain="all", item_id=None) -> None:
         """Request one manual inventory reconciliation through bridge control."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError("Connect to a room first.")
+            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
         control = json.dumps({"type": "inventory_resync", "domain": domain, "item_id": item_id}, separators=(",", ":"))
         with self._write_lock:
-            process.stdin.write(f"AP_CONTROL {control}\n")
+            process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
             process.stdin.flush()
+
+    def request_delivery_capabilities(self, room, request_id):
+        control = {"type": "delivery_capabilities", "room": asdict(room), "request_id": request_id}
+        self.send_command('AP_CONTROL ' + json.dumps(control, separators=(",", ":")))
+
+    def resolve_item(self, request):
+        control = {"type": "item_resolution", "room": asdict(request.room), "request_id": request.request_id,
+                   "command_id": request.action.command_id, "expected_revision": request.action.expected_revision,
+                   "action": request.action.kind.value}
+        self.send_command('AP_CONTROL ' + json.dumps(control, separators=(",", ":")))
 
     def _watch_process(self) -> None:
         process = self._process
@@ -241,18 +259,18 @@ class BridgeSupervisor:
         if intentional_stop:
             self.state = BridgeState.STOPPED
             if emit_disconnected:
-                self.event_sink({"type": "disconnected", "intentional": True})
+                self._emit({"type": "disconnected", "intentional": True})
         else:
             self.last_error = {
                 "code": "bridge_exited",
-                "message": "Room connection stopped. Retry, then select Help -> SAVE SUPPORT REPORT.",
+                "message": player_text('launcher.supervisor', 'room_connection_stopped_retry_then_select_help_save_support_repo'),
             }
             self.state = BridgeState.FAILED
             if not self._failure_emitted:
                 self._failure_emitted = True
-                self.event_sink({"type": "setup_failed", **self.last_error})
+                self._emit({"type": "setup_failed", **self.last_error})
         self._stopped.set()
-        self.event_sink(
+        self._emit(
             {
                 "type": "worker_stopped",
                 "intentional": intentional_stop,

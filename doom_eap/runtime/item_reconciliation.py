@@ -10,15 +10,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from doom_eap.contracts.foundation import compile_item_delivery_plan
-from doom_eap.contracts.receipt_delivery import (
-    NEW_RECEIPT, HISTORICAL_OWNERSHIP, RECONCILIATION_REPAIR, PRESENTATION_REPAIR,
-)
-from doom_eap.contracts.tag_prerequisites import AUTHORED_TAG_PREREQUISITES
+from doom_eap.contracts.foundation import compile_item_delivery_plan as compile_item_delivery_plan
 from doom_eap.contracts.ownership import (
-    CompletionUpgrade, DerivedOwnershipFact, EffectiveOwnership, ReceiptSessionToken,
+    CompletionUpgrade,
+    DerivedOwnershipFact,
+    EffectiveOwnership,
+    ReceiptSessionToken,
     StartingMaterializationFact,
 )
+from doom_eap.contracts.receipt_delivery import (
+    HISTORICAL_OWNERSHIP,
+    NEW_RECEIPT,
+    PRESENTATION_REPAIR,
+    RECONCILIATION_REPAIR,
+)
+from doom_eap.contracts.tag_prerequisites import AUTHORED_TAG_PREREQUISITES
 
 REPLAY_IDEMPOTENT = "replay_idempotent"
 REPLAY_MANUAL_ONLY = "replay_manual_only"
@@ -212,7 +218,7 @@ class ReconciliationCommand:
     name: str
     policy: str
     stage: int
-    spool_id: str
+    command_key: str
     command: str
     description: str
 
@@ -330,7 +336,7 @@ def receipt_item_id(receipt: Any) -> int:
     value = _field(receipt, "item")
     if value is None:
         value = _field(receipt, "item_id")
-    if value is None and isinstance(receipt, (tuple, list)) and receipt:
+    if value is None and isinstance(receipt, tuple | list) and receipt:
         value = receipt[0]
     if value is None or isinstance(value, bool):
         raise ValueError("received item ID must be an integer")
@@ -347,9 +353,9 @@ def _canonical_value(value: Any) -> Any:
             str(key): _canonical_value(value[key])
             for key in sorted(value, key=lambda candidate: str(candidate))
         }
-    if isinstance(value, (tuple, list)):
+    if isinstance(value, tuple | list):
         return [_canonical_value(entry) for entry in value]
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, str | int | float | bool) or value is None:
         return value
     return str(value)
 
@@ -842,73 +848,6 @@ def normalize_session_state(session: Mapping[str, Any] | None) -> dict[str, Any]
         or isinstance(normalized["cultist_autosave_path"], str)
     ):
         normalized["cultist_autosave_path"] = None
-    normalized["item_mapping_revision"] = _safe_nonnegative_int(
-        normalized.get("item_mapping_revision"), 0
-    )
-    mapping_indices = normalized.get("mapping_repair_indices")
-    if isinstance(mapping_indices, list):
-        normalized["mapping_repair_indices"] = sorted(
-            {
-                entry
-                for entry in mapping_indices
-                if isinstance(entry, int) and not isinstance(entry, bool) and entry >= 0
-            }
-        )
-    elif "mapping_repair_indices" in normalized:
-        normalized["mapping_repair_indices"] = []
-    if not isinstance(normalized.get("perk_reconciliation"), Mapping):
-        normalized["perk_reconciliation"] = {"epoch": 0, "delivered": {}}
-    else:
-        reconciliation = copy.deepcopy(dict(normalized["perk_reconciliation"]))
-        epoch = reconciliation.get("epoch", 0)
-        reconciliation["epoch"] = _safe_nonnegative_int(epoch, 0)
-        delivered = reconciliation.get("delivered")
-        if isinstance(delivered, Mapping):
-            reconciliation["delivered"] = {
-                str(key): value
-                for key, value in delivered.items()
-                if str(key) and _safe_nonnegative_int(value, -1) >= 0
-            }
-        else:
-            reconciliation["delivered"] = {}
-        normalized["perk_reconciliation"] = reconciliation
-    rune_reconciliation = normalized.get("rune_reconciliation")
-    normalized["rune_reconciliation"] = (
-        copy.deepcopy(dict(rune_reconciliation))
-        if isinstance(rune_reconciliation, Mapping)
-        else {}
-    )
-    groups = normalized.get("item_command_groups")
-    if isinstance(groups, Mapping):
-        safe_groups = {}
-        for key, value in groups.items():
-            if not isinstance(key, str) or not key or not isinstance(value, Mapping):
-                continue
-            item_id = value.get("item_id")
-            next_command = value.get("next_command", 0)
-            total_commands = value.get("total_commands", 0)
-            if (
-                isinstance(item_id, bool)
-                or not isinstance(item_id, int)
-                or _safe_nonnegative_int(next_command, -1) < 0
-                or _safe_nonnegative_int(total_commands, -1) < 0
-            ):
-                continue
-            next_command = int(next_command)
-            total_commands = int(total_commands)
-            if next_command > total_commands:
-                continue
-            safe_group = copy.deepcopy(dict(value))
-            safe_group.update(
-                item_id=item_id,
-                next_command=next_command,
-                total_commands=total_commands,
-            )
-            safe_groups[key] = safe_group
-        normalized["item_command_groups"] = safe_groups
-    elif "item_command_groups" in normalized:
-        normalized.pop("item_command_groups")
-
     # Keep valid history and make malformed values inert rather than executable.
     for key in ("never_replay_history", "never_replay_items", "never_replayed", "never_replay"):
         if key not in normalized:
@@ -1010,21 +949,34 @@ def load_policy_registry(
 
 
 def compile_reconciliation_plan(
-    received_item_ids: Iterable[int],
-    definitions: Mapping[int, Any],
-    registry: Mapping[int, ReplayPolicy],
-    slot_identity: str,
-    epoch: int,
-    *,
-    include_manual_replay: bool = False,
+    received_item_ids: Iterable[int], definitions: Mapping[int, Any],
+    registry: Mapping[int, ReplayPolicy], slot_identity: str, epoch: int,
+    *, include_manual_replay: bool = False,
 ) -> ReconciliationPlan:
-    """Compile ownership replay from authoritative receipts without side effects.
+    from doom_eap.runtime.inventory import InventoryOwnership, compare_inventory
 
-    ``replay_manual_only`` items are persistent ownership grants whose in-game
-    acquisition presentation must not rerun on checkpoint/respawn epoch
-    refresh. They compile only for deliberate repair paths (manual Resync and
-    explicit campaign-context materialization).
-    """
+    _validate_replay_identity(slot_identity, epoch, include_manual_replay)
+    if set(registry) != set(definitions):
+        raise ValueError("reconciliation registry does not exactly cover active items")
+    received_history = _replay_history(received_item_ids)
+    counts = Counter(received_history)
+    unknown = sorted(set(counts) - set(registry))
+    if unknown:
+        raise ValueError("received item has no policy: " + ", ".join(map(str, unknown)))
+    _validate_replay_definitions(counts, definitions, registry)
+    result = compare_inventory(
+        InventoryOwnership(received_history), definitions=dict(definitions), policies=registry,
+        replay_identity=(slot_identity, epoch), include_manual_replay=include_manual_replay,
+    )
+    plan = result.reconciliation
+    assert plan is not None
+    command_keys = [command.command_key for command in plan.commands]
+    if len(command_keys) != len(set(command_keys)):
+        raise ValueError("reconciliation compiled duplicate command keys")
+    return plan
+
+
+def _validate_replay_identity(slot_identity, epoch, include_manual_replay):
     if (
         not isinstance(slot_identity, str)
         or not slot_identity
@@ -1035,9 +987,9 @@ def compile_reconciliation_plan(
         or not isinstance(include_manual_replay, bool)
     ):
         raise ValueError("reconciliation requires slot identity and non-negative epoch")
-    if set(registry) != set(definitions):
-        raise ValueError("reconciliation registry does not exactly cover active items")
-    definition_map = dict(definitions)
+
+
+def _replay_history(received_item_ids):
     try:
         received_history = tuple(received_item_ids)
         if any(
@@ -1045,90 +997,23 @@ def compile_reconciliation_plan(
             for item_id in received_history
         ):
             raise ValueError("received item history contains a non-integer item ID")
-        counts = Counter(received_history)
     except TypeError as error:
         raise ValueError("received item history is not hashable") from error
-    unknown = sorted(set(counts) - set(registry))
-    if unknown:
-        raise ValueError("received item has no policy: " + ", ".join(map(str, unknown)))
+    return received_history
 
-    commands: list[ReconciliationCommand] = []
-    selections: list[ReconciliationSelection] = []
-    replayed = 0
-    special_stages = 0
-    skipped_never_replay = 0
-    skipped_manual_replay = 0
 
-    for item_id in sorted(counts):
-        if item_id == 7770904:
-            # The native perk observer owns cumulative Blood Punch repair.
-            continue
+def _validate_replay_definitions(counts, definitions, registry):
+    for item_id in counts:
         policy = registry[item_id]
         if not isinstance(policy, ReplayPolicy) or policy.policy not in SUPPORTED_POLICIES:
             raise ValueError(f"unsupported policy for item {item_id}: {getattr(policy, 'policy', None)!r}")
-        count = counts[item_id]
-        selected_commands: list[str] = []
-        if policy.policy == NEVER_REPLAY:
-            skipped_never_replay += 1
-        elif policy.policy == REPLAY_MANUAL_ONLY and not include_manual_replay:
-            skipped_manual_replay += 1
-        elif policy.policy in {REPLAY_IDEMPOTENT, REPLAY_MANUAL_ONLY}:
-            plan = compile_item_delivery_plan(item_id, definition_map)
-            if not plan.commands:
-                raise ValueError(f"replay-safe item {item_id} compiled no commands")
-            for delivery in plan.commands:
-                stage = delivery.index
-                spool_id = (
-                    f"reconcile-{slot_identity}-e{epoch}-item{item_id}-stage{stage}"
-                )
-                commands.append(
-                    ReconciliationCommand(
-                        item_id, policy.name, policy.policy, stage, spool_id,
-                        delivery.command, plan.description,
-                    )
-                )
-                selected_commands.append(delivery.command)
-            replayed += 1
-        elif policy.policy == SPECIAL_PROGRESSIVE:
-            definition = definitions[item_id]
-            if not isinstance(definition, Mapping) or definition.get("type") not in {
-                "progressive_perk", "progressive_item",
-            }:
-                raise ValueError(f"progressive item {item_id} has an invalid definition")
-            perks = definition.get("perks")
-            if not isinstance(perks, list) or not perks:
-                raise ValueError(f"progressive item {item_id} has no configured stages")
-            configured_stages = len(perks)
-            for stage in range(min(count, configured_stages)):
-                plan = compile_item_delivery_plan(item_id, definition_map, stage=stage)
-                if len(plan.commands) != 1:
-                    raise ValueError(
-                        f"progressive item {item_id} stage {stage} must compile one command"
-                    )
-                delivery = plan.commands[0]
-                spool_id = (
-                    f"reconcile-{slot_identity}-e{epoch}-item{item_id}-stage{stage}"
-                )
-                commands.append(
-                    ReconciliationCommand(
-                        item_id, policy.name, policy.policy, stage, spool_id,
-                        delivery.command, plan.description,
-                    )
-                )
-                selected_commands.append(delivery.command)
-                special_stages += 1
-        selections.append(
-            ReconciliationSelection(
-                item_id, policy.name, policy.policy, count,
-                tuple(selected_commands),
-            )
-        )
+        if policy.policy == SPECIAL_PROGRESSIVE:
+            _validate_progressive_definition(item_id, definitions[item_id])
 
-    spool_ids = [command.spool_id for command in commands]
-    if len(spool_ids) != len(set(spool_ids)):
-        raise ValueError("reconciliation compiled duplicate spool IDs")
-    return ReconciliationPlan(
-        tuple(commands), tuple(selections), replayed, special_stages,
-        skipped_never_replay,
-        skipped_manual_replay=skipped_manual_replay,
-    )
+
+def _validate_progressive_definition(item_id, definition):
+    if not isinstance(definition, Mapping) or definition.get("type") not in {"progressive_perk", "progressive_item"}:
+        raise ValueError(f"progressive item {item_id} has an invalid definition")
+    perks = definition.get("perks")
+    if not isinstance(perks, list) or not perks:
+        raise ValueError(f"progressive item {item_id} has no configured stages")

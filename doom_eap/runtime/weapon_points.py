@@ -1,22 +1,25 @@
-"""Spendable WUP receipt ownership and the typed Sentinel Game Link adapter."""
+"""Typed Sentinel Game Link adapter for runtime features and observations."""
 from __future__ import annotations
-import re
 
+import asyncio
 import hashlib
 import json
-import os
-import secrets
+import re
 import struct
-import subprocess
 import time
 from pathlib import Path
-from doom_eap.runtime.connection_diagnostics import timed_sync_call
+from uuid import uuid4
+
+from doom_eap.runtime.inventory import WeaponPointsBlocked
+
+from . import sentinel_protocol_generated as codec
+from .native_transport import NativeTransport, TransportError
 
 ITEM_ID = 7770903
 AMOUNT = 3
 
 
-class WeaponPointsBlocked(RuntimeError):
+class NativeGameplayInactive(WeaponPointsBlocked):
     pass
 
 
@@ -34,534 +37,241 @@ def namespace_id(seed: str, team: int, slot: int, fingerprint: str) -> str:
 
 
 class SentinelWeaponPoints:
-    """Uses the existing process-authenticated inspection transport and queue."""
+    """Keep one v2 connection on the bridge's serialized native worker."""
     def __init__(self, probe: Path, pid: int, namespace: str, diagnostic=None, *, command_prefix=(), environment=None):
         self.probe, self.pid, self.namespace = probe.resolve(), pid, namespace
         self.diagnostic = diagnostic
         self.command_prefix, self.environment = command_prefix, environment
-        self._probe_sha256 = None
+        self._runner = None
+        self._transport = None
         self._diagnostic_signatures = {}
 
-    def _diagnose(self, evidence):
-        if self.diagnostic:
-            key = (evidence["stage"], evidence["operation"])
-            try:
-                response = json.loads(evidence.get("stdout", "{}"))
-            except ValueError:
-                response = evidence.get("stdout")
-            def semantic(value):
-                if isinstance(value, dict):
-                    return {key: (item not in (0, "0", None) if key == "event_gap_count" else semantic(item)) for key, item in value.items()
-                            if key not in {"sequence", "timestamp_ms", "at_monotonic", "sampled_at_ms",
-                                "event_sequence", "callback_sequence", "callback_at_ms", "context_sampled_at_ms",
-                                "history_oldest", "history_overwritten", "events", "qualified_kills", "at_ms"}}
-                if isinstance(value, list):
-                    return [semantic(item) for item in value]
-                return value
-            signature = json.dumps((evidence.get("predicate"), evidence.get("error"),
-                evidence.get("returncode"), evidence.get("argv"), semantic(response)), sort_keys=True)
-            now = time.monotonic()
-            previous = self._diagnostic_signatures.get(key)
-            if previous is None or previous["signature"] != signature:
-                row = {"signature": signature, "first_seen": now, "last_seen": now, "count": 1, "emitted_at": now}
-                first_error = previous.get("first_error") if previous else None
-                if first_error is None and (evidence.get("error") or evidence.get("returncode", 0)):
-                    first_error = {**evidence, "at_monotonic": now}
-                if first_error is not None:
-                    row["first_error"] = first_error
-                self._diagnostic_signatures[key] = row
-                self.diagnostic({**evidence, "first_seen": now, "last_seen": now, "count": 1})
-            else:
-                previous.update(last_seen=now, count=previous["count"] + 1)
-                if now - previous["emitted_at"] >= 60:
-                    self.diagnostic({"stage": key[0], "operation": key[1], "summary": "unchanged",
-                        **{field: previous[field] for field in ("first_seen", "last_seen", "count")}})
-                    previous["emitted_at"] = now
+    def close(self):
+        if self._runner is not None:
+            self._runner.run_until_complete(self._transport.close())
+            self._runner.run_until_complete(self._runner.shutdown_asyncgens())
+            self._runner.run_until_complete(self._runner.shutdown_default_executor())
+            self._runner.close()
+            self._runner = self._transport = None
 
-    @timed_sync_call
-    def _run(self, args, payload=None):
-        evidence = {"executable": str(self.probe), "argv": [str(self.probe), *args],
-                    "cwd": os.getcwd(), "stage": args[2] if args[0] == "--pid" else args[0],
-                    "operation": struct.unpack_from("<H", payload, 6)[0] if payload else None}
+    def _diagnose(self, evidence):
+        if not self.diagnostic:
+            return
+        key = (evidence["stage"], evidence["operation"])
         try:
-            if self._probe_sha256 is None:
-                self._probe_sha256 = hashlib.sha256(self.probe.read_bytes()).hexdigest()
-            evidence["sha256"] = self._probe_sha256
+            response = json.loads(evidence.get("stdout", "{}"))
+        except ValueError:
+            response = evidence.get("stdout")
+        signature = json.dumps((evidence.get("predicate"), evidence.get("error"), evidence.get("returncode"),
+                                evidence.get("argv"), diagnostic_value(response)), sort_keys=True)
+        now = time.monotonic()
+        previous = self._diagnostic_signatures.get(key)
+        if previous is None or previous["signature"] != signature:
+            self._diagnostic_signatures[key] = diagnostic_entry(evidence, previous, now, signature)
+            self.diagnostic({**evidence, "first_seen": now, "last_seen": now, "count": 1})
+            return
+        previous.update(last_seen=now, count=previous["count"] + 1)
+        if now - previous["emitted_at"] >= 60:
+            self.diagnostic({"stage": key[0], "operation": key[1], "summary": "unchanged",
+                **{field: previous[field] for field in ("first_seen", "last_seen", "count")}})
+            previous["emitted_at"] = now
+
+    def request(self, command_type, tag=0, payload=None):
+        if self._runner is None:
+            self._runner = asyncio.new_event_loop()
             executable = str(self.probe)
             if self.command_prefix:
-                from doom_eap.runtime.proton import windows_path
+                from .proton import windows_path
                 executable = windows_path(self.probe)
-            process = subprocess.run([*self.command_prefix, executable, *args], input=payload,
-                                     capture_output=True, timeout=4, check=False, env=self.environment,
-                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            evidence.update(returncode=process.returncode,
-                            stdout=process.stdout.decode("utf-8", errors="replace"),
-                            stderr=process.stderr.decode("utf-8", errors="replace"))
-            result = json.loads(process.stdout)
-        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-            evidence.update(predicate="transport_or_json", error=str(error))
-            self._diagnose(evidence)
-            raise WeaponPointsBlocked(f"Sentinel transport unavailable: {error}") from error
-        predicate = "exit_or_result" if process.returncode or result.get("result") != "ok" else None
-        evidence["predicate"] = predicate
-        self._diagnose(evidence)
-        if predicate:
-            error = WeaponPointsBlocked(f"Sentinel response validation failed: {json.dumps(evidence)}")
-            error.probe_result = result.get("result")
-            raise error
+            self._transport = NativeTransport((*self.command_prefix, executable), self.pid, env=self.environment)
+        try:
+            result = self._runner.run_until_complete(self._request(command_type, tag, payload or {}))
+        except (TransportError, OSError, TimeoutError, ValueError) as error:
+            self._diagnose(dict(stage='v2', operation=str(command_type), error=str(error), returncode=1))
+            self.close()
+            raise WeaponPointsBlocked(f"Sentinel v2 unavailable: {error}") from error
+        self._diagnose(dict(stage='v2', operation=str(command_type), stdout=json.dumps(result), returncode=0))
         return result
 
-    def _execute(self, amount=0, expected=0):
-        body = struct.pack("<III", int(amount != 0), amount, expected)
-        return self._execute_typed(2048, "--weapon-points", 18, 19, 21, body)
+    async def _request(self, command_type, tag, payload):
+        transport = self._transport
+        await transport.connect()
+        if command_type in (22, 23, 24) and not all(transport.supports(kind, 4) for kind in (22, 23, 24)):
+            raise WeaponPointsBlocked('Native Campaign menu requires payload revision 4')
+        command = codec.COMMANDS[command_type]
+        revision = max(command['payload_revisions'])
+        variant = next(v for v in command['payload']['variants'] if v['tag'] == tag)
+        namespace, binding = await self._admit(command_type, tag, payload, variant)
+        scope = transport.scope
+        encoded = codec.encode_variant(command_type, revision, tag, payload)
+        if variant['operation'] == 'read':
+            result = await transport.read(dict(scope=scope, namespace_id=namespace, save_binding=binding,
+                                               command_type=command_type, payload_revision=revision), encoded)
+        else:
+            submission = dict(reference=dict(scope=scope, namespace_id=namespace, command_id=str(uuid4()),
+                                             command_type=command_type, payload_revision=revision),
+                              save_binding=binding, deadline_ms=2000)
+            result = await self._submit(submission, encoded)
+        return self._result(command_type, result, transport.scope)
 
-    @timed_sync_call
-    def _execute_typed(self, capability, flag, submit, result_operation, release_operation, body, *, trace=None):
-        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
-        if trace is not None:
-            trace.append({"stage": "scope", "response": scope})
-        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
-            raise WeaponPointsBlocked("Native gameplay context is not active")
-        identity = (scope["process_created"], scope["instance_id"], scope["build_id"])
-        if getattr(self, "_runtime_identity", None) != identity:
-            self._runtime_identity, self._incompatible_capabilities = identity, set()
-            self._diagnostic_signatures.clear()
-        if capability in self._incompatible_capabilities:
-            raise WeaponPointsBlocked("Native probe response incompatible with this runtime identity")
-        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
-        payload = struct.pack("<QIQ16sQQ16sI", capability, self.pid,
-                              int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
-                              int(scope["lifecycle_generation"]), request_id, nonce, 2000)
-        payload += self.namespace.encode("ascii") + b"\0" + body
+    async def _admit(self, command_type, tag, payload, variant):
+        namespace, binding = self.namespace.encode('ascii'), bytes(16)
+        if variant['admission'] in ('S', 'G'):
+            admission = await self._transport.observe(12, b'0' * 64, bytes(16))
+            if admission is None or not any(admission['save_binding']):
+                raise NativeGameplayInactive('Native gameplay context is not active')
+            binding = bytes(admission['save_binding'])
+            if command_type == 46 and tag == 8 and payload in (
+                    {'variable': 0, 'value': '1.00'}, {'variable': 1, 'value': '1.00'}, {'variable': 2, 'value': '0'}):
+                namespace = wire_text(admission['observation']['namespace_id']).encode('ascii')
+        elif variant['admission'] == 'P':
+            namespace = b'0' * 64
+        return namespace, binding
+
+    async def _submit(self, submission, encoded):
+        transport = self._transport
+        prepared = await transport.prepare(submission, encoded)
+        response = await transport.submit(prepared)
         deadline = time.monotonic() + 5
-        operation = submit
-        while True:
-            message = struct.pack("<IHHII", 0x50494353, 1, operation, len(payload), 0) + payload
-            try:
-                result = self._run([flag], message)
-            except WeaponPointsBlocked as error:
-                if trace is not None:
-                    trace.append({"stage": "transport", "operation": operation, "error": str(error)})
-                if operation != release_operation:
-                    release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
-                    try:
-                        cleaned = self._run([flag], release)
-                        if trace is not None:
-                            trace.append({"stage": "cleanup", "operation": release_operation, "response": cleaned})
-                    except WeaponPointsBlocked as cleanup_error:
-                        if trace is not None:
-                            trace.append({"stage": "cleanup", "operation": release_operation, "error": str(cleanup_error)})
-                if getattr(error, "probe_result", None) == "invalid_response":
-                    self._incompatible_capabilities.add(capability)
-                raise
-            if trace is not None:
-                trace.append({"stage": "response", "operation": operation,
-                              "request_id": request_id, "nonce": nonce.hex(),
-                              "response": result, "at_monotonic": time.monotonic()})
-            if (result.get("namespace") != self.namespace or int(result["request_id"]) != request_id
-                    or result.get("build_id") != scope.get("build_id")):
-                raise WeaponPointsBlocked("Sentinel response identity changed")
-            if result["state"] in (3, 4, 5, 6):
-                # Release the retained queue slot; durable receipt intent belongs to the caller.
-                release = struct.pack("<IHHII", 0x50494353, 1, release_operation, len(payload), 0) + payload
-                try:
-                    released = self._run([flag], release)
-                    if trace is not None:
-                        trace.append({"stage": "release", "operation": release_operation, "response": released})
-                except WeaponPointsBlocked as error:
-                    if trace is not None:
-                        trace.append({"stage": "release", "operation": release_operation, "error": str(error)})
-            if result["state"] == 3:
-                return result
-            if result["state"] not in (1, 2) or time.monotonic() >= deadline:
-                # Uncertain results must be checked against the persisted receipt before resubmission.
-                error = WeaponPointsBlocked(f"Native {flag[2:]} execution not confirmed: {result}")
-                error.native_result = result
-                raise error
-            operation = result_operation
-            time.sleep(0.025)
+        while response.response['reply']['dimensions']['progress'] in (0, 1) and time.monotonic() < deadline:
+            await asyncio.sleep(.01)
+            response = await transport.query(prepared.reference)
+        dimensions = response.response['reply']['dimensions']
+        if response.response['error'] or dimensions['progress'] != 2 or response.result is None:
+            raise WeaponPointsBlocked('Native feature result is uncertain')
+        await transport.ack(prepared.reference, bytes(dimensions['result_token']))
+        return response.result
 
-    def observe_combat(self, mission_maps):
-        if not re.fullmatch(r"[0-9a-f]{64}", self.namespace):
-            raise WeaponPointsBlocked("Invalid combat namespace")
-        if (not isinstance(mission_maps, (list, tuple, set, frozenset)) or not 1 <= len(mission_maps) <= 64
-                or any(not isinstance(name, str) or not 1 <= len(name) <= 255
-                       or not name.isascii() or "\0" in name for name in mission_maps)):
-            raise WeaponPointsBlocked("Invalid combat mission maps")
-        maps = sorted(set(mission_maps))
-        body = struct.pack("<QIIH", 4194304, 2, self.pid, 64) + self.namespace.encode("ascii")
-        body += struct.pack("<I", len(maps))
-        for name in maps:
-            encoded = name.encode("ascii")
-            body += struct.pack("<H", len(encoded)) + encoded
-        reply = self._run(["--combat"], struct.pack("<4sHHII", b"SCIP", 1, 50, len(body), 0) + body)
-        try:
-            def uint(value, bits=64):
-                if type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value)):
-                    raise ValueError("invalid integer")
-                number = int(value)
-                if not 0 <= number < 2**bits:
-                    raise ValueError("integer outside wire range")
-                return number
+    def _result(self, command_type, result, scope):
+        value = admission_result(result) if command_type == 12 else dict(result)
+        value.update(pid=scope['pid'], target_pid=scope['pid'], process_created=str(scope['process_created']),
+                     instance_id=bytes(scope['instance_id']).hex(), lifecycle_generation=scope['generation'])
+        if 'namespace_id' in value:
+            value['namespace_id'] = wire_text(value['namespace_id'])
+            value['namespace'] = value['namespace_id']
+        if 'abi_version' in value:
+            value[codec.COMMANDS[command_type]['name'] + '_abi'] = value['abi_version']
+        if 'current_map' in value:
+            value['current_map'] = wire_text(value['current_map']['bytes'])
+        if command_type == 4:
+            value['availability'] = 'enabled' if value['availability'] == 1 else 'unavailable'
+            value['lifecycle'] = 'active' if value['lifecycle'] == 2 else 'inactive'
+        value.setdefault('build_id', getattr(self, '_build_id', ''))
+        if command_type == 1:
+            value['build_id'] = self._build_id = wire_text(value['build_id'])
+        if command_type in (22, 23, 24):
+            value['hint_intents'] = value['intent_ids'][:value['intent_count']]
+        value['result'] = 'ok'
+        return value
 
-            if uint(reply["combat_abi"], 32) != 2 or uint(reply["pid"], 32) != self.pid:
-                raise ValueError("combat ABI or process mismatch")
-            created = uint(reply["process_created"])
-            instance = reply["instance_id"]
-            build = reply["build_id"]
-            if (not created or not isinstance(instance, str) or not re.fullmatch(r"[0-9a-f]{32}", instance)
-                    or not isinstance(build, str) or not build or len(build) > 128):
-                raise ValueError("invalid producer identity")
-            if reply["namespace_id"] != self.namespace:
-                raise ValueError("combat namespace mismatch")
-            return {"producer": [str(self.pid), str(created), instance, build], "namespace_id": self.namespace,
-                    "qualified_kills": uint(reply["qualified_kills"]),
-                    "observation_gaps": uint(reply["observation_gaps"])}
-        except (KeyError, TypeError, ValueError) as error:
-            raise WeaponPointsBlocked(f"Invalid native combat observation: {error}") from error
-
-    def publish_combat_progress(self, total, target, first_milestone=0, milestone=0,
-                                milestone_step=0, visible=True):
-        values = (total, target, first_milestone, milestone, milestone_step)
-        if any(type(value) is not int or not 0 <= value < 2**64 for value in values) or type(visible) is not bool:
-            raise WeaponPointsBlocked("Invalid combat presentation values")
-        notices = (first_milestone, milestone, milestone_step)
-        if (target and target <= total or any(notices) and not (
-                0 < first_milestone <= milestone <= total and milestone_step > 0
-                and (milestone - first_milestone) % milestone_step == 0)):
-            raise WeaponPointsBlocked("Invalid combat presentation targets")
-        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
-        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
-            raise WeaponPointsBlocked("Native gameplay context is not active")
-        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
-        try:
-            payload = struct.pack("<QIQ16sQQ16sI", 8388608, self.pid,
-                                  int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
-                                  int(scope["lifecycle_generation"]), request_id, nonce, 1000)
-            payload += struct.pack("<I65sQQQQQI", 1, self.namespace.encode("ascii"), *values, int(visible))
-            message = struct.pack("<4sHHII", b"SCIP", 1, 51, len(payload), 0) + payload
-            result = self._run(["--combat-presentation"], message)
-            expected = (self.pid, int(scope["process_created"]), scope["instance_id"],
-                        int(scope["lifecycle_generation"]), scope["build_id"], request_id, nonce.hex())
-            actual = (int(result["pid"]), int(result["process_created"]), result["instance_id"],
-                      int(result["lifecycle_generation"]), result["build_id"],
-                      int(result["request_id"]), result["nonce"])
-            if (actual != expected or result["combat_presentation_abi"] != 1 or result["status"] != 0
-                    or tuple(int(result[key]) for key in ("total", "target", "milestone", "visible"))
-                    != (total, target, milestone, int(visible))):
-                raise ValueError("native acknowledgement does not match presentation")
-        except (KeyError, TypeError, ValueError, OverflowError, struct.error) as error:
-            raise WeaponPointsBlocked(f"Native combat presentation refused: {error}") from error
-        return result
-
-    def deathlink_request(self, kind, *, enabled=False, mode="soft", event_id=0,
-                          event_hash=bytes(16), ack_sequence=0):
-        body = struct.pack("<IIIIQ16sQI", kind, int(enabled), int(mode == "hardcore"),
-                           0, event_id, event_hash, ack_sequence, 0)
-        return self._execute_typed(131072, "--deathlink", 41, 42, 44, body)
-
-    def observe(self):
-        result = self._execute()
-        if result["outcome"] not in (1, 2) or not result["flags"] & 16:
-            raise WeaponPointsBlocked(f"Native WUP observation failed: {result}")
-        return result
+    def _run(self, args):
+        operations = {'--native': 4, '--inspect': 1, '--save-admission': 12, '--save': 11,
+                      '--engine': 2, '--context': 3, '--save-installation': 17}
+        operation = next(operations[arg] for arg in args if arg in operations)
+        if operation == 4:
+            self.request(1)
+        return self.request(operation, payload={'after_event': 0} if operation == 4 else {})
 
     def admitted_save_root(self):
-        """Observe the exact provider admitted for this AP identity; never scan vanilla."""
-        facts = self._run(["--pid", str(self.pid), "--save-admission", "--json"])
-        if (facts.get("namespace_id") != self.namespace or not facts.get("accepting_requests")
-                or not facts.get("route_retained") or facts.get("state") != "admitted"
-                or not re.fullmatch(r"ap-[0-9a-f]{40}", str(facts.get("native_root", "")))):
-            raise WeaponPointsBlocked("AP save provider is not admitted for this identity")
+        facts = self._run(['--save-admission'])
+        if (facts['namespace_id'] != self.namespace or not facts['accepting_requests']
+                or not facts['route_retained'] or facts['state'] != 'admitted'
+                or not re.fullmatch(r'ap-[0-9a-f]{40}', facts['native_root'])):
+            raise WeaponPointsBlocked('AP save provider is not admitted for this identity')
         self.save_admission = facts
-        return facts["native_root"]
-
-    def grant_weapon_upgrade_points(self, amount, expected_gained):
-        if type(amount) is not int or amount <= 0 or amount > 117:
-            raise WeaponPointsBlocked("Invalid WUP amount")
-        result = self._execute(amount, expected_gained)
-        if result["outcome"] not in (1, 2) or not result["flags"] & 16:
-            raise WeaponPointsBlocked(f"Native WUP execution failed: {result}")
-        return result
-
-    def ensure_meat_hook(self):
-        body = struct.pack("<IIIIBBHIB3s", 1, 1 << 8, 0, 0, 0, 0, 0, 0, 0, b"\0\0\0")
-        result = self._execute_typed(16384, "--arsenal", 29, 30, 32, body)
-        if (result["outcome"] not in (0, 1) or result["flags"] & 26 != 26
-                or not result["mods_after"] & (1 << 8)):
-            raise WeaponPointsBlocked(f"Native Meat Hook authorization failed: {result}")
-        return result
-
-    def ensure_progressive_special_weapon(self, count, *, hammer_only=False):
-        if type(count) is not int or not 1 <= count <= (2 if hammer_only else 3):
-            raise WeaponPointsBlocked("Invalid Progressive Special Weapon count")
-        own_crucible = int(not hammer_only)
-        own_hammer = int(hammer_only or count >= 2)
-        hammer_tier = 2 if count >= (2 if hammer_only else 3) else own_hammer
-        body = struct.pack("<IIIIIIIQII", 1, own_crucible, own_hammer, hammer_tier, 0, 0, 0, 0, 0, 0)
-        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
-        required_known = own_crucible | (2 if own_hammer else 0) | (4 if hammer_tier == 2 else 0)
-        required_flags = 34 | (64 if result["outcome"] == 1 else 0)
-        if (result["outcome"] not in (0, 1) or result["flags"] & required_flags != required_flags
-                or (own_crucible and (result["owns_crucible"] != 1 or result["native_crucible"] != 1))
-                or result["owns_hammer"] < own_hammer or result["native_hammer"] < own_hammer
-                or result["hammer_tier"] < hammer_tier
-                or (hammer_tier == 2 and result["native_hammer_perks"] != 3)
-                or result["native_state_known"] & required_known != required_known):
-            raise WeaponPointsBlocked(f"Native Special ownership failed: {result}")
-        # NOOP performs no native mutation, independently of selection knowledge.
-        # A mutating acquisition still requires its preservation postconditions.
-        if ((result["outcome"] == 1 and result["flags"] & 4)
-                or (result["outcome"] == 0 and (result["flags"] & 8 != 8
-                    or (result["flags"] & 4096 and not result["flags"] & 8192)))):
-            raise WeaponPointsBlocked(f"Native Special ownership confirmed; preservation unconfirmed: {result}")
-        return result
-
-    def select_special_weapon(self, selected):
-        if type(selected) is not int or selected not in (1, 2):
-            raise WeaponPointsBlocked("Invalid Special selection")
-        body = struct.pack("<IIIIIIIQII", 2, 0, 0, 0, selected, 0, 0, 0, 0, 0)
-        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
-        if (result["outcome"] not in (0, 1) or not result["flags"] & 4096
-                or not result["native_state_known"] & 8 or result["native_selected"] != selected):
-            raise WeaponPointsBlocked(f"Special route selection unconfirmed: {result}")
-        return result
-
-    def publish_ammo_refill(self, snapshot, *, connected):
-        authoritative = snapshot.get("authoritative") is True
-        available = snapshot.get("available")
-        known = authoritative and type(available) is int and 0 <= available <= 3
-        balance = available if known else 0
-        flags = int(bool(connected)) | (2 if authoritative else 0) | (4 if known else 0)
-        body = struct.pack("<IIIIIIIQII", 4, 0, 0, 0, 0, balance, flags, 0, 0, 0)
-        result = self._execute_typed(65536, "--special", 37, 38, 40, body)
-        if (result["outcome"] not in (0, 1) or result.get("kind") != 4
-                or result.get("refill_balance") != balance or result.get("refill_flags") != flags
-                or result["flags"] & 4):
-            raise WeaponPointsBlocked(f"Ammo presentation publication unconfirmed: {result}")
-        return result
-
-    def observe_blood_punch(self):
-        body = struct.pack("<5I4B", *([0] * 9))
-        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body)
-        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("outcome") != 1
-                or result.get("flags", 0) & 3 != 3 or result.get("upgrades_after") == 0xffffffff):
-            raise WeaponPointsBlocked(f"Blood Punch native observation is unknown or incompatible: {result}")
-        return (result["upgrades_after"] >> 11) & 15
+        return facts['native_root']
 
     def observe_inventory(self):
-        body = struct.pack("<5I4B", *([0] * 9))
-        trace = []
-        result = self._execute_typed(8192, "--inventory", 25, 26, 28, body, trace=trace)
-        if trace:
-            scope = trace[0]["response"]
-            result["_observation_scope"] = tuple(str(scope[key]) for key in
-                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
-            result["_observation_map"] = scope.get("current_map")
-        if result.get("inventory_abi") == 4:
-            result["dash_before"] = result["dash_after"] = 255
-        if result.get("inventory_abi") in (4, 5):
-            result["slayer_key_before"] = result["slayer_key_after"] = 255
-        if result.get("inventory_abi") in (4, 5, 6):
-            result["frag_grenade_before"] = result["frag_grenade_after"] = 255
-        if result.get("inventory_abi") in (4, 5, 6, 7):
-            result["perks_known"] = result["perks_owned"] = 0
-            result["flame_belch_after"] = result["blood_punch_after"] = 255
-        if result.get("inventory_abi") == 8:
-            try:
-                values = tuple(result[name] for name in ("perks_known", "perks_owned"))
-                if any(type(value) is not int and not (isinstance(value, str) and re.fullmatch(r"[0-9]+", value))
-                       for value in values):
-                    raise ValueError("invalid integer")
-                known, owned = map(int, values)
-            except (KeyError, ValueError, TypeError) as error:
-                raise WeaponPointsBlocked("Native permanent-perk observation is malformed") from error
-            if not (0 <= owned <= known < 1 << 64) or owned & ~known:
-                raise WeaponPointsBlocked("Native permanent-perk observation is malformed")
-            result["perks_known"], result["perks_owned"] = known, owned
-        if (result.get("inventory_abi") not in (4, 5, 6, 7, 8) or result.get("kind") != 0
-                or result.get("outcome") != 1 or result.get("flags", 0) & 3 != 3
-                or result.get("ice_bomb_after") not in (0, 1, 255)
-                or result.get("dash_after") not in (0, 1, 255)
-                or result.get("slayer_key_after") not in (0, 1, 255)
-                or result.get("frag_grenade_after") not in (0, 1, 255)
-                or result.get("flame_belch_after") not in (0, 1, 255)
-                or result.get("blood_punch_after") not in (0, 1, 255)):
-            raise WeaponPointsBlocked(f"Native inventory observation is unknown or incompatible: {result}")
+        scope = self._run(['--native'])
+        result = self.request(25)
+        if (result['abi_version'] != 8 or result['kind'] != 0 or result['outcome'] != 1 or result['flags'] & 3 != 3
+                or result['perks_owned'] & ~result['perks_known']
+                or any(result[name] not in (0, 1, 255) for name in ('ice_bomb_after', 'dash_after', 'slayer_key_after',
+                                                                  'frag_grenade_after', 'flame_belch_after', 'blood_punch_after'))):
+            raise WeaponPointsBlocked('Native inventory observation is malformed or unknown')
+        result['_observation_scope'] = tuple(str(scope[k]) for k in ('process_created', 'instance_id', 'build_id', 'lifecycle_generation'))
+        result['_observation_map'] = scope['current_map']
         return result
 
     def observe_special_inventory(self):
-        body = struct.pack("<IIIIIIIQII", *([0] * 10))
-        trace = []
-        result = self._execute_typed(65536, "--special", 37, 38, 40, body, trace=trace)
-        if trace:
-            scope = trace[0]["response"]
-            result["_observation_scope"] = tuple(str(scope[key]) for key in
-                ("process_created", "instance_id", "build_id", "lifecycle_generation"))
-            result["_observation_map"] = scope.get("current_map")
-        known = result.get("native_state_known")
-        if (result.get("outcome") not in (0, 1) or result.get("kind") != 0
-                or result.get("flags", 0) & 3 != 3 or type(known) is not int or not 0 <= known <= 31
-                or any(known & bit and (type(result.get(field)) is not int or not 0 <= result[field] <= maximum)
-                       for bit, field, maximum in ((1, "native_crucible", 1), (2, "native_hammer", 1),
-                                                   (4, "native_hammer_perks", 3)))):
-            raise WeaponPointsBlocked(f"Native Special observation is unavailable: {result}")
+        scope = self._run(['--native'])
+        result = self.request(37)
+        result['_observation_scope'] = tuple(str(scope[k]) for k in ('process_created', 'instance_id', 'build_id', 'lifecycle_generation'))
+        result['_observation_map'] = scope['current_map']
         return result
 
-    def ensure_masteries(self, mask):
-        if type(mask) is not int or not 0 < mask <= 0x1FFF:
-            raise WeaponPointsBlocked("Invalid Arsenal mastery mask")
-        body = struct.pack("<IIIIBBHIB3s", 4, 0, 0, mask, 0, 0, 0, 0, 0, b"\0\0\0")
-        result = self._execute_typed(16384, "--arsenal", 29, 30, 32, body)
-        if (result["outcome"] not in (0, 1, 2) or result["flags"] & 27 != 27
-                or (result["outcome"] == 2 and not result["flags"] & 32)
-                or result["masteries_ap_after"] & mask != mask):
-            raise WeaponPointsBlocked(f"Native Arsenal mastery projection unconfirmed: {result}")
-        return result
+    def observe_combat(self, mission_maps):
+        self._run(['--native'])
+        if not 1 <= len(mission_maps) <= 64:
+            raise WeaponPointsBlocked('Invalid combat mission maps')
+        result = self.request(50, payload={'maps': [{'value': name} for name in sorted(set(mission_maps))]})
+        return dict(producer=[str(self.pid), result['process_created'], result['instance_id'], result['build_id']],
+                    namespace_id=result['namespace_id'], qualified_kills=result['qualified_kills'],
+                    observation_gaps=result['observation_gaps'])
 
-    def ensure_normal_runes(self, mask):
-        if type(mask) is not int or not 0 < mask <= 0x1FF:
-            raise WeaponPointsBlocked("Invalid normal Rune mask")
-        body = struct.pack("<IIIBb2s", 1, mask, 0, 0, -1, b"\0\0")
-        result = self._execute_typed(32768, "--runes", 33, 34, 36, body)
-        if (result["outcome"] not in (0, 1) or result["flags"] & 11 != 11
-                or result["owned_normal_after"] & mask != mask
-                or result["selected_slots_after"] != result["selected_slots_before"]):
-            raise WeaponPointsBlocked(f"Native normal Rune registration unconfirmed: {result}")
-        return result
+    def deathlink_request(self, kind, *, enabled=False, mode='soft', event_id=0, event_hash=bytes(16), ack_sequence=0):
+        payloads = {0: {}, 1: dict(enabled=int(enabled), mode=int(mode == 'hardcore')),
+                    2: dict(event_id=event_id, event_hash=event_hash), 3: {},
+                    4: dict(sequence=ack_sequence), 5: dict(event_id=event_id)}
+        return self.request(41, kind, payloads[kind])
 
-    def ensure_support_runes(self, mask):
-        if type(mask) is not int or not 0 < mask <= 7:
-            raise WeaponPointsBlocked("Invalid support Rune mask")
-        body = struct.pack("<IIIBb2s", 2, 0, mask, 0, -1, b"\0\0")
-        result = self._execute_typed(32768, "--runes", 33, 34, 36, body)
-        if (result["outcome"] not in (0, 1) or result["flags"] & 11 != 11
-                or result["owned_support_after"] & mask != mask
-                or result["selected_support_after"] != result["selected_support_before"]):
-            raise WeaponPointsBlocked(f"Native support Rune registration unconfirmed: {result}")
-        return result
+    def select_special_weapon(self, selected):
+        return self.request(37, 2, dict(selected=selected))
+
+    def publish_ammo_refill(self, snapshot, *, connected):
+        known = snapshot.get('authoritative') is True
+        balance = snapshot.get('available', 0) if known else 0
+        flags = int(bool(connected)) | (6 if known else 0)
+        return self.request(37, 4, dict(balance=balance, flags=flags))
 
     def publish_checked_locations(self, checked_locations, revision):
-        if type(revision) is not int or revision <= 0:
-            raise WeaponPointsBlocked("Invalid Automap snapshot revision")
-        scope = self._run(["--pid", str(self.pid), "--native", "--json"])
-        if scope.get("availability") != "enabled" or scope.get("lifecycle") != "active":
-            raise WeaponPointsBlocked("Native gameplay context is not active")
         bits = [0] * 9
-        for location_id in checked_locations:
-            offset = int(location_id) - 7770000
-            if 0 <= offset < len(bits) * 64:
+        for location in checked_locations:
+            offset = location - 7770000
+            if 0 <= offset < 576:
                 bits[offset // 64] |= 1 << (offset % 64)
-        request_id, nonce = secrets.randbits(64) or 1, secrets.token_bytes(16)
-        payload = struct.pack("<QIQ16sQQ16sI", 262144, self.pid,
-                              int(scope["process_created"]), bytes.fromhex(scope["instance_id"]),
-                              int(scope["lifecycle_generation"]), request_id, nonce, 2000)
-        payload += self.namespace.encode("ascii") + b"\0" + struct.pack("<IIQ9Q", 1, 1, revision, *bits)
-        message = struct.pack("<IHHII", 0x50494353, 1, 45, len(payload), 0) + payload
-        result = self._run(["--automap"], message)
-        if (result.get("namespace") != self.namespace or int(result.get("request_id", 0)) != request_id
-                or result.get("build_id") != scope.get("build_id") or result.get("outcome") != 0
-                or result.get("known") != 1 or int(result.get("revision", 0)) != revision):
-            raise WeaponPointsBlocked(f"Native Automap snapshot refused: {result}")
-        return result
+        return self.request(45, 1, dict(known=1, revision=revision, checked_locations=bits))
+
+    def publish_combat_progress(self, total, target, first_milestone=0, milestone=0, milestone_step=0, visible=True):
+        scope = self._run(['--native'])
+        native_scope = dict(pid=self.pid, process_created=int(scope['process_created']),
+                            instance_id=bytes.fromhex(scope['instance_id']), lifecycle_generation=scope['lifecycle_generation'])
+        presentation = dict(execution=dict(expected=native_scope, request_id=1, nonce=uuid4().bytes, deadline_ms=2000),
+                            namespace_id=self.namespace.encode('ascii') + b'\0', total=total, target=target,
+                            first_milestone=first_milestone, milestone=milestone, milestone_step=milestone_step, visible=int(visible))
+        return self.request(51, payload=dict(presentation=presentation))
 
 
-class WeaponPointReceipts:
-    def __init__(self, session_state, persist, link, namespace):
-        self.state, self.persist, self.link, self.namespace = session_state, persist, link, namespace
+def wire_text(value):
+    return bytes(value).split(b'\0', 1)[0].decode('utf-8')
 
-    def _initial_facts(self, facts):
-        return self.link.observe() if facts is None else facts
 
-    def _ledger(self, authoritative, facts=None):
-        ledger = self.state.get("weapon_points")
-        if ledger is None:
-            facts = self._initial_facts(facts)
-            gained = facts["gained_after"]
-            history = sorted(authoritative.items())
-            if type(gained) is not int or gained < 0 or gained % AMOUNT or gained > len(history) * AMOUNT:
-                raise WeaponPointsBlocked("Native earned WUP needs the complete matching AP item history")
-            ledger = {"version": 1, "namespace": self.namespace, "receipts": [
-                {"index": index, "receipt": receipt, "amount": AMOUNT}
-                for index, receipt in history[:gained // AMOUNT]]}
-            self.state["weapon_points"] = ledger
-            try:
-                self.persist()
-            except Exception:
-                self.state.pop("weapon_points", None)
-                raise
-        if (not isinstance(ledger, dict) or ledger.get("version") != 1
-                or ledger.get("namespace") != self.namespace or not isinstance(ledger.get("receipts"), list)):
-            raise WeaponPointsBlocked("Incompatible WUP receipt ownership")
-        previous = -1
-        for record in ledger["receipts"]:
-            if (not isinstance(record, dict) or set(record) != {"index", "receipt", "amount"} or type(record["index"]) is not int
-                    or record["index"] <= previous or not isinstance(record["receipt"], str)
-                    or not record["receipt"] or record["amount"] != AMOUNT):
-                raise WeaponPointsBlocked("Invalid WUP receipt ledger")
-            previous = record["index"]
-        return ledger
+def admission_result(result):
+    value = dict(result['observation'])
+    value.update(save_binding=bytes(result['save_binding']).hex(),
+                 state='admitted' if value['state'] == 3 else 'unavailable',
+                 accepting_requests=bool(value['flags'] & 2), route_retained=bool(value['flags'] & 1))
+    value['native_root'] = wire_text(value['native_root'])
+    return value
 
-    def reconcile(self, authoritative):
-        ledger = self._ledger(authoritative)
-        for record in ledger["receipts"]:
-            if authoritative.get(record["index"]) != record["receipt"]:
-                raise WeaponPointsBlocked("AP history does not own the persisted WUP receipt")
-        gained = self.link.observe()["gained_after"]
-        total = sum(record["amount"] for record in ledger["receipts"])
-        if gained > total or gained % AMOUNT:
-            raise WeaponPointsBlocked("Native earned WUP disagrees with receipt ownership")
-        while gained < total:
-            result = self.link.grant_weapon_upgrade_points(AMOUNT, gained)
-            if result["gained_before"] != gained or result["gained_after"] != gained + AMOUNT:
-                raise WeaponPointsBlocked("Native grant result does not match the pending receipt")
-            gained += AMOUNT
 
-    def deliver(self, index, receipt, authoritative):
-        if authoritative.get(index) != receipt or not receipt:
-            raise WeaponPointsBlocked("WUP receipt is not authoritative")
-        ledger = self._ledger(authoritative)
-        self._record_receipt(ledger, index, receipt)
-        self.reconcile(authoritative)
+def diagnostic_value(value):
+    if isinstance(value, dict):
+        return {key: (item not in (0, "0", None) if key == "event_gap_count" else diagnostic_value(item))
+                for key, item in value.items() if key not in {
+                    "sequence", "timestamp_ms", "at_monotonic", "sampled_at_ms", "event_sequence",
+                    "callback_sequence", "callback_at_ms", "context_sampled_at_ms", "history_oldest",
+                    "history_overwritten", "events", "qualified_kills", "at_ms"}}
+    if isinstance(value, list):
+        return [diagnostic_value(item) for item in value]
+    return value
 
-    def _record_receipt(self, ledger, index, receipt):
-        existing = next((r for r in ledger["receipts"] if r["index"] == index), None)
-        if existing is not None:
-            if existing["receipt"] != receipt:
-                raise WeaponPointsBlocked("WUP receipt changed at an existing index")
-        else:
-            if ledger["receipts"] and ledger["receipts"][-1]["index"] >= index:
-                raise WeaponPointsBlocked("WUP receipt order changed")
-            ledger["receipts"].append({"index": index, "receipt": receipt, "amount": AMOUNT})
-            # persist ownership before mutation so recovery can use the native gained total
-            try:
-                self.persist()
-            except Exception:
-                ledger["receipts"].pop()
-                raise
 
-    async def _ledger_async(self, authoritative, run):
-        facts = await run(self.link, "observe") if self.state.get("weapon_points") is None else None
-        return self._ledger(authoritative, facts)
-
-    async def reconcile_async(self, authoritative, run):
-        ledger = await self._ledger_async(authoritative, run)
-        for record in ledger["receipts"]:
-            if authoritative.get(record["index"]) != record["receipt"]:
-                raise WeaponPointsBlocked("AP history does not own the persisted WUP receipt")
-        gained = (await run(self.link, "observe"))["gained_after"]
-        total = sum(record["amount"] for record in ledger["receipts"])
-        if gained > total or gained % AMOUNT:
-            raise WeaponPointsBlocked("Native earned WUP disagrees with receipt ownership")
-        while gained < total:
-            result = await run(self.link, "grant_weapon_upgrade_points", AMOUNT, gained)
-            if result["gained_before"] != gained or result["gained_after"] != gained + AMOUNT:
-                raise WeaponPointsBlocked("Native grant result does not match the pending receipt")
-            gained += AMOUNT
-
-    async def deliver_async(self, index, receipt, authoritative, run):
-        if authoritative.get(index) != receipt or not receipt:
-            raise WeaponPointsBlocked("WUP receipt is not authoritative")
-        ledger = await self._ledger_async(authoritative, run)
-        self._record_receipt(ledger, index, receipt)
-        await self.reconcile_async(authoritative, run)
+def diagnostic_entry(evidence, previous, now, signature):
+    row = {"signature": signature, "first_seen": now, "last_seen": now, "count": 1, "emitted_at": now}
+    first_error = previous.get("first_error") if previous else None
+    if first_error is None and (evidence.get("error") or evidence.get("returncode", 0)):
+        first_error = {**evidence, "at_monotonic": now}
+    if first_error is not None:
+        row["first_error"] = first_error
+    return row

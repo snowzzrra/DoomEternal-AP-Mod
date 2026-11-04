@@ -192,12 +192,13 @@ def ui(tmp_path, monkeypatch):
     pytest.importorskip("PySide6.QtWidgets", reason="Qt tests require requirements-launcher.txt")
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
+
     from doom_eap.launcher.launcher_ui import LauncherUI
 
     app = QApplication.instance() or QApplication([])
     schema = json.loads((Path(__file__).parents[1] / "data/options_schema.json").read_text(encoding="utf-8"))
     controller = Mock(config={}, options_schema=schema, bundle_dir=tmp_path,
-                      application_dir=tmp_path, client_dir=tmp_path, last_setup_failure=None)
+                      application_dir=tmp_path, client_dir=tmp_path, last_setup_failure=None, items_room=None)
     controller.workflow.session_owner.status = {}
     with patch.object(LauncherUI, "_discover"):
         window = LauncherUI(controller)
@@ -209,10 +210,80 @@ def ui(tmp_path, monkeypatch):
 
 
 def test_help_respects_doctor_attention(ui):
-    ui._render_doctor_report({"ok": False, "diagnostics": [
-        {"key": "ap_session", "status": "attention", "message": "Session refused"}]})
-    assert ui.doctor_status.text() == "GAME SETUP NEEDS ATTENTION"
-    assert "NEEDS ATTENTION" in ui.doctor_evidence.text()
+    dispatch_window(ui, {"type": "doctor_report", "report": {"ok": False, "diagnostics": [
+        {"key": "ap_session", "status": "attention", "message": "Session refused"}]}})
+    assert "ATTENTION" in ui.help_view.doctor_status.text()
+    assert "NEEDS ATTENTION" in ui.help_view.doctor_evidence.text()
+
+
+def dispatch_window(ui, *events):
+    import queue
+
+    from PySide6.QtWidgets import QApplication
+    ui.controller.events = queue.Queue()
+    ui.controller.operation_generation = 3
+    ui.controller.connection_attempt_id = 2
+    ui.controller.item_history_status = None
+    ui.controller.process_event.return_value = True
+    for event in events:
+        ui.controller.events.put(event)
+    ui.timer.start(0)
+    for _ in range(20):
+        QApplication.processEvents()
+        if ui.controller.events.empty():
+            break
+    ui.timer.stop()
+    assert ui.controller.events.empty()
+
+
+def test_window_keeps_installer_progress_inventory_result_and_session_navigation(ui):
+    from PySide6.QtWidgets import QApplication
+    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_bytes())
+    dispatch_window(ui, {"type": "connected", "seed_name": "room", "team": 0, "slot": 1, "slot_data": slot_data},
+                    {"type": "mod_staged"}, {"type": "injector_started"})
+    assert "EternalModInjector" in ui.session_setup_detail.text()
+    assert not ui.session_setup_detail.isHidden()
+    now = [ui._setup_progress.clock()]
+    ui._setup_progress.clock = lambda: now[0]
+    dispatch_window(ui, {"type": "injector_finished", "state": "applied"})
+    now[0] += 300
+    ui.lifecycle_timer.start(0)
+    QApplication.processEvents()
+    ui.lifecycle_timer.stop()
+    assert not ui.session_setup_help.isHidden()
+    dispatch_window(ui, {"type": "connection_lost"})
+    ui.hero_action.click()
+    assert ui.pages.currentWidget() is ui.play_view
+    ui.show()
+    dispatch_window(ui, {"type": "inventory_resync", "status": "waiting"})
+    waiting = ui.player_inventory.text()
+    assert ui.player_inventory.isVisible() and not ui.resync_inventory_button.isEnabled()
+    dispatch_window(ui, {"type": "inventory_resync", "status": "error"})
+    assert ui.player_inventory.isVisible() and ui.player_inventory.text() != waiting
+    assert ui.resync_inventory_button.isEnabled()
+
+
+def test_window_requires_retry_instead_of_confirmation_for_unknown_injection(ui):
+    dispatch_window(ui, {'type': 'manual_install_required', 'recovery_required': True,
+                         'injector_state': 'unknown', 'message': 'Re-run installation.'})
+    assert ui.session_manual_complete_action.isHidden()
+    assert not ui.session_manual_retry_action.isHidden()
+    dispatch_window(ui, {'type': 'manual_install_required', 'message': 'Confirm installation.'})
+    assert not ui.session_manual_complete_action.isHidden()
+
+
+def test_window_offers_preservation_for_interrupted_save(ui, monkeypatch):
+    from PySide6.QtWidgets import QComboBox, QInputDialog
+
+    shown = []
+    def inspect_dialog(dialog):
+        combo = dialog.findChild(QComboBox)
+        shown.append((dialog.labelText(), combo.model().item(1).isEnabled()))
+        return 0
+    monkeypatch.setattr(QInputDialog, "exec", inspect_dialog)
+    dispatch_window(ui, {"type": "ap_save_inspection", "inspection": {
+        "seed": "fixture", "slot": 1, "status": "save_interrupted", "native_backup_available": False}})
+    assert len(shown) == 1 and "interrupted" in shown[0][0] and shown[0][1]
 
 
 def test_room_summary_displays_tracker_options(ui):
@@ -239,6 +310,7 @@ def test_injector_failure_displays_exit_code_and_output(ui):
 
 def test_report_actions_open_copy_and_show_without_submission(ui, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QApplication, QDialog, QPushButton
+
     from doom_eap.launcher import launcher_ui
     from doom_eap.launcher.launcher_reporting import report_text
 
@@ -263,6 +335,55 @@ def test_report_actions_open_copy_and_show_without_submission(ui, tmp_path, monk
         return 0
 
     monkeypatch.setattr(QDialog, "exec", review)
-    ui._present_problem_report({"payload": payload, "message": "Review", "path": str(bundle), "submitted": False})
+    dispatch_window(ui, {"type": "problem_report_ready", "payload": payload, "message": "Review", "path": str(bundle), "submitted": False})
     ui.controller.request_report_submission.assert_not_called()
     ui.controller.save_problem_report.assert_called_once_with(payload)
+
+
+def test_manual_confirmation_defaults_to_no(ui, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    calls = []
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: calls.append(args) or QMessageBox.StandardButton.No)
+    ui._confirm_manual_installation()
+    assert calls[0][-1] == QMessageBox.StandardButton.No
+    ui.controller.confirm_manual_installation.assert_not_called()
+
+
+def test_installation_confirmation_is_inline_and_sent_once(ui):
+    dispatch_window(ui, {"type": "installation_confirmation_required", "request_id": "install"})
+    ui.show()
+    assert ui.install_yes.isVisible() and ui.install_no.isVisible()
+    ui.install_no.click()
+    ui.install_yes.click()
+    ui.controller.resolve_installation_confirmation.assert_called_once_with("install", False)
+
+
+def test_window_waits_for_safe_close(ui, monkeypatch):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+    scheduled = []
+    monkeypatch.setattr(QTimer, "singleShot", lambda delay, callback: scheduled.append(callback))
+    ui.show()
+    QApplication.processEvents()
+    ui.controller.close.return_value = False
+    ui.controller.workers.active = {"install"}
+    ui.close()
+    assert ui.isVisible() and ui._close_requested
+    assert not ui.centralWidget().isEnabled()
+    assert "Stop requested" in ui.hero_detail.text()
+    ui._finish_close()
+    assert ui.isVisible()
+    ui.controller.workers.active = frozenset()
+    ui.controller.close.return_value = True
+    ui._finish_close()
+    assert not ui.isVisible()
+
+
+def test_uncertain_installation_offers_install_again(ui):
+    ui._prepare = Mock()
+    ui._handle_event({"type": "manual_install_required", "message": "recovery guidance", "recovery_required": True})
+    assert ui.session_manual_retry_action.text() == "INSTALL AGAIN"
+    assert ui.session_manual_complete_action.isHidden()
+    assert ui.hero_action.text() == "INSTALL AGAIN"
+    ui.hero_action.click()
+    ui._prepare.assert_called_once_with(force=True)

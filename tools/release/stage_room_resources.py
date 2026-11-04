@@ -11,6 +11,7 @@ from pathlib import Path
 
 from doom_eap.content.map_registry import load_map_registry
 from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.strings import GAME_LOCALES, load_catalog
 from tools.release.prebuilt_room_resources import compute_room_resource_input_fingerprint
 from tools.release.room_payloads import canonical_json
 
@@ -58,7 +59,7 @@ def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
                              f"extra={sorted(set(actual) - set(expected))}")
         generated[key] = entities
 
-    for language in ("english", "portuguese"):
+    for language in GAME_LOCALES:
         destination = staged / f"gameresources_patch1/EternalMod/strings/{language}.json"
         run("tools.release.build_string_table", "--items", root / "data/items.json",
             "--item-replay-policies", root / "data/item_replay_policies.json", "--maps-dir", maps,
@@ -66,7 +67,7 @@ def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
         table = json.loads(destination.read_text(encoding="utf-8"))
         entries = {entry["name"]: entry for entry in table["strings"]}
         for key in ("#str_code__GHOST31004", "#str_code_mainmenu_campaign_name"):
-            entries[key] = {"name": key, "text": "DOOM ETERNAL ARCHIPELAGO"}
+            entries[key] = {"name": key, "text": load_catalog().text("branding", "campaign_title", locale=GAME_LOCALES[language])}
         table["strings"] = [entries[key] for key in sorted(entries)]
         destination.write_text(json.dumps(table, indent=4, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 

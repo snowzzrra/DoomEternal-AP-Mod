@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Mapping
 from urllib.parse import urlsplit
+
+from doom_eap.launcher.ui.strings import text as player_text
 
 
 @dataclass(frozen=True)
@@ -19,89 +21,111 @@ class ConnectionFailure:
 
 
 _BY_CODE = {
-    "missing_slot": ConnectionFailure(
-        "invalid_slot", "Player name required",
-        "Enter your player name exactly as shown in the room.",
-        "Copy the name from the room page, including capital letters.",
+    "missing_slot": (
+        "invalid_slot",
+        ("launcher.connection_errors", "player_name_required"),
+        ("launcher.connection_errors", "enter_your_player_name_exactly_as_shown_in_the_room"),
+        ("launcher.connection_errors", "copy_the_name_from_the_room_page_including_capital_letters"),
     ),
-    "invalid_slot": ConnectionFailure(
-        "invalid_slot", "Player name not found",
-        "This room has no player with that name.",
-        "Check the player name in the room and enter it exactly.",
+    "invalid_slot": (
+        "invalid_slot",
+        ("launcher.connection_errors", "player_name_not_found"),
+        ("launcher.connection_errors", "this_room_has_no_player_with_that_name"),
+        ("launcher.connection_errors", "check_the_player_name_in_the_room_and_enter_it_exactly"),
     ),
-    "invalid_password": ConnectionFailure(
-        "invalid_password", "Incorrect room password",
-        "The password does not match this room.",
-        "Check the room password and try again.",
+    "invalid_password": (
+        "invalid_password",
+        ("launcher.connection_errors", "incorrect_room_password"),
+        ("launcher.connection_errors", "the_password_does_not_match_this_room"),
+        ("launcher.connection_errors", "check_the_room_password_and_try_again"),
     ),
-    "password_required": ConnectionFailure(
-        "password_required", "Room password required",
-        "Enter the password for this room.",
-        "Enter the room password and try again.",
+    "password_required": (
+        "password_required",
+        ("launcher.connection_errors", "room_password_required"),
+        ("launcher.connection_errors", "enter_the_password_for_this_room"),
+        ("launcher.connection_errors", "enter_the_room_password_and_try_again"),
     ),
-    "invalid_game": ConnectionFailure(
-        "invalid_game", "This player is assigned another game",
-        "This player name belongs to another game in the room.",
-        "Enter the DOOM Eternal player name from this room.",
+    "invalid_game": (
+        "invalid_game",
+        ("launcher.connection_errors", "this_player_is_assigned_another_game"),
+        ("launcher.connection_errors", "this_player_name_belongs_to_another_game_in_the_room"),
+        ("launcher.connection_errors", "enter_the_doom_eternal_player_name_from_this_room"),
     ),
-    "incompatible_version": ConnectionFailure(
-        "incompatible", "DoomEAP and the room are incompatible",
-        "This DoomEAP version cannot connect to the room.",
-        "Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.",
+    "incompatible_version": (
+        "incompatible",
+        ("launcher.connection_errors", "doomeap_and_the_room_are_incompatible"),
+        ("launcher.connection_errors", "this_doomeap_version_cannot_connect_to_the_room"),
+        ("launcher.connection_errors", "select_help_save_support_report_and_ask_the_host_which_doomeap_v"),
     ),
-    "invalid_items_handling": ConnectionFailure(
-        "incompatible", "Room settings are incompatible",
-        "This DoomEAP version cannot use the room settings.",
-        "Select Help -> SAVE SUPPORT REPORT and send it to the room host.",
+    "invalid_items_handling": (
+        "incompatible",
+        ("launcher.connection_errors", "room_settings_are_incompatible"),
+        ("launcher.connection_errors", "this_doomeap_version_cannot_use_the_room_settings"),
+        ("launcher.connection_errors", "select_help_save_support_report_and_send_it_to_the_room_host"),
     ),
-    "room_incompatible": ConnectionFailure(
-        "incompatible", "Room version mismatch",
-        "This room is incompatible with your DoomEAP version.",
-        "Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.",
+    "room_incompatible": (
+        "incompatible",
+        ("launcher.connection_errors", "room_version_mismatch"),
+        ("launcher.connection_errors", "this_room_is_incompatible_with_your_doomeap_version"),
+        ("launcher.connection_errors", "select_help_save_support_report_and_ask_the_host_which_doomeap_v"),
     ),
-    "connection_refused": ConnectionFailure(
-        "refused", "Cannot reach the server",
-        "The server did not accept the connection.",
-        "Check the room address and port. Ask the host whether the server is running.",
+    "connection_refused": (
+        "refused",
+        ("launcher.connection_errors", "cannot_reach_the_server"),
+        ("launcher.connection_errors", "the_server_did_not_accept_the_connection"),
+        ("launcher.connection_errors", "check_the_room_address_and_port_ask_the_host_whether_the_server"),
     ),
-    "dns_failed": ConnectionFailure(
-        "dns", "Server name not found",
-        "The server name could not be found.",
-        "Check the spelling of the server address or copy it again from the room page.",
+    "dns_failed": (
+        "dns",
+        ("launcher.connection_errors", "server_name_not_found"),
+        ("launcher.connection_errors", "the_server_name_could_not_be_found"),
+        ("launcher.connection_errors", "check_the_spelling_of_the_server_address_or_copy_it_again_from_t"),
     ),
-    "connection_timeout": ConnectionFailure(
-        "timeout", "Connection timed out",
-        "The server did not respond in time.",
-        "Check the room address and your internet connection, then retry. If it continues, select Help -> SAVE SUPPORT REPORT.",
+    "connection_timeout": (
+        "timeout",
+        ("launcher.connection_errors", "connection_timed_out"),
+        ("launcher.connection_errors", "the_server_did_not_respond_in_time"),
+        ("launcher.connection_errors", "check_the_room_address_and_your_internet_connection_then_retry_i"),
     ),
-    "tls_failed": ConnectionFailure(
-        "tls", "Secure connection failed",
-        "Windows could not connect securely to the server.",
-        "Check the room address and Windows date and time, then retry. If it continues, select Help -> SAVE SUPPORT REPORT.",
+    "tls_failed": (
+        "tls",
+        ("launcher.connection_errors", "secure_connection_failed"),
+        ("launcher.connection_errors", "windows_could_not_connect_securely_to_the_server"),
+        ("launcher.connection_errors", "check_the_room_address_and_windows_date_and_time_then_retry_if_i"),
     ),
-    "malformed_address": ConnectionFailure(
-        "malformed_address", "Invalid server address",
-        "The room address has an incorrect format.",
-        "Enter the address and port, for example archipelago.gg:12345, or paste the room's connection address.",
+    "malformed_address": (
+        "malformed_address",
+        ("launcher.connection_errors", "invalid_server_address"),
+        ("launcher.connection_errors", "the_room_address_has_an_incorrect_format"),
+        ("launcher.connection_errors", "enter_the_address_and_port_for_example_archipelago_gg_12345_or_p"),
     ),
-    "connection_closed": ConnectionFailure(
-        "closed", "Server closed the connection",
-        "The server closed the connection before you could join.",
-        "Retry once. If it continues, ask the host whether the room is running and select Help -> SAVE SUPPORT REPORT.",
+    "connection_closed": (
+        "closed",
+        ("launcher.connection_errors", "server_closed_the_connection"),
+        ("launcher.connection_errors", "the_server_closed_the_connection_before_you_could_join"),
+        ("launcher.connection_errors", "retry_once_if_it_continues_ask_the_host_whether_the_room_is_runn"),
     ),
-    "malformed_server_data": ConnectionFailure(
-        "malformed", "Room data could not be read",
-        "DoomEAP could not read the room settings.",
-        "Select Help -> SAVE SUPPORT REPORT and send it to the room host.",
+    "malformed_server_data": (
+        "malformed",
+        ("launcher.connection_errors", "room_data_could_not_be_read"),
+        ("launcher.connection_errors", "doomeap_could_not_read_the_room_settings"),
+        ("launcher.connection_errors", "select_help_save_support_report_and_send_it_to_the_room_host"),
     ),
 }
+
+
+def _failure_for(code):
+    category, *entries = _BY_CODE[code]
+    return ConnectionFailure(category, *(player_text(*entry) for entry in entries))
 
 
 def _canonical_code(value: object) -> str:
     text = str(value or "").strip().replace("-", "_").casefold()
     aliases = {
-        "invalidslot": "invalid_slot", "invalidpassword": "invalid_password",
-        "invalidgame": "invalid_game", "incompatibleversion": "incompatible_version",
+        "invalidslot": "invalid_slot",
+        "invalidpassword": "invalid_password",
+        "invalidgame": "invalid_game",
+        "incompatibleversion": "incompatible_version",
         "invaliditemshandling": "invalid_items_handling",
     }
     return aliases.get(text, text)
@@ -110,59 +134,66 @@ def _canonical_code(value: object) -> str:
 def normalize_connection_failure(event: Mapping[str, object]) -> ConnectionFailure:
     code = _canonical_code(event.get("code"))
     reason_codes = event.get("reason_codes")
-    if isinstance(reason_codes, (list, tuple)):
+    if isinstance(reason_codes, list | tuple):
         for reason in reason_codes:
             candidate = _canonical_code(reason)
             if candidate in _BY_CODE:
                 code = candidate
                 break
     if code in _BY_CODE:
-        return _BY_CODE[code]
+        return _failure_for(code)
 
-    technical = " ".join(str(event.get(key, "")) for key in (
-        "message", "technical_message", "raw_message", "reason",
-    )).casefold()
-    if any(token in technical for token in ("getaddrinfo", "name or service not known", "nodename nor servname", "dns")):
-        return _BY_CODE["dns_failed"]
-    if any(token in technical for token in ("timed out", "timeout", "timeouterror")):
-        return _BY_CODE["connection_timeout"]
-    if any(token in technical for token in ("ssl", "tls", "certificate", "cert_verify")):
-        return _BY_CODE["tls_failed"]
-    if any(token in technical for token in ("connection refused", "connectionrefused", "winerror 10061")):
-        return _BY_CODE["connection_refused"]
-    if any(token in technical for token in ("connection closed", "server closed", "websocket connection is closed")):
-        return _BY_CODE["connection_closed"]
-    if any(token in technical for token in ("invalid uri", "invalid address", "invalid port", "malformed")):
-        return _BY_CODE["malformed_address"]
     return ConnectionFailure(
-        "unexpected", "Could not connect",
-        "DoomEAP could not join the room.",
-        "Retry once. If it still fails, select Help -> SAVE SUPPORT REPORT.",
+        "unexpected",
+        player_text("launcher.connection_errors", "could_not_connect"),
+        player_text("launcher.connection_errors", "doomeap_could_not_join_the_room"),
+        player_text("launcher.connection_errors", "retry_once_if_it_still_fails_select_help_save_support_report"),
     )
 
 
 def enrich_connection_failure(event: Mapping[str, object], *, attempt_id: int) -> dict[str, object]:
     normalized = normalize_connection_failure(event)
     return {
-        **event, **normalized.payload(),
-        "failure_domain": "archipelago_connection", "attempt_id": attempt_id,
+        **event,
+        **normalized.payload(),
+        "failure_domain": "archipelago_connection",
+        "attempt_id": attempt_id,
     }
 
 
 def validate_server_address(value: str) -> str:
     endpoint = value.strip()
     if not endpoint or any(character.isspace() for character in endpoint):
-        raise ValueError("invalid server address")
+        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
     candidate = endpoint if "://" in endpoint else f"ws://{endpoint}"
     try:
         parsed = urlsplit(candidate)
         port = parsed.port
     except ValueError as error:
-        raise ValueError("invalid server address") from error
+        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c")) from error
     if parsed.scheme not in {"ws", "wss"} or not parsed.hostname:
-        raise ValueError("invalid server address")
+        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
     if port is not None and not 1 <= port <= 65535:
-        raise ValueError("invalid server address")
+        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username:
-        raise ValueError("invalid server address")
+        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
     return endpoint
+
+
+def connection_error_code(error):
+    import socket
+    import ssl
+
+    from websockets.exceptions import ConnectionClosed, InvalidURI
+
+    for kind, code in (
+        (socket.gaierror, "dns_failed"),
+        (TimeoutError, "connection_timeout"),
+        (ssl.SSLError, "tls_failed"),
+        (ConnectionRefusedError, "connection_refused"),
+        (ConnectionClosed, "connection_closed"),
+        (InvalidURI, "malformed_address"),
+    ):
+        if isinstance(error, kind):
+            return code
+    return "connection_failed"

@@ -77,6 +77,7 @@ def test_source_only_checks_apworld_copies_without_authoring_maps(tmp_path, monk
     manifest = json.loads(output.with_name("projection_manifest.json").read_bytes())
     assert {"slot_data_contract.py", "recipe_codec.py", "slot_catalog.json", "generated_content.py", "native_enemy_catalog.json"} <= set(manifest["files"])
     assert "projection_manifest.json" not in manifest["files"]
+    assert "player_strings_generated.py" in manifest["files"]
     assert "native_enemy_assets.json" not in manifest["files"]
     assert not (tmp_path / "native_enemy_assets.json").exists()
     for name, digest in manifest["files"].items():
@@ -130,6 +131,8 @@ def test_slot_catalog_is_projected_hashed_and_staged(tmp_path):
     root, output, staging = tmp_path / "mod", tmp_path / "ap", tmp_path / "runtime"
     source = root / "doom_eap/content"
     source.mkdir(parents=True)
+    (root / "data").mkdir()
+    shutil.copyfile(compiler.MOD_ROOT / "data/player_strings.json", root / "data/player_strings.json")
     for name in CATALOG_DEPENDENCIES:
         shutil.copyfile(catalog_dependency_path(compiler.MOD_ROOT / 'doom_eap/content', name), source / name)
     for name in ("slot_data_contract.py", "recipe_codec.py"):

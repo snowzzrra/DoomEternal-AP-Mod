@@ -1,4 +1,3 @@
-from types import SimpleNamespace
 import hashlib
 import json
 import multiprocessing
@@ -9,9 +8,8 @@ import threading
 import unittest
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
-from tests.test_core_distribution import fixture as core_distribution_fixture
-
 
 import doom_eap.launcher.launcher_controller as launcher_controller_mod
 import doom_eap.launcher.launcher_platform as launcher_platform_mod
@@ -31,6 +29,7 @@ from doom_eap.launcher.launcher_platform import (
     install_meathook,
     stage_windows_injector_toolchain,
 )
+from tests.test_core_distribution import fixture as core_distribution_fixture
 
 
 def _install_core_fixture(game_root: Path) -> Path:
@@ -221,13 +220,13 @@ class TestCorePrerequisiteGate(unittest.TestCase):
             old_runtime = Path(directory) / "old-runtime"
             old_runtime.mkdir()
             old = core_distribution_fixture(old_runtime)
-            old.update(version="1.1.2", base_version="1.1.2", channel="stable", rc_number=0)
+            old.update(version="2.0.2", base_version="2.0.2", channel="stable", rc_number=0)
             old_manifest = old_runtime / "distribution.json"
             old_manifest.write_text(json.dumps(old), encoding="utf-8")
             new_runtime = Path(directory) / "new-runtime"
             new_runtime.mkdir()
             incoming = core_distribution_fixture(new_runtime, build_id="c" * 64)
-            incoming.update(version="1.1.2", base_version="1.1.2", channel="stable", rc_number=0,
+            incoming.update(version="2.0.2", base_version="2.0.2", channel="stable", rc_number=0,
                             build_id="c" * 64, pair_id="c" * 64)
             new_manifest = new_runtime / "distribution.json"
             new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
@@ -243,13 +242,13 @@ class TestCorePrerequisiteGate(unittest.TestCase):
                 for name in before:
                     (backup / name).replace(root / name)
                 self.assertEqual(before, {name: (root / name).read_bytes() for name in before})
-                incoming.update(version="1.1.3", base_version="1.1.3")
+                incoming.update(version="2.0.3", base_version="2.0.3")
                 new_manifest.write_text(json.dumps(incoming), encoding="utf-8")
                 result = install_meathook(root, None, consent=lambda _: False, local_artifact=new_manifest)
                 self.assertEqual(result.state, "installed")
                 verified = launcher_platform_mod.probe_meathook(root)
                 self.assertTrue(verified.ok)
-                self.assertEqual(verified.details["version"], "1.1.3")
+                self.assertEqual(verified.details["version"], "2.0.3")
                 self.assertEqual(verified.details["build_id"], "c" * 64)
                 from doom_eap.launcher.launcher_core_install import rollback_core
                 rollback_core(root, None)
@@ -406,21 +405,33 @@ class TestCorePrerequisiteGate(unittest.TestCase):
             )
 
             mock_digest = "0" * 64
+            generated = base_dir / "room.zip"
+            with zipfile.ZipFile(generated, "w") as archive:
+                archive.writestr("seed_manifest.json", "{}")
             with patch.object(RoomCompiler, "__init__", return_value=None), \
                  patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
-                 patch.object(workflow.core_runtime, "check", return_value=None):
+                 patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()), \
+                 patch("doom_eap.launcher.installation_adapters.injector_processes", return_value=()), \
+                 patch.object(RoomCompiler, "build", return_value=generated):
                 with self.assertRaises(RuntimeError) as ctx:
                     workflow.execute(_snapshot())
 
-            failure = setup_failure_payload(ctx.exception, phase=workflow._failure_phase)
+            failure = setup_failure_payload(ctx.exception, phase="game_setup")
             self.assertEqual(failure["recovery_action"], "repair_game_integration")
             self.assertEqual(failure["failure_domain"], "game_setup")
-            with patch.object(workflow, "ensure_game_link", side_effect=ValueError("Invalid Core manifest")):
-                with self.assertRaisesRegex(ValueError, "Invalid Core manifest") as refused:
+            config_path.write_text(json.dumps({"doom_base_dir": str(game_root / "base"),
+                                               "core_runtime_manifest": str(base_dir / "missing.json")}))
+            workflow = IntegratedLaunchWorkflow(app_dir, state_dir, config_path, platform_name="linux",
+                                                consent=lambda _spec: False)
+            with patch.object(RoomCompiler, "__init__", return_value=None), \
+                 patch.object(RoomCompiler, "static_content_digest", mock_digest, create=True), \
+                 patch("doom_eap.launcher.launcher_platform.detect_doom_processes", return_value=()), \
+                 patch("doom_eap.launcher.installation_adapters.injector_processes", return_value=()), \
+                 patch.object(RoomCompiler, "build", return_value=generated):
+                with self.assertRaises((ValueError, OSError)) as refused:
                     workflow.execute(_snapshot())
-            failure = setup_failure_payload(refused.exception, phase=workflow._failure_phase)
+            failure = setup_failure_payload(refused.exception, phase="game_setup")
             self.assertEqual(failure["recovery_action"], "repair_game_integration")
-            # assert zero mutations
             self.assertFalse((game_root / "XINPUT1_3.dll").exists())
             self.assertEqual(list((game_root / "Mods").glob("*.zip")), [])
 
@@ -435,7 +446,7 @@ class TestWindowsToolchainStaging(unittest.TestCase):
         for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
             member_path = root / member
             member_path.parent.mkdir(parents=True, exist_ok=True)
-            member_path.write_bytes(f"content_of_{member}".encode("utf-8"))
+            member_path.write_bytes(f"content_of_{member}".encode())
         bat_path = root / "EternalModInjector.bat"
         return InstalledDependency(
             "EternalModInjector", "2026-09-04", "mock_sha", "mock_url", str(root), str(bat_path)
@@ -496,6 +507,21 @@ class TestWindowsToolchainStaging(unittest.TestCase):
 
 
 class TestWindowsNativeClientLifecycle(unittest.TestCase):
+    def test_hotkey_changes_wait_for_installation_recovery(self):
+        from doom_eap.launcher.install_journal import InstallJournal, InstallPhase
+        journal = InstallJournal(self.game_root)
+        journal.begin({})
+        journal.transition(InstallPhase.INJECTING)
+        self.controller.config["ammo_refill_keybind"] = "F11"
+        base = self.game_root / "base"
+        before = {path: path.read_bytes() for path in base.rglob("*") if path.is_file()}
+        self.assertIsNone(self.controller.ensure_ammo_refill_keybind())
+        self.assertEqual(before, {path: path.read_bytes() for path in base.rglob("*") if path.is_file()})
+        journal.transition(InstallPhase.ROLLED_BACK)
+        path = self.controller.ensure_ammo_refill_keybind()
+        self.assertIsNotNone(path)
+        self.assertIn("F11", path.read_text())
+
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory(prefix="doomeap_native_client_test_")
         self.tmp = Path(self.tmp_dir.name)
@@ -768,7 +794,7 @@ class TestWindowsFilesystemCorrective(unittest.TestCase):
 
     def _file_spec(self, tmp: Path, name="CacheTool", version="1.0"):
         artifact = tmp / f"{name}.dll"
-        content = f"{name}_bytes_{version}".encode("utf-8")
+        content = f"{name}_bytes_{version}".encode()
         artifact.write_bytes(content)
         spec = DependencySpec(
             name=name,
@@ -817,3 +843,37 @@ class TestWindowsFilesystemCorrective(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+def test_staging_preserves_existing_injector_on_both_platforms(tmp_path):
+    import pytest
+
+    from doom_eap.launcher.install_journal import InstallJournal
+    from doom_eap.launcher.installation_adapters import LinuxModManagerAdapter
+
+    for system in ("linux", "windows"):
+        for journaled in (False, True):
+            root = tmp_path / f"{system}-{journaled}"
+            dep = TestWindowsToolchainStaging()._create_mock_dep_root(root / "dep")
+            game = root / "game"
+            game.mkdir()
+            journal = InstallJournal(game) if journaled else None
+            if journal is not None:
+                journal.begin({})
+            existing = game / WINDOWS_INJECTOR_REQUIRED_MEMBERS[-1]
+            existing.parent.mkdir(parents=True, exist_ok=True)
+            existing.write_bytes(b"player installation")
+            before = {p.relative_to(game): p.read_bytes() for p in game.rglob("*") if p.is_file()}
+            prepare = (lambda dep=dep, game=game, journal=journal: stage_windows_injector_toolchain(dep, game, journal=journal)) if system == "windows" else (
+                lambda dep=dep, game=game, journal=journal: LinuxModManagerAdapter(dep)._prepare_tools(game, journal=journal))
+            with pytest.raises(launcher_platform_mod.InjectorInstallationMismatch) as failure:
+                prepare()
+            assert failure.value.details["failure_category"] == "injector_installation_mismatch"
+            assert {p.relative_to(game): p.read_bytes() for p in game.rglob("*") if p.is_file()} == before
+            existing.write_bytes((Path(dep.root) / WINDOWS_INJECTOR_REQUIRED_MEMBERS[-1]).read_bytes())
+            prepare()
+            for member in WINDOWS_INJECTOR_REQUIRED_MEMBERS:
+                assert (game / member).read_bytes() == (Path(dep.root) / member).read_bytes()
+            if journal is not None:
+                assert str(existing.resolve()) not in {entry["path"] for entry in journal.document["files"]}

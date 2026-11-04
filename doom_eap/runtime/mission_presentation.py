@@ -5,8 +5,9 @@ import json
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from tools.maps.notification_formatting import item_receipt_text
 from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
+from doom_eap.strings import text as player_text
+from tools.maps.notification_formatting import item_receipt_text
 
 
 @dataclass(frozen=True)
@@ -68,14 +69,21 @@ class MissionPresentations:
                                 if entry["signal"].get("kind") == "physical_event_equivalent")
 
     @staticmethod
-    def reward(entry, facts, placements):
+    def reward(entry, facts, placements, *, mastery=False):
         """Active Location identity, exact placement and server ACK; no inventory inference."""
         location_id = entry["location_id"]
         placement = placements.get(location_id)
-        text = "REWARD UNKNOWN" if placement is None else item_receipt_text(
-            placement["item_name"], local=placement["local"],
-            trap=bool(placement["classification"] & ITEM_CLASSIFICATION_TRAP),
-            recipient_name=placement["recipient_name"], uppercase=False)
+        text = (
+            (player_text("game.menu", "mastery_unknown") if mastery else player_text("notifications", "reward_unknown"))
+            if placement is None
+            else item_receipt_text(
+                placement["item_name"],
+                local=placement["local"],
+                trap=bool(placement["classification"] & ITEM_CLASSIFICATION_TRAP),
+                recipient_name=placement["recipient_name"],
+                uppercase=False,
+            )
+        )
         return ChallengeReward(location_id, entry["signal"].get("unlockable", ""),
                                entry["name"].split(" - Mission Challenge - ")[-1],
                                location_id in facts.checked, text)
@@ -96,7 +104,7 @@ class MissionPresentations:
                     unlockable=authored["signal"]["unlockable"].rsplit("/", 1)[0]) if aggregate else None)
 
     def mastery_snapshot(self, facts, placements, masteries):
-        return tuple(replace(self.reward(entry, facts, placements), unlockable=entry["gameplay_perk"]) for entry in masteries
+        return tuple(replace(self.reward(entry, facts, placements, mastery=True), unlockable=entry["gameplay_perk"]) for entry in masteries
                      if entry["location_id"] in facts.server_locations)
 
     def encounter_snapshot(self, runtime_map, *, revealed, facts, placements, pending):

@@ -1,12 +1,17 @@
 """Existing repair decisions with explicit Doctor/configuration/install adapters."""
+
 from pathlib import Path
-from .launcher_platform import GameLinkResult, validate_game_root, probe_meathook
+
+from doom_eap.launcher.ui.strings import text as player_text
+
+from .launcher_platform import GameLinkResult, probe_meathook, validate_game_root
+
 
 def install_game_link(config, workflow, emit, force_repair: bool = False) -> GameLinkResult:
     """Acquire, verify, and install supported Game Link runtime library."""
     game_root = config.get("game_root") or config.get("doom_base_dir")
     if not game_root:
-        raise RuntimeError("Choose the game folder.")
+        raise RuntimeError(player_text('launcher.platform', 'choose_the_game_folder'))
     root = validate_game_root(Path(str(game_root)))
     local_key = "core_runtime_manifest"
     local_value = config.get(local_key)
@@ -37,13 +42,13 @@ def repair_idfile_decompressor(workflow, emit) -> str:
         path=installed.executable,
         sha256=installed.artifact_sha256,
     )
-    return "Mod-building tool repaired."
+    return player_text('launcher.repairs', 'mod_building_tool_repaired')
 
 
 def remove_idfile_decompressor(workflow, emit) -> str:
     removed = workflow.remove_idfile_decompressor()
     emit("repair_complete", action="remove_idfile_decompressor", removed=removed)
-    return "Downloaded tool removed." if removed else "Downloaded tool is not installed."
+    return player_text('launcher.repairs', 'downloaded_tool_removed') if removed else player_text('launcher.repairs', 'downloaded_tool_is_not_installed')
 
 
 def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_setup) -> str:
@@ -51,16 +56,16 @@ def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_
     actions = {action.key: action for action in doctor.repair_preview()}
     action = actions.get(action_key)
     if action is None:
-        raise ValueError("This repair is unavailable. Run Check Setup again.")
+        raise ValueError(player_text('launcher.repairs', 'this_repair_is_unavailable_run_check_setup_again'))
     if action_key == "archive_stale_install_record":
         backup = doctor.archive_stale_install_record()
         emit("repair_complete", action=action_key, backup=str(backup))
         return str(backup)
     if action_key in {"rebuild_room_package", "update_room_package", "reinstall_room_mod"}:
         if not start_room_setup():
-            raise RuntimeError("Connect to the room before rebuilding its mod.")
+            raise RuntimeError(player_text('launcher.repairs', 'connect_to_the_room_before_rebuilding_its_mod'))
         emit("repair_started", action=action_key)
-        return "Rebuilding room mod…"
+        return player_text('launcher.repairs', 'rebuilding_room_mod')
     if action_key in {"install_game_link", "repair_game_link"}:
         result = install_game_link(config, workflow, emit, force_repair=action_key == "repair_game_link")
         game_root = config.get("game_root") or config.get("doom_base_dir")
@@ -71,9 +76,9 @@ def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_
                 "repair_failed",
                 action=action_key,
                 state=result.state,
-                message=f"post-repair probe failed: {post_probe.message}",
+                message=player_text('launcher.repairs', 'post_repair_probe_failed_value_0', value_0=f'{post_probe.message}'),
             )
-            raise RuntimeError("Game connection repair could not be checked. Select Help -> SAVE SUPPORT REPORT.")
+            raise RuntimeError(player_text('launcher.repairs', 'game_connection_repair_could_not_be_checked_select_help_save_sup'))
         emit(
             "repair_complete",
             action=action_key,
@@ -82,10 +87,10 @@ def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_
             sha256=result.sha256,
             probe=post_probe.message,
         )
-        return "Game connection repaired."
+        return player_text('launcher.repairs', 'game_connection_repaired')
     if action_key == "repair_idfile_decompressor":
         return repair_idfile_decompressor(workflow, emit)
     if action_key == "remove_idfile_decompressor":
         return remove_idfile_decompressor(workflow, emit)
-    raise ValueError("This repair is unavailable. Run Check Setup again.")
+    raise ValueError(player_text('launcher.repairs', 'this_repair_is_unavailable_run_check_setup_again'))
 

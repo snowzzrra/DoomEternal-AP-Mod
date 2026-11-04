@@ -264,6 +264,8 @@ jobs:
           if errorlevel 1 exit /b 1
           "%SC_CMAKE%\cmake.exe" -S Sentinel-Core -B Sentinel-Core/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
           if errorlevel 1 exit /b 1
+          python -B tools/content/project_transport_protocol.py --check --core-root Sentinel-Core
+          if errorlevel 1 exit /b 1
           "%SC_CMAKE%\cmake.exe" --build Sentinel-Core/build
           if errorlevel 1 exit /b 1
           "%SC_CMAKE%\ctest.exe" --test-dir Sentinel-Core/build --output-on-failure --timeout 60
@@ -282,9 +284,10 @@ jobs:
           if not exist Sentinel-Core\build\generated\sentinel_version.h exit /b 1
           python -m pip install --requirement requirements-ci.txt
           if errorlevel 1 exit /b 1
+          set "SENTINEL_TRANSPORT_RELAY=%CD%\build\release\build\client\save_death_probe.exe"
           set "DELIVERY_TESTS="
           if exist tests\test_delivery_scenarios.py set "DELIVERY_TESTS=tests/test_delivery_scenarios.py"
-          python -m pytest tests/test_native_queue.py tests/test_ap_client_timing.py %DELIVERY_TESTS% -q --junitxml=native-client-results.xml
+          python -m pytest tests/test_native_features.py tests/test_native_transport.py tests/test_native_transport_pipe.py %DELIVERY_TESTS% -q --basetemp=.tmp/native-client-tests -p no:cacheprovider --junitxml=native-client-results.xml
           if errorlevel 1 exit /b 1
           python -c "import xml.etree.ElementTree as ET; root = ET.parse('native-client-results.xml').getroot(); assert list(root.iter('testcase')), 'Native-client gate collected zero tests'; assert not list(root.iter('skipped')), 'Native-client gate contains skipped tests'"
 
