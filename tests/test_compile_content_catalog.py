@@ -132,7 +132,7 @@ def test_slot_catalog_is_projected_hashed_and_staged(tmp_path):
     source = root / "doom_eap/content"
     source.mkdir(parents=True)
     (root / "data").mkdir()
-    shutil.copyfile(compiler.MOD_ROOT / "data/player_strings.json", root / "data/player_strings.json")
+    shutil.copytree(compiler.MOD_ROOT / "data/strings", root / "data/strings")
     for name in CATALOG_DEPENDENCIES:
         shutil.copyfile(catalog_dependency_path(compiler.MOD_ROOT / 'doom_eap/content', name), source / name)
     for name in ("slot_data_contract.py", "recipe_codec.py"):

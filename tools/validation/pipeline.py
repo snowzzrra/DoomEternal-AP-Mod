@@ -106,7 +106,7 @@ WORKSPACES_ROOT = CACHE_ROOT / "workspaces"
 IDENTITY_PATH = ROOT / "data" / "content_identity.json"
 PIPELINE_VERSION = "5"
 CORE_MAP_INPUTS = (
-    "data/player_strings.json",
+    "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json",
     "doom_eap/strings.py",
     "data/items.json",
     "data/item_replay_policies.json",
@@ -629,14 +629,14 @@ class Pipeline:
         metadata_path = directory / "metadata.json"
         if not self.no_cache:
             cached = self._cached_map_artifact(
-                map_key=map_key,
-                digest=digest,
-                inputs=inputs,
-                directory=directory,
-                output=output,
-                manifest=manifest,
-                metadata_path=metadata_path,
-            )
+            map_key=map_key,
+            digest=digest,
+            inputs=inputs,
+            directory=directory,
+            output=output,
+            manifest=manifest,
+            metadata_path=metadata_path,
+        )
             if cached is not None:
                 self.cache_hits[map_key] = True
                 print(f"MAP {map_key} cache=hit digest={digest[:16]}")
@@ -649,8 +649,8 @@ class Pipeline:
                 raw = temporary / f"{map_key}.raw.entities"
                 generated_manifest = temporary / f"{map_key}.json"
                 items = json.loads(
-                    (ROOT / "data" / "items.json").read_text(encoding="utf-8")
-                )
+                (ROOT / "data" / "items.json").read_text(encoding="utf-8")
+            )
                 item_names, receipt_feedback = load_item_notification_policies(
                     ROOT / "data" / "item_replay_policies.json"
                 )
@@ -1107,7 +1107,7 @@ class Pipeline:
             "doom_eap/runtime/ledger_records.py",
             "doom_eap/runtime/delivery_control.py",
             "doom_eap/strings.py",
-            "data/player_strings.json",
+            "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json",
             "doom_eap/runtime/publisher_runtime.py",
             "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
             "doom_eap/runtime/__init__.py", "doom_eap/runtime/save_decrypt.py",

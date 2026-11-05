@@ -272,12 +272,12 @@ class RoomDelivery:
         async with self.lock:
             await self._ingest_existing_owner()
             if not await self.ready(evidence):
-                return None, text("activity", "resync_waiting")
+                return None, 'Return to DOOM and unpause within 30 seconds. Inventory resync is waiting for safe gameplay.'
             await self.ingest()
             context = self.bridge._refresh_runtime_context(self.bridge._connected_slot_data, evidence)
             snapshot = await self._snapshot(context, evidence)
             if snapshot is None:
-                return None, text("activity", "repair_context_changed")
+                return None, 'Repair dispatched; context changed before ownership could be observed'
             await self._recover(snapshot)
             plan = await self._plan(context, snapshot, evidence, selected)
             await self._execute(snapshot)
@@ -288,7 +288,7 @@ class RoomDelivery:
                 await self._balance()
             await self._publish_local_obligation()
             if selected is not None and (plan.unresolved_item_ids or await self._has_unconfirmed_repairs(selected)):
-                return plan.reconciliation, text("activity", "repair_unconfirmed")
+                return plan.reconciliation, 'Repair dispatched; native ownership has not been confirmed. Consumables were preserved.'
         if selected is None:
             await self._temporaries(plan)
         return plan.reconciliation, None
@@ -524,7 +524,7 @@ class RoomDelivery:
                 self.balance = dict(available=min(AMMO_REFILL_CAPACITY, max(0, totals.credited - totals.consumed - totals.discarded - totals.reserved)),
                                     consumed=totals.consumed, authoritative=True)
         self.emit("ammo_refill", **self.balance, can_spend=self.can_spend, status="balance",
-                  message=text("ammo_refill", "available", count=str(self.balance["available"])))
+                  message='Ammo Refill charges available: {count}'.format(count=str(self.balance["available"])))
 
     async def close(self):
         self.closed = True

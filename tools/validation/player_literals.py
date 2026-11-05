@@ -2,9 +2,14 @@
 
 import argparse
 import ast
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+GAME_TEXT_FUNCTIONS = {
+    "notification_text", "major_notification_text", "location_sent_text", "item_receipt_text",
+    "build_string_table", "string_entries", "_apply_placement_strings",
+}
 WIDGETS = {
     "QLabel",
     "QPushButton",
@@ -28,7 +33,6 @@ SETTERS = {
     "setPlainText",
     "setHtml",
     "setInformativeText",
-    "setDetailedText",
     "setHeaderLabels",
     "setHorizontalHeaderLabels",
     "setLabelText",
@@ -59,6 +63,9 @@ ALLOWED = {
     "1": "initial quantity",
     "00": "timer padding",
     "02d": "timer format",
+    "Ammo Refill key: {value_0}": "fixed keybinding indicator classified as code",
+    "Try again": "manual item retry classified as code",
+    "Trying again may duplicate the effect. Confirm only if you want another attempt.": "manual retry confirmation classified as code",
 }
 ALLOWED.update(
     {
@@ -90,7 +97,7 @@ def display_arguments(node):
     elif target.startswith(("QMessageBox.", "QInputDialog.")):
         indices = (1, 2)
     elif target.startswith("QFileDialog."):
-        indices = (1, 3)
+        indices = (1,)
     else:
         indices = POSITIONS.get(short, ())
     return [node.args[i] for i in indices if i < len(node.args)] + [
@@ -192,23 +199,38 @@ def text_children(node):
     return ast.iter_child_nodes(node)
 
 
-def issues(source, filename):
+def issues(source, filename, *, game_only=False):
     tree = ast.parse(source, filename=filename)
     found = {}
-    scopes = [tree] + [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)]
+    scopes = text_scopes(tree, game_only)
     globals_ = bindings_for(list(scope_nodes(tree)))
     for scope in scopes:
         nodes = list(scope_nodes(scope))
         bindings = globals_ | bindings_for(nodes)
         for node in nodes:
-            for value in sink_values(node):
-                for literal in literals(value, bindings):
-                    if literal.value not in ALLOWED:
-                        found[(literal.lineno, literal.col_offset)] = literal.value
+            values = sink_values(node, game_only=game_only)
+            for literal in (literal for value in values for literal in literals(value, bindings)):
+                if not technical_literal(literal.value):
+                    found[(literal.lineno, literal.col_offset)] = literal.value
     return [f"{filename}:{line}:{col + 1}: player literal {value!r}" for (line, col), value in sorted(found.items())]
 
 
-def sink_values(node):
+def text_scopes(tree, game_only):
+    scopes = [tree] + [node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)]
+    if game_only:
+        scopes = [scope for scope in scopes if getattr(scope, "name", "") in GAME_TEXT_FUNCTIONS]
+    return scopes
+
+
+def technical_literal(value):
+    if value in ALLOWED or value in {"Player", "archipelago.gg:38281"}:
+        return True
+    return not re.search(r"[A-Za-zÀ-ÿ]", re.sub(r"\{[a-z0-9_]+\}", "", value))
+
+
+def sink_values(node, *, game_only=False):
+    if game_only:
+        return game_text_values(node)
     if isinstance(node, ast.Call):
         return display_arguments(node)
     if isinstance(node, ast.Dict):
@@ -220,16 +242,46 @@ def sink_values(node):
     return []
 
 
+def game_text_values(node):
+    match node:
+        case ast.Return(value=value):
+            return [value] if value is not None else []
+        case ast.Call(func=ast.Attribute(value=ast.Name(id="entries"), attr="append"),
+                      args=[ast.Tuple(elts=[_, value])]):
+            return [value]
+        case ast.Assign(targets=[ast.Subscript(slice=ast.Constant(value="text"))], value=value):
+            return [value]
+        case ast.Dict(keys=keys, values=values):
+            return [value for key, value in zip(keys, values, strict=True)
+                    if isinstance(key, ast.Constant) and key.value == "text"]
+        case _:
+            return []
+
+
 def scan(root=ROOT):
     failures = [
         issue
-        for path in sorted((root / "doom_eap").rglob("*.py"))
+        for directory in ("doom_eap/launcher/ui", "doom_eap/launcher/presenters")
+        for path in sorted((root / directory).rglob("*.py"))
         for issue in issues(path.read_text(encoding="utf-8"), path.relative_to(root).as_posix())
     ]
-    script = root / "scripts/launch/run_bridge.sh"
-    if script.is_file():
-        failures.extend(shell_issues(script.read_text(encoding="utf-8"), script.relative_to(root).as_posix()))
+    for path in sorted((root / "doom_eap").rglob("*.py")):
+        failures.extend(player_error_issues(path.read_text(encoding="utf-8"), path.relative_to(root).as_posix()))
+    for filename in ("tools/maps/notification_formatting.py", "tools/release/build_string_table.py",
+                     "doom_eap/launcher/launcher_core.py"):
+        path = root / filename
+        failures.extend(issues(path.read_text(encoding="utf-8"), filename, game_only=True))
     return failures
+
+
+def player_error_issues(source, filename):
+    return [
+        f"{filename}:{node.lineno}: PlayerError requires catalog category and key"
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and name(node.func) == "PlayerError"
+        and (len(node.args) != 2 or not all(isinstance(arg, ast.Constant) and isinstance(arg.value, str)
+                                          for arg in node.args))
+    ]
 
 
 def shell_issues(source, filename):

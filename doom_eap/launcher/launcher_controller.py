@@ -22,7 +22,7 @@ from pathlib import Path
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 from doom_eap.runtime.delivery_control import control_room
-from doom_eap.strings import load_catalog
+from doom_eap.strings import PlayerError, load_catalog
 
 from .connection_errors import enrich_connection_failure, validate_server_address
 from .events import EventOrigin, LauncherEvent, adapt_event
@@ -108,11 +108,11 @@ def normalize_ammo_refill_keybind(keybind: str) -> str:
     if not value or value.casefold() == "unbound":
         return ""
     if "\n" in value or "\r" in value or "+" in value or len(value) > 32:
-        raise ValueError(player_text('launcher.controller', 'choose_one_key_without_ctrl_alt_or_shift'))
+        raise ValueError('Choose one key without Ctrl, Alt, or Shift.')
     folded = {token.casefold(): token for token in AMMO_REFILL_SUPPORTED_KEY_TOKENS}
     canonical = folded.get(value.casefold())
     if canonical is None:
-        raise ValueError(player_text('launcher.controller', 'choose_a_letter_number_function_key_or_navigation_key'))
+        raise ValueError('Choose a letter, number, function key, or navigation key.')
     return canonical
 
 
@@ -134,7 +134,7 @@ def bundle_directory() -> Path:
 class LauncherState(str, Enum):
     IDLE = 'IDLE'
     CONNECTING = player_text('launcher.ui', 'connecting')
-    CONNECTED = player_text('launcher.ui', 'connected')
+    CONNECTED = player_text('common', 'connected')
     FAILED = player_text('launcher.ui', 'failed')
     DISCONNECTING = 'DISCONNECTING'
 
@@ -256,30 +256,30 @@ class LauncherController:
     ) -> None:
         if reason == "native_helper_missing":
             message = (
-                player_text('launcher.controller', 'a_required_doomeap_file_is_missing_check_windows_security_protec')
+                'A required DoomEAP file is missing. Check Windows Security -> Protection history, then reinstall DoomEAP from its official download. If it happens again, select Help -> SAVE SUPPORT REPORT.'
             )
         elif reason == "native_helper_application_control_blocked":
             message = (
-                player_text('launcher.controller', 'windows_blocked_doomeap_from_starting_its_game_connection_select')
+                'Windows blocked DoomEAP from starting its game connection. Select Help -> SAVE SUPPORT REPORT and ask your device administrator or DoomEAP support for help.'
             )
         elif reason == "native_helper_removed_after_validation":
             message = (
-                player_text('launcher.controller', 'doomeap_could_not_start_its_game_connection_check_windows_securi')
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
             )
         elif reason == "native_helper_access_denied":
             message = (
-                player_text('launcher.controller', 'doomeap_could_not_start_its_game_connection_check_windows_securi')
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
             )
         elif reason == "immediate_exit":
             message = (
-                player_text('launcher.controller', 'doomeap_could_not_start_its_game_connection_check_windows_securi')
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
             )
         else:
             message = (
-                player_text('launcher.controller', 'doomeap_could_not_start_its_game_connection_check_windows_securi')
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
             )
         detail = (
-            player_text('launcher.controller', 'game_integration_helper_startup_failed_reason_value_0_path_value', value_0=f'{reason}', value_1=f'{executable_path}', value_2=f'{technical_message}')
+            'Game integration helper startup failed: reason={value_0} path={value_1} detail={value_2}'.format(value_0=f'{reason}', value_1=f'{executable_path}', value_2=f'{technical_message}')
         )
         if exit_code is not None:
             detail += f" exit_code={exit_code}"
@@ -349,11 +349,11 @@ class LauncherController:
                     "process_start_status": "failed", "winerror": None,
                     "normalized_category": "native_helper_missing",
                     "disappeared_after_validation": False,
-                    "latest_startup_error": player_text('launcher.controller', 'expected_helper_is_missing_it_may_have_been_quarantined'),
+                    "latest_startup_error": 'expected helper is missing; it may have been quarantined',
                 })
                 self._native_start_failure(
                     reason="native_helper_missing",
-                    technical_message=player_text('launcher.controller', 'file_not_found_value_0_it_may_have_been_quarantined', value_0=f'{client_exe}'),
+                    technical_message='file not found: {value_0}; it may have been quarantined'.format(value_0=f'{client_exe}'),
                     executable_path=client_exe,
                 )
                 return False
@@ -373,7 +373,10 @@ class LauncherController:
             if not meathook.ok:
                 return False
 
-            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            LaunchWorkflow.write_client_config(
+            self.client_dir,
+            runtime_config=self.config,
+        )
             command = [str(client_exe), str(root)]
             creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
             try:
@@ -396,11 +399,11 @@ class LauncherController:
                         return True
                     self._native_helper_startup.update({
                         "process_start_status": "failed", "normalized_category": "immediate_exit",
-                        "latest_startup_error": player_text('launcher.controller', 'process_exited_before_publishing_current_native_health'),
+                        "latest_startup_error": 'process exited before publishing current native health',
                     })
                     self._native_start_failure(
                         reason="immediate_exit",
-                        technical_message=player_text('launcher.controller', 'process_exited_before_publishing_current_native_health'),
+                        technical_message='process exited before publishing current native health',
                         executable_path=client_exe,
                         exit_code=exit_code,
                     )
@@ -495,7 +498,7 @@ class LauncherController:
 
         special = normalize_ammo_refill_keybind(str(self.config.get("special_toggle_keybind", "F10")))
         if normalized_keybind and normalized_keybind == special:
-            raise ValueError(player_text('launcher.controller', 'choose_different_keys_for_ammo_refill_and_special_weapon'))
+            raise ValueError('Choose different keys for Ammo Refill and Special Weapon.')
         state_file = write_ap_hotkey_states(base_dir, normalized_keybind, special)
         logger.info(
             "AMMO_HOTKEY_CONFIG path=%s token=%s state=%s",
@@ -504,7 +507,7 @@ class LauncherController:
             "loaded" if normalized_keybind else "disabled",
         )
         self._record_diagnostic(
-            player_text('launcher.controller', 'ammo_hotkey_config_path_value_0_token_value_1_state_value_2', value_0=f'{state_file}', value_1=f"{normalized_keybind or 'UNBOUND'}", value_2=f"{('loaded' if normalized_keybind else 'disabled')}")
+            'AMMO_HOTKEY_CONFIG path={value_0} token={value_1} state={value_2}'.format(value_0=f'{state_file}', value_1=f"{normalized_keybind or 'UNBOUND'}", value_2=f"{('loaded' if normalized_keybind else 'disabled')}")
         )
 
         self.emit(
@@ -532,7 +535,7 @@ class LauncherController:
         proton_changed = any(key in updates and updates[key] != self.config.get(key)
             for key in ("proton_executable", "proton_compat_data_dir"))
         if proton_changed and self.is_game_running():
-            raise RuntimeError(player_text('launcher.controller', 'close_doom_eternal_before_changing_proton'))
+            raise RuntimeError('Close DOOM Eternal before changing Proton.')
         self.config.update(updates)
         self._persist_config()
         LaunchWorkflow.write_client_config(
@@ -550,7 +553,7 @@ class LauncherController:
 
     def set_launcher_language(self, code: str) -> None:
         if code not in load_catalog().languages:
-            raise ValueError(player_text('launcher.controller', 'unsupported_launcher_language_value_0', value_0=f'{code}'))
+            raise ValueError('unsupported launcher language: {value_0}'.format(value_0=f'{code}'))
         previous = dict(self.config)
         self.config["launcher_language"] = code
         try:
@@ -681,7 +684,7 @@ class LauncherController:
         """Prepare process-session admission on the shared worker before opening Steam."""
         event = self.setup.current_event
         if not self.connected_room or not event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_an_ap_room_before_playing'))
+            raise RuntimeError('Connect to an AP room before playing')
         snapshot = RoomSnapshot.from_event(event)
         configuration = dict(self.config)
         generation = self.workers.generation
@@ -691,11 +694,11 @@ class LauncherController:
             root = validate_game_root(Path(str(configuration.get("game_root") or configuration.get("doom_base_dir"))))
             prerequisites = probe_runtime_prerequisites(root, self.client_dir, configuration)
             if not prerequisites.ok:
-                raise RuntimeError(player_text('launcher.controller', 'cannot_play') + "; ".join(check.message for check in prerequisites.checks if not check.ok))
+                raise RuntimeError('Cannot play: ' + "; ".join(check.message for check in prerequisites.checks if not check.ok))
             workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
             installed = workflow.install_state(snapshot)
             if installed.state != "already_installed":
-                raise RuntimeError(player_text('launcher.controller', 'prepare_the_room_package_before_playing'))
+                raise RuntimeError('Prepare the room package before playing')
             workflow.ensure_game_link(root)
             configuration.update(workflow._config())
             status = workflow.session_owner.prepare(snapshot, configuration)
@@ -704,15 +707,15 @@ class LauncherController:
                 self.emit("ap_session_status", **status)
                 return
             if status["state"] not in {"prelaunch_ready", "awaiting_recovery"}:
-                raise RuntimeError(player_text('launcher.controller', 'an_ap_game_process_is_already_active_or_requires_attention'))
+                raise RuntimeError('An AP game process is already active or requires attention')
             if (platform or os.name) == "nt" and not self._ensure_native_client(generation=generation):
-                raise RuntimeError(player_text('launcher.controller', 'the_game_integration_helper_could_not_start'))
+                raise RuntimeError('The game integration helper could not start')
             self.emit("ap_session_status", **status)
             url = launch_doom_via_steam()
             self.emit("steam_launch_requested", url=url)
 
         if not self.workers.submit("launch_game", operation, generation=generation):
-            raise RuntimeError(player_text('launcher.controller', 'a_game_launch_is_already_being_prepared'))
+            raise RuntimeError('A game launch is already being prepared')
         return "queued"
 
 
@@ -721,7 +724,7 @@ class LauncherController:
     def probe_handshake(self) -> dict[str, object]:
         base = self.config.get("doom_base_dir")
         if not base:
-            result = {"status": "unavailable", "reason": player_text('launcher.controller', 'doom_eternal_base_directory_is_not_configured')}
+            result = {"status": "unavailable", "reason": 'DOOM Eternal base directory is not configured'}
         else:
             result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
         self.emit("handshake_probe", **result)
@@ -805,6 +808,7 @@ class LauncherController:
             }
         return {
             "supervisor": supervisor_details,
+            "last_operation_failure": getattr(self, "last_operation_failure", None),
             "delivery_ledger": {"path": str(self.items_reader.path), "exists": self.items_reader.path.is_file(),
                                 "room": asdict(self.items_room) if self.items_room else None, **self.items_diagnostics},
             "native_rpc": native,
@@ -916,7 +920,7 @@ class LauncherController:
                 if action_key in {"repair_core", "repair_session", "rollback_core"}:
                     root = workflow._game_root(config)
                     if workflow.session_owner.game_processes(config) != ():
-                        raise RuntimeError(player_text('launcher.controller', 'close_doom_eternal_before_repairing_save_setup_or_restoring_a_pr'))
+                        raise RuntimeError('Close DOOM Eternal before repairing save setup or restoring a previous version.')
                     if action_key == "rollback_core":
                         from .launcher_core_install import rollback_core
                         self.save_config({"core_auto_update": False})
@@ -925,16 +929,16 @@ class LauncherController:
                         rollback_core(root, self.state_dir)
                         self.save_config({"core_auto_update": False, "core_runtime_manifest": None, "selected_core_runtime_manifest": None})
                         workflow.core_runtime.checked = False
-                        message = player_text('launcher.controller', 'previous_game_connection_version_restored_automatic_updates_are')
+                        message = 'Previous game connection version restored. Automatic updates are off. Reconnect to the same room.'
                     elif action_key == "repair_core":
                         workflow.session_owner.retire()
                         self._stop_native_client()
                         message = workflow.ensure_game_link(root, force_repair=True).message
                     else:
                         if not repair_event:
-                            raise RuntimeError(player_text('launcher.controller', 'connect_to_the_same_room_before_repairing_its_session'))
+                            raise RuntimeError('Connect to the same room before repairing its session')
                         workflow.ensure_game_link(root)
-                        message = player_text('launcher.controller', 'save_setup_repaired_saves_received_items_and_spending_records_we')
+                        message = 'Save setup repaired. Saves, received items, and spending records were kept.'
                     if action_key != "rollback_core" and repair_event:
                         job.check()
                         config.update(workflow._config())
@@ -942,7 +946,7 @@ class LauncherController:
                         job.check()
                         if os.name == "nt" and not self._ensure_native_client(generation=job.generation):
                             job.check()
-                            raise RuntimeError(player_text('launcher.controller', 'the_game_integration_helper_could_not_start'))
+                            raise RuntimeError('The game integration helper could not start')
                         with self._lifecycle_lock:
                             job.check()
                             self.last_setup_failure = None
@@ -966,7 +970,7 @@ class LauncherController:
             except Exception as error:
                 self._setup_event(
                     "integration_repair_result" if integration_only else "ui_repair_result",
-                    job.event({"message": player_text('launcher.controller', 'repair_error_value_0', value_0=f'{error}'), "success": False}),
+                    job.event({"message": 'Repair error: {value_0}'.format(value_0=f'{error}'), "success": False}),
                 )
 
         return self.workers.submit(("repair", action_key), operation, generation=generation)
@@ -1008,7 +1012,7 @@ class LauncherController:
         draft = self.user_paths.data_dir / "reports" / "draft.json"
         saved = json.loads(draft.read_text(encoding="utf-8"))
         if not saved.get("url"):
-            raise ValueError(player_text('launcher.controller', 'retry_the_saved_report_before_starting_a_new_one_its_submitted_t'))
+            raise ValueError('Retry the saved report before starting a new one. Its submitted text cannot be changed.')
         archived = draft.with_name(str(uuid.UUID(saved["payload"]["idempotency_key"])) + ".json")
         publish_file(draft, archived, operation="report_archive_publish")
         return self.request_problem_report(logs=logs)
@@ -1016,7 +1020,7 @@ class LauncherController:
     def request_report_submission(self, payload: dict) -> bool:
         endpoint = submission_endpoint(self.client_dir)
         if endpoint is None:
-            raise RuntimeError(player_text('launcher.controller', 'sending_reports_is_unavailable_open_report_a_problem_in_help_to'))
+            raise RuntimeError('Sending reports is unavailable. Open Report a Problem in Help to save a copy.')
         payload = deepcopy(payload)
         report_body(payload)
         def operation(job):
@@ -1064,12 +1068,12 @@ class LauncherController:
                 (Diagnostic(
                     "support",
                     "attention",
-                    player_text('launcher.controller', 'doctor_inspection_is_unavailable_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                    'doctor inspection is unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
                 ),),
                 "needs_attention",
                 "",
                 "",
-                player_text('launcher.controller', 'support_bundle_collected_without_a_doctor_report_value_0', value_0=f'{error}'),
+                'Support bundle collected without a doctor report: {value_0}'.format(value_0=f'{error}'),
                 {},
             )
         timings["doctor_ms"] = round((time.monotonic() - stage) * 1000)
@@ -1164,7 +1168,7 @@ class LauncherController:
             return {
                 "status": "unavailable",
                 "reason": "game_closed",
-                "message": player_text('launcher.controller', 'diagnostic_condump_unavailable_game_not_running'),
+                "message": 'diagnostic condump unavailable: game not running',
                 "requested_at": requested_at,
             }
         # use fresh native readiness on proton; diagnostics don't need to wait for the host process-name check
@@ -1173,7 +1177,7 @@ class LauncherController:
             return {
                 "status": "unavailable",
                 "reason": "game_closed",
-                "message": player_text('launcher.controller', 'diagnostic_condump_unavailable_game_not_running'),
+                "message": 'diagnostic condump unavailable: game not running',
                 "requested_at": requested_at,
             }
         if not supervisor_available:
@@ -1196,7 +1200,7 @@ class LauncherController:
             return {
                 "status": "unavailable",
                 "reason": "saved_games_path_invalid",
-                "message": player_text('launcher.controller', 'saved_games_path_unavailable_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                "message": 'Saved Games path unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
                 "requested_at": requested_at,
             }
         with self._condump_lock:
@@ -1328,7 +1332,7 @@ class LauncherController:
                 event = {
                     **event,
                     **setup_failure_payload(
-                        RuntimeError(str(event.get("message", player_text('launcher.controller', 'setup_failed')))),
+                        RuntimeError(str(event.get("message", 'setup failed'))),
                         phase="game_setup",
                     ),
                 }
@@ -1413,7 +1417,7 @@ class LauncherController:
             if kind == "injector_started":
                 self._injector_output = None
             elif kind == "injector_finished":
-                output = (''.join(('stdout:', '\n', '', player_text('launcher.ui', 'value_0', value_0=f"{payload.get('stdout', '')}"), '', '\n', 'stderr:', '\n', '', player_text('launcher.ui', 'value_0', value_0=f"{payload.get('stderr', '')}"))))
+                output = (''.join(('stdout:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stdout', '')}"), '', '\n', 'stderr:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stderr', '')}"))))
                 self._injector_output = output
             if kind == "core_runtime_selected":
                 old = self.config.get("selected_core_runtime_manifest")
@@ -1444,7 +1448,10 @@ class LauncherController:
                     self.last_setup_failure = None
             self.emit(kind, **payload)
         if runtime_changed:
-            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            LaunchWorkflow.write_client_config(
+            self.client_dir,
+            runtime_config=self.config,
+        )
             supervisor = self.supervisor
             if supervisor is not None and supervisor.running:
                 try:
@@ -1499,7 +1506,7 @@ class LauncherController:
                 return False
             last_event = self.setup.current_event
         if not last_event:
-            raise RuntimeError(player_text('launcher.controller', 'no_connected_room_session_is_available'))
+            raise RuntimeError('No connected room session is available.')
 
         transaction_id = self.last_setup.transaction_id if self.last_setup else self.workflow.installation_transaction_id()
 
@@ -1578,9 +1585,9 @@ class LauncherController:
         saves_root: str,
     ) -> None:
         if not endpoint.strip():
-            raise ValueError(player_text('launcher.controller', 'server_address_is_required'))
+            raise ValueError('server address is required')
         if not slot.strip():
-            raise ValueError(player_text('launcher.controller', 'player_name_is_required'))
+            raise ValueError('player name is required')
         endpoint = validate_server_address(endpoint)
         try:
             game = validate_game_root(Path(game_root))
@@ -1589,11 +1596,11 @@ class LauncherController:
             raise ValueError(str(error)) from error
         with self._lifecycle_lock:
             if "new_ap_save" in self.workers.active:
-                raise RuntimeError(player_text('launcher.controller', 'wait_for_the_save_operation_to_finish_before_reconnecting'))
+                raise RuntimeError('Wait for the save operation to finish before reconnecting.')
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
-                raise RuntimeError(player_text('launcher.controller', 'disconnect_from_the_current_room_first'))
+                raise RuntimeError('Disconnect from the current room first.')
             if self.state is LauncherState.DISCONNECTING:
-                raise RuntimeError(player_text('launcher.controller', 'disconnecting_wait_before_joining_another_room'))
+                raise RuntimeError('Disconnecting… Wait before joining another room.')
             self.connection_attempt_id += 1
             self.item_history_status = None
             self.setup.invalidate()
@@ -1616,9 +1623,9 @@ class LauncherController:
         stop_failed_worker: BridgeSupervisor | None = None
         with self._lifecycle_lock:
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
-                raise RuntimeError(player_text('launcher.controller', 'disconnect_from_the_current_room_first'))
+                raise RuntimeError('Disconnect from the current room first.')
             if self.state is LauncherState.DISCONNECTING:
-                raise RuntimeError(player_text('launcher.controller', 'disconnecting_wait_before_joining_another_room'))
+                raise RuntimeError('Disconnecting… Wait before joining another room.')
             if self.supervisor is not None:
                 self._pending_connect = connection
                 self.state = LauncherState.CONNECTING
@@ -1673,7 +1680,7 @@ class LauncherController:
                 emit(
                     "room_install_state",
                     state="install_needed",
-                    reason=player_text('launcher.controller', 'could_not_verify_installed_room_mod_value_0', value_0=f'{error}'),
+                    reason='could not verify installed room mod: {value_0}'.format(value_0=f'{error}'),
                     readiness="blocked",
                     readiness_reason=str(error),
                     **issue,
@@ -1733,7 +1740,7 @@ class LauncherController:
             connected = self.connected_room
             supervisor = self.supervisor
         if not connected or supervisor is None:
-            raise RuntimeError(player_text('launcher.controller', 'not_connected'))
+            raise RuntimeError('not connected')
         supervisor.send_chat(text)
 
     def request_items(self, query, *, online=False) -> bool:
@@ -1762,7 +1769,7 @@ class LauncherController:
     def resolve_item(self, request):
         supervisor = self.supervisor
         if not self.connected_room or supervisor is None:
-            raise RuntimeError(player_text('launcher.controller', 'delivery_connection_unavailable'))
+            raise RuntimeError('delivery connection unavailable')
         supervisor.resolve_item(request)
 
     def poll_game_lifecycle(self) -> None:
@@ -1819,7 +1826,7 @@ class LauncherController:
     def set_ap_keybinds(self, refill: str, special: str) -> None:
         refill, special = normalize_ammo_refill_keybind(refill), normalize_ammo_refill_keybind(special)
         if refill and refill == special:
-            raise ValueError(player_text('launcher.controller', 'choose_different_keys_for_ammo_refill_and_special_weapon'))
+            raise ValueError('Choose different keys for Ammo Refill and Special Weapon.')
         previous = {key: self.config.get(key) for key in (AMMO_REFILL_KEYBIND_CONFIG, "special_toggle_keybind")}
         write_ap_hotkey_states(doom_base_dir_from_config(self.config), refill, special)
         try:
@@ -1832,7 +1839,7 @@ class LauncherController:
 
     def set_killsanity_counter_visible(self, visible: bool) -> None:
         if type(visible) is not bool:
-            raise ValueError(player_text('launcher.controller', 'killsanity_counter_visibility_must_be_a_boolean'))
+            raise ValueError('Killsanity counter visibility must be a boolean')
         previous = self.config.get("killsanity_counter_visible", True)
         try:
             self.save_config({"killsanity_counter_visible": visible})
@@ -1849,7 +1856,7 @@ class LauncherController:
 
     def set_death_link_grace(self, deaths: int) -> None:
         if type(deaths) is not int or not 0 <= deaths <= 2147483647:
-            raise ValueError(player_text('launcher.controller', 'enter_a_whole_number_of_deaths_from_0_to_2147483647'))
+            raise ValueError('Enter a whole number of deaths from 0 to 2147483647.')
         previous = self.config.get("death_link_grace", 0)
         try:
             self.save_config({"death_link_grace": deaths})
@@ -1865,7 +1872,7 @@ class LauncherController:
             self.emit(
                 "ammo_refill",
                 status="blocked",
-                message=player_text('launcher.controller', 'ammo_refill_unavailable_while_disconnected'),
+                message='Ammo Refill unavailable while disconnected',
             )
             return
         control = json.dumps({"type": "ammo_refill"}, separators=(",", ":"))
@@ -1876,12 +1883,12 @@ class LauncherController:
 
     def ap_backups(self) -> list[str]:
         if not self.connected_room or not self.setup.current_event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_a_room_before_selecting_its_ap_backups'))
+            raise RuntimeError('Connect to a room before selecting its AP backups')
         return self.workflow.session_owner.list_backups(RoomSnapshot.from_event(self.setup.current_event))
 
     def request_ap_save_inspection(self, *, copy_files=False) -> bool:
         if not self.connected_room or not self.setup.current_event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_a_room_before_inspecting_its_ap_save'))
+            raise RuntimeError('Connect to a room before inspecting its AP save')
         snapshot = RoomSnapshot.from_event(self.setup.current_event)
         configuration = dict(self.config)
 
@@ -1905,9 +1912,9 @@ class LauncherController:
 
     def request_new_ap_save(self) -> bool:
         if not self.connected_room or not self.setup.current_event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_the_existing_room_before_creating_its_new_game_save'))
+            raise RuntimeError('Connect to the existing room before creating its new game save')
         if self.workflow.session_owner.game_processes(self.config) != ():
-            raise RuntimeError(player_text('launcher.controller', 'exit_doom_eternal_before_creating_a_new_ap_game_save'))
+            raise RuntimeError('Exit DOOM Eternal before creating a new AP game save')
         snapshot = RoomSnapshot.from_event(self.setup.current_event)
         configuration = dict(self.config)
         supervisor = self.supervisor
@@ -1916,7 +1923,7 @@ class LauncherController:
         def operation(job):
             job.check()
             if supervisor is not None and not supervisor.wait_stopped(15):
-                raise RuntimeError(player_text('launcher.controller', 'the_bridge_has_not_stopped_existing_saves_were_kept'))
+                raise RuntimeError('The bridge has not stopped; existing saves were kept')
             archive = job.publish(lambda: self.workflow.session_owner.restart_campaign(snapshot, configuration))
             self.emit("ap_backup_result", message=player_text("launcher.save", "restart_ready", path=str(archive)))
 
@@ -1924,7 +1931,7 @@ class LauncherController:
 
     def request_ap_backup(self, *, restore=None) -> bool:
         if not self.connected_room or not self.setup.current_event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_a_room_before_managing_its_ap_save'))
+            raise RuntimeError('Connect to a room before managing its AP save')
         snapshot=RoomSnapshot.from_event(self.setup.current_event)
         configuration=dict(self.config)
 
@@ -1938,7 +1945,7 @@ class LauncherController:
                 expected=namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
                                       snapshot.slot_data["native_generation_fingerprint"])
                 if self.workflow.session_owner.namespace != expected:
-                    raise RuntimeError(player_text('launcher.controller', 'the_live_ap_session_belongs_to_a_different_room'))
+                    raise RuntimeError('The live AP session belongs to a different room')
                 result=self.workflow.session_owner.create_backup()
                 message=player_text('launcher.controller', 'backup_saved_and_checked_value_0_loading_it_in_the_game_has_not', value_0=f"{result['basename']}")
             job.check()
@@ -1951,9 +1958,9 @@ class LauncherController:
             connected = self.connected_room
             supervisor = self.supervisor
         if not connected:
-            raise RuntimeError(player_text('launcher.controller', 'not_connected'))
+            raise RuntimeError('not connected')
         if supervisor is None or not supervisor.running:
-            raise RuntimeError(player_text('launcher.controller', 'bridge_worker_is_not_running'))
+            raise RuntimeError('bridge worker is not running')
         try:
             supervisor.request_inventory_resync(domain=domain, item_id=item_id)
         except Exception as error:
@@ -2025,15 +2032,15 @@ class LauncherController:
         with self._lifecycle_lock:
             generation = self.workers.generation if generation is None else generation
             if not self.workers.accepts(generation):
-                raise RuntimeError(player_text('launcher.controller', 'room_changed_before_uninstall_confirmation'))
+                raise RuntimeError('Room changed before uninstall confirmation.')
             last_event = self.setup.last_event
             connected = self.connected_room
         if not connected or not last_event:
-            raise RuntimeError(player_text('launcher.controller', 'connect_to_room_before_uninstalling_its_mod'))
+            raise RuntimeError('connect to room before uninstalling its mod')
         if not self.setup.submit_uninstall(last_event, generation=generation):
             payload = {
                 "state": "attention",
-                "message": player_text('launcher.controller', 'another_room_setup_or_uninstall_operation_is_already_active'),
+                "message": 'Another room setup or uninstall operation is already active.',
                 "attention": True,
             }
             self.emit("uninstall_attention", **payload)
@@ -2042,7 +2049,7 @@ class LauncherController:
 
     def close(self) -> bool:
         if not self.workflow.session_owner.can_close():
-            raise RuntimeError(player_text('launcher.ui', 'close_doom_eternal_before_closing_this_launcher'))
+            raise PlayerError('launcher.ui', 'close_doom_eternal_before_closing_this_launcher')
         self.workers.close(timeout=0)
         if self.workers.active:
             return False

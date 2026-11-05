@@ -176,7 +176,6 @@ doom_eap/launcher/resource_bank.py::select_resources 50 22
 doom_eap/launcher/sentinel_diagnostics.py::collect 22 19
 doom_eap/launcher/session_owner_app.py::main 30 20
 doom_eap/launcher/ui/app_window.py::LauncherUI._archipelago_activity_detail 18 13
-doom_eap/launcher/ui/app_window.py::LauncherUI._discover 24 16
 doom_eap/launcher/ui/app_window.py::LauncherUI._normalize_activity_event 17 17
 doom_eap/launcher/ui/app_window.py::LauncherUI._render_native_health 16 10
 doom_eap/launcher/ui/app_window.py::LauncherUI._request_dependency_consent 9 11

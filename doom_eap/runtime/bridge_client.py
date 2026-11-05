@@ -541,7 +541,7 @@ else:
                 from tkinter import filedialog
                 root = tk.Tk()
                 root.withdraw()
-                root.attributes('-topmost', True)
+                root.attributes("-topmost", True)
                 path = filedialog.askdirectory(title=title)
                 root.destroy()
             except Exception:
@@ -549,10 +549,10 @@ else:
 
             if not path and has_tty:
                 print(f"\n{title}")
-                path = input(player_text("activity", "enter_path")).strip()
+                path = input('Enter Path: ').strip()
 
             if not path:
-                raise RuntimeError(player_text("activity", "setup_cancelled"))
+                raise RuntimeError("DOOM Eternal Client Setup cancelled. Please create ap_config.json manually with 'doom_base_dir' and 'save_games_dir'.")
 
             try:
                 normalized = validation_func(path)
@@ -562,7 +562,7 @@ else:
                 return normalized
 
             if has_tty:
-                print(player_text("activity", "validation_error", message=str(error_msg)))
+                print(f'Validation Error: {error_msg!s}')
             else:
                 try:
                     import tkinter.messagebox as messagebox
@@ -591,7 +591,7 @@ else:
     config["save_games_dir"] = SAVE_GAMES_DIR
     save_config()
     if sys.stdin and sys.stdin.isatty():
-        print(player_text("activity", "config_saved", newline="\n"))
+        print('Configuration saved to ap_config.json!{newline}'.format(newline='\n'))
 
 TAG_INVENTORY_SETTLE_SECONDS = 1.0
 GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
@@ -1019,16 +1019,14 @@ def _describe_steam_remote_candidate(remote, steam_id3):
         newest = mtime if newest is None else max(newest, mtime)
 
     if newest is None:
-        save_description = player_text("activity", "no_autosave")
+        save_description = 'no autosave files found yet'
     else:
         save_description = time.strftime(
             "%Y-%m-%d %H:%M:%S",
             time.localtime(newest),
         )
 
-    return player_text(
-        "activity", "steam_candidate", path=str(remote), account=str(steam_id3), latest_save=str(save_description)
-    )
+    return f'{remote!s} (Steam account {steam_id3!s}; latest save: {save_description!s})'
 
 
 def prompt_for_steam_remote(candidates):
@@ -1036,7 +1034,7 @@ def prompt_for_steam_remote(candidates):
     has_tty = bool(sys.stdin and sys.stdin.isatty())
 
     if candidates and has_tty:
-        print(player_text("activity", "steam_directories_found", newline="\n"))
+        print('{newline}Found DOOM Eternal Steam save directories:'.format(newline='\n'))
         for index, (remote, steam_id3) in enumerate(candidates, start=1):
             print(
                 f"  {index}. "
@@ -1044,7 +1042,7 @@ def prompt_for_steam_remote(candidates):
             )
 
         while True:
-            answer = input(player_text("activity", "choose_steam_account", count=str(len(candidates)))).strip()
+            answer = input(f'Choose the active Steam account [1-{len(candidates)!s}] (default 1): ').strip()
             if not answer:
                 return candidates[0]
             try:
@@ -1053,7 +1051,7 @@ def prompt_for_steam_remote(candidates):
                 index = 0
             if 1 <= index <= len(candidates):
                 return candidates[index - 1]
-            print(player_text("activity", "invalid_selection"))
+            print('Invalid selection.')
 
     while True:
         selected = None
@@ -1070,9 +1068,9 @@ def prompt_for_steam_remote(candidates):
             selected = None
 
         if not selected and has_tty:
-            print(player_text("activity", "steam_directory_guidance", newline="\n"))
-            print(player_text("activity", "steam_directory_example"))
-            selected = input(player_text("activity", "steam_path")).strip()
+            print('{newline}Select the Steam directory that contains userdata/<ACCOUNT_ID>/782330/remote.'.format(newline='\n'))
+            print('Windows example: C:/Program Files (x86)/Steam')
+            selected = input('Steam path: ').strip()
 
         if not selected:
             return None, 0
@@ -1081,7 +1079,7 @@ def prompt_for_steam_remote(candidates):
             return normalize_steam_remote_dir(selected)
         except ValueError as error:
             if has_tty:
-                print(player_text("activity", "steam_validation_error", error=str(error)))
+                print(f'Validation error: {error!s}')
                 continue
 
             try:
@@ -1985,17 +1983,10 @@ class DoomCommandProcessor(ClientCommandProcessor):
     async def _reconcile(self):
         plan, error = await self.ctx.manual_reconcile_inventory()
         if error:
-            self.output(player_text("activity", "reconcile_rejected", error=str(error)))
+            self.output(f'AP reconcile rejected: {error!s}')
             return
         self.output(
-            player_text(
-                "activity",
-                "reconcile_summary",
-                replayed=str(plan.replayed),
-                special_stages=str(plan.special_stages),
-                skipped_never_replay=str(plan.skipped_never_replay),
-                skipped_unproven=str(plan.skipped_unproven),
-            )
+            f'replayed={plan.replayed!s} special_stages={plan.special_stages!s} skipped_never_replay={plan.skipped_never_replay!s} skipped_unproven={plan.skipped_unproven!s}'
         )
 
     def _cmd_doom_rune_diag(self):
@@ -2014,7 +2005,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
     def _cmd_doom_items_reset(self, confirmation: str = ""):
         """Preserve the receipt ledger when native reconstruction is unqualified."""
-        self.output(player_text("activity", "reset_refused"))
+        self.output('AP reset refused: native reconstruction and spent consumables require verified backup evidence. Receipt history is preserved.')
 
     def _cmd_doom_status(self):
         """Show user-facing integration and tracker status."""
@@ -2022,36 +2013,30 @@ class DoomCommandProcessor(ClientCommandProcessor):
         alive = getattr(ctx, "tracker_alive", False)
         degraded = getattr(ctx, "tracker_degraded", False) or getattr(ctx, "item_delivery_blocked", False)
         status_str = (
-            player_text("activity", "status_degraded")
+            'DEGRADED'
             if degraded
-            else (player_text("activity", "status_running") if alive else player_text("activity", "status_stopped"))
+            else ('running' if alive else 'stopped')
         )
         hb_ts = getattr(ctx, "last_heartbeat_timestamp", None)
-        hb_age = f"{time.time() - hb_ts:.1f}s" if hb_ts else player_text("activity", "heartbeat_never")
+        hb_age = f"{time.time() - hb_ts:.1f}s" if hb_ts else 'never'
         restarts = getattr(ctx, "tracker_restart_count", 0)
         last_err = getattr(ctx, "last_tracker_error", "none")
         backoff = getattr(ctx, "tracker_backoff", 1.0)
         consec_err = getattr(ctx, "consecutive_same_error_count", 0)
         blocked_info = getattr(ctx, "item_delivery_blocked_info", None)
 
-        self.output(player_text("activity", "integration_status", status=str(status_str)))
-        self.output(player_text("activity", "tracker_alive", alive=str(alive)))
-        self.output(player_text("activity", "heartbeat_age", age=str(hb_age)))
-        self.output(player_text("activity", "restart_count", count=str(restarts)))
-        self.output(player_text("activity", "consecutive_errors", count=str(consec_err)))
-        self.output(player_text("activity", "current_backoff", seconds=f"{backoff:.1f}"))
-        self.output(player_text("activity", "last_error_summary", error=str(last_err)))
+        self.output(f'DOOM integration status: {status_str!s}')
+        self.output(f'Tracker alive: {alive!s}')
+        self.output(f'Last heartbeat age: {hb_age!s}')
+        self.output(f'Restart count: {restarts!s}')
+        self.output(f'Consecutive error count: {consec_err!s}')
+        self.output('Current backoff: {seconds}s'.format(seconds=f'{backoff:.1f}'))
+        self.output(f'Last error summary: {last_err!s}')
         if blocked_info:
             self.output(
-                player_text(
-                    "activity",
-                    "blocked_item",
-                    index=str(blocked_info.get("index")),
-                    item_id=str(blocked_info.get("item_id")),
-                    name=str(blocked_info.get("item_name")),
-                )
+                'Blocked item: index={index} id={item_id} name={name}'.format(index=str(blocked_info.get("index")), item_id=str(blocked_info.get("item_id")), name=str(blocked_info.get("item_name")))
             )
-        self.output(player_text("activity", "diagnostics_directory", path=str(BRIDGE_LOG_DIR)))
+        self.output(f'Detailed diagnostics: {BRIDGE_LOG_DIR!s}')
 
     def _cmd_doom_deathlink_diag(self):
         """Show bounded DeathLink receive evidence and active policy."""
@@ -2343,10 +2328,10 @@ class DoomEternalContext(CommonContext):
             self.session_tasks.start(lambda: _launcher_inventory_resync(self, {"domain": "all"}))
             return
         if not self.server or not self.server.socket.open or self.server.socket.closed:
-            raise RuntimeError(player_text("activity", "chat_disconnected"))
+            raise RuntimeError('Archipelago connection is unavailable')
         accepted = self.on_user_say(text)
         if accepted is None:
-            raise RuntimeError(player_text("activity", "chat_rejected"))
+            raise RuntimeError('Archipelago rejected message')
         self.protocol_feed.record_echo(accepted)
         await self.send_msgs([{"cmd": "Say", "text": accepted}])
 
@@ -2366,7 +2351,7 @@ class DoomEternalContext(CommonContext):
         from doom_eap.runtime.ledger import LedgerError
         from doom_eap.runtime.native_transport import TransportError
         if self.room_delivery is None:
-            return None, player_text("activity", "resync_waiting")
+            return None, 'Return to DOOM and unpause within 30 seconds. Inventory resync is waiting for safe gameplay.'
         try:
             return await self.room_delivery.reconcile(evidence, selected=selected)
         except (LedgerError, TransportError, OSError, TimeoutError) as error:
@@ -2732,7 +2717,7 @@ class DoomEternalContext(CommonContext):
                 emit_launcher_event(
                     "connection_lost",
                     code="connection_closed",
-                    message=player_text("activity", "connection_interrupted"),
+                    message='The room connection was interrupted; reconnecting automatically.',
                     technical_message=msg,
                 )
         else:
@@ -2755,13 +2740,13 @@ class DoomEternalContext(CommonContext):
         )
         await super().connection_closed()
         if unexpected_launcher_close and not self._room_session_established:
-            self._report_launcher_connection_failure(player_text("activity", "connection_closed"), code="connection_closed")
+            self._report_launcher_connection_failure('Disconnected from the Archipelago server', code="connection_closed")
         elif unexpected_launcher_close and not self._launcher_connection_loss_reported:
             self._launcher_connection_loss_reported = True
             emit_launcher_event(
                 "connection_lost",
                 code="connection_closed",
-                message=player_text("activity", "connection_interrupted"),
+                message='The room connection was interrupted; reconnecting automatically.',
                 technical_message="Disconnected from the Archipelago server",
             )
 
@@ -2797,7 +2782,7 @@ class DoomEternalContext(CommonContext):
     async def server_auth(self, password_requested: bool = False):
         if password_requested and LAUNCHER_EVENTS_ENABLED and not self.password:
             self._report_launcher_connection_failure(
-                player_text("activity", "password_required"),
+                'This room requires a password.',
                 code="password_required",
                 reason_codes=[],
                 technical_message="Archipelago requested a password and none was supplied",
@@ -2888,7 +2873,7 @@ class DoomEternalContext(CommonContext):
         elif self._slot_validation_task is not None and cmd not in {"RoomInfo", "ConnectionRefused"}:
             if len(self._pending_slot_packages) >= 256:
                 self.reset_room_session_authority("pending_packets_limit")
-                self._reject_slot_contract(ValueError(player_text("activity", "pending_packets_limit")))
+                self._reject_slot_contract(ValueError('Too many packets received before room validation completed'))
             else:
                 received_count = len(self.items_received) if cmd == "ReceivedItems" else None
                 self._pending_slot_packages.append((cmd, args, received_count))
@@ -2932,7 +2917,7 @@ class DoomEternalContext(CommonContext):
             try:
                 self.unified_campaign = UnifiedCampaign(slot_data, self.session_state, self.persist_session_state)
             except ValueError as error:
-                message = player_text("activity", "campaign_state_incompatible", error=str(error))
+                message = f'Estado local incompatível com a campanha: {error!s}'
                 logger.error("[State] Connected campaign rejected: %s", error)
                 self._report_launcher_connection_failure(
                     message, code="campaign_state_incompatible", technical_message=message,
@@ -2976,7 +2961,7 @@ class DoomEternalContext(CommonContext):
             if not isinstance(reasons, list | tuple):
                 reasons = [reasons]
             self._report_launcher_connection_failure(
-                player_text("activity", "login_rejected"),
+                'Archipelago rejected the room login.',
                 code="connection_refused",
                 reason_codes=reasons,
                 technical_message="ConnectionRefused: " + ", ".join(map(str, reasons)),
@@ -3565,7 +3550,8 @@ class DoomEternalContext(CommonContext):
                 for row in projection["rows"]
             }
             placements = {entry["location_id"]: entry for entry in resolve_placement_records(
-                self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot)}
+                self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot
+            )}
             projection["hub_summary"] = self._mission_presentations.snapshot(
                 link.namespace, generation, projection["hub_map"], revealed=True, facts=facts, pending=pending)
             projection["challenge_rewards"] = {
@@ -4283,7 +4269,7 @@ class DoomEternalContext(CommonContext):
         self._item_state_error = str(error)
         self.item_state_ready = False
         self.item_delivery_blocked = True
-        message = player_text("activity", "item_state_blocked", error=str(error))
+        message = f'Item delivery blocked by local client state: {error!s}. Check the state file and restart the bridge.'
         self.item_delivery_blocked_info = {"reason": "client_state_error", "message": message}
         logger.error("[State] %s", message)
         emit_launcher_event("item_history_status", status="blocked", **self.item_delivery_blocked_info)
@@ -4326,7 +4312,7 @@ class DoomEternalContext(CommonContext):
 
     def validate_item_history_prefix(self):
         if not getattr(self, "_item_history_received", True):
-            raise ValueError(player_text("activity", "waiting_full_history"))
+            raise ValueError('waiting for the full server item history')
         compatible, detail = validate_session_receipt_prefix(
             self.session_state,
             self.items_received,
@@ -4355,7 +4341,7 @@ class DoomEternalContext(CommonContext):
                 self.item_delivery_blocked = True
                 self.item_delivery_blocked_info = blocked
                 emit_launcher_event("item_history_status", status="blocked", **blocked)
-            raise ValueError(player_text("activity", "history_incompatible_detail", detail=str(detail)))
+            raise ValueError(f'received-item history is incompatible: {detail!s}')
         if (getattr(self, "item_delivery_blocked_info", None) or {}).get("reason") == "history_incompatible":
             self.item_delivery_blocked = False
             self.item_delivery_blocked_info = None
@@ -4400,7 +4386,7 @@ class DoomEternalContext(CommonContext):
     async def observe_rune_native_state(self):
         """Read distinct Rune surfaces only from lifecycle-proven active save."""
         if not self.has_authoritative_save_proof() or not self.active_save_slot:
-            return None, player_text("activity", "active_save_required")
+            return None, 'authoritative active-save proof required'
         lease = getattr(self, "runtime_observation_lease", None)
         evidence_epoch = getattr(lease, "gameplay_loaded_ns", None)
         if evidence_epoch is None:
@@ -4413,7 +4399,7 @@ class DoomEternalContext(CommonContext):
 
     async def observe_owned_rune_plan(self):
         if not self.item_state_ready:
-            return None, player_text("activity", "item_state_not_ready")
+            return None, 'item state is not ready'
         native, error = (await self.observe_rune_native_state())
         if error:
             return None, error
@@ -4988,7 +4974,9 @@ class DoomEternalContext(CommonContext):
 
     async def send_mission_complete(self, location_id, source_description, report_goal=False):
         if report_goal:
-            return await DoomEternalContext.evaluate_campaign_goal(self, source_description)
+            return await DoomEternalContext.evaluate_campaign_goal(
+            self, source_description
+        )
         self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
         return await self.publisher_dispatch.mission(
             location_id, source_description, DoomEternalContext.check_publication(self), self.persist_session_state,
@@ -5590,7 +5578,7 @@ async def _launcher_inventory_resync(ctx, control):
         emit_launcher_event(
             "inventory_resync",
             status="error",
-            message=_bounded_event_text(str(error or player_text("activity", "resync_no_plan")), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+            message=_bounded_event_text(str(error or 'manual inventory resync returned no plan'), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
             **_resync_correlation(ctx),
         )
     else:
@@ -5631,7 +5619,7 @@ async def launcher_control_loop(ctx):
         try:
             control = json.loads(line[len("AP_CONTROL "):])
         except json.JSONDecodeError:
-            emit_launcher_event("chat_send_failed", message=player_text("activity", "invalid_control_message"))
+            emit_launcher_event("chat_send_failed", message='Invalid launcher control message')
             continue
         if not isinstance(control, dict):
             continue

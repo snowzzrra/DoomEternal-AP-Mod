@@ -29,6 +29,10 @@ from ..ui.strings import (
 @dataclass(frozen=True)
 class PlayModel:
     game_found: bool = False
+    game_path: str = ""
+    server: str = ""
+    player: str = ""
+    connecting: bool = False
     game_connection_ready: bool = False
     room_connected: bool = False
     installation: InstallationState = InstallationState.CHECKING
@@ -56,9 +60,12 @@ class PlayPresenter:
     def activate(self, generation, room, attempt=None) -> None:
         scope = (generation, room)
         if scope != self.progress.scope or attempt != self.attempt:
-            self.model = PlayModel(game_found=self.model.game_found)
+            self.model = PlayModel(game_found=self.model.game_found, game_path=self.model.game_path)
         self.attempt = attempt
         self.progress.activate(generation, room)
+
+    def room_details(self, server, player):
+        self.model = replace(self.model, server=server, player=player)
 
     def observe(self, event: LauncherEvent) -> dict | None:
         if not self.accepts(event):
@@ -72,12 +79,17 @@ class PlayPresenter:
             projection["offer_new_save"] = session.new_save_available and not self.model.new_save_available
         if isinstance(event, RoomAccepted):
             projection.update(launcher_job_generation=generation, setup_progress_room=room)
-            self.model = replace(self.model, game_found=True, room_connected=True)
+            self._accepted(projection)
         self.progress.observe({**projection, "launcher_job_generation": generation, "setup_progress_room": room})
         self._reduce(event)
         projection["recovery_message"] = self.model.recovery_message
         self.present()
         return projection
+
+    def _accepted(self, projection):
+        self.model = replace(self.model, game_found=True, room_connected=True, connecting=False,
+                             server=str(projection.get("endpoint") or self.model.server),
+                             player=str(projection.get("slot_name") or projection.get("player_name") or self.model.player))
 
     def accepts(self, event: LauncherEvent) -> bool:
         generation, room = self.progress.scope or (None, None)
@@ -87,9 +99,8 @@ class PlayPresenter:
                 and (context.attempt is None or context.attempt == self.attempt))
 
     def _reduce(self, event: LauncherEvent) -> None:
-        if isinstance(event, ConnectionChanged) and event.state in {ConnectionState.STOPPED, ConnectionState.FAILED}:
-            self.model = PlayModel(game_found=self.model.game_found,
-                                   tone=Tone.FAILURE if event.state is ConnectionState.FAILED else Tone.NEUTRAL)
+        if isinstance(event, ConnectionChanged):
+            self._connection(event)
         elif isinstance(event, InstallationChanged):
             tone = {InstallationState.FAILED: Tone.FAILURE, InstallationState.BLOCKED: Tone.ATTENTION,
                     InstallationState.VERIFIED: Tone.SUCCESS}.get(event.state, Tone.PROGRESS)
@@ -101,6 +112,14 @@ class PlayPresenter:
         else:
             self._reduce_observation(event)
 
+    def _connection(self, event):
+        if event.state in {ConnectionState.STOPPED, ConnectionState.FAILED}:
+            self.model = PlayModel(game_found=self.model.game_found, game_path=self.model.game_path,
+                                   tone=Tone.FAILURE if event.state is ConnectionState.FAILED else Tone.NEUTRAL)
+        elif event.state is ConnectionState.CONNECTING:
+            data = event.projection()
+            self.model = replace(self.model, connecting=True, server=str(data.get("endpoint") or self.model.server))
+
     def _reduce_observation(self, event: LauncherEvent) -> None:
         if isinstance(event, SessionChanged):
             self._session(event)
@@ -110,7 +129,8 @@ class PlayPresenter:
         elif isinstance(event, ResyncProgress):
             self.model = replace(self.model, tone=event.tone, action=event.action)
         elif isinstance(event, DiscoveryChanged):
-            self.model = replace(self.model, game_found=event.game_found)
+            self.model = replace(self.model, game_found=event.game_found,
+                                 game_path=str(event.projection().get("game_root") or ""))
         elif isinstance(event, DiagnosticsReady) and event.ok is not None:
             self.model = replace(self.model, tone=Tone.SUCCESS if event.ok else Tone.ATTENTION)
 
@@ -132,3 +152,15 @@ class PlayPresenter:
             action = actions[progress.next_action]
         self.model = replace(self.model, progress=progress, action=action)
         return self.model
+
+    @staticmethod
+    def guidance(model):
+        if model.game_confirmed:
+            return player_text("launcher.play", "confirmed_guidance")
+        if model.ready_to_play:
+            return player_text("launcher.play", "ready_guidance")
+        if model.connecting:
+            return player_text("launcher.play", "connecting_guidance", server=model.server)
+        if model.room_connected and model.installation is InstallationState.REQUIRED:
+            return player_text("launcher.play", "install_guidance")
+        return player_text("launcher.play", "connect_guidance")

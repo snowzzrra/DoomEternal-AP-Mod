@@ -7,7 +7,6 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
-from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.ledger_records import ItemAction, RoomKey
 
 from .setup_progress import EVENT_STEPS, SetupStep
@@ -44,6 +43,7 @@ class ActionId(str, Enum):
     VIEW_SESSION = "view_session"
     REPAIR_INVENTORY = "repair_inventory"
     CONNECT = "connect"
+    DISCONNECT = "disconnect"
     RESUME = "resume"
     PREPARE = "prepare"
     REINSTALL = "reinstall"
@@ -51,6 +51,17 @@ class ActionId(str, Enum):
     REPAIR_CONNECTION = "repair_connection"
     SAVE = "save"
     SELECT_PROTON = "select_proton"
+    SHOW_PLAY = "show_play"
+    CHOOSE_GAME_FOLDER = "choose_game_folder"
+    FIX_SETUP = "fix_setup"
+    SAVE_REPORT = "save_report"
+    OPEN_ISSUE = "open_issue"
+    UNINSTALL = "uninstall"
+    LOCAL_BUILD = "local_build"
+    AUTOMATIC_CORE = "automatic_core"
+    REPAIR_CORE = "repair_core"
+    REPAIR_SESSION = "repair_session"
+    ROLLBACK_CORE = "rollback_core"
 
 
 class Tone(str, Enum):
@@ -318,7 +329,7 @@ def _resync_progress(context, kind, data, tone, action):
     room = control_room(data["room"]) if "room" in data else None
     commands = data.get("command_ids", ())
     if not isinstance(commands, list | tuple) or any(not isinstance(c, str) or not c for c in commands):
-        raise ValueError(player_text('launcher.events', 'invalid_resync_command_identities'))
+        raise ValueError('Invalid resync command identities')
     return ResyncProgress(context, kind, data, tone, action, room, tuple(commands))
 
 
@@ -329,9 +340,9 @@ def _delivery_progress(context, kind, data):
     room = control_room(data.get("room"))
     command_id, revision, index = data.get("command_id"), data.get("revision"), data.get("receipt_index")
     if not isinstance(command_id, str) or not command_id or type(revision) is not int or revision < 0:
-        raise ValueError(player_text('launcher.events', 'invalid_delivery_progress_identity'))
+        raise ValueError('Invalid delivery progress identity')
     if index is not None and (type(index) is not int or index < 0):
-        raise ValueError(player_text('launcher.events', 'invalid_delivery_progress_receipt'))
+        raise ValueError('Invalid delivery progress receipt')
     CommandState(data.get("state"))
     return DeliveryProgress(context, kind, data, room, command_id, revision, index)
 
@@ -346,9 +357,9 @@ def _local_delivery_status(context, kind, data):
         return LocalDeliveryStatus(context, kind, data, room, None, ())
     revision, item_id = data.get("expected_revision"), data.get("item_id")
     if not isinstance(command_id, str) or not command_id or type(revision) is not int or revision < 0:
-        raise ValueError(player_text('launcher.events', 'invalid_local_delivery_command'))
+        raise ValueError('Invalid local delivery command')
     if type(item_id) is not int:
-        raise ValueError(player_text('launcher.events', 'invalid_local_delivery_item'))
+        raise ValueError('Invalid local delivery item')
     actions = tuple(ItemAction(action, command_id, revision) for action in ResolutionAction)
     return LocalDeliveryStatus(context, kind, data, room, item_id, actions)
 
@@ -359,11 +370,11 @@ def _adapt_delivery_event(context, kind, data):
     room = control_room(data.get("room"))
     request_id = data.get("request_id")
     if not isinstance(request_id, str) or type(data.get("ok")) is not bool:
-        raise ValueError(player_text('launcher.events', 'invalid_delivery_control_result'))
+        raise ValueError('invalid delivery control result')
     if kind == "item_resolution_result":
         return ItemResolutionResult(context, kind, data, room, request_id, data["ok"])
     if type(data.get("can_resolve")) is not bool:
-        raise ValueError(player_text('launcher.events', 'invalid_delivery_capability'))
+        raise ValueError('invalid delivery capability')
     return AccountingCapabilityChanged(context, kind, data, room, request_id, data["can_resolve"] and data["ok"],
                                        data.get("can_spend") is True and data["ok"])
 

@@ -10,8 +10,6 @@ import tempfile
 from contextlib import ExitStack
 from pathlib import Path
 
-from doom_eap.launcher.ui.strings import text as player_text
-
 
 def _u32(data, offset):
     return struct.unpack_from('<I', data, offset)[0]
@@ -24,7 +22,7 @@ def _u64(data, offset):
 def _resource_header(source, path):
     header = source.read(124)
     if len(header) != 124 or header[:8] != b'IDCL\x0c\0\0\0':
-        raise ValueError(player_text('launcher.resource_bank', 'unsupported_native_resource_bank_value_0', value_0=f'{path.name}'))
+        raise ValueError('Unsupported native resource bank: {value_0}'.format(value_0=f'{path.name}'))
     return header
 
 
@@ -40,34 +38,34 @@ class ResourceIndex:
             self.idcl_at = _u64(self.header, 116)
             size = self.path.stat().st_size
             if not 124 <= self.info_at <= self.names_at <= self.names_end <= self.lookup_at <= self.ids_at <= self.idcl_at <= self.data_at <= size:
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_index_boundaries'))
+                raise ValueError('Invalid native resource index boundaries')
             if self.info_at + self.count * 144 != self.names_at or self.data_at > 64 * 1024 * 1024:
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_index_size'))
+                raise ValueError('Invalid native resource index size')
             source.seek(0)
             self.index = source.read(self.data_at)
         count = _u64(self.index, self.names_at)
         strings_at = self.names_at + 8 + count * 8
         if strings_at > self.names_end:
-            raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_string_table'))
+            raise ValueError('Invalid native resource string table')
         self.names = []
         for i in range(count):
             start = strings_at + _u64(self.index, self.names_at + 8 + i * 8)
             end = self.index.find(b'\0', start, self.names_end)
             if not strings_at <= start <= end:
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_string'))
+                raise ValueError('Invalid native resource string')
             self.names.append(self.index[start:end].decode('utf-8'))
         self.metadata = []
         if self.names_end + 32 * _u32(self.header, 36) != self.lookup_at:
-            raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_metadata_table'))
+            raise ValueError('Invalid native resource metadata table')
         for i in range(_u32(self.header, 36)):
             row = self.index[self.names_end + i * 32:self.names_end + (i + 1) * 32]
             first, second = _u64(row, 0), _u64(row, 8)
             if max(first, second) >= len(self.names):
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_metadata_name'))
+                raise ValueError('Invalid native resource metadata name')
             self.metadata.append((self.names[first], self.names[second], row[16:].hex()))
         self.types = struct.unpack_from('<' + 'I' * _u32(self.header, 40), self.index, self.lookup_at)
         if any(value >= len(self.metadata) for value in self.types):
-            raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_metadata_reference'))
+            raise ValueError('Invalid native resource metadata reference')
         metadata_tokens = [json.dumps(value, separators=(',', ':')).encode('utf-8') for value in self.metadata]
         self.records = []
         for i in range(self.count):
@@ -76,18 +74,18 @@ class ResourceIndex:
             def name(field, local=local, row=row):
                 pointer = local + _u64(row, field) * 8
                 if not self.ids_at <= pointer < self.idcl_at:
-                    raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_name_reference'))
+                    raise ValueError('Invalid native resource name reference')
                 return self.names[_u64(self.index, pointer)]
             kind, filename = name(0), name(8)
             offset, stored = _u64(row, 56), _u64(row, 64)
             type_start, type_count = _u64(row, 24), _u32(row, 132)
             if type_start + type_count > _u32(self.header, 40):
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_native_resource_type_reference'))
+                raise ValueError('Invalid native resource type reference')
             types = hashlib.sha256(b'\0'.join(metadata_tokens[value]
                 for value in self.types[type_start:type_start + type_count])).hexdigest()
             key = (kind, filename, types, _u64(row, 80) if kind == 'renderProgResource' else 0)
             if offset < self.data_at or offset + stored > size:
-                raise ValueError(player_text('launcher.resource_bank', 'invalid_or_duplicate_native_resource_record_value_0_value_1_valu', value_0=f'{self.path.name}', value_1=f'{key}', value_2=f'{i}'))
+                raise ValueError('Invalid or duplicate native resource record: {value_0}: {value_1}: {value_2}'.format(value_0=f'{self.path.name}', value_1=f'{key}', value_2=f'{i}'))
             self.records.append((key, (kind, row, i)))
 
 
@@ -137,14 +135,14 @@ def select_resources(available, local, roots):
                     streams |= kind == 'rs_emb_sfile' and name not in aliases
                 if key[0] == 'rs_streamfile' and key[1].endswith('.decl'):
                     if _u64(row, 64) != _u64(row, 72) or _u32(row, 112) != 0:
-                        raise ValueError(player_text('launcher.resource_bank', 'expected_decoded_native_declaration') + key[1])
+                        raise ValueError('Expected decoded native declaration: ' + key[1])
                     if index.path not in readers:
                         readers[index.path] = stack.enter_context(index.path.open('rb'))
                     source = readers[index.path]
                     source.seek(_u64(row, 56))
                     payload = source.read(_u64(row, 64))
                     if len(payload) != _u64(row, 64):
-                        raise ValueError(player_text('launcher.resource_bank', 'truncated_native_declaration'))
+                        raise ValueError('Truncated native declaration')
                     # native shader strings and legacy comment bytes are not JSON.
                     for match in re.finditer(r'"(?:[^"\\]|\\.)*"', payload.decode('utf-8-sig', errors='replace')):
                         try:
@@ -162,7 +160,7 @@ def resource_signature(value):
         while remaining:
             chunk = source.read(min(remaining, 1024 * 1024))
             if not chunk:
-                raise ValueError(player_text('launcher.resource_bank', 'truncated_native_resource_payload'))
+                raise ValueError('Truncated native resource payload')
             digest.update(chunk)
             remaining -= len(chunk)
     return row[40:56], row[64:88], row[96:144], digest.digest()
@@ -227,7 +225,7 @@ def _bank_payloads(stream, entries, rows):
             while remaining:
                 chunk = source.read(min(remaining, 1024 * 1024))
                 if not chunk:
-                    raise ValueError(player_text('launcher.resource_bank', 'truncated_native_resource_payload'))
+                    raise ValueError('Truncated native resource payload')
                 stream.write(chunk)
                 remaining -= len(chunk)
     stream.seek(124)
@@ -255,7 +253,7 @@ def plan_resource_bank(selected, staging):
     try:
         verified = ResourceIndex(incoming)
         if [key for key, _ in verified.records] != [key for key, _ in entries]:
-            raise ValueError(player_text('launcher.resource_bank', 'selected_native_resource_index_differs'))
+            raise ValueError('Selected native resource index differs')
         with incoming.open('rb') as source:
             identity = hashlib.file_digest(source, 'sha256').hexdigest()
         target = staging / (identity + '.resources')
@@ -272,9 +270,9 @@ def verify_resource_bank(path, info):
 
     checked_path(path)
     if path.stat().st_size != info['size'] or file_digest(path) != info['identity']:
-        raise ValueError(player_text('launcher.resource_bank', 'generated_resource_bank_integrity_differs'))
+        raise ValueError('Generated resource bank integrity differs')
     if len(ResourceIndex(path).records) != info['records']:
-        raise ValueError(player_text('launcher.resource_bank', 'selected_native_resource_index_differs'))
+        raise ValueError('Selected native resource index differs')
 
 
 def publish_resource_bank(source, target, info, *, journal=None):
@@ -310,18 +308,18 @@ def write_resource_bank(selected, cache):
 
 def mask_tables(mask):
     if len(mask) < 8:
-        raise ValueError(player_text('launcher.campaign_resources', 'truncated_native_resource_mask'))
+        raise ValueError('Truncated native resource mask')
     tables, at = {}, 8
     for _ in range(_u32(mask, 4)):
         if at + 12 > len(mask):
-            raise ValueError(player_text('launcher.campaign_resources', 'truncated_native_resource_mask'))
+            raise ValueError('Truncated native resource mask')
         end = at + 12 + 8 * _u32(mask, at + 8)
         if end > len(mask):
-            raise ValueError(player_text('launcher.campaign_resources', 'truncated_native_resource_mask'))
+            raise ValueError('Truncated native resource mask')
         tables[at] = mask[at + 12:end]
         at = end
     if at != len(mask):
-        raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_resource_mask_boundary'))
+        raise ValueError('Invalid native resource mask boundary')
     return tables
 
 
@@ -344,7 +342,7 @@ def _bank_mapping(mask, mapping):
         name, offset = line.rsplit(';', 1)
         name, offset = name.replace('\\', '/').removeprefix('./'), int(offset)
         if name in result or offset in offsets or offset not in tables:
-            raise ValueError(player_text('launcher.resource_bank', 'ambiguous_or_invalid_native_resource_mask_mapping'))
+            raise ValueError('Ambiguous or invalid native resource mask mapping')
         result[name] = offset
         offsets.add(offset)
     return result
@@ -366,9 +364,9 @@ def _verify_bank_tables(mask, mapping, banks, paths):
         verify_resource_bank(paths[name], info)
         offset = offsets.get(name)
         if offset is None or not _u64(mask, offset):
-            raise ValueError(player_text('launcher.resource_bank', 'native_resource_header_registration_is_empty_30d41b45') + name)
+            raise ValueError('Native resource header registration is empty: ' + name)
         if tables[offset] != _bank_bits(info):
-            raise ValueError(player_text('launcher.resource_bank', 'native_resource_bank_mask_differs') + name)
+            raise ValueError('Native resource bank mask differs: ' + name)
 
 
 def verify_bank_registration(meta, mapping, spec, report, *, bank_paths):
@@ -380,14 +378,14 @@ def verify_bank_registration(meta, mapping, spec, report, *, bank_paths):
         return
     _, kind, _, mask, flags = _records(meta, {'generated/buildgame/container.mask'})['generated/buildgame/container.mask']
     if kind != 'rs_streamfile' or flags:
-        raise ValueError(player_text('launcher.resource_bank', 'expected_uncompressed_native_resource_mask'))
+        raise ValueError('Expected uncompressed native resource mask')
     _verify_bank_tables(mask, mapping, banks, bank_paths)
     _check_spec_refs(spec)
     refs = {(spec['maps'][ref['map']]['name'], spec['files'][ref['file']]['name']) for ref in spec['mapFileRefs']}
     referenced = {name for _, name in refs}
     expected = {(target, name) for target, names in report['maps'].items() for name in names}
     if not set(banks) <= referenced or not expected <= refs:
-        raise ValueError(player_text('launcher.resource_bank', 'native_resource_bank_package_reference_differs'))
+        raise ValueError('Native resource bank package reference differs')
 
 
 def obsolete_banks(base, spec):
@@ -395,7 +393,7 @@ def obsolete_banks(base, spec):
     if not directory.is_dir():
         return {}
     if directory.resolve() != base.resolve() / directory.name:
-        raise ValueError(player_text('launcher.resource_bank', 'generated_resource_directory_is_redirected'))
+        raise ValueError('Generated resource directory is redirected')
     active = {value['name'] for value in spec['files']}
     result = {}
     for receipt in directory.glob('*.json'):
@@ -447,18 +445,18 @@ def _remove_obsolete_bank(base, name, before):
     from .install_journal import checked_path, file_digest
 
     if not re.fullmatch(r'ap_enemy_resources/[0-9a-f]{64}\.resources', name):
-        raise OSError(player_text('launcher.resource_bank', 'invalid_obsolete_resource_bank_path'))
+        raise OSError('Invalid obsolete resource bank path')
     path = checked_path(base / name)
     receipt = checked_path(path.with_suffix('.json'))
     if not path.exists() and not receipt.exists():
         return 0
     if file_digest(receipt) != before['receipt_sha256']:
-        raise OSError(player_text('launcher.resource_bank', 'obsolete_resource_receipt_changed_before_cleanup'))
+        raise OSError('Obsolete resource receipt changed before cleanup')
     size = 0
     if path.exists():
         if (path.stat().st_size != before['size'] or path.stat().st_mtime_ns != before['mtime_ns']
                 or file_digest(path) != path.stem):
-            raise OSError(player_text('launcher.resource_bank', 'obsolete_resource_bank_changed_before_cleanup'))
+            raise OSError('Obsolete resource bank changed before cleanup')
         size = before['size']
         path.unlink()
     receipt.unlink()
@@ -480,7 +478,7 @@ def register_banks(base, banks, updates, obsolete=(), *, bank_paths=None):
         meta.write_bytes(original)
         number, _, _, payload, flags = _records(meta, {'generated/buildgame/container.mask'})['generated/buildgame/container.mask']
         if flags:
-            raise ValueError(player_text('launcher.resource_bank', 'expected_uncompressed_native_resource_mask'))
+            raise ValueError('Expected uncompressed native resource mask')
         mapping = ''.join(resource_mapping_lines(payload, mapping))
         _bank_mapping(payload, mapping)
         lines = [line.rsplit(';', 1) for line in mapping.splitlines()]
@@ -530,10 +528,10 @@ def register_banks(base, banks, updates, obsolete=(), *, bank_paths=None):
 def _verify_rehashed_mask(mask, actual, entries):
     for _, offset in entries:
         if not any(actual[offset:offset + 8]):
-            raise ValueError(player_text('launcher.resource_bank', 'native_resource_header_registration_is_empty'))
+            raise ValueError('Native resource header registration is empty')
         mask[offset:offset + 8] = actual[offset:offset + 8]
     if actual != mask:
-        raise ValueError(player_text('launcher.resource_bank', 'native_resource_registration_changed_unrelated_mask_records'))
+        raise ValueError('Native resource registration changed unrelated mask records')
 
 
 def _rehash_banks(base, directory, entries, bank_paths):
@@ -543,4 +541,4 @@ def _rehash_banks(base, directory, entries, bank_paths):
     result = subprocess.run([str(tool.resolve())], cwd=directory, capture_output=True, timeout=120,
                             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
     if result.returncode:
-        raise RuntimeError(player_text('launcher.resource_bank', 'native_resource_header_registration_failed') + result.stderr.decode(errors='replace')[-1000:])
+        raise RuntimeError('Native resource header registration failed: ' + result.stderr.decode(errors='replace')[-1000:])

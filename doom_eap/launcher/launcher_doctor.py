@@ -148,7 +148,7 @@ def _sanitize_support_text(text: str) -> str:
             end = len(text) if text[start:start + 1] in {"{", "["} else text.find("\n", start)
             if end == -1:
                 end = len(text)
-        text = text[:match.start()] + player_text('launcher.doctor', 'redacted') + text[end:]
+        text = text[:match.start()] + '[REDACTED]' + text[end:]
     fields = "|".join(sorted(_CREDENTIAL_FIELDS, key=len, reverse=True))
     text = re.sub(
         rf"""(?ix)(["']?\b(?:[\w-]+_)?(?:{fields})["']?\s*[=:]\s*)
@@ -165,7 +165,7 @@ def sanitize_support_value(value: object, *, key: str = "") -> object:
     if lowered == "gameplay_authorization" and value == "unvalidated":
         return value
     if lowered in _CREDENTIAL_FIELDS or any(lowered.endswith("_" + field) for field in _CREDENTIAL_FIELDS):
-        return player_text('launcher.doctor', 'redacted')
+        return '[REDACTED]'
     if isinstance(value, Mapping):
         return {_sanitize_support_text(str(name)): sanitize_support_value(item, key=str(name))
                 for name, item in value.items() if not str(name).casefold().endswith("private")}
@@ -446,7 +446,7 @@ def _bound_support_text(text: str) -> str:
     half = SUPPORT_LOG_TAIL_BYTES // 2
     head = encoded[:half].decode("utf-8", errors="replace")
     tail = encoded[-half:].decode("utf-8", errors="replace")
-    return head + '' + '\n' + '' + '\n' + player_text('launcher.doctor', 'head_tail_boundary') + '\n' + '' + '\n' + '' + tail
+    return head + '' + '\n' + '' + '\n' + '[... HEAD+TAIL BOUNDARY ...]' + '\n' + '' + '\n' + '' + tail
 
 
 def _encounter_console(path: Path) -> tuple[str, dict[str, object]]:
@@ -515,7 +515,7 @@ def _windows_crash_evidence() -> dict[str, object]:
         for hive in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
             for app in ("", r"\DOOMEternalx64vk.exe"):
                 try:
-                    with winreg.OpenKey(hive, player_text('launcher.doctor', 'software_microsoft_windows_windows_error_reporting_localdumps') + app) as key:
+                    with winreg.OpenKey(hive, 'SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting\\LocalDumps' + app) as key:
                         folder, _ = winreg.QueryValueEx(key, "DumpFolder")
                     if isinstance(folder, str) and folder:
                         locations.append((Path(os.path.expandvars(folder)), "dumps"))
@@ -602,7 +602,7 @@ def _log_freshness(
         if age_before_session < 86400 * 2:
             return "recent_previous", iso_time
         age_days = int(age_before_session // 86400)
-        return player_text('launcher.doctor', 'historical_stale_value_0_days_old', value_0=f'{age_days}'), iso_time
+        return 'historical_stale ({value_0} days old)'.format(value_0=f'{age_days}'), iso_time
 
     age_seconds = max(0.0, now - mtime)
     if age_seconds < 300:
@@ -610,7 +610,7 @@ def _log_freshness(
     if age_seconds < 86400 * 2:
         return "recent_previous", iso_time
     age_days = int(age_seconds // 86400)
-    return player_text('launcher.doctor', 'historical_stale_value_0_days_old', value_0=f'{age_days}'), iso_time
+    return 'historical_stale ({value_0} days old)'.format(value_0=f'{age_days}'), iso_time
 
 
 def _support_log_tails(
@@ -700,8 +700,8 @@ def _mtime_document(path: Path) -> dict[str, object]:
         "size_bytes": stat_result.st_size,
         "mtime_ns": stat_result.st_mtime_ns,
         "modified_iso": datetime.datetime.fromtimestamp(
-            stat_result.st_mtime, tz=datetime.timezone.utc
-        ).isoformat(),
+        stat_result.st_mtime, tz=datetime.timezone.utc
+    ).isoformat(),
     })
     if is_file:
         try:
@@ -779,7 +779,7 @@ def _saved_games_candidates(
         for parent in (root, *root.parents):
             if parent.name.casefold() == "steamapps":
                 candidates.append(
-                    parent.parent / player_text('launcher.doctor', 'steamapps_compatdata_782330_pfx_drive_c_users_steamuser_saved_ga')
+                    parent.parent / 'steamapps/compatdata/782330/pfx/drive_c/users/steamuser/Saved Games/id Software/DOOMEternal/base'
                 )
                 break
     return tuple(dict.fromkeys(path.expanduser() for path in candidates))
@@ -828,9 +828,9 @@ def _saved_games_diagnostics(
             is_dir = False
         recent = _recent_relevant_files(path) if is_dir else []
         game_detected = any(
-            str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}
-            for item in processes
-        )
+        str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}
+        for item in processes
+    )
         candidates.append({
             "path": str(path),
             "exists": is_dir,
@@ -854,25 +854,25 @@ def _saved_games_diagnostics(
             ),
             "shape_verdict": saved_games_shape_verdict(path),
             "markers": {
-                "ap_active_map": _marker_files(path, "ap_active_map") if is_dir else [{"path": str(path), "exists": False, "error": player_text('launcher.doctor', 'candidate_is_not_an_accessible_directory')}],
-                "ap_telemetry": _marker_files(path, "ap_telemetry") if is_dir else [{"path": str(path), "exists": False, "error": player_text('launcher.doctor', 'candidate_is_not_an_accessible_directory')}],
-                "ap_event": _marker_files(path, "ap_event") if is_dir else [{"path": str(path), "exists": False, "error": player_text('launcher.doctor', 'candidate_is_not_an_accessible_directory')}],
+                "ap_active_map": _marker_files(path, "ap_active_map") if is_dir else [{"path": str(path), "exists": False, "error": 'candidate is not an accessible directory'}],
+                "ap_telemetry": _marker_files(path, "ap_telemetry") if is_dir else [{"path": str(path), "exists": False, "error": 'candidate is not an accessible directory'}],
+                "ap_event": _marker_files(path, "ap_event") if is_dir else [{"path": str(path), "exists": False, "error": 'candidate is not an accessible directory'}],
             },
             "recent_writes": recent,
             "live_game_detected": game_detected,
             "live_game_writing": bool(recent) and game_detected,
             "live_game_writing_reason": (
-                player_text('launcher.doctor', 'recent_ap_save_write_while_doom_process_detected')
+                'recent AP/save write while DOOM process detected'
                 if recent and game_detected else
-                player_text('launcher.doctor', 'no_recent_relevant_write_observed') if game_detected else
-                player_text('launcher.doctor', 'doom_process_not_detected')
+                'no recent relevant write observed' if game_detected else
+                'DOOM process not detected'
             ),
         })
     result: dict[str, object] = {
         "effective_path": str(selected) if selected else None,
         "configured_path": str(configured_value) if configured_value else None,
         "source": selection.source if selection is not None else "unresolved",
-        "reason": selection.reason if selection is not None else player_text('launcher.doctor', 'no_effective_saved_games_path'),
+        "reason": selection.reason if selection is not None else 'no effective Saved Games path',
         "repaired": bool(selection is not None and selection.repaired),
         "previous_path": selection.previous_path if selection is not None else None,
         "live_evidence": list(selection.live_evidence) if selection is not None else [],
@@ -1134,16 +1134,16 @@ def _verify_linux_receipt(
     generated_path = Path(str(receipt.get("generated_mod", ""))).expanduser()
     generated_expected = str(receipt.get("generated_sha256", ""))
     if not staged_expected or not room_zip_expected or not generated_expected or not generated_path.is_file():
-        raise ValueError(player_text('launcher.doctor', 'linux_install_record_lacks_complete_room_zip_hash_evidence'))
+        raise ValueError('Linux install record lacks complete room ZIP hash evidence')
     staged_actual = hashlib.sha256(staged.read_bytes()).hexdigest()
     generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
     if not (staged_actual == staged_expected == room_zip_expected == generated_expected == generated_actual):
-        raise ValueError(player_text('launcher.doctor', 'generated_and_staged_room_zip_hashes_differ'))
+        raise ValueError('generated and staged room ZIP hashes differ')
     expected_digest = _expected_room_compiler_digest(application_dir)
     if expected_digest:
         recorded_digest = str(receipt.get("static_content_digest", ""))
         if not recorded_digest or recorded_digest != expected_digest:
-            raise ValueError(player_text('launcher.doctor', 'installed_package_static_content_is_stale_value_0_value_1', value_0=f"{recorded_digest or 'missing'}", value_1=f'{expected_digest}'))
+            raise ValueError('installed package static content is stale ({value_0} != {value_1})'.format(value_0=f"{recorded_digest or 'missing'}", value_1=f'{expected_digest}'))
     raw_command = receipt.get("injector_command", receipt.get("adapter_command", ()))
     raw_resources = receipt.get("required_resources", ())
     expected_mods = str((root / "Mods").resolve())
@@ -1155,10 +1155,10 @@ def _verify_linux_receipt(
         or any(not isinstance(item, Mapping) or item.get("status") != "verified" for item in raw_resources)
         or str(receipt.get("mods_path", "")) != expected_mods
     ):
-        raise ValueError(player_text('launcher.doctor', 'linux_install_record_lacks_complete_injector_or_resource_evidenc'))
+        raise ValueError('Linux install record lacks complete injector or resource evidence')
     verification = verify_linux_mod_installation(root, staged)
     if str(receipt.get("post_install_verification", "")) != "verified":
-        raise ValueError(player_text('launcher.doctor', 'linux_post_install_verification_is_not_recorded'))
+        raise ValueError('Linux post-install verification is not recorded')
     return verification
 
 
@@ -1173,8 +1173,7 @@ def _support_game_link_diagnostics(
     live: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     game_running = any(
-        str(item.get("name", "")).casefold()
-        in {"doometernalx64vk", "doometernalx64vk.exe"}
+        str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"}
         for item in processes
     )
     process = {
@@ -1452,10 +1451,10 @@ def _native_startup_diagnostics(config, session, install):
             with path.open("rb") as stream:
                 raw = stream.read(SUPPORT_DIAGNOSTIC_MAX_BYTES + 1)
             if len(raw) > SUPPORT_DIAGNOSTIC_MAX_BYTES:
-                raise ValueError(player_text('launcher.doctor', 'native_diagnostic_exceeds_support_limit'))
+                raise ValueError('native diagnostic exceeds support limit')
             data = json.loads(raw)
             if not isinstance(data, dict) or [str(data.get("pid")), str(data.get("process_created"))] != identity:
-                raise ValueError(player_text('launcher.doctor', 'native_diagnostic_process_identity_mismatch'))
+                raise ValueError('native diagnostic process identity mismatch')
             if data.get("build_id") != build:
                 continue
             namespace = session.get("namespace_id")
@@ -1537,7 +1536,7 @@ def _install_diagnostics(config):
               "manifest": {"parses": None}, "structure": {"status": "unknown"},
               "ownership": {"status": "unknown"}, "compatibility": {"status": "unknown"}, "issues": []}
     if base is None:
-        result["issues"].append(player_text('launcher.doctor', 'game_directory_is_not_configured'))
+        result["issues"].append('Game directory is not configured')
         return result
     root = base.parent
     try:
@@ -1556,7 +1555,7 @@ def _install_diagnostics(config):
         with (root / "sentinel-distribution.json").open("rb") as stream:
             raw = stream.read(SUPPORT_DIAGNOSTIC_MAX_BYTES + 1)
         if len(raw) > SUPPORT_DIAGNOSTIC_MAX_BYTES:
-            manifest.update(status="omitted", reason=player_text('launcher.doctor', 'manifest_exceeds_256_kib'))
+            manifest.update(status="omitted", reason='Manifest exceeds 256 KiB')
             return result
         document = json.loads(raw, object_pairs_hook=_unique)
     except FileNotFoundError:
@@ -1579,7 +1578,7 @@ def _install_diagnostics(config):
                   all(item[field] == artifacts[name][field] for field in ("size", "sha256"))
                   for name, item in zip(("sentinel_core.dll", "msimg32.dll"), pair, strict=False))
     result["ownership"] = {"status": "owned" if matches else "unverified",
-                           "reason": player_text('launcher.doctor', 'core_and_bootstrap_hashes_match_manifest') if matches else player_text('launcher.doctor', 'core_or_bootstrap_missing_or_different')}
+                           "reason": 'Core and bootstrap hashes match manifest' if matches else 'Core or bootstrap missing or different'}
     try:
         validate_manifest(document)
     except (ValueError, KeyError, TypeError, AttributeError) as error:
@@ -1592,9 +1591,9 @@ def _install_diagnostics(config):
 def _setup_failure_summary(payload, support):
     failure = payload.get("last_setup_failure") or support.get("session_preparation_failure", {}).get("evidence") or {}
     if failure:
-        return (player_text('launcher.doctor', 'fail_last_setup_failure_value_0_value_1_date_value_2', value_0=f"{failure.get('failure_domain', 'unknown')}", value_1=f"{failure.get('user_message') or failure.get('message') or failure.get('technical_message') or 'unknown'}", value_2=f"{failure.get('at_utc') or failure.get('timestamp') or support.get('session_preparation_failure', {}).get('modified_utc', 'unknown')}"))
+        return ('FAIL Last setup failure: {value_0} | {value_1} | date={value_2}'.format(value_0=f"{failure.get('failure_domain', 'unknown')}", value_1=f"{failure.get('user_message') or failure.get('message') or failure.get('technical_message') or 'unknown'}", value_2=f"{failure.get('at_utc') or failure.get('timestamp') or support.get("session_preparation_failure", {}).get('modified_utc', 'unknown')}"))
     else:
-        return (player_text('launcher.doctor', 'unknown_last_setup_failure_none_recorded'))
+        return ('UNKNOWN Last setup failure: none recorded')
 
 
 def _support_summary(payload, install, members, notes):
@@ -1608,10 +1607,10 @@ def _support_summary(payload, install, members, notes):
     manifest = install["manifest"].get("document")
     core_version = manifest.get("version", "unknown") if isinstance(manifest, dict) else "unknown"
     apworld_version = session.get("slot_data", {}).get("apworld_revision", "unknown")
-    lines = [player_text('launcher.doctor', 'doomeap_support_report'), player_text('launcher.doctor', 'utc_value_0', value_0=f"{payload['created_utc']}"), player_text('launcher.doctor', 'report_id_value_0', value_0=f"{payload['report_id']}"),
-             player_text('launcher.doctor', 'versions_launcher_value_0_apworld_value_1_core_value_2', value_0=f"{payload['version']}", value_1=f'{apworld_version}', value_2=f'{core_version}'),
-             player_text('launcher.doctor', 'game_path_type_value_0', value_0=f"{install['path_type']}"),
-             player_text('launcher.doctor', 'room_seed_value_0_slot_value_1', value_0=f"{session.get('seed_name') or 'unknown'}", value_1=f"{session.get('slot') or 'unknown'}")]
+    lines = ['DoomEAP support report', 'UTC: {value_0}'.format(value_0=f"{payload['created_utc']}"), 'Report ID: {value_0}'.format(value_0=f"{payload['report_id']}"),
+             'Versions: Launcher {value_0} | APWorld {value_1} | Core {value_2}'.format(value_0=f"{payload['version']}", value_1=f'{apworld_version}', value_2=f'{core_version}'),
+             'Game path type: {value_0}'.format(value_0=f"{install['path_type']}"),
+             'Room seed: {value_0} | Slot: {value_1}'.format(value_0=f"{session.get('seed_name') or 'unknown'}", value_1=f"{session.get('slot') or 'unknown'}")]
     checks = {item["key"]: item for item in payload["diagnostics"]}
     game = install["game_found"]
     foreign_xinput = any(item["name"].casefold() == "xinput1_3.dll" and item["status"] == "available" for item in install["dlls"])
@@ -1627,12 +1626,12 @@ def _support_summary(payload, install, members, notes):
     delivery = _delivery_verdict(delivery_state)
     for name, value, detail in (
         (player_text('launcher.play', 'game_found'), game, checks.get("game", {}).get("message", "")),
-        (player_text('launcher.doctor', 'core_installed_and_compatible'), core if core_known else None,
-         player_text('launcher.doctor', 'ownership_value_0_compatibility_value_1_xinput_present_value_2', value_0=f"{install['ownership']['status']}", value_1=f"{install['compatibility']['status']}", value_2=f'{foreign_xinput}')),
-        (player_text('launcher.doctor', 'room_mod_staged'), staged, player_text('launcher.doctor', 'receipt_unavailable') if receipt.get("status") != "available" else player_text('launcher.doctor', 'installation_receipt')),
-        (player_text('launcher.support', 'game_connection'), game_connected, str(health.get("reason", player_text('launcher.doctor', 'no_current_evidence')))),
-        (player_text('launcher.doctor', 'ap_connection'), ap_connected, str(session.get("identity_source", "unavailable"))),
-        (player_text('launcher.doctor', 'item_delivery'), delivery, player_text('launcher.doctor', 'ledger_value_0_counts_value_1_truncated_value_2', value_0=f"{delivery_state.get('status', 'unavailable')}", value_1=f"{delivery_state.get('counts', {})}", value_2=f"{delivery_state.get('truncated', False)}")),
+        ('Core installed and compatible', core if core_known else None,
+         'ownership={value_0}, compatibility={value_1}, XINPUT present={value_2}'.format(value_0=f"{install['ownership']['status']}", value_1=f"{install['compatibility']['status']}", value_2=f'{foreign_xinput}')),
+        ('Room mod staged', staged, 'receipt unavailable' if receipt.get("status") != "available" else 'installation receipt'),
+        (player_text('launcher.support', 'game_connection'), game_connected, str(health.get("reason", 'no current evidence'))),
+        ('AP connection', ap_connected, str(session.get("identity_source", "unavailable"))),
+        ('Item delivery', delivery, 'ledger={value_0}, counts={value_1}, truncated={value_2}'.format(value_0=f"{delivery_state.get('status', 'unavailable')}", value_1=f"{delivery_state.get('counts', {})}", value_2=f"{delivery_state.get('truncated', False)}")),
     ):
         verdict = 'PASS' if value is True else 'FAIL' if value is False else 'UNKNOWN'
         lines.append(f"{verdict} {name}: {detail}".rstrip(": "))
@@ -1644,22 +1643,22 @@ def _support_summary(payload, install, members, notes):
         for line in content.decode("utf-8", errors="replace").splitlines():
             if re.search(r"(?:^|[\W_])(warn(?:ing)?|error|failed|failure)(?:$|[\W_])", line, re.I):
                 stamp = re.search(r"\d{4}-\d{2}-\d{2}[T ][\d:.]+(?:Z|[+-]\d{2}:?\d{2})?", line)
-                warnings.append((stamp.group() if stamp else player_text('launcher.doctor', 'timestamp_unknown'), name, line))
+                warnings.append((stamp.group() if stamp else 'timestamp unknown', name, line))
     warnings.sort(key=lambda item: "" if item[0] == "timestamp unknown" else item[0])
-    lines.append(player_text('launcher.doctor', 'last_warnings_errors_up_to_5'))
+    lines.append('Last warnings/errors (up to 5):')
     lines.extend(f"  {stamp} {name}: {line[:180]}" for stamp, name, line in warnings[-5:])
     if not warnings:
-        lines.append(player_text('launcher.doctor', 'none_recorded'))
-    lines.append(player_text('launcher.doctor', 'zip_files_uncompressed_bytes'))
-    lines.append(player_text('launcher.doctor', 'summary_txt_this_file'))
+        lines.append('  none recorded')
+    lines.append('ZIP files (uncompressed bytes):')
+    lines.append('  summary.txt (this file)')
     lines.extend(f"  {name}: {len(content)}" for name, content in members.items())
-    lines.append(player_text('launcher.doctor', 'collection_limits_omissions'))
+    lines.append('Collection limits/omissions:')
     lines.extend(f"  {note}" for note in notes)
     if not notes:
         lines.append("  none")
     text = "\n".join(str(line).replace("\r", " ").replace("\n", " ")[:240] for line in lines) + "\n"
     if len(text.encode("utf-8")) > 64 * 1024:
-        text = text.encode("utf-8")[:63 * 1024].decode("utf-8", errors="ignore") + '' + '\n' + player_text('launcher.doctor', 'summary_truncated_at_63_kib') + '\n' + ''
+        text = text.encode("utf-8")[:63 * 1024].decode("utf-8", errors="ignore") + '' + '\n' + 'Summary truncated at 63 KiB.' + '\n' + ''
     return text
 
 
@@ -1781,57 +1780,57 @@ def write_support_bundle(
         payload["log_provenance"] = sanitize_support_value(provenance)
     notes = []
     if "[... HEAD+TAIL BOUNDARY ...]" in safe_logs:
-        notes.append(player_text('launcher.doctor', 'in_memory_launcher_log_head_tail_retained_middle_omitted'))
+        notes.append('In-memory launcher log: head/tail retained, middle omitted')
     history_files = support.get("native_diagnostics", {}).pop("files", [])
     for source in history_files:
         name = "sentinel/" + source["source_filename"]
         records = source.pop("records")
         if not records:
-            notes.append(player_text('launcher.doctor', 'value_0_omitted_no_matching_records_within_source_limits', value_0=f'{name}'))
+            notes.append('{value_0}: omitted, no matching records within source limits'.format(value_0=f'{name}'))
             continue
         tails[name] = (json.dumps(records[0]) if name.endswith(".json") and records else
                        "\n".join(json.dumps(record) for record in records)) + "\n"
         if source["truncated"]:
-            notes.append(player_text('launcher.doctor', 'value_0_source_tail_last_64_records_retained_source_value_1_byte', value_0=f'{name}', value_1=f"{source['source_size']}"))
+            notes.append('{value_0}: source tail/last 64 records retained; source {value_1} bytes'.format(value_0=f'{name}', value_1=f"{source['source_size']}"))
     if history_files:
         support["native_diagnostics"]["files"] = history_files
     for issue in support.get("native_diagnostics", {}).get("issues", []):
-        notes.append(player_text('launcher.doctor', 'sentinel_history_value_0_unavailable_value_1', value_0=f"{issue['file']}", value_1=f"{issue['error']}"))
+        notes.append('Sentinel history {value_0}: unavailable ({value_1})'.format(value_0=f"{issue['file']}", value_1=f"{issue['error']}"))
     for issue in native_startup.get("errors", []):
-        notes.append(player_text('launcher.doctor', 'native_startup_value_0_skipped_value_1', value_0=f"{issue['source_filename']}", value_1=f"{issue['reason']}"))
+        notes.append('Native startup {value_0}: skipped ({value_1})'.format(value_0=f"{issue['source_filename']}", value_1=f"{issue['reason']}"))
     for error in darklord.get("errors", []):
-        notes.append(player_text('launcher.doctor', 'dark_lord_telemetry_value_0', value_0=f'{error}'))
+        notes.append('Dark Lord telemetry: {value_0}'.format(value_0=f'{error}'))
     base = doom_base_dir_from_config(config or {})
     if base is not None:
         console = base / "qconsole.log"
         try:
             tails["logs/qconsole.log"], retention = _encounter_console(console)
             if retention["omitted_bytes"]:
-                notes.append(player_text('launcher.doctor', 'logs_qconsole_log_value_0_source_value_1_bytes', value_0=f"{retention['truncation']}", value_1=f"{retention['source_size']}"))
+                notes.append('logs/qconsole.log: {value_0}; source {value_1} bytes'.format(value_0=f"{retention['truncation']}", value_1=f"{retention['source_size']}"))
         except OSError as error:
-            notes.append(player_text('launcher.doctor', 'logs_qconsole_log_unavailable_value_0', value_0=f'{type(error).__name__}'))
+            notes.append('logs/qconsole.log: unavailable ({value_0})'.format(value_0=f'{type(error).__name__}'))
     else:
-        notes.append(player_text('launcher.doctor', 'logs_qconsole_log_game_directory_unavailable'))
+        notes.append('logs/qconsole.log: game directory unavailable')
     if injector_output is not None:
         tails["install/injector.log"] = _sanitize_support_text(injector_output)
-        notes.append(player_text('launcher.doctor', 'install_injector_log_full_stdout_and_stderr_of_the_most_recent_r'))
+        notes.append('install/injector.log: full stdout and stderr of the most recent run')
     else:
-        notes.append(player_text('launcher.doctor', 'install_injector_log_no_run_retained_in_this_launcher_session'))
+        notes.append('install/injector.log: no run retained in this launcher session')
     for name, details in provenance.items():
         if details.get("status") == "unavailable":
-            notes.append(player_text('launcher.doctor', 'value_0_unavailable_value_1', value_0=f'{name}', value_1=f"{details.get('reason', 'unknown')}"))
+            notes.append('{value_0}: unavailable ({value_1})'.format(value_0=f'{name}', value_1=f"{details.get('reason', 'unknown')}"))
         elif details.get("size_bytes", 0) > SUPPORT_LOG_MAX_BYTES:
-            notes.append(player_text('launcher.doctor', 'value_0_bounded_log_excerpt_source_value_1_bytes', value_0=f'{name}', value_1=f"{details['size_bytes']}"))
+            notes.append('{value_0}: bounded log excerpt; source {value_1} bytes'.format(value_0=f'{name}', value_1=f"{details['size_bytes']}"))
     for record in darklord["records"] if "records" in darklord else ():
         if record["truncated"]:
-            notes.append(player_text('launcher.doctor', 'value_0_last_1_mib_retained_source_value_1_bytes', value_0=f"{record['archive_member']}", value_1=f"{record['source_size']}"))
+            notes.append('{value_0}: last 1 MiB retained; source {value_1} bytes'.format(value_0=f"{record['archive_member']}", value_1=f"{record['source_size']}"))
     if condump_metadata.get("omitted_bytes"):
-        notes.append(player_text('launcher.doctor', 'ap_support_file_txt_value_0_value_1_bytes_omitted', value_0=f"{condump_metadata['truncation']}", value_1=f"{condump_metadata['omitted_bytes']}"))
+        notes.append('AP_SUPPORT_FILE.txt: {value_0}; {value_1} bytes omitted'.format(value_0=f"{condump_metadata['truncation']}", value_1=f"{condump_metadata['omitted_bytes']}"))
     notes.extend(install["issues"])
-    notes.extend(player_text('launcher.doctor', 'install_json_value_0_value_1_value_2', value_0=f"{item['name']}", value_1=f"{item['status']}", value_2=f"{item.get('reason', 'unavailable')}")
+    notes.extend('install.json {value_0}: {value_1} ({value_2})'.format(value_0=f"{item['name']}", value_1=f"{item['status']}", value_2=f"{item.get('reason', 'unavailable')}")
                  for item in install["dlls"] + install["mods"] if item["status"] in {"omitted", "unreadable"})
     if install["manifest"].get("status") != "available":
-        notes.append(player_text('launcher.doctor', 'install_json_manifest_value_0', value_0=f"{install['manifest'].get('reason') or install['manifest'].get('status', 'unavailable')}"))
+        notes.append('install.json manifest: {value_0}'.format(value_0=f"{install['manifest'].get('reason') or install['manifest'].get('status', 'unavailable')}"))
     members = {
         "installation_journal.json": json.dumps(payload["installation_journal"], indent=2, sort_keys=True),
         "checkpoint_generations.json": json.dumps(payload["checkpoint_generations"], indent=2, sort_keys=True),
@@ -1860,12 +1859,12 @@ def write_support_bundle(
         limit = min(remaining, SUPPORT_LOG_MAX_BYTES if name == "logs/qconsole.log" else remaining)
         if len(data) > limit:
             if name.endswith(".log") and limit > 0:
-                notes.append(player_text('launcher.doctor', 'value_0_truncated_from_value_1_to_at_most_value_2_bytes', value_0=f'{name}', value_1=f'{len(data)}', value_2=f'{limit}'))
+                notes.append('{value_0}: truncated from {value_1} to at most {value_2} bytes'.format(value_0=f'{name}', value_1=f'{len(data)}', value_2=f'{limit}'))
                 data = data[-limit:].decode("utf-8", errors="ignore").encode("utf-8")
             else:
-                notes.append(player_text('launcher.doctor', 'value_0_omitted_value_1_bytes_10_mib_bundle_budget', value_0=f'{name}', value_1=f'{len(data)}'))
+                notes.append('{value_0}: omitted ({value_1} bytes, 10 MiB bundle budget)'.format(value_0=f'{name}', value_1=f'{len(data)}'))
                 if name in {"doctor.json", "install.json"}:
-                    document = {"status": "omitted", "reason": player_text('launcher.doctor', 'text_10_mib_bundle_budget')}
+                    document = {"status": "omitted", "reason": '10 MiB bundle budget'}
                     if name == "doctor.json":
                         document.update(report_id=payload["report_id"], version=payload["version"])
                     data = json.dumps(document).encode("utf-8")
@@ -1887,11 +1886,11 @@ def write_support_bundle(
             archive.writestr(name, data)
     with zipfile.ZipFile(temporary) as archive:
         if archive.testzip() is not None:
-            raise OSError(player_text('launcher.doctor', 'support_archive_verification_failed_value_0', value_0=f'{temporary}'))
+            raise OSError('Support archive verification failed: {value_0}'.format(value_0=f'{temporary}'))
     publish_file(temporary, local_archive, operation="support_bundle_publish")
     with zipfile.ZipFile(local_archive) as archive:
         if archive.testzip() is not None:
-            raise OSError(player_text('launcher.doctor', 'support_archive_verification_failed_value_0', value_0=f'{local_archive}'))
+            raise OSError('Support archive verification failed: {value_0}'.format(value_0=f'{local_archive}'))
     export_owned = False
     try:
         destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1902,7 +1901,7 @@ def write_support_bundle(
             os.fsync(exported.fileno())
         with zipfile.ZipFile(destination) as archive:
             if archive.testzip() is not None:
-                raise OSError(player_text('launcher.doctor', 'support_export_verification_failed'))
+                raise OSError('Support export verification failed')
         return destination
     except (OSError, zipfile.BadZipFile) as error:
         if export_owned:
@@ -1918,7 +1917,7 @@ def write_support_bundle(
 
 
 def _installation_receipt_message(receipt):
-    return str(receipt.get("adapter_message") or player_text('launcher.doctor', 'install_the_room_mod_before_playing'))
+    return str(receipt.get("adapter_message") or 'Install the room mod before playing.')
 
 
 class LauncherDoctor:
@@ -1966,20 +1965,20 @@ class LauncherDoctor:
                 meathook_probe = probe_meathook(root)
                 if meathook_probe.status == PrerequisiteStatus.MISSING:
                     actions.append(RepairAction(
-                        "install_game_link", player_text('launcher.doctor', 'set_up_game_connection'),
-                        (player_text('launcher.doctor', 'download_and_install_the_matching_game_connection_files'),),
+                        "install_game_link", 'Set up game connection',
+                        ('Download and install the matching game connection files.',),
                         False,
-                        player_text('launcher.doctor', 'requires_matching_game_connection_files'),
+                        'Requires matching game connection files.',
                     ))
                 elif meathook_probe.status in {PrerequisiteStatus.INCOMPATIBLE, PrerequisiteStatus.INVALID}:
                     actions.append(RepairAction(
-                        "repair_game_link", player_text('launcher.doctor', 'repair_game_connection'),
+                        "repair_game_link", 'Repair game connection',
                         (
-                            player_text('launcher.doctor', 'check_existing_files'),
-                            player_text('launcher.doctor', 'reinstall_matching_connection_files'),
+                            'Check existing files',
+                            'Reinstall matching connection files',
                         ),
                         True,
-                        player_text('launcher.doctor', 'other_mods_are_kept_previous_files_are_restored_if_installation'),
+                        'Other mods are kept. Previous files are restored if installation fails.',
                     ))
             except Exception:
                 pass
@@ -2004,29 +2003,29 @@ class LauncherDoctor:
                 if codec_inspected is None:
                     actions.append(RepairAction(
                         "repair_idfile_decompressor",
-                        player_text('launcher.doctor', 'repair_mod_building_tool'),
+                        'Repair mod-building tool',
                         (
-                            player_text('launcher.doctor', 'download_and_check_version_value_0', value_0=f'{selected_spec.version}'),
-                            player_text('launcher.doctor', 'verify_sha_256_value_0', value_0=f'{selected_spec.sha256}'),
+                            'Download and check version {value_0}'.format(value_0=f'{selected_spec.version}'),
+                            'Verify SHA-256: {value_0}'.format(value_0=f'{selected_spec.sha256}'),
                         ),
                         True,
-                        player_text('launcher.doctor', 'store_the_checked_tool_for_reuse'),
+                        'Store the checked tool for reuse.',
                     ))
                 else:
                     actions.append(RepairAction(
                         "remove_idfile_decompressor",
-                        player_text('launcher.doctor', 'remove_downloaded_mod_building_tool'),
-                        (player_text('launcher.doctor', 'remove_the_downloaded_tool'),),
+                        'Remove downloaded mod-building tool',
+                        ('Remove the downloaded tool.',),
                         True,
-                        player_text('launcher.doctor', 'setup_will_ask_before_downloading_it_again'),
+                        'Setup will ask before downloading it again.',
                     ))
             elif codec_legacy_present:
                 actions.append(RepairAction(
                     "remove_idfile_decompressor",
-                    player_text('launcher.doctor', 'remove_incompatible_mod_building_tool'),
-                    (player_text('launcher.doctor', 'remove_the_downloaded_version_that_cannot_run_on_this_system'),),
+                    'Remove incompatible mod-building tool',
+                    ('Remove the downloaded version that cannot run on this system.',),
                     True,
-                    player_text('launcher.doctor', 'this_downloaded_version_cannot_run_on_windows'),
+                    'This downloaded version cannot run on Windows.',
                 ))
         issue = self._current_issue()
         if issue is not None:
@@ -2037,10 +2036,10 @@ class LauncherDoctor:
             )
             actions.append(RepairAction(
                 action_id,
-                player_text('launcher.doctor', 'update_room_mod') if action_id == "update_room_package" else player_text('launcher.doctor', 'rebuild_room_mod'),
-                (player_text('launcher.doctor', 'build_and_check_the_mod_for_this_room'),),
+                'Update room mod' if action_id == "update_room_package" else 'Rebuild room mod',
+                ('Build and check the mod for this room.',),
                 True,
-                player_text('launcher.doctor', 'existing_saves_and_received_items_are_kept'),
+                'Existing saves and received items are kept.',
             ))
         if state_dir is None:
             return tuple(actions)
@@ -2057,29 +2056,29 @@ class LauncherDoctor:
         try:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             if not isinstance(receipt, dict):
-                raise ValueError(player_text('launcher.doctor', 'record_must_be_an_object'))
+                raise ValueError('record must be an object')
             staged = Path(str(receipt["staged_mod"])).resolve()
             digest = str(receipt["staged_sha256"])
             adapter_state = str(receipt.get("adapter_state", ""))
             if root is not None:
                 owned_location = staged.parent == root / "Mods"
                 if not owned_location:
-                    raise ValueError(player_text('launcher.doctor', 'recorded_package_is_outside_configured_mods_folder'))
+                    raise ValueError('recorded package is outside configured Mods folder')
             if adapter_state in UNINSTALL_OWNED_STATES:
                 return tuple(actions)
             if not staged.is_file():
                 actions.append(RepairAction(
-                    "reinstall_room_mod", player_text('launcher.doctor', 'reinstall_missing_room_mod'),
-                    (player_text('launcher.doctor', 'install') + staged.name,), True,
-                    player_text('launcher.doctor', 'previous_files_are_backed_up'),
+                    "reinstall_room_mod", 'Reinstall missing room mod',
+                    ('Install ' + staged.name,), True,
+                    'Previous files are backed up.',
                 ))
                 return tuple(actions)
             actual = hashlib.sha256(staged.read_bytes()).hexdigest()
             if actual != digest:
                 actions.append(RepairAction(
-                    "reinstall_room_mod", player_text('launcher.doctor', 'reinstall_changed_room_mod'),
-                    (player_text('launcher.doctor', 'replace') + staged.name, player_text('launcher.doctor', 'sha_256_value_0_value_1', value_0=f'{actual}', value_1=f'{digest}')), True,
-                    player_text('launcher.doctor', 'previous_files_are_backed_up'),
+                    "reinstall_room_mod", 'Reinstall changed room mod',
+                    ('Replace ' + staged.name, 'SHA-256: {value_0} → {value_1}'.format(value_0=f'{actual}', value_1=f'{digest}')), True,
+                    'Previous files are backed up.',
                 ))
                 return tuple(actions)
             if os.name == "nt" and adapter_state == "applied" and root is not None:
@@ -2088,8 +2087,8 @@ class LauncherDoctor:
                     verify_installed_resources(root, receipt)
                 except (OSError, ValueError) as error:
                     actions.append(RepairAction(
-                        "reinstall_room_mod", player_text('launcher.doctor', 'repair_changed_game_files'),
-                        (player_text('launcher.doctor', 'reinstall') + staged.name,), True, str(error),
+                        "reinstall_room_mod", 'Repair changed game files',
+                        ('Reinstall ' + staged.name,), True, str(error),
                     ))
                     return tuple(actions)
             if os.name != "nt" and adapter_state == "applied":
@@ -2097,25 +2096,25 @@ class LauncherDoctor:
                     _verify_linux_receipt(receipt, self.config, application_dir=self._application_dir())
                 except Exception as error:
                     actions.append(RepairAction(
-                        "reinstall_room_mod", player_text('launcher.doctor', 'repair_room_mod'),
-                        (player_text('launcher.doctor', 'reinstall_and_check_value_0', value_0=f'{staged.name}'),), True,
-                        player_text('launcher.doctor', 'installation_failed_at_verify_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                        "reinstall_room_mod", 'Repair room mod',
+                        ('Reinstall and check {value_0}'.format(value_0=f'{staged.name}'),), True,
+                        'Installation failed at verify: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
                     ))
                     return tuple(actions)
             if adapter_state != "applied":
                 actions.append(RepairAction(
-                    "reinstall_room_mod", player_text('launcher.ui', 'install_room_mod'),
-                    (player_text('launcher.doctor', 'complete_installation_in_eternalmodinjector'),), True,
-                    player_text('launcher.doctor', 'confirm_installation_when_prompted'),
+                    "reinstall_room_mod", player_text('common', 'install_room_mod'),
+                    ('Complete installation in EternalModInjector.',), True,
+                    'Confirm installation when prompted.',
                 ))
                 return tuple(actions)
         except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError):
             if issue is not None:
                 return tuple(actions)
             actions.append(RepairAction(
-                "archive_stale_install_record", player_text('launcher.doctor', 'reset_saved_installation_details'),
-                (player_text('launcher.doctor', 'back_up_installation_details_value_0', value_0=f'{receipt_path.name}'),), False,
-                player_text('launcher.doctor', 'previous_details_can_be_restored_from_the_backup'),
+                "archive_stale_install_record", 'Reset saved installation details',
+                ('Back up installation details: {value_0}'.format(value_0=f'{receipt_path.name}'),), False,
+                'Previous details can be restored from the backup.',
             ))
             return tuple(actions)
         return tuple(actions)
@@ -2127,39 +2126,39 @@ class LauncherDoctor:
         """Move only launcher state receipt into rollback storage."""
         state_dir = self._state_dir()
         if state_dir is None:
-            raise ValueError(player_text('launcher.doctor', 'launcher_state_directory_is_unavailable'))
+            raise ValueError('launcher state directory is unavailable')
         receipt = state_dir / "launcher_setup.json"
         if not receipt.is_file():
-            raise ValueError(player_text('launcher.doctor', 'launcher_install_record_is_unavailable'))
+            raise ValueError('launcher install record is unavailable')
         backups = state_dir / "repair-backups"
         backups.mkdir(parents=True, exist_ok=True)
         backup = backups / "launcher_setup.json"
         if backup.exists():
-            raise ValueError(player_text('launcher.doctor', 'repair_backup_already_exists_restore_or_remove_it_first'))
+            raise ValueError('repair backup already exists; restore or remove it first')
         publish_file(receipt, backup, operation="archive_install_record")
         return backup
 
     def restore_archived_install_record(self) -> Path:
         state_dir = self._state_dir()
         if state_dir is None:
-            raise ValueError(player_text('launcher.doctor', 'launcher_state_directory_is_unavailable'))
+            raise ValueError('launcher state directory is unavailable')
         backup = state_dir / "repair-backups" / "launcher_setup.json"
         receipt = state_dir / "launcher_setup.json"
         if not backup.is_file() or receipt.exists():
-            raise ValueError(player_text('launcher.doctor', 'install_record_rollback_is_unavailable'))
+            raise ValueError('install record rollback is unavailable')
         publish_file(backup, receipt, operation="restore_install_record")
         return receipt
 
     def run(self) -> DoctorReport:
         checks: list[Diagnostic] = []
-        platform_name = player_text('launcher.doctor', 'windows') if os.name == "nt" else player_text('launcher.doctor', 'linux')
+        platform_name = 'windows' if os.name == "nt" else 'linux'
         checks.append(Diagnostic("platform", "ok", platform_name))
         game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
         root: Path | None = None
         if game_root:
             try:
                 root = validate_game_root(Path(str(game_root)))
-                checks.append(Diagnostic("game", "ok", player_text('launcher.doctor', 'game_folder_found'), {"path": str(root)}))
+                checks.append(Diagnostic("game", "ok", 'Game folder found.', {"path": str(root)}))
             except ValueError as error:
                 checks.append(Diagnostic("game", "invalid", str(error)))
         else:
@@ -2167,7 +2166,7 @@ class LauncherDoctor:
             details: dict[str, object] | None = None
             if isinstance(game_discovery, dict):
                 details = {"discovery": game_discovery}
-            checks.append(Diagnostic("game", "missing", player_text('launcher.doctor', 'choose_the_folder_containing_doometernalx64vk_exe'), details))
+            checks.append(Diagnostic("game", "missing", 'Choose the folder containing DOOMEternalx64vk.exe.', details))
 
         meathook_probe = probe_meathook(root)
         checks.append(Diagnostic(
@@ -2179,15 +2178,15 @@ class LauncherDoctor:
 
         try:
             processes = list(detect_doom_processes())
-            checks.append(Diagnostic("processes", "ok", player_text('launcher.doctor', 'process_probe_complete'), {"items": processes}))
+            checks.append(Diagnostic("processes", "ok", 'process probe complete', {"items": processes}))
         except ProcessInspectionError as error:
             processes = []
             checks.append(Diagnostic("processes", "attention", str(error)))
-        checks.append(Diagnostic("config", "ok", player_text('launcher.doctor', 'launcher_configuration_loaded'), {"keys": sorted(self.config)}))
+        checks.append(Diagnostic("config", "ok", 'launcher configuration loaded', {"keys": sorted(self.config)}))
         checks.append(Diagnostic(
             "runtime_paths",
             "ok",
-            player_text('launcher.doctor', 'effective_runtime_paths_and_path_selection_evidence_collected'),
+            'effective runtime paths and path-selection evidence collected',
             _runtime_diagnostics(self.config, self.config_path, self.paths, processes, app_dir=self._application_dir()),
         ))
         runtime_details = checks[-1].details if isinstance(checks[-1].details, Mapping) else {}
@@ -2210,7 +2209,7 @@ class LauncherDoctor:
         if (isinstance(admission, Mapping) and admission.get("state") == "admission_refused"
                 and str(admission.get("pid")) in game_pids):
             checks.append(Diagnostic("ap_session", "attention",
-                player_text('launcher.doctor', 'save_setup_failed_do_not_load_the_save_yet_select_help_save_supp'),
+                'Save setup failed. Do not load the save yet. Select Help -> SAVE SUPPORT REPORT.',
                 dict(admission)))
 
         state_dir = self._state_dir()
@@ -2235,7 +2234,7 @@ class LauncherDoctor:
                                 "verification_error": str(error),
                                 **installation_error_details(error, "verify"),
                             }
-                            checks.append(Diagnostic("mod_injection", "failed", player_text('launcher.doctor', 'installation_failed_at_verify_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}'), details))
+                            checks.append(Diagnostic("mod_injection", "failed", 'Installation failed at verify: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'), details))
                         else:
                             details = {
                                 "adapter_state": adapter_state,
@@ -2243,54 +2242,54 @@ class LauncherDoctor:
                                 "post_install_verification": verification.get("state", ""),
                                 "required_resources": verification.get("required_resources", ()),
                             }
-                            checks.append(Diagnostic("mod_injection", "ok", player_text('launcher.doctor', 'mod_installed_and_checked'), details))
+                            checks.append(Diagnostic("mod_injection", "ok", 'Mod installed and checked.', details))
                             room_receipt_applied = True
                     else:
                         from .campaign_resources import verify_installed_resources
                         try:
                             if root is None:
-                                raise ValueError(player_text('launcher.doctor', 'game_files_could_not_be_found_verify_the_game_in_steam_then_retr'))
+                                raise ValueError('Game files could not be found. Verify the game in Steam, then retry setup.')
                             verify_installed_resources(root, receipt)
                         except (OSError, ValueError) as error:
                             for key in ("mod_injection", "windows_mod_installer"):
                                 checks.append(Diagnostic(key, "failed", str(error), {"adapter_state": adapter_state}))
                         else:
-                            checks.append(Diagnostic("mod_injection", "ok", player_text('launcher.doctor', 'game_files_checked'), {"adapter_state": adapter_state, "installation_mode": mode}))
-                            checks.append(Diagnostic("windows_mod_installer", "ok", player_text('launcher.doctor', 'mod_installed_and_checked'), {"installation_mode": mode, "adapter_state": adapter_state}))
+                            checks.append(Diagnostic("mod_injection", "ok", 'Game files checked.', {"adapter_state": adapter_state, "installation_mode": mode}))
+                            checks.append(Diagnostic("windows_mod_installer", "ok", 'Mod installed and checked.', {"installation_mode": mode, "adapter_state": adapter_state}))
                             room_receipt_applied = True
                 elif adapter_state in UNINSTALL_OWNED_STATES:
                     details = {"adapter_state": adapter_state, "installation_mode": mode}
                     if adapter_state == "uninstalled":
                         status = "not_applicable"
-                        message = player_text('launcher.doctor', 'room_mod_is_not_installed')
+                        message = 'Room mod is not installed.'
                     else:
                         status = "attention"
-                        message = player_text('launcher.doctor', 'removal_failed_retry_uninstall_or_select_help_save_support_repor')
+                        message = 'Removal failed. Retry uninstall or select Help -> SAVE SUPPORT REPORT.'
                     checks.append(Diagnostic("mod_injection", status, message, details))
                     if os.name == "nt":
                         checks.append(Diagnostic("windows_mod_installer", status, message, details))
                 elif adapter_state == "manual_install_required":
-                    checks.append(Diagnostic("mod_injection", "failed", player_text('launcher.doctor', 'follow_windows_manual_installation_in_install_md'), {"adapter_state": adapter_state, "installation_mode": mode}))
+                    checks.append(Diagnostic("mod_injection", "failed", 'Follow Windows manual installation in INSTALL.md.', {"adapter_state": adapter_state, "installation_mode": mode}))
                     if os.name == "nt":
-                        checks.append(Diagnostic("windows_mod_installer", "failed", player_text('launcher.doctor', 'follow_windows_manual_installation_in_install_md'), {"installation_mode": mode, "adapter_state": adapter_state}))
+                        checks.append(Diagnostic("windows_mod_installer", "failed", 'Follow Windows manual installation in INSTALL.md.', {"installation_mode": mode, "adapter_state": adapter_state}))
                 else:
                     details = {"adapter_state": adapter_state, "installation_mode": mode,
                                **receipt.get("adapter_details", {})}
                     message = _installation_receipt_message(receipt)
                     checks.append(Diagnostic("mod_injection", "failed", message, details))
                     if os.name == "nt":
-                        checks.append(Diagnostic("windows_mod_installer", "failed", player_text('launcher.doctor', 'installer_is_not_ready_retry_setup'), {"installation_mode": mode, "adapter_state": adapter_state}))
+                        checks.append(Diagnostic("windows_mod_installer", "failed", 'Installer is not ready. Retry setup.', {"installation_mode": mode, "adapter_state": adapter_state}))
             except Exception:
-                checks.append(Diagnostic("mod_injection", "invalid", player_text('launcher.doctor', 'saved_installation_details_could_not_be_read_select_fix_setup')))
+                checks.append(Diagnostic("mod_injection", "invalid", 'Saved installation details could not be read. Select Fix Setup.'))
                 if os.name == "nt":
-                    checks.append(Diagnostic("windows_mod_installer", "invalid", player_text('launcher.doctor', 'saved_installation_details_could_not_be_read_select_fix_setup')))
+                    checks.append(Diagnostic("windows_mod_installer", "invalid", 'Saved installation details could not be read. Select Fix Setup.'))
         else:
-            checks.append(Diagnostic("mod_injection", "not_applicable", player_text('launcher.doctor', 'installation_details_are_missing_select_check_setup')))
+            checks.append(Diagnostic("mod_injection", "not_applicable", 'Installation details are missing. Select Check Setup.'))
             if os.name == "nt":
-                checks.append(Diagnostic("windows_mod_installer", "not_applicable", player_text('launcher.doctor', 'installation_details_are_missing_select_check_setup')))
+                checks.append(Diagnostic("windows_mod_installer", "not_applicable", 'Installation details are missing. Select Check Setup.'))
 
         if os.name != "nt":
-            checks.append(Diagnostic("windows_mod_installer", "not_applicable", player_text('launcher.doctor', 'windows_only_diagnostic')))
+            checks.append(Diagnostic("windows_mod_installer", "not_applicable", 'Windows-only diagnostic'))
 
         try:
             actions = self.repair_actions()
@@ -2299,7 +2298,7 @@ class LauncherDoctor:
             checks.append(Diagnostic(
                 "room_mod",
                 "invalid",
-                player_text('launcher.doctor', 'room_repair_inspection_is_unavailable_value_0_value_1', value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                'room repair inspection is unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
             ))
         room_actions = tuple(
             action for action in actions
@@ -2310,7 +2309,7 @@ class LauncherDoctor:
         )
         if room_actions:
             checks.append(Diagnostic(
-                "room_mod", "invalid", player_text('launcher.doctor', 'room_mod_needs_repair_select_fix_setup'),
+                "room_mod", "invalid", 'Room mod needs repair. Select Fix Setup.',
                 {"actions": [asdict(action) for action in room_actions]},
             ))
         elif room_uninstall_state:
@@ -2318,9 +2317,9 @@ class LauncherDoctor:
                 "room_mod",
                 "not_applicable" if room_uninstall_state == "uninstalled" else "attention",
                 (
-                    player_text('launcher.doctor', 'room_package_is_intentionally_uninstalled')
+                    'Room package is intentionally uninstalled'
                     if room_uninstall_state == "uninstalled"
-                    else player_text('launcher.doctor', 'room_package_uninstall_requires_attention_automatic_reinstall_is')
+                    else 'Room package uninstall requires attention; automatic reinstall is disabled'
                 ),
                 {"adapter_state": room_uninstall_state},
             ))
@@ -2328,22 +2327,22 @@ class LauncherDoctor:
             checks.append(Diagnostic(
                 "room_mod",
                 "ok",
-                player_text('launcher.doctor', 'room_mod_checked'),
+                'Room mod checked.',
                 {"adapter_state": "applied", "receipt": str(receipt_path) if receipt_path else None},
             ))
         else:
-            checks.append(Diagnostic("room_mod", "not_applicable", player_text('launcher.doctor', 'installation_could_not_be_checked_select_check_setup')))
+            checks.append(Diagnostic("room_mod", "not_applicable", 'Installation could not be checked. Select Check Setup.'))
         issue = self._current_issue()
         if issue is not None:
             domain = str(issue.get("failure_domain", "room_package"))
             checks.append(Diagnostic(
                 "current_room_package",
                 "attention",
-                str(issue.get("user_message") or issue.get("technical_message") or player_text('launcher.doctor', 'room_mod_needs_repair_select_fix_setup')),
+                str(issue.get("user_message") or issue.get("technical_message") or 'Room mod needs repair. Select Fix Setup.'),
                 dict(issue),
             ))
             summary_status = "room_package_needs_attention"
-            summary_message = str(issue.get("user_message") or player_text('launcher.doctor', 'room_mod_needs_repair_select_fix_setup'))
+            summary_message = str(issue.get("user_message") or 'Room mod needs repair. Select Fix Setup.')
             recovery_action = str(issue.get("recovery_action") or "rebuild_room_package")
         else:
             domain = ""

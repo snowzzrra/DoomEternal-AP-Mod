@@ -7,8 +7,6 @@ from collections import Counter
 from importlib.resources import files
 from pathlib import Path, PurePosixPath
 
-from doom_eap.launcher.ui.strings import text as player_text
-
 _MARKER = "doomEAPEnemyResourceBanks"
 _HUB_TEXT_DONORS = {
     'game/dlc2/e5m1_spear/e5m1_spear.resources',
@@ -26,13 +24,13 @@ def native_resource_maps(plan):
     result = {}
     for key, stage in plan["maps"].items():
         if key not in catalog or stage["runtime_map"] != catalog[key]["runtime_map"]:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_destination_differs_from_the_catalog'))
+            raise ValueError('Native enemy resource destination differs from the catalog')
         donors = set()
         for recipe in [*stage["recipes"], *stage.get('compatibility_recipes', []), *stage.get('counter_recipes', [])]:
             for body in recipe["bodies"]:
                 donor = body["ai"]["map_key"]
                 if donor not in catalog:
-                    raise ValueError(player_text('launcher.native_enemy_resources', 'unknown_native_enemy_resource_donor'))
+                    raise ValueError('Unknown native enemy resource donor')
                 if donor != key:
                     donors.add(catalog[donor]["runtime_map"])
         if donors:
@@ -74,7 +72,7 @@ def _native_spec(path):
     original = path.read_bytes()
     spec = json.loads(original.decode("utf-8-sig"))
     if any(not isinstance(spec.get(key), list) for key in ("files", "maps", "mapFileRefs")):
-        raise ValueError(player_text('launcher.native_enemy_resources', 'invalid_native_package_map_specification'))
+        raise ValueError('Invalid native package map specification')
     _check_spec_refs(spec)
     previous = spec.pop(_MARKER, None)
     if previous is not None:
@@ -85,7 +83,7 @@ def _native_spec(path):
 def _requested_resources(plan, roots, hub_world_text):
     requested = native_resource_maps(plan)
     if roots is not None and not isinstance(roots, dict):
-        raise ValueError(player_text('launcher.native_enemy_resources', 'native_resource_roots_must_be_a_map_to_resource_mapping'))
+        raise ValueError('Native resource roots must be a map-to-resource mapping')
     boon_maps = _boon_maps(plan, roots)
     for target in boon_maps:
         requested.setdefault(target, set()).add('game/sp/e2m2_base/e2m2_base')
@@ -101,7 +99,7 @@ def _map_files(base, spec, hub_world_text):
     maps = {}
     for index, value in enumerate(spec["maps"]):
         if not isinstance(value, dict) or not isinstance(value.get("name"), str) or value["name"] in maps:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'invalid_or_duplicate_native_package_map'))
+            raise ValueError('Invalid or duplicate native package map')
         maps[value["name"]] = index
     if hub_world_text:
         _compact_hub_imports(base, spec, maps)
@@ -139,7 +137,7 @@ def _select_banks(requested, maps, by_map, common, indices, masks, roots, spec):
         names = {spec['files'][i]['name'] for i in native | targets[target]
                  if PurePosixPath(spec['files'][i]['name']).suffix in {'.resources', '.streamdb'}}
         if len(names) + bool(selected) > 64:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_closure_exceeds_the_database_limit'))
+            raise ValueError('Native enemy resource closure exceeds the database limit')
     return shared, missing, targets
 
 
@@ -159,26 +157,26 @@ def verify_native_resource_banks(base, report):
 
 def _generated_bank_path(base, name, info):
     if not re.fullmatch(r'ap_enemy_resources/[0-9a-f]{64}\.resources', name) or Path(name).stem != info['identity']:
-        raise ValueError(player_text('launcher.build_manifest', 'invalid_generated_resource_bank_path'))
+        raise ValueError('Invalid generated resource bank path')
     return base / name
 
 
 def _check_spec_refs(spec):
     for ref in spec["mapFileRefs"]:
         if (not isinstance(ref, dict) or type(ref.get("file")) is not int or type(ref.get("map")) is not int
-                or not 0 <= ref["file"] < len(spec["files"]) or not 0 <= ref["map"] < len(spec["maps"])):
-            raise ValueError(player_text('launcher.native_enemy_resources', 'invalid_native_package_resource_reference'))
+                or not 0 <= ref["file"] < len(spec['files']) or not 0 <= ref["map"] < len(spec["maps"])):
+            raise ValueError('Invalid native package resource reference')
 
 
 def _restore_native_spec(spec, previous):
     _check_ownership(previous)
     prefix = len(previous["files"])
     if not prefix or spec["files"][:prefix] != previous["files"]:
-        raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_file_order_changed_externally'))
+        raise ValueError('Native enemy resource file order changed externally')
     owned = previous["refs"]
     actual = [ref for ref in spec["mapFileRefs"] if ref["file"] < prefix]
     if Counter(json.dumps(ref, sort_keys=True) for ref in actual) != Counter(json.dumps(ref, sort_keys=True) for ref in owned):
-        raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_references_changed_externally'))
+        raise ValueError('Native enemy resource references changed externally')
     spec["files"] = spec["files"][prefix:]
     spec["mapFileRefs"] = [{**ref, "file": ref["file"] - prefix}
                            for ref in spec["mapFileRefs"] if ref["file"] >= prefix]
@@ -188,7 +186,7 @@ def _restore_native_spec(spec, previous):
 def _check_ownership(previous):
     if (not isinstance(previous, dict) or previous.get("revision") != 1
             or not isinstance(previous.get("files"), list) or not isinstance(previous.get("refs"), list)):
-        raise ValueError(player_text('launcher.native_enemy_resources', 'invalid_native_enemy_resource_ownership_metadata'))
+        raise ValueError('Invalid native enemy resource ownership metadata')
 
 
 def _remove_generated_files(spec, previous):
@@ -196,7 +194,7 @@ def _remove_generated_files(spec, previous):
     if generated:
         start = len(spec['files']) - len(generated)
         if spec['files'][start:] != generated or any(ref['file'] >= start for ref in spec['mapFileRefs']):
-            raise ValueError(player_text('launcher.native_enemy_resources', 'consolidated_native_resource_ownership_changed_externally'))
+            raise ValueError('Consolidated native resource ownership changed externally')
         del spec['files'][start:]
 
 
@@ -204,11 +202,10 @@ def _boon_maps(plan, roots):
     boon_maps = {target for target, values in (roots or {}).items() if isinstance(values, list)
                  and _has_powerup(values)}
     if boon_maps:
-        catalog = (plan or {}).get('maps') or json.loads(
-            files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())['maps']
+        catalog = (plan or {}).get('maps') or json.loads(files("doom_eap.content").joinpath("native_enemy_catalog.json").read_bytes())['maps']
         supported = {stage['runtime_map'] for stage in catalog.values()} | {'game/hub/hub'}
         if not boon_maps <= supported:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'unknown_powerup_resource_destination'))
+            raise ValueError('Unknown powerup resource destination')
     return boon_maps
 
 
@@ -223,7 +220,7 @@ def _compact_hub_imports(base, spec, maps):
     if imports:
         backup = base / 'packagemapspec.json.backup'
         if not backup.is_file():
-            raise ValueError(player_text('launcher.native_enemy_resources', 'fortress_resource_compaction_requires_the_native_package_map_bac'))
+            raise ValueError('Fortress resource compaction requires the native package map backup')
         native = json.loads(backup.read_text(encoding='utf-8-sig'))
         native_files = _hub_files(native)
         spec['mapFileRefs'] = [ref for ref in spec['mapFileRefs'] if ref not in imports
@@ -231,7 +228,7 @@ def _compact_hub_imports(base, spec, maps):
 
 
 def _hub_files(spec):
-    hub = next(i for i, row in enumerate(spec['maps']) if row['name'] == 'game/hub/hub')
+    hub = next(i for i, row in enumerate(spec["maps"]) if row['name'] == 'game/hub/hub')
     return {spec['files'][ref['file']]['name'] for ref in spec['mapFileRefs'] if ref['map'] == hub}
 
 
@@ -242,7 +239,7 @@ def _check_roots(plan, roots, boon_maps, hub_world_text):
         expected.add('game/hub/hub')
     if (not isinstance(roots, dict) or set(roots) != expected
             or any(not _resource_roots(values) for values in roots.values())):
-        raise ValueError(player_text('launcher.native_enemy_resources', 'rebuild_the_room_package_with_native_enemy_resource_roots'))
+        raise ValueError('Rebuild the room package with native enemy resource roots')
 
 
 def _resource_roots(values):
@@ -253,11 +250,11 @@ def _needed_banks(requested, maps, by_map, common):
     needed = set(common)
     for target, donors in requested.items():
         if target not in maps or not donors <= maps.keys():
-            raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_map_is_absent_from_the_installation'))
+            raise ValueError('Native enemy resource map is absent from the installation')
         needed.update(by_map.get(maps[target], set()))
         for donor in donors:
             if not by_map.get(maps[donor]):
-                raise ValueError(player_text('launcher.native_enemy_resources', 'native_enemy_resource_donor_has_no_banks'))
+                raise ValueError('Native enemy resource donor has no banks')
             needed.update(by_map[maps[donor]])
     return needed
 
@@ -270,12 +267,12 @@ def _resource_indices(base, spec, needed):
         name = spec['files'][number]['name']
         bank = PurePosixPath(name)
         if bank.is_absolute() or '..' in bank.parts or '\\' in name or ':' in name:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'invalid_native_resource_bank_path'))
+            raise ValueError('Invalid native resource bank path')
         if bank.suffix not in {'.resources', '.streamdb'}:
             continue
         source = base / name
         if not source.is_file() or not source.stat().st_size:
-            raise ValueError(player_text('launcher.native_enemy_resources', 'missing_native_enemy_resource_bank') + name)
+            raise ValueError('Missing native enemy resource bank: ' + name)
         if bank.suffix == '.resources':
             indices[number] = ResourceIndex(source)
     return indices
@@ -286,7 +283,7 @@ def _merge_resources(shared, selected):
 
     for key, value in selected.items():
         if key in shared and value != shared[key] and resource_signature(value) != resource_signature(shared[key]):
-            raise ValueError(player_text('launcher.native_enemy_resources', 'conflicting_native_enemy_resource') + key[1])
+            raise ValueError('Conflicting native enemy resource: ' + key[1])
         shared.setdefault(key, value)
 
 

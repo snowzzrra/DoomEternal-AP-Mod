@@ -6,6 +6,7 @@ import html
 import json
 import os
 import queue
+import re
 import sys
 import time
 import webbrowser
@@ -32,7 +33,6 @@ from PySide6.QtGui import (
 )
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
     QComboBox,
     QDialog,
     QFileDialog,
@@ -47,7 +47,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
-    QPushButton,
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
@@ -57,8 +56,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from doom_eap.content.item_classification import load_item_classifications
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
 from doom_eap.runtime.ledger_records import RoomKey
+from doom_eap.strings import PlayerError
 
 from ..connection_errors import enrich_connection_failure
 from ..events import (
@@ -83,8 +84,20 @@ from ..launcher_platform import (
 from ..presenters.diagnostics_presenter import DiagnosticsPresenter
 from ..presenters.items_presenter import ItemsPresenter
 from ..presenters.play_presenter import PlayPresenter
-from ..setup_progress import SetupAction
-from .controls import AmmoRefillKeyControl, _AmmoRefillPips, _card, _label, _ScanlineButton, _scroll
+from ..setup_progress import STEP_TEXT, SetupAction
+from .controls import (
+    AmmoRefillKeyControl,
+    ElidedLabel,
+    ElidedPath,
+    ToggleSwitch,
+    _AmmoRefillPips,
+    _card,
+    _label,
+    _ScanlineButton,
+    _scroll,
+)
+from .doom_style import DoomBackground, animations_enabled, fade_page
+from .doom_style import DoomButton as QPushButton
 from .help_view import HelpView
 from .items_view import ItemsView
 from .language_button import LanguageButton
@@ -92,27 +105,16 @@ from .play_view import PlayView
 from .player_file_view import PlayerFileView
 from .report_view import ReportDialog
 from .settings_view import SettingsView
-from .strings import configure_language, installer_instruction
+from .strings import configure_language, failure_text, installer_instruction, record_failure
 from .strings import text as player_text
 
 
 class LauncherUI(QMainWindow):
     """Controller-backed, keyboard-first launcher shell."""
 
-    COLORS: ClassVar = {
-        "ink": "#080b0d",
-        "panel": "#111619",
-        "panel2": "#171e22",
-        "line": "#3b4549",
-        "text": ARCHIPELAGO_PRESENTATION_COLORS["text"],
-        "muted": "#9ba3a3",
-        "doom": ARCHIPELAGO_PRESENTATION_COLORS["item_trap"],
-        "doom_hot": ARCHIPELAGO_PRESENTATION_COLORS["player_remote"],
-        "ap": ARCHIPELAGO_PRESENTATION_COLORS["location"],
-        "good": ARCHIPELAGO_PRESENTATION_COLORS["player_self"],
-        "warn": "#f2c230",
-        "bad": "#ff7777",
-    }
+    COLORS: ClassVar = dict(re.findall(
+        r"@([a-z0-9_]+)@ = (#[0-9a-f]{6})", Path(__file__).with_name("theme.qss").read_text(encoding="utf-8")
+    ))
 
     _label = staticmethod(_label)
     _card = staticmethod(_card)
@@ -121,7 +123,8 @@ class LauncherUI(QMainWindow):
     def __init__(self, controller: LauncherController):
         super().__init__()
         self.controller = controller
-        configure_language(controller.config.get("launcher_language"), QLocale.system().name())
+        language = configure_language(controller.config.get("launcher_language"), QLocale.system().name())
+        self.setLocale(QLocale(language))
         self.setWindowTitle(player_text("launcher.navigation", "brand"))
         self.resize(1280, 720)
         self.setMinimumSize(760, 600)
@@ -138,6 +141,9 @@ class LauncherUI(QMainWindow):
         )
         self._setup_progress = self._play_presenter.progress
         self._resolved_consent_requests: set[str] = set()
+        self._dependency_request = None
+        self._repair_preview_request = None
+        self._manual_installation_generation = None
         self._native_health_presentation: tuple[str, str] | None = None
         self._session_log_limit = 400
         self._chat_pending_text: str | None = None
@@ -147,6 +153,7 @@ class LauncherUI(QMainWindow):
         self.items_presenter = ItemsPresenter()
         self._configure_style()
         self._build()
+        self._set_chat_enabled(False)
         self._set_connection_badge(player_text("launcher.ui", "offline"), False)
         self._set_hints_state("disconnected")
         self._set_setup_state("disconnected")
@@ -168,19 +175,28 @@ class LauncherUI(QMainWindow):
         self.setStyleSheet(style)
 
     def _build(self) -> None:
-        root = QWidget()
+        root = DoomBackground()
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         topbar = self._card("topbar")
+        topbar.setFixedHeight(56)
         top = QHBoxLayout(topbar)
-        top.setContentsMargins(16, 8, 16, 8)
-        top.addWidget(self._label(player_text("launcher.navigation", "brand"), "brand"))
+        top.setContentsMargins(24, 0, 24, 0)
+        top.setSpacing(12)
+        icon = QLabel()
+        icon.setPixmap(QIcon(str(self.controller.bundle_dir / "assets/launcher/EternalAP.ico")).pixmap(28, 28))
+        top.addWidget(icon)
+        brand = QVBoxLayout()
+        brand.setSpacing(0)
+        brand.addWidget(self._label(player_text("launcher.navigation", "brand_top"), "brandTop"))
+        brand.addWidget(self._label(player_text("launcher.navigation", "brand_bottom"), "brand"))
+        top.addLayout(brand)
         top.addStretch()
         self.nav_buttons = []
         for key, target in (("play", 0), ("create_player", 3), ("help", 4), ("settings", 5)):
-            button = QPushButton(player_text("launcher.navigation", key))
+            button = QPushButton(player_text("common", "create_player") if key == "create_player" else player_text("launcher.navigation", key))
             button.setObjectName("nav")
             button.setCheckable(True)
             button.clicked.connect(lambda checked=False, page=target: self._show_page(page))
@@ -188,8 +204,6 @@ class LauncherUI(QMainWindow):
             self.nav_buttons.append(button)
         self.language_button = LanguageButton(self.controller, self)
         top.addWidget(self.language_button)
-        self.top_state = self._label("", "state")
-        self.top_context = self._label("")
         layout.addWidget(topbar)
         self.pages = QStackedWidget()
         connection = self._join_card()
@@ -198,9 +212,10 @@ class LauncherUI(QMainWindow):
         self.hero_detail = self.session_setup_detail
         self.hero_action = self.session_setup_action
         self._action_id = ActionId.CONNECT
-        self.join_another_button = QPushButton(self)
-        self.join_another_button.hide()
         self.items_view = ItemsView(self.items_presenter)
+        classification_path = self.controller.bundle_dir / "data/item_classifications.json"
+        if classification_path.is_file():
+            self.items_view.item_classifications = load_item_classifications(classification_path)
         self.items_view.query_requested.connect(self._request_items)
         self.items_view.resolution_requested.connect(self._resolve_item)
         self._capability_request = None
@@ -213,8 +228,10 @@ class LauncherUI(QMainWindow):
             self._activity_card(),
             self._hints_card(),
             self._chat_bar(),
+            self.session_setup_action,
         )
         self.session_stack = self.play_view.tabs
+        self.session_stack.setCornerWidget(self.player_ammo_refills, Qt.Corner.TopRightCorner)
         self.pages.addWidget(self.play_view)
         self.player_view = PlayerFileView(self.controller, self.COLORS, self)
         self.player_view.activity.connect(self._activity_event)
@@ -223,32 +240,40 @@ class LauncherUI(QMainWindow):
         self.help_view = HelpView(
             self.controller,
             {
-                name: getattr(self, name)
-                for name in (
-                    "_report_problem",
-                    "_run_doctor",
-                    "_preview_repairs",
-                    "_save_support_bundle",
-                    "_select_proton",
-                    "_uninstall_room_package",
-                    "_runtime_repair",
-                    "_select_local_core",
-                    "_clear_local_core",
-                )
+                ActionId.DIAGNOSE: self._run_doctor,
+                ActionId.FIX_SETUP: self._preview_repairs,
+                ActionId.SAVE_REPORT: self._save_support_bundle,
+                ActionId.OPEN_ISSUE: self._open_github_issue,
+                ActionId.SELECT_PROTON: self._select_proton,
+                ActionId.UNINSTALL: self._uninstall_room_package,
+                ActionId.LOCAL_BUILD: self._select_local_core,
+                ActionId.AUTOMATIC_CORE: self._clear_local_core,
+                ActionId.REPAIR_CORE: lambda: self._runtime_repair("repair_core"),
+                ActionId.REPAIR_SESSION: lambda: self._runtime_repair("repair_session"),
+                ActionId.ROLLBACK_CORE: lambda: self._runtime_repair("rollback_core"),
+                ActionId.SHOW_PLAY: lambda: self._show_page(0),
+                ActionId.CHOOSE_GAME_FOLDER: self._open_game_paths,
+                ActionId.REPAIR_INVENTORY: self._request_inventory_resync,
+                ActionId.REINSTALL: lambda: self._prepare(force=True),
             },
             self.ap_save_button,
             self._session_log_page(),
             self._session_card(),
+            self.player_inventory,
+            self.resync_inventory_button,
             self,
         )
         self.pages.addWidget(self.help_view)
+        self.help_view.repair_confirmed.connect(self._apply_repair_preview)
+        self.help_view.download_answered.connect(self._answer_dependency_consent)
         self.play_view.set_launch_option(
             self.launch_option_label, self.launch_option, self.copy_launch_option_button, enabled=os.name != "nt"
         )
         self.settings_view = SettingsView(
-            self.ammo_refill_keybind, self.special_toggle_keybind, self.killsanity_counter_visible, self.grace_control
+            self.ammo_refill_keybind, self.special_toggle_keybind, self.killsanity_counter_visible, self.grace_control, self.language_button
         )
         self.pages.addWidget(self.settings_view)
+        self.pages.currentChanged.connect(self._sync_navigation)
         layout.addWidget(self.pages, 1)
         self._show_page(0)
 
@@ -267,82 +292,158 @@ class LauncherUI(QMainWindow):
 
     def _join_card(self) -> QFrame:
         card = self._card()
-        layout = QGridLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
-        layout.setVerticalSpacing(9)
-        layout.setColumnStretch(1, 1)
-        layout.addWidget(self._label(player_text("launcher.connection", "title"), "section"), 0, 0, 1, 3)
-        layout.addWidget(
-            self._label(player_text("launcher.ui", "server_player_name_and_optional_password"), "muted"), 1, 0, 1, 3
-        )
-        self.game_root = QLineEdit(str(self.controller.config.get("game_root", "")))
-        self.saves_root = QLineEdit(str(self.controller.config.get("save_games_dir", "")))
-        self.server = QLineEdit(str(self.controller.config.get("server_address", "")))
-        self.slot = QLineEdit(str(self.controller.config.get("slot", "")))
-        self._create_settings_controls()
-        self.server.setPlaceholderText(player_text("launcher.connection", "server_example"))
-        self.slot.setPlaceholderText(player_text("launcher.connection", "player_example"))
-        self.slot.setToolTip(player_text("launcher.connection", "player_help"))
-        self.password = QLineEdit()
-        self.password.setEchoMode(QLineEdit.EchoMode.Password)
-        self.detected_paths = self._label(player_text("launcher.ui", "checking_for_doom_eternal"), "muted")
-        layout.addWidget(self.detected_paths, 2, 0, 1, 3)
-        self.change_paths = QPushButton(player_text("launcher.ui", "choose_game_folder"))
-        self.change_paths.clicked.connect(self._toggle_paths)
-        layout.addWidget(self.change_paths, 3, 0, 1, 3, Qt.AlignmentFlag.AlignLeft)
-        self.game_path_label = self._label(player_text("launcher.ui", "game_folder"), "eyebrow")
-        self.save_path_label = self._label(player_text("launcher.ui", "save_folder"), "eyebrow")
-        layout.addWidget(self.game_path_label, 4, 0)
-        layout.addWidget(self.game_root, 4, 1)
-        layout.addWidget(self.save_path_label, 5, 0)
-        layout.addWidget(self.saves_root, 5, 1)
-        self.game_browse = QPushButton(player_text("launcher.ui", "browse"))
-        self.game_browse.clicked.connect(self._browse_game)
-        self.save_browse = QPushButton(player_text("launcher.ui", "browse"))
-        self.save_browse.clicked.connect(self._browse_saves)
-        layout.addWidget(self.game_browse, 4, 2)
-        layout.addWidget(self.save_browse, 5, 2)
-        row = 6
-        self.proton_executable = None
-        if sys.platform.startswith("linux"):
-            self.proton_executable = QLineEdit(str(self.controller.config.get("proton_executable") or ""))
-            self.proton_executable.setPlaceholderText(
-                player_text("launcher.ui", "automatic_choose_a_file_if_requested")
-            )
-            self.proton_executable.setToolTip(
-                player_text("launcher.ui", "select_the_file_named_proton_from_the_same_proton_version_select")
-            )
-            self.proton_executable.editingFinished.connect(self._save_proton)
-            self._path_row(
-                layout, row, player_text("launcher.ui", "proton_program"), self.proton_executable, self._browse_proton
-            )
-            row += 1
-        for offset, key, field in (
-            (0, "server", self.server),
-            (2, "player", self.slot),
-            (4, "password", self.password),
-        ):
-            label = self._label(player_text("launcher.connection", key), "eyebrow")
-            label.setBuddy(field)
-            layout.addWidget(label, row + offset, 0, 1, 3)
-            layout.addWidget(field, row + offset + 1, 0, 1, 3)
-        row += 3
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+        outer = layout
+        self.room_section = QWidget()
+        self.room_section.setObjectName("roomSection")
+        layout = QVBoxLayout(self.room_section)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        outer.addWidget(self.room_section)
+        layout.addWidget(self._label(player_text("launcher.connection", "title"), "eyebrow"))
+        self.room_fields = QWidget()
+        self.room_fields.setObjectName("roomFields")
+        fields = QVBoxLayout(self.room_fields)
+        fields.setContentsMargins(0, 0, 0, 0)
+        fields.setSpacing(12)
+        layout.addWidget(self.room_fields)
         self.recent_rooms = QComboBox()
         self.recent_rooms.setAccessibleName(player_text("launcher.connection", "recent"))
         self.recent_rooms.addItem(player_text("launcher.connection", "recent"), None)
         for entry in self.controller.config.get("recent_rooms", []):
             self.recent_rooms.addItem(entry["server"] + " · " + entry["player"], entry)
         self.recent_rooms.activated.connect(self._select_recent_room)
-        layout.addWidget(self.recent_rooms, row + 5, 0, 1, 3)
-        self.join_button = _ScanlineButton(player_text("launcher.ui", "connect"))
+        fields.addWidget(self.recent_rooms)
+        self.server = QLineEdit(str(self.controller.config.get("server_address", "")))
+        self.slot = QLineEdit(str(self.controller.config.get("slot", "")))
+        self.password = QLineEdit()
+        self.password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.password.setPlaceholderText(player_text("launcher.connection", "optional"))
+        self.server.setPlaceholderText('archipelago.gg:38281')
+        self.slot.setPlaceholderText(player_text("launcher.connection", "player_example"))
+        self._create_settings_controls()
+        for key, field in (("server", self.server), ("player", self.slot), ("password", self.password)):
+            row = QVBoxLayout()
+            row.setSpacing(4)
+            label = self._label(player_text("launcher.connection", key), "fieldLabel")
+            label.setBuddy(field)
+            row.addWidget(label)
+            row.addWidget(field)
+            if key == "player":
+                row.addWidget(self._label(player_text("launcher.connection", "player_help"), "muted"))
+            fields.addLayout(row)
+        self.room_identity = QWidget()
+        self.room_identity.setObjectName("roomIdentity")
+        identity = QVBoxLayout(self.room_identity)
+        identity.setContentsMargins(0, 0, 0, 0)
+        identity.setSpacing(4)
+        self.connected_server = self._label("")
+        self.connected_player = self._label("")
+        for key, value in (("server", self.connected_server), ("player", self.connected_player)):
+            if key == "player":
+                identity.addSpacing(8)
+            identity.addWidget(self._label(player_text("launcher.connection", key), "fieldLabel"))
+            identity.addWidget(value)
+        self.room_identity.hide()
+        layout.addWidget(self.room_identity)
+        self.join_button = QPushButton(player_text("launcher.ui", "connect"))
         self.join_button.setObjectName("primary")
-        self.join_button.clicked.connect(self._connect)
-        layout.addWidget(self.join_button, row + 3, 0, 1, 3)
+        self.join_button.clicked.connect(self._room_action)
+        layout.addWidget(self.join_button)
         self.join_error = self._label("", "warning")
         self.join_error.hide()
-        layout.addWidget(self.join_error, row + 4, 0, 1, 3)
+        layout.addWidget(self.join_error)
+        layout = outer
+        self.game_summary = QWidget()
+        self.game_summary.setObjectName("gameSummary")
+        layout.addWidget(self.game_summary)
+        layout = QVBoxLayout(self.game_summary)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(12)
+        separator = QFrame()
+        separator.setObjectName("separator")
+        layout.addWidget(separator)
+        layout.addWidget(self._label(player_text("launcher.play", "game"), "eyebrow"))
+        game = QVBoxLayout()
+        game.setSpacing(4)
+        title = QHBoxLayout()
+        title.setSpacing(12)
+        self.detected_paths = self._label("", "gameTitle")
+        title.addWidget(self.detected_paths, 1)
+        self.change_paths = QPushButton(player_text("launcher.play", "change"))
+        self.change_paths.setObjectName("link")
+        self.change_paths.setProperty("compact", True)
+        self.change_paths.setProperty("gameChange", True)
+        self.change_paths.clicked.connect(self._toggle_paths)
+        title.addWidget(self.change_paths)
+        game.addLayout(title)
+        self.game_path_summary = ElidedLabel("", "muted")
+        self.game_path_summary.setWordWrap(False)
+        game.addWidget(self.game_path_summary)
+        layout.addLayout(game)
+        layout = outer
+        self.game_paths = QWidget()
+        self.game_paths.setObjectName("gamePaths")
+        paths = QVBoxLayout(self.game_paths)
+        paths.setContentsMargins(0, 0, 0, 0)
+        paths.setSpacing(12)
+        paths.addWidget(self._label(player_text("launcher.play", "game_folders"), "eyebrow"))
+        self.game_root = ElidedPath(str(self.controller.config.get("game_root", "")))
+        self.saves_root = ElidedPath(str(self.controller.config.get("save_games_dir", "")))
+        self.game_path_label, self.game_browse = self._folder_control(paths, "game_folder", self.game_root, self._browse_game)
+        self.save_path_label, self.save_browse = self._folder_control(paths, "save_folder", self.saves_root, self._browse_saves)
+        self.proton_executable = None
+        if sys.platform.startswith("linux"):
+            self.proton_executable = ElidedPath(str(self.controller.config.get("proton_executable") or ""))
+            self._folder_control(paths, "proton_program", self.proton_executable, self._browse_proton)
+        done = QPushButton(player_text("launcher.play", "done"))
+        done.setObjectName("primary")
+        done.clicked.connect(lambda: self._toggle_paths(force=False))
+        paths.addWidget(done)
+        layout.insertWidget(0, self.game_paths)
+        layout.addStretch()
+        self.game_root.textChanged.connect(self._render_game_block)
+        self.saves_root.textChanged.connect(self._render_game_block)
         self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
+        self._render_game_block()
         return card
+
+    def _folder_control(self, layout, key, field, callback):
+        group = QVBoxLayout()
+        group.setSpacing(4)
+        layout.addLayout(group)
+        label = self._label(player_text("launcher.ui", key), "fieldLabel")
+        label.setBuddy(field)
+        group.addWidget(label)
+        group.addWidget(field)
+        browse = QPushButton(player_text("launcher.ui", "browse"))
+        browse.clicked.connect(callback)
+        group.addWidget(browse, alignment=Qt.AlignmentFlag.AlignRight)
+        return label, browse
+
+    def _room_action(self):
+        action = ActionId.DISCONNECT if self._room_connected else ActionId.CONNECT
+        if action is ActionId.CONNECT:
+            self._connect()
+        else:
+            self._disconnect()
+
+    def _render_game_block(self):
+        found = bool(self.game_root.text() and self.saves_root.text())
+        self._play_presenter.observe(adapt_event({"type": "discovery_changed", "game_root": self.game_root.text() if found else None}))
+        if hasattr(self, "play_view"):
+            self.play_view.render(self._play_presenter.present())
+        self.detected_paths.setText(player_text('common', 'game_title') if found else player_text('launcher.play', 'game_missing'))
+        self.detected_paths.setProperty("tone", "text" if found else "warn")
+        self.detected_paths.style().unpolish(self.detected_paths)
+        self.detected_paths.style().polish(self.detected_paths)
+        path = self.game_root.text()
+        self.game_path_summary.setToolTip(path)
+        self.game_path_summary.setText(path)
+        if not found:
+            self._toggle_paths(force=True)
 
     def _select_recent_room(self, index):
         entry = self.recent_rooms.itemData(index)
@@ -351,6 +452,7 @@ class LauncherUI(QMainWindow):
         self.server.setText(entry["server"])
         self.slot.setText(entry["player"])
         self.password.clear()
+        self.password.setFocus(Qt.FocusReason.OtherFocusReason)
         self.items_presenter.activate(RoomKey(**entry["room"]), online=False)
         self._set_item_names(entry)
         self.items_view.request(refresh=True)
@@ -358,9 +460,9 @@ class LauncherUI(QMainWindow):
     def _session_card(self) -> QFrame:
         card = self._card()
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
-        layout.setSpacing(9)
-        layout.addWidget(self._label(player_text("launcher.ui", "room_mod"), "section"))
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
+        layout.addWidget(self._label(player_text('common', 'room_mod'), "section"))
         self.room_summary = self._label(
             player_text("launcher.ui", "no_room_connected_join_a_room_to_start_playing"), "muted", rich=True
         )
@@ -397,12 +499,12 @@ class LauncherUI(QMainWindow):
         """Session identity, readiness, and room actions in one primary surface."""
         card = self._card("hero")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 16, 20, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(12)
         identity = QHBoxLayout()
-        identity.setSpacing(14)
+        identity.setSpacing(12)
         copy = QVBoxLayout()
-        copy.setSpacing(3)
+        copy.setSpacing(4)
         copy.addWidget(self._label(player_text("launcher.ui", "current_session"), "eyebrow"))
         self.session_player_name = self._label(player_text("launcher.ui", "no_room_connected"), "sessionPlayerName")
         self.session_player_name.setWordWrap(True)
@@ -424,7 +526,7 @@ class LauncherUI(QMainWindow):
         self.player_slot = self._label(player_text("launcher.ui", "player_number"), "muted")
         self.player_inventory = self._label(player_text("launcher.ui", "connect_to_load_your_received_items"), "muted")
         self.player_inventory.setWordWrap(True)
-        self.resync_inventory_button = QPushButton(player_text("launcher.ui", "repair_inventory"))
+        self.resync_inventory_button = QPushButton(player_text('common', 'repair_inventory'))
         self.resync_inventory_button.setEnabled(False)
         self.resync_inventory_button.clicked.connect(self._request_inventory_resync)
         actions = QHBoxLayout()
@@ -439,10 +541,13 @@ class LauncherUI(QMainWindow):
         self.stop_button.setObjectName("danger")
         self.stop_button.clicked.connect(self._disconnect)
         self.stop_button.setEnabled(False)
+        self.stop_button.hide()
+        self.session_uninstall_button.hide()
         actions.addWidget(self.stop_button)
         layout.addLayout(actions)
         layout.addWidget(self.player_inventory)
         backup_actions = QHBoxLayout()
+        backup_actions.setSpacing(12)
         backup_button = QPushButton(player_text("launcher.ui", "ap_save"))
         backup_button.setToolTip(
             player_text("launcher.ui", "back_up_restore_or_start_a_new_game_save_in_the_same_room_restar")
@@ -458,7 +563,8 @@ class LauncherUI(QMainWindow):
     def _session_log_page(self) -> QFrame:
         card = self._card()
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
+        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.addWidget(self._label(player_text("launcher.ui", "session_log"), "section"))
         self.session_log = QPlainTextEdit()
         self.session_log.setReadOnly(True)
@@ -468,12 +574,13 @@ class LauncherUI(QMainWindow):
         return card
 
     def _activity_card(self) -> QFrame:
-        card = self._card()
+        card = self._card("plain")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
-        layout.addWidget(
-            self._label(player_text("launcher.ui", "items_chat_deathlink_and_setup_updates_newest_first"), "muted")
-        )
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.activity_empty = self._label(player_text("launcher.play", "activity_empty"), "empty")
+        self.activity_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.activity_empty, 1)
         self.activity = QTableWidget(0, 3)
         self.activity.setHorizontalHeaderLabels(
             [
@@ -484,7 +591,9 @@ class LauncherUI(QMainWindow):
         )
         self.activity.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.activity.setAlternatingRowColors(True)
+        self.activity.setShowGrid(False)
+        self.activity.horizontalHeader().hide()
+        self.activity.hide()
         self.activity.verticalHeader().hide()
         self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
         self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
@@ -495,13 +604,14 @@ class LauncherUI(QMainWindow):
         return card
 
     def _hints_card(self) -> QFrame:
-        card = self._card()
+        card = self._card("plain")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
-        layout.addWidget(self._label(player_text("launcher.ui", "hints"), "section"))
-        layout.addWidget(self._label(player_text("launcher.ui", "hints_for_your_player"), "muted"))
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
         self.hints_empty = self._label(player_text("launcher.ui", "connect_to_the_room_to_see_hints"), "muted")
-        layout.addWidget(self.hints_empty)
+        self.hints_empty.setObjectName("empty")
+        self.hints_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.hints_empty, 1)
         self.hints = QTableWidget(0, 5)
         self.hints.setHorizontalHeaderLabels(
             [
@@ -514,7 +624,8 @@ class LauncherUI(QMainWindow):
         )
         self.hints.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.hints.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.hints.setAlternatingRowColors(True)
+        self.hints.setShowGrid(False)
+        self.hints.horizontalHeader().hide()
         self.hints.verticalHeader().hide()
         self.hints.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         for column in range(1, 5):
@@ -523,11 +634,11 @@ class LauncherUI(QMainWindow):
         return card
 
     def _chat_bar(self) -> QFrame:
-        card = self._card()
+        card = self._card("plain")
         layout = QHBoxLayout(card)
-        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
-        layout.addWidget(self._label(player_text("launcher.ui", "ap_chat"), "eyebrow"))
+        layout.addWidget(self._label(player_text('common', 'chat'), "eyebrow"))
         self.command_input = QLineEdit()
         self.command_input.setPlaceholderText(player_text("launcher.ui", "send_a_message_or_server_command"))
         self.command_input.setEnabled(False)
@@ -551,7 +662,7 @@ class LauncherUI(QMainWindow):
             self,
             player_text("launcher.ui", "select_local_game_connection_files"),
             "",
-            player_text("launcher.app_window", "game_connection_settings_distribution_json"),
+            'Game connection settings (distribution.json)',
         )
         if path:
             self.controller.save_config({"core_runtime_manifest": path})
@@ -562,14 +673,13 @@ class LauncherUI(QMainWindow):
     def _clear_local_core(self):
         self.controller.save_config({"core_runtime_manifest": None})
         self.help_view.core_status.setText(player_text("launcher.ui", "game_connection_files_download_during_setup"))
+        self.help_view.core_status.show()
 
     def _runtime_repair(self, action):
-        if action in {"repair_session", "rollback_core"}:
-            message = (
-                player_text("launcher.ui", "close_doom_eternal_before_repairing_save_setup_existing_saves_re")
-                if action == "repair_session"
-                else player_text("launcher.ui", "restore_the_previous_game_connection_files_and_turn_off_automati")
-            )
+        if action == "repair_session":
+            self.help_view.doctor_action.setText(player_text("launcher.ui", "close_doom_eternal_before_repairing_save_setup_existing_saves_re"))
+        if action == "rollback_core":
+            message = player_text("launcher.ui", "restore_the_previous_game_connection_files_and_turn_off_automati")
             if (
                 QMessageBox.question(
                     self,
@@ -588,30 +698,36 @@ class LauncherUI(QMainWindow):
             self.controller.set_death_link_grace(deaths)
         except (OSError, ValueError) as error:
             self._append_log(
-                player_text("launcher.app_window", "deathlink_grace_setting_failed_value_0", value_0=f"{error}")
+                'DeathLink Grace setting failed: {value_0}'.format(value_0=f'{error}')
             )
             self.death_link_grace.blockSignals(True)
             self.death_link_grace.setValue(int(self.controller.config.get("death_link_grace", 0)))
             self.death_link_grace.blockSignals(False)
 
     def _save_ammo_refill_keybind(self, captured: str = "") -> None:
-        value = captured.strip()
         try:
-            self.controller.set_ammo_refill_keybind(value)
+            if self._save_keybinds():
+                self._set_ammo_refill_indicator(self._ammo_refills_available)
         except (ValueError, OSError) as error:
-            self.ammo_refill_keybind.set_value(str(self.controller.config.get("ammo_refill_keybind", "F9")))
-            self._append_log(
-                player_text("launcher.app_window", "ammo_refill_keybind_rejected_value_0", value_0=f"{error}")
-            )
-            return
-        self._set_ammo_refill_indicator(self._ammo_refills_available)
+            self._append_log(f'Ammo Refill keybind rejected: {error!s}')
 
     def _save_special_toggle_keybind(self, captured: str) -> None:
         try:
-            self.controller.set_ap_keybinds(self.ammo_refill_keybind.value(), captured)
+            self._save_keybinds()
         except (ValueError, OSError) as error:
+            QMessageBox.warning(self, player_text("launcher.ui", "keyboard_shortcut"), self._operation_failure('repair', error))
+
+    def _save_keybinds(self):
+        if self.settings_view.render_conflict():
+            return False
+        try:
+            self.controller.set_ap_keybinds(self.ammo_refill_keybind.value(), self.special_toggle_keybind.value())
+        except (ValueError, OSError):
+            self.ammo_refill_keybind.set_value(str(self.controller.config.get("ammo_refill_keybind", "F9")))
             self.special_toggle_keybind.set_value(str(self.controller.config.get("special_toggle_keybind", "F10")))
-            QMessageBox.warning(self, player_text("launcher.ui", "keyboard_shortcut"), str(error))
+            self.settings_view.render_conflict()
+            raise
+        return True
 
     def _save_killsanity_counter_visible(self, visible: bool) -> None:
         try:
@@ -619,15 +735,11 @@ class LauncherUI(QMainWindow):
         except (ValueError, OSError) as error:
             self.killsanity_counter_visible.blockSignals(True)
             self.killsanity_counter_visible.setChecked(
-                self.controller.config.get("killsanity_counter_visible", True) is True
-            )
+            self.controller.config.get("killsanity_counter_visible", True) is True
+        )
             self.killsanity_counter_visible.blockSignals(False)
             self._append_log(
-                player_text(
-                    "launcher.app_window",
-                    "killsanity_counter_preference_could_not_be_saved_value_0",
-                    value_0=f"{error}",
-                )
+                'Killsanity counter preference could not be saved: {value_0}'.format(value_0=f'{error}')
             )
 
     def _set_ammo_refill_indicator(self, value: object) -> None:
@@ -644,10 +756,11 @@ class LauncherUI(QMainWindow):
             "launcher.ui", "ammo_refills_value_0_key_value_1", value_0=f"{state}", value_1=f"{keybind}"
         )
         self.player_ammo_refills.setToolTip(description)
+        self.player_ammo_refills.setVisible(self._room_connected and available is not None)
         self.player_ammo_refills.setAccessibleName(player_text("launcher.ui", "ammo_refill_availability"))
         self.player_ammo_refills.setAccessibleDescription(description)
         self.ammo_refill_key.setText(keybind)
-        self.ammo_refill_key.setToolTip(player_text("launcher.ui", "ammo_refill_key_value_0", value_0=f"{keybind}"))
+        self.ammo_refill_key.setToolTip('Ammo Refill key: {value_0}'.format(value_0=f'{keybind}'))
         self.ammo_refill_pips.set_available(available)
         self.ammo_refill_pips.setToolTip(description)
         self._update_ammo_refill_button()
@@ -686,72 +799,45 @@ class LauncherUI(QMainWindow):
 
     def _show_page(self, index: int) -> None:
         page = {0: 0, 1: 0, 2: 0, 3: 1, 4: 2, 5: 3}[index]
+        previous = None
+        if page != self.pages.currentIndex() and self.isVisible() and animations_enabled(self):
+            previous = self.pages.currentWidget().grab()
         self.pages.setCurrentIndex(page)
+        if previous is not None:
+            self._fade_in(self.pages.currentWidget(), previous)
         if index == 1:
             self.play_view.focus_connection()
         if index == 4:
             self._refresh_help_room_package()
+        self._sync_navigation(page)
+
+    def _sync_navigation(self, page: int) -> None:
         for number, button in enumerate(self.nav_buttons):
             button.setChecked(number == page)
+
+    def _open_game_paths(self):
+        self._show_page(0)
+        self._toggle_paths(force=True)
+
+    def _open_github_issue(self):
+        from ..launcher_reporting import github_issue_url
+
+        url, _ = github_issue_url({"title": "", "description": "", "diagnostics": ""})
+        webbrowser.open(url)
 
     def _refresh_help_room_package(self) -> None:
         if not hasattr(self, "help_view"):
             return
         failure = getattr(self.controller, "last_setup_failure", None) or {}
-        proton_pending = failure.get("failure_domain") == "proton_runtime"
-        self.help_view.doctor_proton_button.setVisible(proton_pending)
-        if proton_pending:
-            self.help_view.doctor_status.setText(player_text("launcher.ui", "select_proton"))
-            self.help_view.doctor_action.setText(str(failure.get("user_message") or ""))
-        presentations = {
-            "package_incompatible": (
-                player_text("launcher.ui", "room_mod_needs_rebuilding"),
-                player_text("launcher.ui", "this_launcher_does_not_match_the_room_select_help_save_support_r"),
-            ),
-            "package_failed": (
-                player_text("launcher.ui", "room_mod_could_not_be_built"),
-                player_text("launcher.ui", "open_session_and_select_rebuild_room_package_if_it_fails_again_s"),
-            ),
-            "install_needed": (
-                player_text("launcher.ui", "room_mod_not_installed"),
-                player_text("launcher.ui", "open_session_and_select_install_room_package_before_playing"),
-            ),
-            "update_required": (
-                player_text("launcher.ui", "room_mod_update_required"),
-                player_text("launcher.ui", "open_session_and_select_update_room_package_before_playing"),
-            ),
-            "checking": (
-                player_text("launcher.ui", "checking_room_mod"),
-                player_text("launcher.ui", "checking_the_installed_mod"),
-            ),
-            "installing": (
-                player_text("launcher.ui", "preparing_room_mod"),
-                player_text("launcher.ui", "preparing_the_room"),
-            ),
-            "updating": (
-                player_text("launcher.ui", "preparing_room_mod"),
-                player_text("launcher.ui", "preparing_the_room"),
-            ),
-            "ready": (player_text("launcher.ui", "room_mod_ready"), player_text("launcher.ui", "ready_to_play")),
-        }
-        title, detail = presentations.get(
-            self._setup_state,
-            (
-                player_text("launcher.ui", "room_mod_not_checked"),
-                player_text("launcher.ui", "connect_to_a_room_to_check_its_mod"),
-            ),
-        )
-        needs_attention = self._setup_state in {
-            "package_incompatible",
-            "package_failed",
-            "install_needed",
-            "update_required",
-        }
+        self.help_view.doctor_proton_button.setVisible(failure.get("failure_domain") == "proton_runtime")
+        title, tone = DiagnosticsPresenter.room_status(self._setup_state)
         self.help_view.doctor_room_status.setText(title)
-        self.help_view.doctor_room_status.setStyleSheet(
-            f"color:{self.COLORS['warn'] if needs_attention else self.COLORS['good']};"
-        )
-        self.help_view.doctor_room_evidence.setText(detail)
+        self.help_view.doctor_room_status.setStyleSheet(f"color:{self.COLORS[tone]};")
+        button = self.help_view.symptom_buttons[ActionId.REINSTALL]
+        button.setEnabled(self._room_connected)
+        button.setToolTip("" if self._room_connected else player_text("launcher.play", "connect_guidance"))
+        self.resync_inventory_button.setToolTip(self.player_inventory.text() if not self.resync_inventory_button.isEnabled() else "")
+        self.help_view.uninstall_button.setToolTip("" if self._room_connected else player_text("launcher.play", "connect_guidance"))
 
     def _set_connection_badge(self, text: str, connected: bool) -> None:
         self.connection_badge.setText(text)
@@ -763,7 +849,13 @@ class LauncherUI(QMainWindow):
         self.connection_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.connection_badge.setWordWrap(False)
 
-    def _fade_in(self, widget: QWidget) -> None:
+    def _fade_in(self, widget: QWidget, previous=None) -> None:
+        if not animations_enabled(widget):
+            widget.setGraphicsEffect(None)
+            return
+        if previous is not None:
+            fade_page(widget, previous)
+            return
         effect = QGraphicsOpacityEffect(widget)
         widget.setGraphicsEffect(effect)
         animation = QPropertyAnimation(effect, b"opacity", widget)
@@ -779,7 +871,6 @@ class LauncherUI(QMainWindow):
         self.hero_detail.setText(detail)
         self.hero_action.setText(action)
         self.hero_action.setEnabled(enabled)
-        self.top_state.setText(state)
         self._action_id = self._setup_action_id()
         self.session_setup.setVisible(bool(detail))
 
@@ -854,17 +945,30 @@ class LauncherUI(QMainWindow):
         generation = self.controller.operation_generation
         attempt = self.controller.connection_attempt_id
         self._play_presenter.activate(generation, key, attempt)
+        self._play_presenter.room_details(self.server.text(), self.slot.text())
         return self._play_presenter.observe(adapt_event(event, generation=generation, room=key, attempt=attempt))
+
+    def _render_room_controls(self):
+        self.room_fields.setVisible(not self._room_connected)
+        self.room_identity.setVisible(self._room_connected)
+        self.connected_server.setText(str(self.room_event.get("endpoint") or self.server.text()))
+        self.connected_player.setText(str(self.room_event.get("slot_name") or self.room_event.get("player_name") or self.slot.text()))
+        self.join_button.setText(player_text("launcher.ui", "disconnect") if self._room_connected else player_text("launcher.ui", "connect"))
+        self.join_button.setObjectName("secondary" if self._room_connected else "primary")
+        self.join_button.setEnabled(not self._connection_pending)
+        self.join_button.setToolTip(player_text("launcher.play", "connecting_guidance", server=self.server.text()) if self._connection_pending else "")
+        self.join_button.style().unpolish(self.join_button)
+        self.join_button.style().polish(self.join_button)
 
     def _render_setup_progress(self) -> None:
         self.play_view.render(self._play_presenter.present())
-        if self._installation_request is not None:
+        self._render_room_controls()
+        if self._installation_request is not None or self._manual_installation_generation is not None:
             return
         if getattr(self, "_close_requested", False):
             message = player_text("launcher.setup", "stop_requested")
             self.session_setup_detail.setText(message)
             self.hero_detail.setText(message)
-            self.top_state.setText(message)
             return
         model = self._play_presenter.present()
         view = model.progress
@@ -873,9 +977,14 @@ class LauncherUI(QMainWindow):
             self.hero_detail.setText(model.recovery_message)
             return
         active = view is not None and self._setup_state in {"checking", "installing", "updating"}
+        self.setup_elapsed.setVisible(active)
+        if active:
+            minutes, seconds = divmod(view.elapsed_seconds, 60)
+            self.setup_elapsed.setText('{minutes}:{seconds}'.format(minutes=str(minutes), seconds=f'{seconds:02d}'))
         self.session_setup_help.setVisible(active and view.next_action is SetupAction.DIAGNOSE)
         if self._setup_state in {"checking", "installing", "updating"}:
-            copy = view.text if active else self._setup_copy
+            operation = STEP_TEXT[view.step] if active else self._setup_copy
+            copy = '{operation}…'.format(operation=operation.rstrip("…."))
             self.session_setup_detail.setText(copy)
             self.hero_detail.setText(copy)
 
@@ -900,25 +1009,17 @@ class LauncherUI(QMainWindow):
 
     def _repair_connection(self):
         generation = self.controller.operation_generation
-        confirm = QMessageBox.question(
-            self,
-            player_text("launcher.ui", "repair_game_connection"),
-            player_text("launcher.ui", "reinstall_the_game_connection_files_if_another_mod_conflicts_uni"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes,
-        )
-        if confirm == QMessageBox.StandardButton.Yes:
-            try:
-                if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
-                    self._set_setup_state("installing", player_text("launcher.ui", "repairing_the_game_connection"))
-            except Exception as error:
-                self._append_log(
-                    player_text("launcher.app_window", "game_integration_repair_error_value_0", value_0=f"{error}")
-                )
-                self._set_setup_state(
-                    "game_link_update_needed",
-                    player_text("launcher.ui", "game_connection_repair_failed_select_fix_setup_again_if_it_fails"),
-                )
+        try:
+            if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
+                self._set_setup_state("installing", player_text("launcher.ui", "repairing_the_game_connection"))
+        except Exception as error:
+            self._append_log(
+                'Game integration repair error: {value_0}'.format(value_0=f'{error}')
+            )
+            self._set_setup_state(
+                "game_link_update_needed",
+                player_text("launcher.ui", "game_connection_repair_failed_select_fix_setup_again_if_it_fails"),
+            )
 
     def _manual_install_action(self) -> None:
         if getattr(self, "_manual_retry", False):
@@ -949,33 +1050,25 @@ class LauncherUI(QMainWindow):
                 webbrowser.open(WINDOWS_MANUAL_INSTALL_GUIDE_URL)
             except Exception as error:
                 self._append_log(
-                    player_text("launcher.app_window", "could_not_open_browser_value_0", value_0=f"{error}")
+                    'Could not open browser: {value_0}'.format(value_0=f'{error}')
                 )
         self._append_log(
-            player_text("launcher.app_window", "opened_manual_installation_guide_install_md_windows_manual_insta")
+            'Opened manual installation guide (INSTALL.md → Windows manual installation).'
         )
 
     def _confirm_manual_installation(self) -> None:
-        """Prompt user confirmation for manual mod installation completion."""
-        generation = self.controller.operation_generation
-        reply = QMessageBox.question(
-            self,
-            player_text("launcher.ui", "confirm_installation"),
-            player_text("launcher.setup", "confirm_question"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                self.controller.confirm_manual_installation(generation=generation)
-                self._append_log(player_text("launcher.app_window", "manual_mod_installation_confirmed"))
-            except Exception as error:
-                self._append_log(
-                    player_text(
-                        "launcher.app_window", "manual_installation_confirmation_error_value_0", value_0=f"{error}"
-                    )
-                )
-                QMessageBox.warning(self, player_text("launcher.ui", "manual_installation_error"), str(error))
+        if self._installation_request is not None:
+            return
+        self._manual_installation_generation = self.controller.operation_generation
+        self._show_installation_confirmation()
+
+    def _complete_manual_installation(self, generation):
+        try:
+            self.controller.confirm_manual_installation(generation=generation)
+            self._append_log('Manual mod installation confirmed.')
+        except Exception as error:
+            self._append_log('Manual installation confirmation error: {value_0}'.format(value_0=f'{error}'))
+            QMessageBox.warning(self, player_text("launcher.ui", "manual_installation_error"), self._operation_failure('install_mod', error))
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -988,48 +1081,15 @@ class LauncherUI(QMainWindow):
     def _discover(self) -> None:
         found = self.controller.discover()
         self._play_presenter.observe(adapt_event({"type": "discovery_changed", **found}))
-        self.play_view.render(self._play_presenter.present())
         if not self.game_root.text() and found.get("game_root"):
             self.game_root.setText(str(found["game_root"]))
         if not self.saves_root.text() and found.get("save_games_dir"):
             self.saves_root.setText(str(found["save_games_dir"]))
-        has_session = bool(self.controller.config.get("server_address") and self.controller.config.get("slot"))
-        self._set_home_secondary_actions(has_session)
-        if self.game_root.text() and self.saves_root.text():
-            self.detected_paths.setText(player_text("launcher.ui", "doom_eternal_found"))
-            self._set_home(
-                player_text("launcher.ui", "welcome_back")
-                if has_session
-                else player_text("launcher.ui", "join_a_room"),
-                player_text("launcher.ui", "reconnect_to_your_saved_room_and_continue_playing")
-                if has_session
-                else player_text("launcher.play", "connect_guidance"),
-                player_text("launcher.ui", "resume") if has_session else player_text("launcher.ui", "join_a_room"),
-                player_text("launcher.ui", "ready"),
-            )
-        else:
-            if not self.game_root.text():
-                self.detected_paths.setText(
-                    player_text("launcher.ui", "select_the_folder_containing_doometernalx64vk_exe")
-                )
-            else:
-                self.detected_paths.setText(
-                    player_text("launcher.ui", "select_your_doom_eternal_save_folder_ending_in_id_software_doome")
-                )
-            self._set_home(
-                player_text("launcher.ui", "welcome_back")
-                if has_session
-                else player_text("launcher.ui", "join_a_room"),
-                player_text("launcher.ui", "reconnect_to_your_saved_room_and_continue_playing")
-                if has_session
-                else player_text("launcher.play", "connect_guidance"),
-                player_text("launcher.ui", "resume") if has_session else player_text("launcher.ui", "join_a_room"),
-                player_text("launcher.ui", "action_needed"),
-            )
+        self._toggle_paths(force=not bool(self.game_root.text() and self.saves_root.text()))
+        self._render_game_block()
+        self.play_view.render(self._play_presenter.present())
         if not self.player_view.start_inventory_catalog:
-            self._append_log(
-                player_text("launcher.app_window", "starting_items_could_not_load_open_help_and_select_check_setup")
-            )
+            self._append_log('Starting items could not load. Open Help and select Check Setup.')
 
     def _focus_join(self) -> None:
         self._show_page(1)
@@ -1096,14 +1156,9 @@ class LauncherUI(QMainWindow):
                 self._show_connection_failure(event)
             else:
                 self._append_log(
-                    player_text(
-                        "launcher.app_window",
-                        "local_setup_input_error_value_0_value_1",
-                        value_0=f"{type(error).__name__}",
-                        value_1=f"{raw}",
-                    )
+                    'Local setup input error: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{raw}')
                 )
-                message = player_text("launcher.ui", "game_setup_failed_open_help_and_select_check_setup_if_it_fails_a")
+                message = self._operation_failure('connect', error)
                 self.join_error.setText(message)
                 self.join_error.show()
                 self._set_home(
@@ -1117,6 +1172,8 @@ class LauncherUI(QMainWindow):
             return
         self.join_error.hide()
         self._connection_pending = True
+        self._play_presenter.observe(adapt_event({"type": "connecting", "endpoint": self.server.text(), "player": self.slot.text()}))
+        self.play_view.render(self._play_presenter.present())
         self._set_connection_controls(False)
         self._set_connection_badge(player_text("launcher.ui", "connecting"), False)
         self._show_page(2)
@@ -1129,37 +1186,17 @@ class LauncherUI(QMainWindow):
         )
 
     def _toggle_paths(self, _checked: bool = False, *, force: bool | None = None) -> None:
-        show = force if force is not None else not self.game_root.isVisible()
-        for widget in (
-            self.game_root,
-            self.saves_root,
-            self.game_path_label,
-            self.save_path_label,
-            self.game_browse,
-            self.save_browse,
-        ):
-            widget.setVisible(show)
-        self.change_paths.setText(
-            player_text("launcher.ui", "hide_folders") if show else player_text("launcher.ui", "choose_game_folder")
-        )
+        show = force if force is not None else self.game_paths.isHidden()
+        self.game_paths.setVisible(show)
+        self.room_section.setVisible(not show)
+        self.game_summary.setVisible(not show)
 
     def _disconnect(self) -> None:
-        if (
-            QMessageBox.question(
-                self,
-                player_text("launcher.ui", "disconnect_session"),
-                player_text("launcher.ui", "disconnect_from_this_room"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            != QMessageBox.StandardButton.Yes
-        ):
-            return
         try:
             self.controller.disconnect()
             self.stop_button.setEnabled(False)
         except Exception as error:
-            self._append_log(player_text("launcher.app_window", "stop_error_value_0", value_0=f"{error}"))
+            self._append_log('Stop error: {value_0}'.format(value_0=f'{error}'))
 
     def _uninstall_room_package(self) -> None:
         if not self._room_connected:
@@ -1187,15 +1224,15 @@ class LauncherUI(QMainWindow):
             self.help_view.uninstall_button.setEnabled(self._room_connected)
             self.help_view.doctor_room_status.setText(player_text("launcher.ui", "uninstall_failed"))
             self.help_view.doctor_room_evidence.setText(
-                player_text("launcher.ui", "close_doom_eternal_and_retry_if_it_fails_again_select_help_save")
-            )
-            self._append_log(player_text("launcher.app_window", "room_package_uninstall_failed"))
+            player_text("launcher.ui", "close_doom_eternal_and_retry_if_it_fails_again_select_help_save")
+        )
+            self._append_log('Room package uninstall failed.')
 
     def _ap_save_actions(self) -> None:
         try:
             self.controller.request_ap_save_inspection()
         except (OSError, RuntimeError, ValueError) as error:
-            QMessageBox.warning(self, player_text("launcher.ui", "ap_save_fe0c41"), str(error))
+            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
 
     def _ap_save_dialog(self, inspection, guidance):
         choices = [
@@ -1207,7 +1244,7 @@ class LauncherUI(QMainWindow):
             player_text("launcher.app_window", "new_doom_save_in_this_room"),
         ]
         dialog = QInputDialog(self)
-        dialog.setWindowTitle(player_text("launcher.ui", "ap_save_fe0c41"))
+        dialog.setWindowTitle(player_text('common', 'ap_save'))
         dialog.setLabelText(
             (
                 player_text(
@@ -1219,7 +1256,7 @@ class LauncherUI(QMainWindow):
                 + ""
                 + "\n"
                 + player_text("launcher.app_window", "save_files")
-                + player_text("launcher.ui", "value_0", value_0=f"{inspection['status'].replace('_', ' ')}")
+                + '{value_0}'.format(value_0=f"{inspection['status'].replace('_', ' ')}")
                 + ""
                 + "\n"
                 + ""
@@ -1297,14 +1334,12 @@ class LauncherUI(QMainWindow):
             else:
                 self._restore_ap_backup_dialog()
         except Exception as error:
-            QMessageBox.warning(self, player_text("launcher.ui", "ap_save_fe0c41"), str(error))
+            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
 
     def _restore_ap_backup_dialog(self):
         backups = self.controller.ap_backups()
         if not backups:
-            raise RuntimeError(
-                player_text("launcher.app_window", "no_backup_matches_this_room_create_a_backup_while_playing_this_r")
-            )
+            raise PlayerError('launcher.app_window', 'no_backup_matches_this_room_create_a_backup_while_playing_this_r')
         basename, accepted = QInputDialog.getItem(
             self,
             player_text("launcher.ui", "restore_ap_save"),
@@ -1340,7 +1375,7 @@ class LauncherUI(QMainWindow):
             ("item", "specific_item"),
         )
         dialog = QInputDialog(self)
-        dialog.setWindowTitle(player_text("launcher.ui", "repair_inventory_5e9bed"))
+        dialog.setWindowTitle(player_text('common', 'repair_inventory'))
         dialog.setLabelText(player_text("launcher.ui", "repair_scope"))
         dialog.setComboBoxItems([player_text("launcher.support", key) for _, key in choices])
         combo = dialog.findChild(QComboBox)
@@ -1361,7 +1396,7 @@ class LauncherUI(QMainWindow):
             }
             selected, accepted = QInputDialog.getItem(
                 self,
-                player_text("launcher.ui", "repair_inventory_5e9bed"),
+                player_text('common', 'repair_inventory'),
                 player_text("launcher.ui", "persistent_item"),
                 sorted(items),
                 0,
@@ -1380,26 +1415,17 @@ class LauncherUI(QMainWindow):
                 player_text("launcher.ui", "inventory_repair_unavailable_select_help_save_support_report")
             )
             self._append_log(
-                player_text("launcher.app_window", "inventory_resync_request_failed_value_0", value_0=f"{error}")
+                'Inventory resync request failed: {value_0}'.format(value_0=f'{error}')
             )
 
     def _prepare(self, *, force: bool = False) -> None:
         if not self._room_connected:
-            self._append_log(player_text("launcher.app_window", "connect_to_a_room_before_preparing_its_mod"))
+            self._append_log('Connect to a room before preparing its mod.')
             return
         if self._setup_state in {"installing", "updating"}:
-            self._append_log(player_text("launcher.app_window", "room_mod_setup_is_already_active"))
+            self._append_log('Room mod setup is already active.')
             return
         generation = self.controller.operation_generation
-        if (
-            QMessageBox.question(
-                self,
-                player_text("launcher.ui", "install_room_mod"),
-                player_text("launcher.ui", "build_and_install_the_mod_for_this_room"),
-            )
-            != QMessageBox.StandardButton.Yes
-        ):
-            return
         try:
             started = (
                 self.controller.reinstall_setup(generation=generation)
@@ -1407,11 +1433,11 @@ class LauncherUI(QMainWindow):
                 else self.controller.prepare_setup(generation=generation)
             )
             if not started:
-                self._append_log(player_text("launcher.app_window", "setup_is_already_active_or_room_is_unavailable"))
+                self._append_log('Setup is already active or room is unavailable.')
                 return
             self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
         except Exception as error:
-            self._append_log(player_text("launcher.app_window", "setup_error_value_0", value_0=f"{error}"))
+            self._append_log('Setup error: {value_0}'.format(value_0=f'{error}'))
             self._set_setup_state(self._room_package_issue_state({"code": getattr(error, "code", None)}))
 
     @staticmethod
@@ -1452,10 +1478,13 @@ class LauncherUI(QMainWindow):
         request_id = str(event.get("request_id", ""))
         if not request_id or request_id in self._resolved_consent_requests:
             self._append_log(
-                player_text("launcher.app_window", "ignored_duplicate_or_invalid_dependency_consent_request")
+                'Ignored duplicate or invalid dependency consent request.'
             )
             return
         self._resolved_consent_requests.add(request_id)
+        if self._dependency_request is not None:
+            self.controller.resolve_consent(request_id, False)
+            return
         name = str(event.get("name") or player_text("launcher.app_window", "required_download"))
         version = str(event.get("version") or player_text("launcher.app_window", "version_not_provided"))
         purpose = str(event.get("purpose") or player_text("launcher.app_window", "finish_room_setup"))
@@ -1471,23 +1500,27 @@ class LauncherUI(QMainWindow):
             player_text("launcher.app_window", "the_launcher_checks_this_download_before_using_it"),
         ]
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle(player_text("launcher.ui", "download_required_tool"))
-        dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setText(player_text("launcher.ui", "download_value_0", value_0=f"{name}"))
-        dialog.setInformativeText("\n\n".join(details))
-        accept = dialog.addButton("Download", QMessageBox.ButtonRole.AcceptRole)
-        dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        accepted = False
+        self._dependency_request = (request_id, name)
         try:
-            dialog.exec()
-            accepted = dialog.clickedButton() is accept
+            title = player_text("launcher.ui", "download_value_0", value_0=f"{name}")
+            self.help_view.download_details.setText("\n\n".join((title, *details)))
+            self.help_view.download_prompt.show()
+            self._show_page(4)
+            self.help_view.ensureWidgetVisible(self.help_view.download_prompt)
         except Exception as error:
             self._append_log(
-                player_text("launcher.app_window", "dependency_consent_dialog_failed_value_0", value_0=f"{error}")
+                'Dependency consent dialog failed: {value_0}'.format(value_0=f'{error}')
             )
-        finally:
-            self.controller.resolve_consent(request_id, accepted)
+            self._answer_dependency_consent(False)
+
+    def _answer_dependency_consent(self, accepted):
+        request = self._dependency_request
+        self._dependency_request = None
+        self.help_view.download_prompt.hide()
+        if request is None:
+            return
+        request_id, name = request
+        self.controller.resolve_consent(request_id, accepted)
         if not accepted:
             self._set_setup_state(
                 "failed",
@@ -1511,11 +1544,7 @@ class LauncherUI(QMainWindow):
         if value:
             path = Path(value).expanduser().resolve()
             if path.name != "proton" or not path.is_file():
-                raise ValueError(
-                    player_text(
-                        "launcher.app_window", "select_the_file_named_proton_inside_the_proton_version_used_by_d"
-                    )
-                )
+                raise PlayerError('launcher.app_window', 'select_the_file_named_proton_inside_the_proton_version_used_by_d')
             value = str(path)
         if self.controller.config.get("proton_executable") != (value or None):
             self.controller.save_config({"proton_executable": value or None})
@@ -1524,7 +1553,7 @@ class LauncherUI(QMainWindow):
         try:
             self._persist_proton()
         except (OSError, ValueError, RuntimeError) as error:
-            QMessageBox.warning(self, player_text("launcher.ui", "proton_program_004d43"), str(error))
+            QMessageBox.warning(self, player_text("launcher.ui", "proton_program_004d43"), self._operation_failure('install_core', error))
 
     def _browse_proton(self) -> None:
         value, _ = QFileDialog.getOpenFileName(
@@ -1541,6 +1570,7 @@ class LauncherUI(QMainWindow):
         self._show_page(1)
         if self.proton_executable is not None:
             self.proton_executable.setFocus(Qt.FocusReason.OtherFocusReason)
+            self._toggle_paths(force=True)
             self._browse_proton()
 
     def _browse_saves(self) -> None:
@@ -1592,7 +1622,7 @@ class LauncherUI(QMainWindow):
                 value_2=f"{slot}",
             )
         )
-        self._set_connection_badge(player_text("launcher.ui", "connected"), True)
+        self._set_connection_badge(player_text('common', 'connected'), True)
         self.player_team.setText(player_text("launcher.ui", "team_value_0", value_0=f"{team}"))
         self.player_slot.setText(
             player_text("launcher.ui", "player_number_value_0_value_1", value_0=f"{slot}", value_1=f"{player}")
@@ -1617,21 +1647,22 @@ class LauncherUI(QMainWindow):
             (
                 player_text("launcher.app_window", "player"),
                 player_text(
-                    "launcher.ui",
-                    "value_0_team_value_1_player_number_value_2",
-                    value_0=f"{player}",
-                    value_1=f"{team}",
-                    value_2=f"{slot}",
-                ),
+                "launcher.ui",
+                "value_0_team_value_1_player_number_value_2",
+                value_0=f"{player}",
+                value_1=f"{team}",
+                value_2=f"{slot}",
+            ),
             ),
             ("Server", endpoint),
             ("Goal", goal),
             ("Campaign", campaign),
-            (player_text("launcher.app_window", "logic_difficulty"), logic),
+            (player_text('common', 'logic_difficulty'), logic),
         )
         self.room_summary.setText(
             "<br>".join((f"<b>{html.escape(label.upper())}</b> &nbsp; {html.escape(value)}" for label, value in fields))
         )
+        self.help_view.room_card.show()
 
     def _room_option_value(self, slot_data: dict[object, object], key: str, fallback: str) -> str:
         if key not in slot_data:
@@ -1656,6 +1687,7 @@ class LauncherUI(QMainWindow):
         dialog.setWindowTitle(player_text("launcher.ui", "room_settings"))
         dialog.resize(640, 480)
         layout = QVBoxLayout(dialog)
+        layout.setSpacing(12)
         layout.addWidget(self._label(player_text("launcher.ui", "room_settings_fff13c"), "section"))
         options = QPlainTextEdit()
         options.setReadOnly(True)
@@ -1684,7 +1716,7 @@ class LauncherUI(QMainWindow):
         try:
             self.controller.send_chat(text)
         except Exception as error:
-            self._append_log(player_text("launcher.app_window", "command_error_value_0", value_0=f"{error}"))
+            self._append_log('Command error: {value_0}'.format(value_0=f'{error}'))
             return
         self._chat_pending_text = text
         self._set_chat_enabled(False)
@@ -1693,6 +1725,10 @@ class LauncherUI(QMainWindow):
         ready = enabled and self._chat_pending_text is None
         self.command_input.setEnabled(ready)
         self.command_send.setEnabled(ready)
+        message = player_text("launcher.play", "connect_chat") if not enabled else ""
+        self.command_input.setPlaceholderText(message or player_text("launcher.ui", "send_a_message_or_server_command"))
+        self.command_input.setToolTip(message)
+        self.command_send.setToolTip(message)
 
     def _render_hints(self, event: dict[str, object]) -> None:
         records = event.get("hints")
@@ -1723,13 +1759,13 @@ class LauncherUI(QMainWindow):
                 str(
                     record.get(
                         "receiving_player_name",
-                        record.get("receiving_player", player_text("launcher.app_window", "player_text")),
+                        record.get("receiving_player", '?'),
                     )
                 ),
                 str(
                     record.get(
                         "finding_player_name",
-                        record.get("finding_player", player_text("launcher.app_window", "player_text")),
+                        record.get("finding_player", '?'),
                     )
                 ),
             )
@@ -1758,10 +1794,10 @@ class LauncherUI(QMainWindow):
             if QApplication.clipboard().text() != value:
                 self.copy_launch_option_button.setText(player_text("launcher.ui", "copy_failed"))
                 self._append_log(
-                    player_text("launcher.app_window", "steam_launch_option_could_not_be_verified_on_clipboard")
+                    'Steam launch option could not be verified on clipboard.'
                 )
                 return
-            self._append_log(player_text("launcher.app_window", "steam_launch_option_copied"))
+            self._append_log('Steam launch option copied.')
             self.copy_launch_option_button.setText(player_text("launcher.ui", "copied"))
             QTimer.singleShot(1800, lambda: self.copy_launch_option_button.setText(player_text("launcher.ui", "copy")))
 
@@ -1772,7 +1808,7 @@ class LauncherUI(QMainWindow):
         dialog.setModal(True)
         dialog.setMinimumWidth(440)
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(26, 24, 26, 22)
+        layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
         layout.addWidget(self._label(player_text("launcher.ui", "setup_complete"), "title"))
         layout.addWidget(
@@ -1816,7 +1852,7 @@ class LauncherUI(QMainWindow):
         try:
             dialog.save_draft()
         except (OSError, ValueError) as error:
-            self._append_log(player_text("launcher.app_window", "report_draft_value_0", value_0=f"{error}"))
+            self._append_log('Report draft: {value_0}'.format(value_0=f'{error}'))
 
     def _report_problem(self) -> None:
         self.controller.request_problem_report(logs=self.help_view.log.toPlainText().splitlines())
@@ -1834,6 +1870,8 @@ class LauncherUI(QMainWindow):
         self.controller.request_doctor(preview=True)
 
     def _present_repair_preview(self, actions, generation) -> None:
+        self._repair_preview_request = None
+        self.help_view.repair_preview.hide()
         if not actions:
             self.help_view.doctor_action.setText(
                 player_text("launcher.ui", "no_automatic_repair_is_available_if_the_problem_continues_select")
@@ -1842,7 +1880,7 @@ class LauncherUI(QMainWindow):
         action = actions[0]
         prompt = "".join(
             (
-                player_text("launcher.ui", "value_0", value_0=f"{action['title']}"),
+                '{value_0}'.format(value_0=f"{action['title']}"),
                 "\n",
                 "",
                 "\n",
@@ -1857,17 +1895,33 @@ class LauncherUI(QMainWindow):
                 player_text("launcher.ui", "recovery_options_value_0", value_0=f"{action['rollback']}"),
             )
         )
-        if (
-            QMessageBox.question(self, player_text("launcher.ui", "apply_repair"), prompt)
-            != QMessageBox.StandardButton.Yes
-        ):
+        self._repair_preview_request = (action["action_id"], generation)
+        self.help_view.repair_changes.setText(prompt)
+        self.help_view.repair_preview.show()
+
+    def _apply_repair_preview(self):
+        if self.help_view.repair_preview.isHidden():
             return
-        if self.controller.request_repair(action["action_id"], generation=generation):
+        request = self._repair_preview_request
+        self._repair_preview_request = None
+        self.help_view.repair_preview.hide()
+        if request is not None and self.controller.request_repair(request[0], generation=request[1]):
             self.help_view.doctor_action.setText(player_text("launcher.ui", "repairing"))
+
+    def _clear_pending_confirmations(self):
+        self._manual_installation_generation = None
+        self._repair_preview_request = None
+        self.help_view.repair_preview.hide()
+        self.help_view.download_prompt.hide()
+        request = self._dependency_request
+        self._dependency_request = None
+        if request is not None:
+            self.controller.resolve_consent(request[0], False)
 
     def _sync_items_room(self, event):
         kind = event.get("type")
         if kind in {"connected", "connecting", "disconnected"}:
+            self._clear_pending_confirmations()
             self._capability_request = None
             self._installation_request = None
             self.install_yes.hide()
@@ -1961,32 +2015,37 @@ class LauncherUI(QMainWindow):
             str(self.controller.config.get("special_toggle_keybind", "F10")), default="F10"
         )
         self.special_toggle_keybind.changed.connect(self._save_special_toggle_keybind)
-        self.killsanity_counter_visible = QCheckBox(player_text("launcher.settings", "killsanity"))
+        self.killsanity_counter_visible = ToggleSwitch(player_text("launcher.settings", "killsanity"))
         self.killsanity_counter_visible.setChecked(
             self.controller.config.get("killsanity_counter_visible", True) is True
         )
         self.killsanity_counter_visible.toggled.connect(self._save_killsanity_counter_visible)
         self.death_link_grace = QSpinBox()
-        self.death_link_grace.setRange(0, 2147483647)
+        self.death_link_grace.setRange(0, 99)
+        self.death_link_grace.setFixedWidth(56)
         self.death_link_grace.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.death_link_grace.setAlignment(Qt.AlignmentFlag.AlignCenter)
         grace_control = QWidget()
         self.grace_control = grace_control
-        grace_control.setMaximumWidth(200)
+        grace_control.setObjectName("stepper")
+        grace_control.setFixedSize(128, 36)
         grace_layout = QHBoxLayout(grace_control)
         grace_layout.setContentsMargins(0, 0, 0, 0)
+        grace_layout.setSpacing(0)
         decrease, increase = (
-            QPushButton(player_text("launcher.ui", "symbol_afba24")),
-            QPushButton(player_text("launcher.ui", "symbol_a318c2")),
+            QPushButton("\N{MINUS SIGN}"),
+            QPushButton('+'),
         )
         for button, action, label in (
             (decrease, self.death_link_grace.stepDown, player_text("launcher.ui", "decrease_deaths_per_deathlink")),
             (increase, self.death_link_grace.stepUp, player_text("launcher.ui", "increase_deaths_per_deathlink")),
         ):
-            button.setFixedWidth(34)
+            button.setFixedSize(36, 36)
             button.setAccessibleName(label)
             button.clicked.connect(action)
         grace_layout.addWidget(decrease)
+        decrease.setObjectName("stepDown")
+        increase.setObjectName("stepUp")
         grace_layout.addWidget(self.death_link_grace, 1)
         grace_layout.addWidget(increase)
         self.death_link_grace.setValue(int(self.controller.config.get("death_link_grace", 0)))
@@ -2005,12 +2064,14 @@ class LauncherUI(QMainWindow):
         self.player_ammo_refills.setObjectName("ammoRefillIndicator")
         self.player_ammo_refills.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         ammo_layout = QHBoxLayout(self.player_ammo_refills)
-        ammo_layout.setContentsMargins(8, 5, 8, 5)
-        ammo_layout.setSpacing(5)
-        ammo_layout.addWidget(self._label(player_text("launcher.ui", "ammo_refill"), "ammoRefillTitle"))
+        ammo_layout.setContentsMargins(0, 0, 0, 0)
+        ammo_layout.setSpacing(8)
+        ammo_layout.addWidget(self._label(player_text('common', 'ammo_refill'), "ammoRefillTitle"))
         self.ammo_refill_pips = _AmmoRefillPips()
         ammo_layout.addWidget(self.ammo_refill_pips, 1)
         self.ammo_refill_key = self._label("", "ammoRefillKey")
+        self.ammo_refill_key.setFixedSize(20, 20)
+        self.ammo_refill_key.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ammo_layout.addWidget(self.ammo_refill_key)
         ammo_block_layout.addWidget(self.player_ammo_refills)
         self.ammo_refill_button = QPushButton(player_text("launcher.ui", "use_ammo_refill"))
@@ -2025,32 +2086,36 @@ class LauncherUI(QMainWindow):
         self.session_setup = self._card("actionStrip")
         self.session_setup.setProperty("actionTone", "warning")
         setup_layout = QVBoxLayout(self.session_setup)
-        setup_layout.setContentsMargins(12, 8, 12, 8)
-        setup_layout.setSpacing(10)
-        setup_copy = QVBoxLayout()
-        setup_copy.setSpacing(2)
-        self.session_setup_title = self._label(player_text("launcher.ui", "room_mod"), "stateName")
+        setup_layout.setContentsMargins(0, 0, 0, 0)
+        setup_layout.setSpacing(12)
+        setup_copy = QHBoxLayout()
+        setup_copy.setSpacing(12)
+        self.session_setup_title = self._label(player_text('common', 'room_mod'), "stateName")
         self.session_setup_detail = self._label(
             player_text("launcher.ui", "connect_to_a_room_to_check_its_mod"), "muted"
         )
-        setup_copy.addWidget(self.session_setup_title)
-        setup_copy.addWidget(self.session_setup_detail)
+        setup_layout.addWidget(self.session_setup_title)
+        self.session_setup_title.hide()
+        setup_copy.addWidget(self.session_setup_detail, 1)
+        self.setup_elapsed = self._label("", "muted")
+        setup_copy.addWidget(self.setup_elapsed)
         setup_layout.addLayout(setup_copy)
         setup_buttons = QHBoxLayout()
+        setup_buttons.setSpacing(12)
         self.session_manual_complete_action = QPushButton(player_text("launcher.ui", "i_completed_manual_installation"))
         self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
         self.session_manual_complete_action.setVisible(False)
         self.session_manual_retry_action = QPushButton(player_text("launcher.setup", "install_again"))
         self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
         self.session_manual_retry_action.setVisible(False)
-        self.session_setup_action = _ScanlineButton(player_text("launcher.ui", "install_room_package"))
+        self.session_setup_action = _ScanlineButton(player_text('common', 'install_room_mod'))
         self.session_setup_action.setObjectName("primary")
         self.session_setup_action.clicked.connect(self._run_setup_action)
         self.reinstall_button = self.session_setup_action
         setup_buttons.addWidget(self.session_manual_complete_action)
         setup_buttons.addWidget(self.session_manual_retry_action)
         setup_buttons.addWidget(self.session_setup_action)
-        self.session_setup_help = QPushButton(player_text("launcher.ui", "check_setup"))
+        self.session_setup_help = QPushButton(player_text('common', 'check_setup'))
         self.session_setup_help.clicked.connect(self._show_progress_help)
         self.session_setup_help.setVisible(False)
         setup_buttons.addWidget(self.session_setup_help)
@@ -2068,7 +2133,7 @@ class LauncherUI(QMainWindow):
     def _setup_presentation(self, state):
         presentations = {
             "disconnected": (
-                player_text("launcher.ui", "room_mod"),
+                player_text('common', 'room_mod'),
                 player_text("launcher.ui", "connect_to_a_room_to_check_its_mod"),
                 "",
                 False,
@@ -2079,12 +2144,12 @@ class LauncherUI(QMainWindow):
                 player_text("launcher.ui", "checking_the_installed_mod"),
                 player_text("launcher.ui", "checking_74fde8"),
                 False,
-                player_text("launcher.ui", "connected"),
+                player_text('common', 'connected'),
             ),
             "install_needed": (
-                player_text("launcher.ui", "install_room_package"),
+                player_text('common', 'install_room_mod'),
                 player_text("launcher.ui", "install_this_room_s_package_before_playing"),
-                player_text("launcher.ui", "install_room_package"),
+                player_text('common', 'install_room_mod'),
                 True,
                 player_text("launcher.ui", "action_needed"),
             ),
@@ -2217,7 +2282,7 @@ class LauncherUI(QMainWindow):
             self.proton_executable.setToolTip(
                 player_text("launcher.ui", "selected_proton_value_0", value_0=f"{proton['tool']}")
                 + "\n"
-                + player_text("launcher.ui", "value_1", value_1=f"{proton['executable']}")
+                + '{value_1}'.format(value_1=f"{proton['executable']}")
             )
         if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
             if event["meathook_ok"]:
@@ -2229,14 +2294,16 @@ class LauncherUI(QMainWindow):
                     "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                 )
                 if self._setup_state != target_state:
-                    self._set_setup_state(target_state, event["meathook_message"])
+                    self._append_log(str(event["meathook_message"]))
+                    self._set_setup_state(target_state, failure_text("install_core", event))
                 return
         elif self._setup_state == "ready" and (not event["meathook_ok"]):
             self._native_health_presentation = None
             target_state = (
                 "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
             )
-            self._set_setup_state(target_state, event["meathook_message"])
+            self._append_log(str(event["meathook_message"]))
+            self._set_setup_state(target_state, failure_text("install_core", event))
             return
 
     def _present_event(self, event: dict[str, object]) -> None:
@@ -2254,26 +2321,19 @@ class LauncherUI(QMainWindow):
             self._render_setup_progress()
         except Exception as error:
             self._append_log(
-                player_text(
-                    "launcher.app_window",
-                    "ui_lifecycle_presentation_failed_for_value_0_value_1_value_2",
-                    value_0=f"{kind}",
-                    value_1=f"{type(error).__name__}",
-                    value_2=f"{error}",
-                )
+                'UI lifecycle presentation failed for {value_0}: {value_1}: {value_2}'.format(value_0=f'{kind}', value_1=f'{type(error).__name__}', value_2=f'{error}')
             )
         try:
             self._activity_event(event)
         except Exception as error:
             self._append_log(
-                player_text(
-                    "launcher.app_window",
-                    "ui_activity_presentation_failed_for_value_0_value_1_value_2",
-                    value_0=f"{kind}",
-                    value_1=f"{type(error).__name__}",
-                    value_2=f"{error}",
-                )
+                'UI activity presentation failed for {value_0}: {value_1}: {value_2}'.format(value_0=f'{kind}', value_1=f'{type(error).__name__}', value_2=f'{error}')
             )
+
+    def _ammo_refill_message(self, event, status):
+        if status in {"error", "blocked"}:
+            return self._operation_failure("ammo_refill", event)
+        return str(event.get("message") or player_text("launcher.app_window", "ammo_refill_update"))
 
     def _activity_event(self, event: dict[str, object]) -> None:
         kind = str(event.get("type", "event"))
@@ -2287,7 +2347,10 @@ class LauncherUI(QMainWindow):
         selected_row = self.activity.currentRow()
         selected_col = max(0, self.activity.currentColumn())
         row = 0
+        self.activity_empty.hide()
+        self.activity.show()
         self.activity.insertRow(row)
+        self.activity.setRowHeight(row, 40)
         self.activity.setItem(row, 0, QTableWidgetItem(datetime.now().strftime("%H:%M:%S")))
         signal = QTableWidgetItem(segment)
         signal.setForeground(QBrush(QColor(color)))
@@ -2319,30 +2382,30 @@ class LauncherUI(QMainWindow):
         """Project whitelisted player events into Activity; diagnostics stay in Log."""
         kind = str(event.get("type", ""))
         if kind == "archipelago":
-            return player_text("launcher.support", "activity_archipelago"), self.COLORS["doom_hot"], ""
+            return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], ""
         if kind == "chat_sent":
             message = str(event.get("text", "")).strip()
-            return (player_text("launcher.support", "activity_chat"), self.COLORS["ap"], message) if message else None
+            return (player_text('common', 'chat'), self.COLORS["ap"], message) if message else None
         if kind == "deathlink":
             detail = str(
                 event.get("message") or event.get("cause") or player_text("launcher.app_window", "deathlink_received")
             )
-            return player_text("launcher.support", "activity_deathlink"), self.COLORS["warn"], detail[:512]
+            return player_text('common', 'deathlink'), self.COLORS["warn"], detail[:512]
         if kind in {"item", "location"}:
             detail = str(
                 event.get("message") or event.get("plain") or player_text("launcher.app_window", "archipelago_update")
             )
-            return player_text("launcher.support", "activity_archipelago"), self.COLORS["ap"], detail[:512]
+            return player_text('common', 'archipelago'), self.COLORS["ap"], detail[:512]
         if kind == "ammo_refill":
             status = str(event.get("status", ""))
             if status not in {"used", "empty", "blocked", "error"}:
                 return None
-            detail = str(event.get("message") or player_text("launcher.app_window", "ammo_refill_update"))
-            return player_text("launcher.support", "activity_archipelago"), self.COLORS["doom_hot"], detail[:512]
+            detail = self._ammo_refill_message(event, status)
+            return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], detail[:512]
         if kind == "setup_ready":
             return (
                 player_text("launcher.support", "activity_installation"),
-                self.COLORS["good"],
+                self.COLORS["accent"],
                 player_text("launcher.app_window", "installation_complete"),
             )
         if kind == "room_install_state":
@@ -2383,30 +2446,33 @@ class LauncherUI(QMainWindow):
         return "".join(rendered) or html.escape(plain)
 
     def _render_core_update(self, event) -> None:
-        if event.get("state") == "skipped":
+        state = event.get("state")
+        if state == "skipped":
             return
-        message = (
-            player_text("launcher.ui", "game_connection_files_selected")
-            if event.get("type") == "core_runtime_selected"
-            else event.get("message", "")
-        )
-        self.help_view.core_status.setText(str(message))
+        if state in {"failed", "error", "deferred", "unavailable"}:
+            message = self._operation_failure("install_core", event)
+        elif event.get("type") == "core_runtime_selected":
+            message = player_text("launcher.ui", "game_connection_files_selected")
+        elif state in {"checking", "checked", "downloading"}:
+            message = str(event.get("message", ""))
+        else:
+            self._append_log(str(event.get("message", "")))
+            message = player_text("launcher.ui", "game_connection_files_download_during_setup")
+        self.help_view.core_status.setText(message)
+        self.help_view.core_status.setVisible(bool(message))
+
 
     def _log_installation_failure(self, event, stdout, stderr):
         self._append_log(
             str(
                 event.get("message")
-                or player_text(
-                    "launcher.installation_adapters",
-                    "installation_failed_at_injector_exit_code_value_0_select_help_sa",
-                    value_0=f"{event.get('returncode')}",
-                )
+                or 'Installation failed at injector: exit code {value_0}. Select Help -> SAVE SUPPORT REPORT.'.format(value_0=f"{event.get("returncode")}")
             )
         )
         if stdout:
-            self._append_log(player_text("launcher.app_window", "injector_stdout_value_0", value_0=f"{stdout[-500:]}"))
+            self._append_log('Injector stdout: {value_0}'.format(value_0=f'{stdout[-500:]}'))
         if stderr:
-            self._append_log(player_text("launcher.app_window", "injector_stderr_value_0", value_0=f"{stderr[-500:]}"))
+            self._append_log('Injector stderr: {value_0}'.format(value_0=f'{stderr[-500:]}'))
 
     def _handle_event(self, event: dict[str, object]) -> None:
         self._append_session_event(event)
@@ -2486,10 +2552,8 @@ class LauncherUI(QMainWindow):
         return
 
     def _on_support_bundle_failed(self, event):
-        self._append_log(
-            player_text("launcher.app_window", "support_bundle_error_value_0", value_0=f"{event.get('message', '')}")
-        )
-        return
+        self.help_view.doctor_action.setText(self._operation_failure("report", event))
+
 
     def _on_problem_report_ready(self, event):
         self._present_problem_report(event)
@@ -2497,7 +2561,7 @@ class LauncherUI(QMainWindow):
 
     def _on_ap_backup_result(self, event):
         self._append_log(str(event["message"]))
-        QMessageBox.information(self, player_text("launcher.ui", "ap_save_fe0c41"), str(event["message"]))
+        QMessageBox.information(self, player_text('common', 'ap_save'), str(event["message"]))
         return
 
     def _on_ap_save_inspection(self, event):
@@ -2507,21 +2571,17 @@ class LauncherUI(QMainWindow):
         return
 
     def _on_ap_save_error(self, event):
-        QMessageBox.warning(self, player_text("launcher.ui", "ap_save_fe0c41"), str(event["message"]))
-        return
+        QMessageBox.warning(self, player_text("common", "ap_save"), self._operation_failure("saves", event))
+
 
     def _on_problem_report_submitted(self, event):
-        self._append_log(player_text("launcher.app_window", "problem_report_submitted") + event["url"])
+        self._append_log('Problem report submitted: ' + event["url"])
         QMessageBox.information(self, player_text("launcher.ui", "report_submitted"), event["url"])
         return
 
     def _on_problem_report_retry(self, event):
-        message = (
-            player_text("launcher.ui", "the_launcher_could_not_confirm_that_the_report_was_sent_retry_th")
-            + event["message"]
-        )
-        self._append_log(message)
-        return
+        self.help_view.doctor_action.setText(self._operation_failure("report", event))
+
 
     def _on_integration_status(self, event):
         self._render_native_health(event)
@@ -2536,21 +2596,10 @@ class LauncherUI(QMainWindow):
         return
 
     def _on_doctor_failed(self, event):
-        if event.get("preview"):
-            self._append_log(
-                player_text(
-                    "launcher.app_window", "repair_preview_error_value_0", value_0=f"{event.get('message', '')}"
-                )
-            )
-        else:
-            self.help_view.doctor_status.setText(player_text("launcher.ui", "setup_check_could_not_run"))
-            self.help_view.doctor_evidence.setText(
-                player_text("launcher.ui", "setup_could_not_be_checked_try_again_or_save_a_support_report")
-            )
-            self._append_log(
-                player_text("launcher.app_window", "setup_check_error_value_0", value_0=f"{event.get('message', '')}")
-            )
-        return
+        message = self._operation_failure("repair" if event.get("preview") else "check", event)
+        self.help_view.doctor_status.setText(player_text("launcher.ui", "setup_check_could_not_run"))
+        self.help_view.doctor_evidence.setText(message)
+
 
     def _on_integration_repair_result(self, event):
         if event.get("success", False):
@@ -2566,23 +2615,20 @@ class LauncherUI(QMainWindow):
 
     def _on_ui_repair_result(self, event):
         self.help_view.core_auto_update.setChecked(bool(self.controller.config.get("core_auto_update", True)))
-        msg = str(event.get("message", ""))
-        self.help_view.doctor_action.setText(msg)
-        if not event.get("success", False):
-            self._append_log(msg)
-        return
+        self._append_log(str(event.get("message", "")))
+        message = (player_text("launcher.ui", "setup_complete") if event.get("success", False)
+                   else self._operation_failure("repair", event))
+        self.help_view.doctor_action.setText(message)
+
 
     def _on_log(self, event):
         self._append_log(str(event.get("message", "")))
         return
 
     def _on_native_client_start_failed(self, event):
-        QMessageBox.warning(
-            self,
-            str(event.get("title") or player_text("launcher.controller", "game_connection_could_not_start")),
-            str(event.get("message") or player_text("launcher.app_window", "select_help_save_support_report")),
-        )
-        return
+        QMessageBox.warning(self, player_text("launcher.controller", "game_connection_could_not_start"),
+                            self._operation_failure("install_core", event))
+
 
     def _on_item_history_status(self, event):
         message = str(event.get("message", ""))
@@ -2612,11 +2658,7 @@ class LauncherUI(QMainWindow):
         if isinstance(available, int):
             self._set_ammo_refill_indicator(available)
         self._append_log(
-            player_text(
-                "launcher.app_window",
-                "ammo_refill_value_0",
-                value_0=f"{event.get('message') or event.get('status') or 'session update'}",
-            )
+            'Ammo Refill: {value_0}'.format(value_0=f"{event.get("message") or event.get("status") or 'session update'}")
         )
         return
 
@@ -2624,9 +2666,9 @@ class LauncherUI(QMainWindow):
         state = str(event.get("state", ""))
         key = str(event.get("configured_key", ""))
         if state == "configured" and key:
-            self._append_log(player_text("launcher.ui", "ammo_refill_key_value_0", value_0=f"{key}"))
+            self._append_log('Ammo Refill key: {value_0}'.format(value_0=f'{key}'))
         elif state == "unbound" or not key:
-            self._append_log(player_text("launcher.app_window", "ammo_refill_key_is_not_set"))
+            self._append_log('Ammo Refill key is not set.')
         return
 
     def _on_uninstall_queued(self, event):
@@ -2673,10 +2715,8 @@ class LauncherUI(QMainWindow):
     def _on_uninstall_attention(self, event):
         self.help_view.uninstall_button.setEnabled(self._room_connected)
         self.help_view.doctor_room_status.setText(player_text("launcher.ui", "uninstall_failed"))
-        self.help_view.doctor_room_evidence.setText(
-            player_text("launcher.ui", "close_doom_eternal_and_retry_if_it_fails_again_select_help_save")
-        )
-        return
+        self.help_view.doctor_room_evidence.setText(self._operation_failure("uninstall", event))
+
 
     def _on_connected(self, event):
         self._reconnecting = False
@@ -2704,8 +2744,8 @@ class LauncherUI(QMainWindow):
 
     def _on_chat_send_failed(self, event):
         self._append_log(
-            player_text("launcher.app_window", "command_error")
-            + str(event.get("message", player_text("launcher.app_window", "could_not_send_message")))
+            'Command error: '
+            + str(event.get("message", 'Could not send message.'))
         )
         self._chat_pending_text = None
         self._set_chat_enabled(self._room_connected)
@@ -2718,11 +2758,7 @@ class LauncherUI(QMainWindow):
     def _on_game_link_installed(self, event):
         self._native_health_presentation = None
         self._append_log(
-            player_text(
-                "launcher.app_window",
-                "game_link_runtime_verified_and_installed_value_0",
-                value_0=f"{event.get('path')}",
-            )
+            'Game Link runtime verified and installed: {value_0}'.format(value_0=f"{event.get('path')}")
         )
 
     def _on_room_install_state(self, event):
@@ -2736,8 +2772,8 @@ class LauncherUI(QMainWindow):
             self._clear_drift()
             self.help_view.uninstall_button.setEnabled(False)
             self._set_setup_state(
-                "install_needed", player_text("launcher.ui", "select_install_room_package_before_playing")
-            )
+            "install_needed", player_text("launcher.ui", "select_install_room_package_before_playing")
+        )
         elif state == "already_installed":
             self._installed_room_state(event)
         else:
@@ -2747,7 +2783,7 @@ class LauncherUI(QMainWindow):
         drift = state == "update_required"
         self.drift.setText(
             player_text("launcher.ui", "room_update")
-            + (reason or player_text("launcher.app_window", "this_room_needs_its_matching_mod"))
+            + player_text("launcher.app_window", "this_room_needs_its_matching_mod")
         )
         self.drift.setVisible(drift)
         setup_copy = (
@@ -2789,45 +2825,22 @@ class LauncherUI(QMainWindow):
             self._set_setup_state("ready")
 
     def _show_setup_failure(self, event, message):
+        operation = {"campaign_session": "saves", "room_package": "install_mod",
+                     "installed_room_package": "install_mod"}.get(event.get("failure_domain"), "repair")
+        message = self._operation_failure(operation, event)
         self._reconnecting = False
         self._connection_pending = False
         self._set_connection_controls(True)
         self._set_connection_badge(player_text("launcher.ui", "failed"), False)
-        self._set_home(
-            player_text("launcher.ui", "setup_failed"),
-            message,
-            player_text("launcher.ui", "retry_join"),
-            player_text("launcher.ui", "setup_failed"),
-        )
-        title = str(event.get("user_title") or player_text("launcher.ui", "game_setup_failed"))
-        player_message = str(event.get("user_message") or message)
-        action = str(
-            event.get("user_action")
-            or event.get("recovery_action")
-            or player_text("launcher.app_window", "check_setup_and_try_again")
-        )
-        self.join_error.setText(
-            player_text(
-                "launcher.ui",
-                "value_0_value_1_value_2",
-                value_0=f"{title}",
-                value_1=f"{player_message}",
-                value_2=f"{action}",
-            )
-        )
+        title = player_text("launcher.ui", "game_setup_failed")
+        self._set_home(title, message, player_text("launcher.ui", "retry_join"), title)
+        self.join_error.setText(message)
         self.join_error.show()
         attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
         if attempt_id not in self._shown_connection_error_attempts:
             self._shown_connection_error_attempts.add(attempt_id)
-            QMessageBox.warning(
-                self,
-                title,
-                player_text("launcher.ui", "value_0", value_0=f"{player_message}")
-                + "\n"
-                + ""
-                + "\n"
-                + player_text("launcher.ui", "value_1", value_1=f"{action}"),
-            )
+            QMessageBox.warning(self, title, message)
+
 
     def _on_setup_started(self, event):
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
@@ -2865,7 +2878,7 @@ class LauncherUI(QMainWindow):
             self._append_log(
                 str(
                     event.get(
-                        "message", player_text("launcher.app_window", "setup_failed_open_help_and_select_fix_setup")
+                        "message", 'Setup failed. Open Help and select Fix Setup.'
                     )
                 )
             )
@@ -2875,7 +2888,7 @@ class LauncherUI(QMainWindow):
 
     def _on_manager_started(self, event):
         message = str(
-            event.get("message", player_text("launcher.doctor", "complete_installation_in_eternalmodinjector"))
+            event.get("message", 'Complete installation in EternalModInjector.')
         )
         self._set_setup_state("installing", installer_instruction(windows=os.name == "nt"))
         self._append_log(message)
@@ -2883,9 +2896,9 @@ class LauncherUI(QMainWindow):
     def _on_manager_closed(self, event):
         returncode = event.get("returncode")
         if returncode is not None:
-            self._append_log(player_text("launcher.app_window", "installer_closed"))
+            self._append_log('Installer closed.')
         else:
-            self._append_log(player_text("launcher.app_window", "installer_closed"))
+            self._append_log('Installer closed.')
 
     def _on_uninstall_confirmation_required(self, event):
         request_id = str(event.get("request_id", ""))
@@ -2909,7 +2922,11 @@ class LauncherUI(QMainWindow):
         self.controller.resolve_uninstall_confirmation(request_id, confirmed)
 
     def _on_installation_confirmation_required(self, event):
+        self._manual_installation_generation = None
         self._installation_request = event["request_id"]
+        self._show_installation_confirmation()
+
+    def _show_installation_confirmation(self):
         self.session_setup_detail.setText(player_text("launcher.setup", "confirm_question"))
         self.session_setup.show()
         self.install_yes.show()
@@ -2917,11 +2934,15 @@ class LauncherUI(QMainWindow):
 
     def _answer_installation(self, confirmed):
         request = self._installation_request
+        generation = self._manual_installation_generation
         self._installation_request = None
+        self._manual_installation_generation = None
         self.install_yes.hide()
         self.install_no.hide()
         if request is not None:
             self.controller.resolve_installation_confirmation(request, confirmed)
+        elif confirmed and generation is not None and generation == self.controller.operation_generation:
+            self._complete_manual_installation(generation)
 
     def _on_installation_declined(self, event):
         self._set_setup_state(
@@ -2938,7 +2959,7 @@ class LauncherUI(QMainWindow):
         stdout = str(event.get("stdout", ""))
         stderr = str(event.get("stderr", ""))
         if state == "applied":
-            self._append_log(player_text("launcher.installation_adapters", "installation_finished"))
+            self._append_log('Installation finished.')
         else:
             self._log_installation_failure(event, stdout, stderr)
 
@@ -2961,6 +2982,7 @@ class LauncherUI(QMainWindow):
         self.session_uninstall_button.setEnabled(False)
         self._clear_drift()
         self.room_summary.setText(player_text("launcher.ui", "no_room_connected_join_a_room_to_start_playing"))
+        self.help_view.room_card.hide()
         self._set_setup_state("disconnected")
         self._set_home(
             player_text("launcher.ui", "session_ended"),
@@ -2982,17 +3004,17 @@ class LauncherUI(QMainWindow):
             enabled=True,
         )
         self._append_log(
-            player_text("launcher.app_window", "archipelago_connection_interrupted_automatic_reconnect_remains_a")
+            'Archipelago connection interrupted; automatic reconnect remains active: '
             + str(
                 event.get("technical_message")
                 or event.get("message")
-                or player_text("launcher.connection_errors", "connection_closed")
+                or 'connection closed'
             )
         )
 
     def _on_setup_failed(self, event):
         kind = event["type"]
-        message = str(event.get("message", player_text("launcher.app_window", "unknown_error")))
+        message = str(event.get("message", 'Unknown error'))
         self._append_log(f"{kind}: {message}")
         if not self._room_connected:
             if kind == "error" and event.get("failure_domain") == "archipelago_connection":
@@ -3012,25 +3034,23 @@ class LauncherUI(QMainWindow):
         message = str(event.get("message") or player_text("launcher.app_window", "the_archipelago_connection_failed"))
         action = str(event.get("action") or player_text("launcher.app_window", "check_the_room_details_and_try_again"))
         player_copy = (
-            player_text("launcher.ui", "value_0", value_0=f"{message}")
+            '{value_0}'.format(value_0=f'{message}')
             + "\n"
             + ""
             + "\n"
-            + player_text("launcher.ui", "value_1", value_1=f"{action}")
+            + '{value_1}'.format(value_1=f'{action}')
         )
         self._reconnecting = False
         self._connection_pending = False
         self._set_connection_controls(True)
         self._set_connection_badge(player_text("launcher.ui", "failed"), False)
         self.join_error.setText(
-            player_text(
-                "launcher.ui", "value_0_value_1_value_2", value_0=f"{title}", value_1=f"{message}", value_2=f"{action}"
-            )
+            '{value_0}. {value_1} {value_2}'.format(value_0=f'{title}', value_1=f'{message}', value_2=f'{action}')
         )
         self.join_error.show()
         self._set_home(
             title.upper(),
-            player_text("launcher.ui", "value_0_value_1", value_0=f"{message}", value_1=f"{action}"),
+            '{value_0} {value_1}'.format(value_0=f'{message}', value_1=f'{action}'),
             player_text("launcher.ui", "retry_join"),
             player_text("launcher.ui", "connection_failed"),
         )
@@ -3038,6 +3058,11 @@ class LauncherUI(QMainWindow):
         if attempt_id not in self._shown_connection_error_attempts:
             self._shown_connection_error_attempts.add(attempt_id)
             QMessageBox.warning(self, title, player_copy)
+
+    def _operation_failure(self, operation, error):
+        technical = record_failure(self.controller, operation, error)
+        self._append_log(f"{operation}: {technical}")
+        return failure_text(operation, error)
 
     def _append_log(self, text: str) -> None:
         sanitized = redact_secrets(text).replace("\r", " ").strip()
@@ -3065,7 +3090,7 @@ class LauncherUI(QMainWindow):
             value = event.get(key)
             if value not in (None, ""):
                 details.append(f"{key}={value}")
-        self._append_log(f"{datetime.now().strftime('%H:%M:%S')} {kind}: {' | '.join(details) or 'received'}")
+        self._append_log(f"{datetime.now().strftime("%H:%M:%S")} {kind}: {' | '.join(details) or 'received'}")
 
     def _load_icon(self) -> None:
         icon = self.controller.bundle_dir / "assets/launcher/EternalAP.ico"
@@ -3133,5 +3158,5 @@ class LauncherUI(QMainWindow):
                     user.SendMessageW(int(self.winId()), 0x80, size, icon)
         app = QApplication.instance()
         if app is None:
-            raise RuntimeError(player_text("launcher.app_window", "launcherui_requires_qapplication"))
+            raise RuntimeError('LauncherUI requires QApplication')
         app.exec()

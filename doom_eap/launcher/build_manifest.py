@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import PurePosixPath
 
-from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.save_decrypt import _aes_gcm_decrypt, _aes_gcm_encrypt
 
 _KEYS = tuple(bytes.fromhex(value) for value in (
@@ -18,7 +17,7 @@ _CHUNK = 1024 * 1024
 
 def decode_manifest(data):
     if len(data) < 92:
-        raise ValueError(player_text('launcher.build_manifest', 'truncated_build_manifest'))
+        raise ValueError('Truncated build manifest')
     for key in _KEYS:
         try:
             plaintext = _aes_gcm_decrypt(key, data[:12], data[12:-80], data[-80:-64], _AAD)
@@ -26,9 +25,9 @@ def decode_manifest(data):
             continue
         document = json.loads(plaintext)
         if not isinstance(document, dict) or not isinstance(document.get("files"), dict):
-            raise ValueError(player_text('launcher.build_manifest', 'invalid_build_manifest_file_table'))
+            raise ValueError('Invalid build manifest file table')
         return document, key
-    raise ValueError(player_text('launcher.build_manifest', 'build_manifest_authentication_failed'))
+    raise ValueError('Build manifest authentication failed')
 
 
 def register_resource_manifest(base, banks, updates, report, obsolete=(), *, bank_paths=None):
@@ -41,7 +40,7 @@ def register_resource_manifest(base, banks, updates, report, obsolete=(), *, ban
     for name in banks:
         parts = PurePosixPath(name)
         if parts.is_absolute() or ".." in parts.parts or "\\" in name or ":" in name:
-            raise ValueError(player_text('launcher.build_manifest', 'invalid_generated_resource_bank_path'))
+            raise ValueError('Invalid generated resource bank path')
         sizes[name] = banks[name]['size']
     changed = False
     for name in obsolete:
@@ -50,7 +49,7 @@ def register_resource_manifest(base, banks, updates, report, obsolete=(), *, ban
             changed = True
     for name, size in sizes.items():
         if size <= 0:
-            raise ValueError(player_text('launcher.build_manifest', 'empty_installed_resource_file'))
+            raise ValueError('Empty installed resource file')
         with _manifest_stream(base, name, banks, updates, bank_paths) as stream:
             hashes = [hashlib.new(document["hash"], chunk).hexdigest()
                       for chunk in iter(lambda: stream.read(_CHUNK), b"")]

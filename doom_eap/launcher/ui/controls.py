@@ -6,8 +6,10 @@ from typing import ClassVar, cast
 
 from PySide6.QtCore import (
     QEasingCurve,
+    QEvent,
     QPointF,
     QPropertyAnimation,
+    QRectF,
     Qt,
     Signal,
 )
@@ -16,6 +18,7 @@ from PySide6.QtGui import (
     QFontMetrics,
     QKeyEvent,
     QPainter,
+    QPalette,
     QPen,
     QPolygonF,
 )
@@ -23,25 +26,26 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
-    QPushButton,
     QScrollArea,
     QSizePolicy,
-    QSlider,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
-    QToolButton,
+    QStyle,
+    QStyleOptionButton,
+    QStyleOptionFrame,
     QVBoxLayout,
     QWidget,
 )
 
 from ..launcher_controller import normalize_ammo_refill_keybind
+from .doom_style import DoomButton, DoomFrame, animations_enabled
+from .option_grid import ColumnFlow, ListCheckBox, stepper
+from .strings import option_text
 from .strings import text as player_text
+
+QPushButton = DoomButton
 
 
 def _simple_physical_key_token(event: QKeyEvent) -> str | None:
@@ -75,24 +79,108 @@ def _simple_physical_key_token(event: QKeyEvent) -> str | None:
     }.get(key)
 
 
-class _AmmoRefillKeyEdit(QLineEdit):
+class ToggleSwitch(QCheckBox):
+    def __init__(self, label=""):
+        super().__init__(label)
+        self.setObjectName("switch")
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        option = QStyleOptionButton()
+        self.initStyleOption(option)
+        rect = QRectF(self.style().subElementRect(QStyle.SubElement.SE_CheckBoxIndicator, option, self))
+        colors = self.window().COLORS
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor(colors["accent" if self.isChecked() else "line"]), 1))
+        painter.setBrush(QColor(colors["accent"]) if self.isChecked() else Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), 9, 9)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(colors["ink" if self.isChecked() else "muted"]))
+        painter.drawEllipse(QRectF(rect.x() + (21 if self.isChecked() else 3), rect.y() + 3, 12, 12))
+
+
+class ElidedLabel(QLabel):
+    def __init__(self, value="", name=""):
+        super().__init__()
+        self.setObjectName(name)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setWordWrap(False)
+        self.setText(value)
+
+    def setText(self, value):
+        self.setToolTip(value)
+        self._elide()
+
+    def _elide(self):
+        super().setText(self.fontMetrics().elidedText(self.toolTip(), Qt.TextElideMode.ElideMiddle, self.width()))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._elide()
+
+
+class ElidedPath(QLineEdit):
+    def __init__(self, value=""):
+        super().__init__(value)
+        self.setReadOnly(True)
+        self.setToolTip(value)
+        self.textChanged.connect(self.setToolTip)
+
+    def paintEvent(self, event):
+        option = QStyleOptionFrame()
+        self.initStyleOption(option)
+        painter = QPainter(self)
+        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_PanelLineEdit, option, painter, self)
+        area = self.contentsRect().adjusted(8, 0, -8, 0)
+        painter.setPen(self.palette().color(QPalette.ColorRole.Text))
+        painter.drawText(area, Qt.AlignmentFlag.AlignVCenter,
+                         self.fontMetrics().elidedText(self.text(), Qt.TextElideMode.ElideMiddle, area.width()))
+
+
+class _AmmoRefillKeyEdit(QPushButton):
     captured = Signal(str)
     rejected = Signal(str)
 
     def __init__(self, value: str):
         super().__init__()
-        self.setReadOnly(True)
+        self.capturing = False
+        self.setFixedWidth(140)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.clicked.connect(self._capture)
         self.set_value(value)
 
     def set_value(self, value: str) -> None:
         self._value = normalize_ammo_refill_keybind(value)
+        self.capturing = False
         self.setText(self._value or player_text("launcher.app_window", "not_set"))
 
     def value(self) -> str:
         return self._value
 
+    def _capture(self):
+        self.capturing = True
+        self.setText(player_text("launcher.settings", "press_key"))
+        self.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def focusOutEvent(self, event):
+        self.set_value(self._value)
+        super().focusOutEvent(event)
+
+    def event(self, event):
+        if event.type() == QEvent.Type.KeyPress and self.capturing:
+            self.keyPressEvent(event)
+            return True
+        return super().event(event)
+
     def keyPressEvent(self, event: QKeyEvent) -> None:
+        if not self.capturing:
+            super().keyPressEvent(event)
+            return
+        if event.key() == Qt.Key.Key_Escape:
+            self.set_value(self._value)
+            event.accept()
+            return
         token = _simple_physical_key_token(event)
         if token is None:
             self.rejected.emit(
@@ -100,8 +188,7 @@ class _AmmoRefillKeyEdit(QLineEdit):
             )
             event.accept()
             return
-        self._value = token
-        self.setText(token)
+        self.set_value(token)
         self.captured.emit(token)
         event.accept()
 
@@ -140,57 +227,14 @@ class _AmmoRefillPips(QWidget):
                 ]
             )
             active = self._available is not None and index < self._available
-            painter.setPen(QColor("#c7ef82") if active else QColor("#4a543c"))
-            painter.setBrush(QColor("#9cdc4a") if active else QColor("#182019"))
+            colors = self.window().COLORS
+            painter.setPen(QColor(colors["accent"] if active else colors["line"]))
+            painter.setBrush(QColor(colors["accent"] if active else colors["panel2"]))
             painter.drawPolygon(shape)
 
 
-class _ScanlineFrame(QFrame):
-    """Panel background with a static, clipped green-and-ink scan texture."""
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        bounds = self.contentsRect().adjusted(1, 1, -1, -1)
-        if bounds.width() < 32 or bounds.height() < 18:
-            return
-        painter = QPainter(self)
-        painter.setClipRect(bounds)
-        dpr = self.devicePixelRatioF()
-        spacing = max(4.0, 7.0 / dpr)
-        pen = QPen(QColor(133, 185, 83, 15))
-        pen.setWidthF(1.0 / dpr)
-        painter.setPen(pen)
-        y = float(bounds.top()) + spacing * 0.5
-        while y < bounds.bottom():
-            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.right(), y - 1.5 / dpr))
-            y += spacing
-        pen.setColor(QColor(0, 0, 0, 18))
-        painter.setPen(pen)
-        y = float(bounds.top()) + spacing
-        while y < bounds.bottom():
-            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.right(), y - 1.5 / dpr))
-            y += spacing
-
-
-class _ScanlineButton(QPushButton):
-    """Primary-action button with a quiet, non-text scanline edge."""
-
-    def paintEvent(self, event) -> None:
-        super().paintEvent(event)
-        bounds = self.contentsRect().adjusted(3, 3, -3, -3)
-        if bounds.width() < 20 or bounds.height() < 14:
-            return
-        painter = QPainter(self)
-        painter.setClipRect(bounds.left(), bounds.top(), min(6, bounds.width()), bounds.height())
-        dpr = self.devicePixelRatioF()
-        pen = QPen(QColor(15, 37, 17, 38))
-        pen.setWidthF(1.0 / dpr)
-        painter.setPen(pen)
-        spacing = max(4.0, 6.0 / dpr)
-        y = float(bounds.top()) + spacing * 0.5
-        while y < bounds.bottom():
-            painter.drawLine(QPointF(bounds.left(), y), QPointF(bounds.left() + 7, y - 1.0 / dpr))
-            y += spacing
+_ScanlineFrame = DoomFrame
+_ScanlineButton = DoomButton
 
 
 class AmmoRefillKeyControl(QWidget):
@@ -201,32 +245,40 @@ class AmmoRefillKeyControl(QWidget):
 
     def __init__(self, value: str = "F9", *, default: str = "F9"):
         super().__init__()
+        self.default = default
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(7)
+        layout.setSpacing(8)
         self.editor = _AmmoRefillKeyEdit(value)
         self.editor.setToolTip(
             player_text("launcher.ui", "press_one_key_ctrl_alt_shift_and_numpad_keys_cannot_be_assigned")
         )
         self.editor.captured.connect(self._emit_value)
         self.editor.rejected.connect(self.rejected)
-        clear = QPushButton(player_text("launcher.ui", "clear"))
+        clear = QPushButton(player_text('common', 'clear'))
         clear.clicked.connect(self._clear)
         reset = QPushButton(player_text("launcher.ui", "reset"))
+        self.reset = reset
+        clear.setObjectName("link")
+        reset.setObjectName("link")
         reset.clicked.connect(lambda: self.set_value(default, emit=True))
-        layout.addWidget(self.editor, 1)
+        layout.addWidget(self.editor)
         layout.addWidget(clear)
         layout.addWidget(reset)
+        layout.addStretch()
+        self.reset.setVisible(value != default)
 
     def value(self) -> str:
         return self.editor.value()
 
     def set_value(self, value: str, *, emit: bool = False) -> None:
         self.editor.set_value(value)
+        self.reset.setVisible(self.value() != self.default)
         if emit:
             self._emit_value()
 
     def _emit_value(self) -> None:
+        self.reset.setVisible(self.value() != self.default)
         self.changed.emit(self.value())
 
     def _clear(self) -> None:
@@ -234,29 +286,35 @@ class AmmoRefillKeyControl(QWidget):
         self._emit_value()
 
 
-class _OptionCategory(QFrame):
+class _OptionCategory(DoomFrame):
     """Keyboard-accessible category with a short, interruptible reveal."""
 
     def __init__(self, title: str, *, expanded: bool = True):
         super().__init__()
         self.setObjectName("card")
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 14, 20, 14)
-        self.toggle = QToolButton()
+        layout.setSpacing(12)
+        layout.setContentsMargins(16, 16, 16, 16)
+        heading = QHBoxLayout()
+        heading.setSpacing(4)
+        self.arrow = QLabel('▾' if expanded else '▸')
+        self.arrow.setObjectName("muted")
+        self.arrow.setFixedWidth(12)
+        self.toggle = QPushButton()
         self.toggle.setText(title.replace("&", "&&"))
         self.toggle.setCheckable(True)
         self.toggle.setChecked(expanded)
-        self.toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
-        self.toggle.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.toggle.setStyleSheet(
-            "QToolButton { color: #e9a64b; font-weight: 800; padding: 7px; text-align: left; } QToolButton:focus { border: 1px solid #e9a64b; }"
-        )
-        layout.addWidget(self.toggle)
+        self.toggle.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.toggle.setObjectName("optionCategory")
+        heading.addWidget(self.toggle)
+        heading.addWidget(self.arrow)
+        heading.addStretch()
+        layout.addLayout(heading)
         self.body = QWidget()
+        self.body.setObjectName("optionBody")
         self.contents = QVBoxLayout(self.body)
         self.contents.setContentsMargins(0, 8, 0, 0)
-        self.contents.setSpacing(9)
+        self.contents.setSpacing(12)
         layout.addWidget(self.body)
         self.body.setVisible(expanded)
         self.animation = QPropertyAnimation(self.body, b"maximumHeight", self)
@@ -267,7 +325,12 @@ class _OptionCategory(QFrame):
 
     def _toggle(self, expanded: bool) -> None:
         self.animation.stop()
-        self.toggle.setArrowType(Qt.ArrowType.DownArrow if expanded else Qt.ArrowType.RightArrow)
+        if not animations_enabled(self):
+            self.arrow.setText('▾' if expanded else '▸')
+            self.body.setVisible(expanded)
+            self.body.setMaximumHeight(16777215)
+            return
+        self.arrow.setText('▾' if expanded else '▸')
         current = self.body.height() if self.body.isVisible() else 0
         self.body.setVisible(True)
         self.animation.setStartValue(current)
@@ -289,27 +352,19 @@ class NamedRangeControl(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        layout.setSpacing(4)
         self.special = QComboBox()
         self.special.addItem(player_text("launcher.ui", "exact_value"), None)
         self.special_values: dict[str, object] = {}
         for special in cast(list[dict[str, object]], option["special_values"]):
             key = str(special["key"])
             self.special_values[key] = special.get("value")
-            self.special.addItem(str(special["label"]), key)
+            self.special.addItem(option_text(option["key"], "choice", str(special["label"]), choice_key=key), key)
         layout.addWidget(self.special)
-        self.numeric_row = QWidget()
-        row = QHBoxLayout(self.numeric_row)
-        row.setContentsMargins(0, 0, 0, 0)
-        self.slider = QSlider(Qt.Orientation.Horizontal)
         self.spin = QSpinBox()
-        self.slider.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
         self.spin.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
-        row.addWidget(self.slider, 1)
-        row.addWidget(self.spin)
+        self.numeric_row = stepper(self.spin)
         layout.addWidget(self.numeric_row)
-        self.slider.valueChanged.connect(self.spin.setValue)
-        self.spin.valueChanged.connect(self.slider.setValue)
         self.spin.valueChanged.connect(self.valueChanged)
         self.special.currentIndexChanged.connect(self._special_changed)
         self.special.currentIndexChanged.connect(self.valueChanged)
@@ -319,19 +374,17 @@ class NamedRangeControl(QWidget):
         key = self.special.currentData()
         if key is None:
             self.numeric_row.show()
-            self.slider.setEnabled(True)
             self.spin.setEnabled(True)
             return
         value = self.special_values.get(str(key))
         displayable = (
             isinstance(value, int)
             and not isinstance(value, bool)
-            and self.slider.minimum() <= value <= self.slider.maximum()
+            and self.spin.minimum() <= value <= self.spin.maximum()
         )
         self.numeric_row.setVisible(displayable)
         if displayable:
             self.spin.setValue(cast(int, value))
-        self.slider.setEnabled(False)
         self.spin.setEnabled(False)
 
     def value(self) -> int | str:
@@ -349,102 +402,99 @@ class NamedRangeControl(QWidget):
 
 
 class DictionaryControl(QWidget):
-    """Edit explicit catalog values; absent entries use Auto."""
+    """Keep explicit values distinct from Auto while arranging entries by column."""
 
     valueChanged = Signal()
 
-    def __init__(self, option: dict[str, object]):
+    def __init__(self, option, *, selected_only=False):
         super().__init__()
-        self.entries = {entry["key"]: entry for entry in option["entries"]}
+        self.entries = {
+            entry["key"]: {**entry, "label": option_text(option.get("key", ""), "choice", entry["label"],
+                                                        choice_key=entry["key"])}
+            for entry in option["entries"]
+        }
         self.range_bounds = {"minimum", "maximum", "early_minimum", "early_maximum", "late_minimum", "late_maximum"}
         self.is_attribute = self.range_bounds <= self.entries.keys()
+        self.selected_only = selected_only
+        self._values = {}
+        self.fields = {}
+        self.rows = {}
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        controls = QHBoxLayout()
-        self.picker = QComboBox()
+        self.flow = ColumnFlow()
+        layout.addWidget(self.flow)
+        self.clear = QPushButton(player_text('common', 'clear'))
+        self.clear.setObjectName("link")
+        self.clear.setProperty("compact", True)
+        self.clear.clicked.connect(self._clear)
+        self.header_actions = (self.clear,)
         for key, entry in self.entries.items():
-            self.picker.addItem(str(entry["label"]), key)
-        self.amount = QSpinBox()
-        self.picker.currentIndexChanged.connect(self._select_entry)
-        apply = QPushButton(player_text("launcher.ui", "set_value"))
-        apply.clicked.connect(self._set_entry)
-        controls.addWidget(self.picker, 1)
-        controls.addWidget(self.amount)
-        controls.addWidget(apply)
-        layout.addLayout(controls)
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(
-            [player_text("launcher.items", "item"), player_text("launcher.ui", "value")]
-        )
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.verticalHeader().hide()
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.table.setFixedHeight(150)
-        layout.addWidget(self.table)
-        remove = QPushButton(player_text("launcher.ui", "reset_selected_to_auto"))
-        remove.clicked.connect(self._remove_entry)
-        layout.addWidget(remove)
+            self._add_entry(key, entry)
         self.setValue(option["default"])
 
-    def _select_entry(self, _index: int = 0) -> None:
-        key = self.picker.currentData()
-        entry = self.entries[key]
-        self.amount.setRange(entry["minimum"], entry["maximum"])
-        self.amount.setValue(self.value().get(key, entry["minimum"]))
+    def _add_entry(self, key, entry):
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        name = ElidedLabel(str(entry["label"]))
+        name.setToolTip(str(entry["label"]))
+        layout.addWidget(name, 1)
+        spin = QSpinBox()
+        spin.setRange(entry["minimum"] - 1, entry["maximum"])
+        spin.setSpecialValueText(player_text('common', 'auto'))
+        spin.setAccessibleName(str(entry["label"]))
+        spin.valueChanged.connect(lambda value, key=key: self._changed(key, value))
+        layout.addWidget(stepper(spin, compact=True))
+        self.fields[key] = spin
+        self.rows[key] = row
+        self.flow.add_entry(row)
 
-    def _set_entry(self) -> None:
+    def _changed(self, key, value):
         values = self.value()
-        key = self.picker.currentData()
+        if value < self.entries[key]["minimum"]:
+            self._remove_value(values, key)
+        else:
+            self._set_entry(values, key, value)
+        self.setValue(values)
+        self.valueChanged.emit()
+
+    def _set_entry(self, values, key, value):
         if self.is_attribute:
             species, separator, bound = key.rpartition(".")
             prefix = f"{species}." if separator else ""
             bound = bound if separator else key
-            active = (
-                {"minimum", "maximum"}
-                if bound in {"minimum", "maximum"}
-                else self.range_bounds - {"minimum", "maximum"}
-            )
+            active = {"minimum", "maximum"} if bound in {"minimum", "maximum"} else self.range_bounds - {"minimum", "maximum"}
             for other in self.range_bounds - active:
                 values.pop(prefix + other, None)
             for other in active:
-                values.setdefault(prefix + other, self.amount.value())
-        values[key] = self.amount.value()
-        self.setValue(values)
-        self.valueChanged.emit()
+                values.setdefault(prefix + other, value)
+        values[key] = value
 
-    def _remove_entry(self) -> None:
-        row = self.table.currentRow()
-        if row < 0:
-            return
-        values = self.value()
-        key = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+    def _remove_value(self, values, key):
         if self.is_attribute:
             species, separator, _bound = key.rpartition(".")
             prefix = f"{species}." if separator else ""
             for bound in self.range_bounds:
                 values.pop(prefix + bound, None)
         else:
-            values.pop(key)
-        self.setValue(values)
+            values.pop(key, None)
+
+    def _clear(self):
+        self.setValue({})
         self.valueChanged.emit()
 
-    def value(self) -> dict[str, int]:
-        return {
-            self.table.item(row, 0).data(Qt.ItemDataRole.UserRole): int(self.table.item(row, 1).text())
-            for row in range(self.table.rowCount())
-        }
+    def value(self):
+        return dict(self._values)
 
-    def setValue(self, values: dict[str, int]) -> None:
-        self.table.setRowCount(0)
-        for key, value in values.items():
-            row = self.table.rowCount()
-            self.table.insertRow(row)
-            item = QTableWidgetItem(str(self.entries[key]["label"]))
-            item.setData(Qt.ItemDataRole.UserRole, key)
-            self.table.setItem(row, 0, item)
-            self.table.setItem(row, 1, QTableWidgetItem(str(value)))
-        self._select_entry()
+    def setValue(self, values):
+        self._values = dict(values)
+        for key, spin in self.fields.items():
+            blocked = spin.blockSignals(True)
+            spin.setValue(values.get(key, self.entries[key]["minimum"] - 1))
+            spin.blockSignals(blocked)
+            self.rows[key].setVisible(not self.selected_only or key in values)
+        self.flow.reflow()
 
 
 class OptionSetControl(QWidget):
@@ -484,56 +534,52 @@ class OptionSetControl(QWidget):
         self._unavailable: set[str] = set()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
+        layout.setSpacing(8)
         actions = QHBoxLayout()
+        actions.setSpacing(12)
         select_all = QPushButton(player_text("launcher.ui", "select_all"))
         select_all.clicked.connect(lambda: self._set_all(True))
-        clear = QPushButton(player_text("launcher.ui", "clear"))
+        clear = QPushButton(player_text('common', 'clear'))
         clear.clicked.connect(lambda: self._set_all(False))
-        actions.addWidget(select_all)
-        actions.addWidget(clear)
-        actions.addStretch(1)
-        layout.addLayout(actions)
-        self.grid = QGridLayout()
-        self.grid.setHorizontalSpacing(12)
-        self.grid.setVerticalSpacing(5)
+        for button in (select_all, clear):
+            button.setObjectName("link")
+            button.setProperty("compact", True)
+        self.header_actions = (select_all, clear)
+        self.flow = ColumnFlow()
+        self.grid = self.flow.grid
         default = option.get("default", [])
         selected = set(default) if isinstance(default, list) else set()
-        for index, choice in enumerate(cast(list[object], option.get("choices", []))):
+        for choice in cast(list[object], option.get("choices", [])):
             if not isinstance(choice, dict):
                 continue
             key = choice.get("key")
-            check = QCheckBox(str(choice.get("label", key)))
+            check = ListCheckBox(option_text(option["key"], "choice", str(choice.get("label", key)), choice_key=key))
             check.setObjectName("requirementOption")
             check.setToolTip(self.TOOLTIPS.get(str(key), ""))
             check.setChecked(key in selected)
-            self.grid.addWidget(check, index, 0)
+            self.flow.add_entry(check)
             self.checks.append((key, check))
         if option.get("key") in {"local_items", "non_local_items"}:
             search = QLineEdit()
             search.setPlaceholderText(player_text("launcher.ui", "find_an_item"))
             search.textChanged.connect(
-                lambda text: [check.setVisible(text.casefold() in check.text().casefold()) for _, check in self.checks]
+                self._filter
             )
             layout.addWidget(search)
-            contents = QWidget()
-            contents.setLayout(self.grid)
             scroll = QScrollArea()
+            scroll.setFrameShape(QFrame.Shape.NoFrame)
             scroll.setWidgetResizable(True)
-            scroll.setWidget(contents)
+            scroll.setWidget(self.flow)
             scroll.setFixedHeight(240)
             layout.addWidget(scroll)
         else:
-            layout.addLayout(self.grid)
+            layout.addWidget(self.flow)
         self._refresh_lock_state()
 
-    def resizeEvent(self, event) -> None:
-        columns = 2 if self.width() >= 650 else 1
-        if columns != getattr(self, "_columns", None):
-            self._columns = columns
-            for index, (_, check) in enumerate(self.checks):
-                self.grid.addWidget(check, index // columns, index % columns)
-        super().resizeEvent(event)
+    def _filter(self, text):
+        for _, check in self.checks:
+            check.setVisible(text.casefold() in check.text().casefold())
+        self.flow.reflow()
 
     def set_dependencies(self, locked: set[str], unavailable: set[str]) -> None:
         """Mark requirements implied by the Goal (locked) or absent from the room."""
@@ -549,7 +595,7 @@ class OptionSetControl(QWidget):
             check.setEnabled(not locked and not unavailable)
             check.setProperty("goalLocked", locked)
             prefix = self.LOCKED_PREFIX if locked else self.UNAVAILABLE_PREFIX if unavailable else ""
-            check.setToolTip(prefix + self.TOOLTIPS.get(name, ""))
+            check.setToolTip(prefix + check.text() + "\n" + self.TOOLTIPS.get(name, ""))
             style = check.style()
             style.unpolish(check)
             style.polish(check)
@@ -589,6 +635,6 @@ def _scroll(widget: QWidget) -> QScrollArea:
 
 
 def _card(name: str = "card") -> QFrame:
-    card = _ScanlineFrame() if name in {"hero", "actionStrip", "effectiveConfig"} else QFrame()
+    card = DoomFrame()
     card.setObjectName(name)
     return card

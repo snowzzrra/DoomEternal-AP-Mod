@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from ..ui.strings import text
+from ..ui.strings import failure_text, text
 
 
 @dataclass(frozen=True)
@@ -12,6 +12,7 @@ class DiagnosticsModel:
     summary: str
     action: str
     technical_lines: tuple[str, ...]
+    can_fix: bool = False
 
 
 class DiagnosticsPresenter:
@@ -31,8 +32,8 @@ class DiagnosticsPresenter:
         if any(status in bad for status in statuses):
             return text("launcher.support", "needs_attention")
         if any(status in {"ok", "ready", "passed", "present", "applied"} for status in statuses):
-            return text("launcher.support", "ready")
-        return text("launcher.support", "not_required" if statuses else "not_checked")
+            return text('common', 'ready')
+        return (text('launcher.support', 'not_required') if statuses else text("launcher.support", "not_checked"))
 
     @classmethod
     def present(cls, report, *, failure, connected, room_issue):
@@ -47,24 +48,33 @@ class DiagnosticsPresenter:
         summary = cls.summary(groups, failure, connected)
         ready = bool(report.get("ok")) and not failure
         return DiagnosticsModel(
-            text("launcher.ui", "game_setup_ready" if ready else "game_setup_needs_attention"),
-            "good" if ready else "warn",
+            (text('common', 'ready') if ready else text("launcher.support", "needs_attention")),
+            "accent" if ready else "warn",
             "\n".join(summary),
             cls.action(failure, room_issue, ready),
             tuple(technical),
+            not ready,
         )
+
+    @staticmethod
+    def room_status(state):
+        if state == "ready":
+            return text('common', 'ready'), "accent"
+        if state in {"package_incompatible", "package_failed", "install_needed", "update_required", "failed"}:
+            return text("launcher.support", "needs_attention"), "warn"
+        return text("launcher.support", "not_checked"), "muted"
 
     @classmethod
     def summary(cls, groups, failure, connected):
-        summary = [f"{text('launcher.support', key)}: {cls.state(statuses)}" for key, statuses in groups.items()]
+        summary = [f"{text(*{'game': ('common', 'game_title'), 'room_mod': ('common', 'room_mod'), 'ap_save': ('common', 'ap_save')}.get(key, ('launcher.support', key)))}: {cls.state(statuses)}" for key, statuses in groups.items()]
         if failure:
             key = "ap_save" if failure.get("failure_domain") == "campaign_session" else "setup"
-            summary.append(f"{text('launcher.support', key)}: {text('launcher.support', 'needs_attention')}")
+            summary.append(f"{text(*{'game': ('common', 'game_title'), 'room_mod': ('common', 'room_mod'), 'ap_save': ('common', 'ap_save')}.get(key, ('launcher.support', key)))}: {text("launcher.support", "needs_attention")}")
         summary.append(
             text(
                 "launcher.support",
                 "current_room",
-                state=text("launcher.support", "connected" if connected else "not_connected"),
+                state=(text('common', 'connected') if connected else text('launcher.support', 'not_connected')),
             )
         )
         return summary
@@ -72,10 +82,8 @@ class DiagnosticsPresenter:
     @staticmethod
     def action(failure, room_issue, ready):
         if failure:
-            return failure.get("user_message") or text("launcher.support", "save_before_retry")
+            operation = "saves" if failure.get("failure_domain") == "campaign_session" else "repair"
+            return failure_text(operation, failure)
         if room_issue:
             return text("launcher.ui", "open_session_and_select_rebuild_room_package")
-        return text(
-            "launcher.ui",
-            "you_are_ready_to_play" if ready else "select_fix_setup_if_it_fails_again_select_help_save_support_repo",
-        )
+        return (text('launcher.ui', 'you_are_ready_to_play') if ready else text('launcher.ui', 'select_fix_setup_if_it_fails_again_select_help_save_support_repo'))

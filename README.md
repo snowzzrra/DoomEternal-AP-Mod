@@ -126,54 +126,57 @@ For development, read [Content and builds](docs/DEVELOPMENT.md) and
 
 ### Changing a text
 
-Every message the player sees, in the launcher or in the game, is in one file:
-[`data/player_strings.json`](data/player_strings.json). The messages are grouped by
-where they show up, like `notifications`, `deathlink` or `launcher.settings`.
-
-A message looks like this:
+Every message the player sees, in the launcher or in the game, lives in
+[`data/strings/`](data/strings/). There is one file per language:
+[`en.json`](data/strings/en.json) has every message in English, and
+[`pt-BR.json`](data/strings/pt-BR.json) has the ones translated to Brazilian Portuguese.
+Each line is one message:
 
 ```json
-"major_item_received": {
-  "parameters": {"item": "str"},
-  "en": "{item} RECEIVED",
-  "pt-BR": "{item} RECEBIDO"
-}
+"notifications.major_item_received": "{item} RECEIVED",
 ```
 
-To change what a message says, edit its text and send a pull request.
+The part before the colon says where the message shows up; the part after is the text.
+To change what a message says, edit the text and send a pull request.
 
 - Words in braces, like `{item}` or `{player}`, are filled in by the game. Keep them
   exactly the same in every language.
-- If you don't know a translation, write `null`. The English text is shown instead.
-- Item, location and player names come from Archipelago, so they aren't in this file.
+- If a message is missing from a translation, the English one is shown instead.
+- Keep the lines in alphabetical order.
+- The English names and descriptions of player options come from the APWorld. To change
+  one, change the option there; the check below tells you when the two don't match.
+- Item, weapon, enemy and mission names aren't in these files. They show as they are in
+  the game.
 
-Before sending, check the file:
+Before sending, update the generated files and check everything:
 
 ```sh
+python -m tools.content.compile_player_strings
 python -m tools.content.compile_player_strings --check
 ```
 
-It tells you if something is wrong, such as a misspelled `{word}` or a text too long
-to fit on the game screen. Developers adding new messages: see
+The check tells you if something is wrong, such as a misspelled `{word}` or a text too
+long to fit on the game screen. Developers adding new messages: see
 [Player text and languages](docs/DEVELOPMENT.md#player-text-and-languages).
 
 ### Adding a language
 
-1. In [`data/player_strings.json`](data/player_strings.json), add your language to
-   `languages` at the top, for example `"fr": {"name": "Français"}`.
-2. Add a `"fr"` line to each message with your translation. Use `null` for any you
-   haven't translated yet; those show in English.
+1. Create `data/strings/<code>.json`, for example `fr.json`, and copy in the lines you
+   want to translate from `en.json`. You don't need all of them at once; the rest show
+   in English.
+2. Add your language to [`data/strings/languages.json`](data/strings/languages.json),
+   for example `{"code": "fr", "name": "Français"}`.
 3. Run the check above.
 4. Open the launcher, click the flag button, pick your language and restart it.
 
-A flag is optional: without one, the button shows the language code (`FR`). If you
-add one, put the SVG in `assets/launcher/flags/`, add `"flag": "fr.svg"` to your
-language, and credit where it came from. Flags must come from a public source with
-a license that allows reuse, like [flag-icons](https://github.com/lipis/flag-icons);
+A flag is optional: without one, the button shows the language code (`FR`). If you add
+one, put the SVG in `assets/launcher/flags/` (for example `fr.svg`), add `"flag": "fr"`
+to your language, and credit where it came from. Flags must come from a public source
+with a license that allows reuse, like [flag-icons](https://github.com/lipis/flag-icons);
 don't use AI-generated images.
 
 The language button changes the launcher only. Text inside the game follows the
-language set in DOOM Eternal.
+language set in DOOM Eternal, and the APWorld's own text stays in English.
 
 Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
 

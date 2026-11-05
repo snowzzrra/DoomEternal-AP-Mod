@@ -14,14 +14,14 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
-    QMessageBox,
 )
 
 from doom_eap.content.enemy_options import enemy_options_for_editing, normalize_enemy_options
-from doom_eap.content.enemy_species import enemy_speed_capabilities, speed_capability_notice
+from doom_eap.content.enemy_species import enemy_speed_capabilities
 
 from .controls import (
     OptionSetControl,
+    _label,
 )
 from .strings import text as player_text
 
@@ -62,6 +62,7 @@ class PlayerOptions:
                 cast(QComboBox, control).currentIndexChanged.connect(self._refresh_create_dependencies)
 
     def _wire_warnings(self):
+        self.randomization_warnings = {}
         requirements = self.view.option_controls.get("additional_victory_requirements")
         if isinstance(requirements, OptionSetControl):
             for _, check in requirements.checks:
@@ -70,10 +71,12 @@ class PlayerOptions:
             control = self.view.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 checkbox = cast(QCheckBox, control)
-                self.view._warning_state[key] = checkbox.isChecked()
-                checkbox.toggled.connect(
-                    lambda checked, option_key=key: self._confirm_randomization(option_key, checked)
-                )
+                message = "before_finding_dash_some_routes_require_bunny_hopping_or_ballist" if key == "randomize_dash" else "hell_on_earth_starts_early_ammo_will_be_scarce_until_you_find_th"
+                warning = _label(player_text("launcher.ui", message), "warning")
+                self.view.option_rows[key].layout().addWidget(warning, 2, 0, 1, 2)
+                warning.setVisible(checkbox.isChecked())
+                checkbox.toggled.connect(warning.setVisible)
+                self.randomization_warnings[key] = warning
 
     def _wire_enemy(self):
         for key in (*self.view.enemy_option_keys, "killsanity"):
@@ -135,7 +138,7 @@ class PlayerOptions:
         try:
             values = normalize_enemy_options(self.view._option_values())
         except ValueError as error:
-            self.view.enemy_preview.setText(str(error))
+            self.view.enemy_preview.set_error(self.view._file_failure(error))
             return
         self._enemy_preview(values, multiplier)
 
@@ -155,56 +158,26 @@ class PlayerOptions:
         other = sum(weight for _, weight in ranked[2:])
         if other:
             parts.append(player_text("launcher.player_file", "other_value_0", value_0=f"{100 * other / total:.1f}"))
-        mode = (
-            player_text("launcher.player_file", "multiplier_value_0", value_0=f"{values['count_multiplier']}")
-            if multiplier
-            else (
-                "".join(
-                    (
-                        "".join(
-                            (
-                                player_text("launcher.player_file", "auto"),
-                                "\n",
-                                player_text("launcher.player_file", "intensity"),
-                            )
-                        ),
-                        player_text(
-                            "launcher.player_file",
-                            "value_0_value_1",
-                            value_0=f"{values['intensity'][0]}",
-                            value_1=f"{values['intensity'][1]}",
-                        ),
-                        "".join(
-                            (
-                                player_text("launcher.player_file", "player_text"),
-                                "\n",
-                                player_text("launcher.player_file", "density"),
-                            )
-                        ),
-                        player_text("launcher.player_file", "value_0", value_0=f"{values['density']}"),
-                    )
-                )
-            )
-        )
-        pool = (
-            player_text("launcher.player_file", "base_game_enemies")
-            if self._choice_value("use_dlc_content") is False
-            else player_text("launcher.player_file", "base_game_and_dlc_enemies")
-        )
-        self.view.enemy_preview.setText(
-            player_text("launcher.ui", "value_0", value_0=f"{mode}")
-            + "\n"
-            + player_text("launcher.ui", "variety_value_1", value_1=f"{values['variety']}")
-            + "\n"
-            + player_text("launcher.ui", "size_variation_value_2", value_2=f"{values['size_variation_chance']}")
-            + "\n"
-            + player_text("launcher.ui", "value_3", value_3=f"{pool}")
-            + "\n"
-            + player_text("launcher.ui", "enemy_mix_value_4", value_4=f"{', '.join(parts) or 'none'}")
-            + "\n"
-            + ""
-            + speed_capability_notice({key: value["label"] for key, value in names.items()})
-        )
+        mode = player_text("launcher.player_file", "multiplier_value_0", value_0=str(values["count_multiplier"])) if multiplier else player_text('common', 'auto')
+        pool = (player_text('launcher.player_file', 'base_game_enemies') if self._choice_value("use_dlc_content") is False else player_text('launcher.player_file', 'base_game_and_dlc_enemies'))
+        self.view.enemy_preview.render({
+            "mode": mode,
+            "intensity": '{early}% → {late}%'.format(early=str(values["intensity"][0]), late=str(values["intensity"][1])),
+            "density": '{value}%'.format(value=str(values["density"])),
+            "variety": '{value}%'.format(value=str(values["variety"])),
+            "size_variation": '{value}%'.format(value=str(values["size_variation_chance"])),
+            "content": pool,
+            "mix": ", ".join(parts) or player_text("launcher.enemy_preview", "none"),
+            "speed": self._speed_preview(names),
+        })
+
+    @staticmethod
+    def _speed_preview(names):
+        supported = [names.get(key, {"label": key.replace("_", " ").title()})["label"]
+                     for key, status in enemy_speed_capabilities().items() if status == "qualified"]
+        if supported:
+            return player_text("launcher.enemy_preview", "speed_supported", species=", ".join(supported))
+        return player_text('common', 'enemy_speed_fixed')
 
     def _refresh_difficulty_skull(self) -> None:
         key = str(self._choice_value("campaign_difficulty"))
@@ -271,6 +244,7 @@ class PlayerOptions:
             requirements = self._refresh_requirements(dlc_missions)
             self._refresh_effective_config(dlc_enabled, requirements)
             self._refresh_enemy_dependencies()
+            self._refresh_randomization_warnings()
         finally:
             self.view._syncing_create_dependencies = False
 
@@ -278,32 +252,9 @@ class PlayerOptions:
         control = self.view.option_controls.get(key)
         return cast(QComboBox, control).currentText() if isinstance(control, QComboBox) else "—"
 
-    def _confirm_randomization(self, key: str, checked: bool) -> None:
-        previous = self.view._warning_state.get(key, False)
-        self.view._warning_state[key] = checked
-        if not checked or previous:
-            return
-        if key == "randomize_dash":
-            title = player_text("launcher.ui", "randomize_dash")
-            message = player_text("launcher.ui", "before_finding_dash_some_routes_require_bunny_hopping_or_ballist")
-        else:
-            title = player_text("launcher.ui", "randomize_chainsaw")
-            message = player_text("launcher.ui", "hell_on_earth_starts_early_ammo_will_be_scarce_until_you_find_th")
-        answer = QMessageBox.question(
-            self.view,
-            title,
-            message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            control = self.view.option_controls.get(key)
-            if isinstance(control, QCheckBox):
-                checkbox = cast(QCheckBox, control)
-                checkbox.blockSignals(True)
-                checkbox.setChecked(False)
-                checkbox.blockSignals(False)
-            self.view._warning_state[key] = False
+    def _refresh_randomization_warnings(self):
+        for key, warning in self.randomization_warnings.items():
+            warning.setVisible(self.view.option_controls[key].isChecked())
 
     def _refresh_mission_options(self, dlc_enabled):
         pool = self._choice_value("mission_pool")
@@ -360,19 +311,16 @@ class PlayerOptions:
 
     def _refresh_effective_config(self, dlc_enabled, requirements):
         goal_label = self._selected_label("goal")
+        special_control = cast(QComboBox, self.view.option_controls["special_weapon"])
         special_label = (
-            player_text("launcher.player_file", "the_crucible")
+            special_control.itemText(special_control.findData("the_crucible"))
             if not dlc_enabled
             else self._selected_label("special_weapon")
         )
         requirement_count = len(requirements.value()) if isinstance(requirements, OptionSetControl) else 0
         victory_summary = player_text("launcher.player_file", "goal_only")
         if requirement_count:
-            victory_summary = player_text(
-                "launcher.player_file",
-                "extra_objective.one" if requirement_count == 1 else "extra_objective.other",
-                count=requirement_count,
-            )
+            victory_summary = (player_text('launcher.player_file.extra_objective', 'one', count=requirement_count) if requirement_count == 1 else player_text('launcher.player_file.extra_objective', 'other', count=requirement_count))
         values = {
             "goal": goal_label,
             "campaign": self._selected_label("mission_pool") + " · " + self._selected_label("mission_order"),

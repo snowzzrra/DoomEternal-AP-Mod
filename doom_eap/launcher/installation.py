@@ -105,7 +105,7 @@ class InstallationService:
             self._recover_local(plan, journal)
         if not exists or journal.phase in {InstallPhase.ROLLED_BACK, InstallPhase.COMPLETE}:
             if manual:
-                raise InstallationRecoveryRequired(player_text('launcher.installation', 'installation_is_not_awaiting_confirmation'))
+                raise InstallationRecoveryRequired('installation is not awaiting confirmation')
             if exists:
                 try:
                     journal.cleanup()
@@ -129,12 +129,12 @@ class InstallationService:
         if not exists or journal.phase in {InstallPhase.COMPLETE, InstallPhase.ROLLED_BACK}:
             return
         if journal.document["identity"] != plan.identity:
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'installation_belongs_to_another_room_package_or_executable'))
+            raise InstallationRecoveryRequired('installation belongs to another room, package or executable')
 
     @staticmethod
     def _check_confirmation(journal, exists, manual, transaction_id):
         if manual and (not exists or transaction_id != journal.transaction_id):
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'stale_installation_confirmation'))
+            raise InstallationRecoveryRequired('stale installation confirmation')
 
     @staticmethod
     def _resolve_external(journal, retry):
@@ -144,9 +144,9 @@ class InstallationService:
             return
         external = journal.phase is InstallPhase.INJECTING or journal.document["evidence"].get("external_uncertain")
         if not external:
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'external_execution_or_recovery_needs_explicit_inspection'))
+            raise InstallationRecoveryRequired('external execution or recovery needs explicit inspection')
         if not retry:
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'injector_result_is_unknown_re_run_installation'))
+            raise InstallationRecoveryRequired('injector result is unknown; re-run installation')
         recover_external_execution(journal)
         journal.transition(InstallPhase.PREPARED, external_uncertain=False)
         return True
@@ -168,9 +168,9 @@ class InstallationService:
     def _check_inputs(plan):
         expected = plan.identity
         if file_digest(plan.game_root / "DOOMEternalx64vk.exe") != expected["executable_sha256"]:
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'game_executable_changed'))
+            raise InstallationRecoveryRequired('game executable changed')
         if file_digest(plan.generated) != expected["generated_sha256"]:
-            raise InstallationRecoveryRequired(player_text('launcher.installation', 'generated_package_changed'))
+            raise InstallationRecoveryRequired('generated package changed')
 
     def _advance(self, plan, journal, actions, manual, retry):
         if journal.phase is InstallPhase.PREPARING:
@@ -187,8 +187,8 @@ class InstallationService:
             journal.load()
             self._record_injector_outcome(journal, outcome)
             journal.transition(
-                InstallPhase.AWAITING_CONFIRMATION, outcome=asdict(outcome), injector_outcome=asdict(outcome)
-            )
+            InstallPhase.AWAITING_CONFIRMATION, outcome=asdict(outcome), injector_outcome=asdict(outcome)
+        )
         else:
             outcome = self._outcome(journal)
         if journal.phase is InstallPhase.AWAITING_CONFIRMATION:
@@ -196,7 +196,7 @@ class InstallationService:
             actions.check()
             if outcome.adapter.details.get("recovery_required"):
                 journal.transition(InstallPhase.RECOVERY_REQUIRED, external_uncertain=True)
-                raise InstallationRecoveryRequired(player_text('launcher.installation', 'injector_may_still_be_running'))
+                raise InstallationRecoveryRequired('injector may still be running')
             if not self._confirmed(outcome, actions, manual):
                 return pending_outcome(outcome)
             if manual:
@@ -337,7 +337,7 @@ class InstallationService:
         journal.save()
         if journal.phase in {InstallPhase.PREPARING, InstallPhase.PREPARED}:
             try:
-                require_doom_closed(player_text('launcher.installation', 'recovering_a_room_installation'))
+                require_doom_closed('recovering a room installation')
                 require_injector_stopped(journal)
                 journal.rollback()
             except (OSError, RuntimeError) as recovery_error:

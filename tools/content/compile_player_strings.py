@@ -10,7 +10,8 @@ from pathlib import Path
 from string import Formatter
 from textwrap import wrap
 
-from doom_eap.strings import CATALOG_PATH, StringCatalog, read_catalog
+from doom_eap.content.option_text import schema_option_texts
+from doom_eap.strings import CATALOG_PATH, StringCatalog, StringEntry, read_catalog
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_APWORLD_ROOT = (
@@ -46,8 +47,10 @@ NATIVE_FIELDS = {
     "game.menu.return_to_fortress": (96, {}),
     "game.menu.resume_checkpoint": (96, {}),
     "game.menu.choose_mission": (96, {}),
-    "game.menu.mastery_reward": (None, {"description": ("str", "%s", 16399), "newline": ("str", "%s", 1),
-                                       "reward": ("str", "%s", 511)}),
+    "game.menu.mastery_reward": (
+        None,
+        {"description": ("str", "%s", 16399), "newline": ("str", "%s", 1), "reward": ("str", "%s", 511)},
+    ),
     "game.menu.mastery_unknown": (512, {}),
     "game.menu.recovery_pending": (None, {}),
     "game.menu.recovery_finished": (None, {}),
@@ -57,10 +60,54 @@ NATIVE_FIELDS = {
     "game.menu.recovery_unknown": (None, {}),
 }
 NATIVE_STRING_TEMPLATES = {"game.menu.challenge_completed", "game.menu.mastery_reward"}
+NATIVE_CATALOG_KEYS = {
+    "game.controls.ammo_refill": "common.ammo_refill",
+    "game.controls.clear": "common.clear",
+    "game.menu.reward_category": "common.archipelago",
+}
+NATIVE_CODE = {
+    "game.controls.binding_error": "{action} - {error}",
+    "game.menu.recovery_pending": "Encounter recovery in progress",
+    "game.menu.recovery_finished": "Encounter finished",
+    "game.menu.recovery_no_active": "No active encounter",
+    "game.menu.recovery_unsupported": "Unsupported encounter",
+    "game.menu.recovery_changed": "Encounter changed; request cancelled",
+    "game.menu.recovery_unknown": "Recovery outcome unknown",
+}
+
+
+APWORLD_CODE = {
+    "apworld.spoiler.access_items": "  Access items: {items}",
+    "apworld.spoiler.automatic_adjustments": "Automatic adjustments",
+    "apworld.spoiler.combat": "  Combat {stage}: cost {original} -> {actual}; {waves} waves, peak cost {peak}",
+    "apworld.spoiler.composition_bands": "Composition bands",
+    "apworld.spoiler.early_delivery": "{item} (early delivery, {count})",
+    "apworld.spoiler.enemy_preset": "  Enemy preset: {preset}",
+    "apworld.spoiler.enemy_seed": "  Enemy generation seed: {seed}",
+    "apworld.spoiler.goal": "  Goal: {goal}",
+    "apworld.spoiler.item_location": "{item} at {location}",
+    "apworld.spoiler.mission_order": "  Mission order: {order}",
+    "apworld.spoiler.mission_selection": "  Mission selection: {requested} requested, {included} included; forced goal: {forced_goal}",
+    "apworld.spoiler.none": "None",
+    "apworld.spoiler.off": "Off",
+    "apworld.spoiler.optional_resources": "Optional resources",
+    "apworld.spoiler.planning_entries": "  {label}: {entries}",
+    "apworld.spoiler.pool_counts": "Pool counts",
+    "apworld.spoiler.preparation": "  Preparation: {preparation}",
+    "apworld.spoiler.preparation_cr": "  Preparation CR: {initial} -> {final}; effective {effective}; overshoot {overshoot}",
+    "apworld.spoiler.progression_bands": "Progression bands",
+    "apworld.spoiler.readiness": "  Readiness deficit: {initial} -> {final}; resource budget: {budget}",
+    "apworld.spoiler.safety_adjustment": "  Safety adjustment: {details}",
+    "apworld.spoiler.sequence": "  Sequence: {sequence}",
+    "apworld.spoiler.sequence_unlocks": "None (missions unlock in sequence)",
+    "apworld.spoiler.starting_inventory": "{item} (starting inventory)",
+    "apworld.spoiler.title": "DOOM Eternal - {player}",
+}
+APWORLD_CATALOG_KEYS = {"apworld.notices.speed_fixed": "common.enemy_speed_fixed"}
 
 
 def native_format(entry, label: str, capacity: int | None, arguments: dict) -> str:
-    if entry.parameters != {name: kind for name, (kind, _, _) in arguments.items()}:
+    if entry.parameters != arguments.keys():
         raise ValueError(f"{label}: native parameters differ from the destination")
     output = ""
     for locale, template in entry.translations.items():
@@ -74,16 +121,16 @@ def native_format(entry, label: str, capacity: int | None, arguments: dict) -> s
 
 def native_translation(template: str, label: str, capacity: int | None, arguments: dict) -> str:
     try:
-        template.encode("ascii")
+        template.encode("utf-8")
     except UnicodeEncodeError as error:
-        raise ValueError(f"{label}: native field requires ascii") from error
+        raise ValueError(f"{label}: native field requires UTF-8") from error
     fields = [name for _, name, _, _ in Formatter().parse(template) if name is not None]
     if fields != list(arguments):
         raise ValueError(f"{label}: native parameters must follow destination order")
     size = 0
     parts = []
     for literal, name, _, _ in Formatter().parse(template):
-        size += len(literal.encode("ascii"))
+        size += len(literal.encode("utf-8"))
         parts.append(literal.replace("%", "%%") if arguments else literal)
         if name is not None:
             _, spec, width = arguments[name]
@@ -107,33 +154,58 @@ def native_string_function(name: str, entry) -> str:
 
 
 def project_sentinel(catalog: StringCatalog, sentinel_root: Path) -> dict[Path, bytes]:
-    controls = catalog.categories.get("game.controls", {})
+    native = {label: native_entry(catalog, label) for label in NATIVE_FIELDS}
+    controls = {
+        label.removeprefix("game.controls."): entry
+        for label, entry in native.items()
+        if label.startswith("game.controls.")
+    }
     action_keys = {"ammo_refill", "toggle_special_weapon"}
-    error_keys = {"unsupported_key", "key_conflict", "game_key_conflict", "save_failed", "restore_failed",
-                  "input_not_ready", "invalid_binding"}
+    error_keys = {
+        "unsupported_key",
+        "key_conflict",
+        "game_key_conflict",
+        "save_failed",
+        "restore_failed",
+        "input_not_ready",
+        "invalid_binding",
+    }
     action_width = control_width(controls, action_keys)
     error_width = control_width(controls, error_keys)
     lines = [
-        "// GENERATED from DoomEternal-AP-Mod/data/player_strings.json; do not edit.",
+        "// GENERATED from DoomEternal-AP-Mod/data/strings/en.json; do not edit.",
         "// regenerate in DoomEternal-AP-Mod: python -m tools.content.compile_player_strings",
         "#pragma once",
         "#include <string>",
         "",
         "namespace sentinel::player_strings {",
     ]
-    for category, entries in sorted(catalog.categories.items()):
-        if not category.startswith("game."):
-            continue
-        for key, entry in sorted(entries.items()):
-            label = f"{category}.{key}"
-            lines.append(sentinel_entry(label, entry, action_width, error_width))
+    for label, entry in sorted(native.items()):
+        lines.append(sentinel_entry(label, entry, action_width, error_width))
     lines.extend(["}", ""])
     return {sentinel_root / "src/player_strings_generated.h": "\n".join(lines).encode("ascii")}
 
 
+def native_entry(catalog: StringCatalog, label: str) -> StringEntry:
+    if label in NATIVE_CODE:
+        value = NATIVE_CODE[label]
+        fields = frozenset(name for _, name, _, _ in Formatter().parse(value) if name)
+        return StringEntry({code: value for code in catalog.languages}, fields)
+    category, key = NATIVE_CATALOG_KEYS.get(label, label).rsplit(".", 1)
+    return catalog.categories[category][key]
+
+
 def control_width(controls, keys) -> int:
-    return max((len(text) for key, entry in controls.items() if key in keys
-                for text in entry.translations.values() if text is not None), default=0)
+    return max(
+        (
+            len(text.encode("utf-8"))
+            for key, entry in controls.items()
+            if key in keys
+            for text in entry.translations.values()
+            if text is not None
+        ),
+        default=0,
+    )
 
 
 def sentinel_entry(label, entry, action_width, error_width) -> str:
@@ -156,8 +228,14 @@ def project_catalog(catalog: StringCatalog, apworld_root: Path = DEFAULT_APWORLD
         if category.startswith("apworld.")
         for key, entry in sorted(entries.items())
     }
+    for label, value in APWORLD_CODE.items():
+        templates[tuple(label.rsplit(".", 1))] = value
+    for label, target in APWORLD_CATALOG_KEYS.items():
+        category, key = target.rsplit(".", 1)
+        templates[tuple(label.rsplit(".", 1))] = catalog.categories[category][key].translations["en"]
+    templates = dict(sorted(templates.items()))
     lines = [
-        "# GENERATED from data/player_strings.json; regenerate in DoomEternal-AP-Mod:",
+        "# GENERATED from data/strings/en.json; regenerate in DoomEternal-AP-Mod:",
         "# python -m tools.content.compile_player_strings",
         '"""APWorld player text; no Mod checkout or runtime catalog is required."""',
         "",
@@ -190,10 +268,14 @@ def project_catalog(catalog: StringCatalog, apworld_root: Path = DEFAULT_APWORLD
 
 
 def compile_player_strings(
-    catalog_path: Path = CATALOG_PATH, *, check: bool = False, apworld_root: Path = DEFAULT_APWORLD_ROOT,
+    catalog_path: Path = CATALOG_PATH,
+    *,
+    check: bool = False,
+    apworld_root: Path = DEFAULT_APWORLD_ROOT,
     sentinel_root: Path = DEFAULT_SENTINEL_ROOT,
 ) -> tuple[Path, ...]:
     catalog = read_catalog(catalog_path)
+    validate_option_texts(catalog, catalog_path.parent / "options_schema.json")
     changed = []
     projections = project_catalog(catalog, apworld_root) | project_sentinel(catalog, sentinel_root)
     for path, expected in projections.items():
@@ -206,6 +288,15 @@ def compile_player_strings(
         path.write_bytes(expected)
         changed.append(path)
     return tuple(changed)
+
+
+def validate_option_texts(catalog: StringCatalog, schema_path: Path) -> None:
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    for key, expected in schema_option_texts(schema).items():
+        category, name = key.rsplit(".", 1)
+        entry = catalog.categories.get(category, {}).get(name)
+        if entry is None or entry.translations["en"] != expected:
+            raise ValueError(f"{key}: English text missing or differs from options_schema.json")
 
 
 def main(argv: list[str] | None = None) -> int:

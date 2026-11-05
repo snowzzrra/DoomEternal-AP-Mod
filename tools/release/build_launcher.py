@@ -18,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKSPACE = REPO_ROOT.parent
 RELEASE_ROOT = (REPO_ROOT / "build/release").resolve()
 SOURCE_EXCLUDED_DIRS = frozenset({
-    ".git", ".cache", ".pytest_cache", "__pycache__", "build", "dist",
+    ".git", ".cache", ".pytest_cache", ".tmp", "__pycache__", "build", "dist",
     "node_modules", "test", "tests", "venv", ".venv",
 })
 PYINSTALLER_EXCLUDES = (

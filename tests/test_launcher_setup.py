@@ -191,13 +191,20 @@ def test_process_query_failure_refuses_mutation(room_files, monkeypatch, query_f
 def ui(tmp_path, monkeypatch):
     pytest.importorskip("PySide6.QtWidgets", reason="Qt tests require requirements-launcher.txt")
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     from PySide6.QtWidgets import QApplication
 
     from doom_eap.launcher.launcher_ui import LauncherUI
 
     app = QApplication.instance() or QApplication([])
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "start_inventory_catalog.json").write_bytes(
+        (Path(__file__).parents[1] / "data/start_inventory_catalog.json").read_bytes()
+    )
     schema = json.loads((Path(__file__).parents[1] / "data/options_schema.json").read_text(encoding="utf-8"))
-    controller = Mock(config={}, options_schema=schema, bundle_dir=tmp_path,
+    controller = Mock(config={"launcher_language": "en"}, options_schema=schema, bundle_dir=tmp_path,
                       application_dir=tmp_path, client_dir=tmp_path, last_setup_failure=None, items_room=None)
     controller.workflow.session_owner.status = {}
     with patch.object(LauncherUI, "_discover"):
@@ -207,13 +214,74 @@ def ui(tmp_path, monkeypatch):
     yield window
     window.close()
     app.processEvents()
+    window.deleteLater()
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+def test_window_has_no_visible_children_outside_central_widget(ui):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QApplication, QWidget
+
+    ui.show()
+    QApplication.processEvents()
+    children = ui.findChildren(QWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+    assert [widget for widget in children if widget.isVisible()] == [ui.centralWidget()]
+    ui.pages.setCurrentIndex(2)
+    assert [button.isChecked() for button in ui.nav_buttons] == [False, False, True, False]
+
+
+def test_game_folder_controls_collapse_when_found_and_change_opens_them(ui):
+    ui.game_root.setText("fixture/game")
+    ui.saves_root.setText("fixture/save")
+    ui._toggle_paths(force=False)
+    assert ui.game_paths.isHidden()
+    assert ui.game_root.isReadOnly() and ui.saves_root.isReadOnly()
+    ui.change_paths.click()
+    assert not ui.game_paths.isHidden()
+    ui._select_recent_room(0)
+    assert not ui.server.text()
+
+
+def test_key_capture_warns_without_saving_conflicts_and_escape_cancels(ui):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    ui.ammo_refill_keybind.set_value("Y")
+    ui.special_toggle_keybind.editor.click()
+    QTest.keyClick(ui.special_toggle_keybind.editor, Qt.Key.Key_Y)
+    assert not ui.settings_view.conflict_warning.isHidden()
+    assert ui.special_toggle_keybind.editor.property("conflict")
+    ui.controller.set_ap_keybinds.assert_not_called()
+    ui.special_toggle_keybind.editor.click()
+    QTest.keyClick(ui.special_toggle_keybind.editor, Qt.Key.Key_Escape)
+    assert ui.special_toggle_keybind.value() == "Y"
+    ui.special_toggle_keybind.editor.click()
+    QTest.keyClick(ui.special_toggle_keybind.editor, Qt.Key.Key_B, Qt.KeyboardModifier.ControlModifier)
+    assert ui.special_toggle_keybind.value() == "Y"
+    QTest.keyClick(ui.special_toggle_keybind.editor, Qt.Key.Key_B)
+    assert ui.settings_view.conflict_warning.isHidden()
+    ui.controller.set_ap_keybinds.assert_called_once_with("Y", "B")
 
 
 def test_help_respects_doctor_attention(ui):
     dispatch_window(ui, {"type": "doctor_report", "report": {"ok": False, "diagnostics": [
         {"key": "ap_session", "status": "attention", "message": "Session refused"}]}})
-    assert "ATTENTION" in ui.help_view.doctor_status.text()
-    assert "NEEDS ATTENTION" in ui.help_view.doctor_evidence.text()
+    assert "attention" in ui.help_view.doctor_status.text().casefold()
+    assert "needs attention" in ui.help_view.doctor_evidence.text().casefold()
+    assert ui.help_view.fix_button.isEnabled()
+
+
+def test_help_game_action_opens_play_folder_controls(ui):
+    from doom_eap.launcher.events import ActionId
+
+    ui._show_page(4)
+    assert not ui.help_view.fix_button.isEnabled()
+    assert ui.help_view.fix_button.toolTip()
+    ui.help_view.symptom_buttons[ActionId.CHOOSE_GAME_FOLDER].click()
+    assert ui.pages.currentWidget() is ui.play_view
+    assert not ui.game_paths.isHidden()
+    assert ui.nav_buttons[0].isChecked()
 
 
 def dispatch_window(ui, *events):
@@ -256,6 +324,8 @@ def test_window_keeps_installer_progress_inventory_result_and_session_navigation
     assert ui.pages.currentWidget() is ui.play_view
     ui.show()
     dispatch_window(ui, {"type": "inventory_resync", "status": "waiting"})
+    ui._show_page(4)
+    ui.help_view.symptom_toggles[2].click()
     waiting = ui.player_inventory.text()
     assert ui.player_inventory.isVisible() and not ui.resync_inventory_button.isEnabled()
     dispatch_window(ui, {"type": "inventory_resync", "status": "error"})
@@ -323,10 +393,10 @@ def test_report_actions_open_copy_and_show_without_submission(ui, tmp_path, monk
     monkeypatch.setattr(launcher_ui.QDesktopServices, "openUrl", lambda url: shown.append(url) or True)
 
     def review(dialog):
-        buttons = {button.text(): button for button in dialog.findChildren(QPushButton)}
-        for action in ("COPY REPORT", "OPEN GITHUB ISSUE", "SHOW ZIP"):
-            assert buttons[action].isEnabled()
-            buttons[action].click()
+        for action in ("reportCopy", "reportOpenIssue", "reportShowZip"):
+            button = dialog.findChild(QPushButton, action)
+            assert button.isEnabled()
+            button.click()
         assert QApplication.clipboard().text() == report_text(payload)
         assert len(opened) == 1 and len(opened[0].encode()) < 2000
         assert len(shown) == 1
@@ -340,13 +410,63 @@ def test_report_actions_open_copy_and_show_without_submission(ui, tmp_path, monk
     ui.controller.save_problem_report.assert_called_once_with(payload)
 
 
-def test_manual_confirmation_defaults_to_no(ui, monkeypatch):
-    from PySide6.QtWidgets import QMessageBox
-    calls = []
-    monkeypatch.setattr(QMessageBox, "question", lambda *args: calls.append(args) or QMessageBox.StandardButton.No)
+@pytest.mark.parametrize("confirmed", (False, True))
+def test_manual_installation_requires_explicit_inline_confirmation_once(ui, confirmed):
+    ui.controller.operation_generation = 10
     ui._confirm_manual_installation()
-    assert calls[0][-1] == QMessageBox.StandardButton.No
     ui.controller.confirm_manual_installation.assert_not_called()
+    assert not ui.install_yes.isHidden() and not ui.install_no.isHidden()
+    ui._answer_installation(confirmed)
+    ui._answer_installation(True)
+    if confirmed:
+        ui.controller.confirm_manual_installation.assert_called_once_with(generation=10)
+    else:
+        ui.controller.confirm_manual_installation.assert_not_called()
+
+
+def test_manual_installation_confirmation_cannot_cross_operations(ui):
+    ui.controller.operation_generation = 10
+    ui._confirm_manual_installation()
+    ui.controller.operation_generation = 11
+    ui._answer_installation(True)
+    ui.controller.confirm_manual_installation.assert_not_called()
+
+
+@pytest.mark.parametrize("confirmed", (False, True))
+def test_download_consent_is_explicit_and_resolved_once(ui, confirmed):
+    event = {"request_id": "download", "name": "fixture", "source": "https://fixture.invalid/tool"}
+    ui._request_dependency_consent(event)
+    ui._request_dependency_consent(event)
+    ui.controller.resolve_consent.assert_not_called()
+    assert not ui.help_view.download_prompt.isHidden()
+    assert event["source"] in ui.help_view.download_details.text()
+    ui.help_view.download_answered.emit(confirmed)
+    ui.help_view.download_answered.emit(True)
+    ui.controller.resolve_consent.assert_called_once_with("download", confirmed)
+
+
+def test_pending_download_is_declined_when_room_controls_reset(ui):
+    ui._request_dependency_consent({"request_id": "download", "name": "fixture"})
+    ui._clear_pending_confirmations()
+    ui.help_view.download_answered.emit(True)
+    ui.controller.resolve_consent.assert_called_once_with("download", False)
+
+
+def test_repair_preview_requires_a_visible_current_choice_and_applies_once(ui):
+    actions = [{"action_id": "fixture", "title": "Fixture repair", "changes": ["fixture"], "rollback": "fixture"}]
+    ui._present_repair_preview(actions, 10)
+    ui.controller.request_repair.assert_not_called()
+    ui.help_view.repair_preview.hide()
+    ui.help_view.repair_confirmed.emit()
+    ui.controller.request_repair.assert_not_called()
+    ui._present_repair_preview(actions, 10)
+    ui._present_repair_preview([], 10)
+    ui.help_view.repair_confirmed.emit()
+    ui.controller.request_repair.assert_not_called()
+    ui._present_repair_preview(actions, 11)
+    ui.help_view.repair_confirmed.emit()
+    ui.help_view.repair_confirmed.emit()
+    ui.controller.request_repair.assert_called_once_with("fixture", generation=11)
 
 
 def test_installation_confirmation_is_inline_and_sent_once(ui):
@@ -382,8 +502,8 @@ def test_window_waits_for_safe_close(ui, monkeypatch):
 def test_uncertain_installation_offers_install_again(ui):
     ui._prepare = Mock()
     ui._handle_event({"type": "manual_install_required", "message": "recovery guidance", "recovery_required": True})
-    assert ui.session_manual_retry_action.text() == "INSTALL AGAIN"
+    assert not ui.session_manual_retry_action.isHidden()
     assert ui.session_manual_complete_action.isHidden()
-    assert ui.hero_action.text() == "INSTALL AGAIN"
+    assert ui._manual_retry
     ui.hero_action.click()
     ui._prepare.assert_called_once_with(force=True)

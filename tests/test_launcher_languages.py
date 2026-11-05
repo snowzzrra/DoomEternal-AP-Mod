@@ -1,6 +1,7 @@
 """Protect catalog-only language contributions and isolated launcher preferences."""
 
 import json
+import shutil
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -12,15 +13,12 @@ from doom_eap.strings import CATALOG_PATH, read_catalog
 
 @pytest.fixture
 def catalog(tmp_path, monkeypatch):
-    document = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    document["languages"]["fr"] = {"name": "Français"}
-    for entries in document["categories"].values():
-        for entry in entries.values():
-            entry["fr"] = None
-    document["categories"]["launcher.navigation"]["play"]["fr"] = "Jouer"
-    document["categories"]["launcher.save"]["recovering"]["fr"] = "Récupération"
-    path = tmp_path / "player_strings.json"
-    path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    path = tmp_path / "strings"
+    shutil.copytree(CATALOG_PATH, path)
+    document = json.loads((path / "languages.json").read_text(encoding="utf-8"))
+    document["languages"].append({"code": "fr", "name": "Français"})
+    (path / "languages.json").write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+    (path / "fr.json").write_text(json.dumps({"launcher.navigation.play": "Jouer", "launcher.save.recovering": "Récupération"}), encoding="utf-8")
     catalog = read_catalog(path)
     monkeypatch.setattr(strings, "load_catalog", lambda: catalog)
     monkeypatch.setattr("doom_eap.launcher.ui.language_button.load_catalog", lambda: catalog)
@@ -44,6 +42,7 @@ def controller(tmp_path):
     controller = LauncherController.__new__(LauncherController)
     controller.config_path = tmp_path / "launcher.json"
     controller.config = {"launcher_language": "en", "server_address": "fixture.invalid", "slot": "Slayer"}
+    controller.emit = Mock()
     controller.bundle_dir = Path(__file__).parents[1]
     controller._persist_config()
     return controller
@@ -56,6 +55,47 @@ def controller(tmp_path):
 ])
 def test_saved_language_or_available_system_language(catalog, saved, system, expected):
     assert strings.configure_language(saved, system) == expected
+
+
+def test_option_translation_falls_back_to_schema(catalog, monkeypatch):
+    monkeypatch.setattr(strings, "_locale", "pt-BR")
+    assert strings.option_text("goal", "name", "Goal") == "Objetivo"
+    monkeypatch.setattr(strings, "_locale", "fr")
+    assert strings.option_text("goal", "name", "New schema goal") == "Goal"
+    with pytest.raises(KeyError):
+        strings.option_text("new_option", "name", "Schema name")
+    with pytest.raises(KeyError):
+        strings.option_text("new_option", "choice", "Schema label", choice_key="choice")
+    assert strings.option_text("", "choice", "Air Control", choice_key="Air Control") == "Air Control"
+
+
+@pytest.mark.parametrize("bound,english,portuguese", [
+    ("minimum", "Minimum", "Mínimo"), ("maximum", "Maximum", "Máximo"),
+    ("early_minimum", "Early Minimum", "Mínimo inicial"), ("early_maximum", "Early Maximum", "Máximo inicial"),
+    ("late_minimum", "Late Minimum", "Mínimo final"), ("late_maximum", "Late Maximum", "Máximo final"),
+])
+def test_enemy_labels_keep_schema_names_and_translate_shared_limits(catalog, monkeypatch, bound, english, portuguese):
+    label = "Arch-vile — " + english
+    assert strings.option_text("enemy_health", "choice", label, choice_key="archvile." + bound) == label
+    monkeypatch.setattr(strings, "_locale", "pt-BR")
+    assert strings.option_text("enemy_health", "choice", label, choice_key="archvile." + bound) == "Arch-vile — " + portuguese
+
+
+@pytest.mark.parametrize("operation", ["check", "install_mod", "install_core", "repair", "connect", "saves", "uninstall", "report", "player_options", "ammo_refill"])
+def test_operation_errors_have_player_guidance_without_raw_exception(catalog, monkeypatch, operation):
+    monkeypatch.setattr(strings, "_locale", "pt-BR")
+    technical = RuntimeError("private driver failure")
+    message = strings.failure_text(operation, technical)
+    assert message == catalog.text("launcher.failures", operation, locale="pt-BR")
+    assert str(technical) not in message
+
+
+def test_catalog_error_is_localized_at_the_dialog_boundary(catalog, monkeypatch):
+    from doom_eap.strings import PlayerError
+
+    error = PlayerError("launcher.ui", "close_doom_eternal_before_closing_this_launcher")
+    monkeypatch.setattr(strings, "_locale", "pt-BR")
+    assert strings.failure_text("repair", error) == catalog.text(error.category, error.key, locale="pt-BR")
 
 
 def test_button_menu_saves_language_and_applies_on_next_start(app, catalog, controller, monkeypatch):
@@ -125,6 +165,8 @@ def test_failed_language_save_keeps_previous_choice(app, controller, monkeypatch
     assert controller.config["launcher_language"] == "en" and button.language == "en"
     assert controller.config_path.read_bytes() == before
     warning.assert_called_once()
+    assert controller.last_operation_failure["technical_message"] == "fixture"
+    controller.emit.assert_called_once_with("log", message="fixture")
     information.assert_not_called()
     with pytest.raises(ValueError, match="unsupported launcher language"):
         controller.set_launcher_language("undeclared")

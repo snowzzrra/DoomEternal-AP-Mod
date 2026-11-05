@@ -6,15 +6,15 @@ from pathlib import Path
 
 import pytest
 
-
-
 from tools.release.prebuilt_room_resources import (
-    CANONICAL_RESOURCE_FILENAMES, METADATA_FILENAMES, compute_room_resource_input_fingerprint,
-    get_frozen_bundle_dir, validate_room_resource_integrity,
+    CANONICAL_RESOURCE_FILENAMES,
+    METADATA_FILENAMES,
+    compute_room_resource_input_fingerprint,
+    get_frozen_bundle_dir,
+    validate_room_resource_integrity,
 )
 from tools.release.room_resource_checkout import stage_room_resource_files
 from tools.release.source_bytes import compiler_source_bytes
-
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
@@ -31,7 +31,7 @@ def test_every_hud_counter_is_a_root_sibling():
         assert hashlib.sha256(data).hexdigest() == entry["result_sha256"]
         position = 27
 
-        def integer():
+        def integer(data=data):
             nonlocal position
             value = struct.unpack_from(">I", data, position)[0]
             position += 4
@@ -88,6 +88,7 @@ def test_source_fingerprint_normalizes_only_owned_text_and_preserves_real_change
 
 def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edits(tmp_path, monkeypatch):
     from types import SimpleNamespace
+
     from tools.content import compile_options_schema as compiler
 
     class Toggle:
@@ -122,9 +123,9 @@ def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edi
 
 
 def test_frozen_compiler_identity_retains_untracked_dependencies_and_content_changes(tmp_path):
-    from doom_eap.content.compiler_identity import load_compiler_source_identity, BUNDLED_IDENTITY_PATH, SOURCE_FILES
+    from doom_eap.content.compiler_identity import BUNDLED_IDENTITY_PATH, SOURCE_FILES, load_compiler_source_identity
     source = tmp_path / "source"
-    for name in SOURCE_FILES:
+    for name in (*SOURCE_FILES, "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json"):
         required = source / name
         required.parent.mkdir(parents=True, exist_ok=True)
         required.write_bytes(b"VALUE = 1\n")
@@ -172,12 +173,12 @@ def test_working_tree_origin_is_exact_and_does_not_claim_its_ancestor_as_built_c
 
 
 @pytest.mark.parametrize("relative", [
-    "data/player_strings.json", "doom_eap/strings.py", "tools/release/build_string_table.py",
+    "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json", "doom_eap/strings.py", "tools/release/build_string_table.py",
 ])
 def test_player_text_changes_invalidate_room_resource_and_compiler_caches(tmp_path, relative):
     from doom_eap.content.compiler_identity import SOURCE_FILES, load_compiler_source_identity
 
-    for name in SOURCE_FILES:
+    for name in (*SOURCE_FILES, "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json"):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"original\n")

@@ -8,7 +8,7 @@ from pathlib import Path
 from doom_eap.contracts.source_bytes import SOURCE_BYTE_CONTRACT, first_party_text_bytes
 
 SOURCE_ROOTS = ("doom_eap/content", "doom_eap/contracts", "tools/decls", "tools/maps")
-SOURCE_FILES = ("data/player_strings.json", "doom_eap/strings.py", "tools/release/build_string_table.py",
+SOURCE_FILES = ("doom_eap/strings.py", "tools/release/build_string_table.py",
                 "doom_eap/launcher/launcher_core.py", "doom_eap/runtime/save_records.py",
                 "doom_eap/runtime/lifecycle.py",
                 "doom_eap/runtime/context_registry.py", "tools/release/room_payloads.py",
@@ -20,6 +20,7 @@ BUNDLED_IDENTITY_PATH = "data/compiler_source_identity.json"
 def capture_compiler_sources(root: Path) -> dict[str, str]:
     hashes = {}
     paths = [root / name for name in SOURCE_FILES]
+    paths.extend((root / "data/strings").glob("*.json"))
     for relative in SOURCE_ROOTS:
         paths.extend((root / relative).rglob("*.py"))
     for path in sorted(paths):

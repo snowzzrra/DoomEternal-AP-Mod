@@ -21,15 +21,10 @@ from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
-    QPushButton,
-    QScrollArea,
     QSpinBox,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -43,22 +38,30 @@ from doom_eap.content.options_foundation import (
     player_yaml_document,
     suggested_yaml_filename,
 )
+from doom_eap.strings import PlayerError
 
 from .controls import (
     DictionaryControl,
     NamedRangeControl,
     OptionSetControl,
+    ToggleSwitch,
     _card,
     _label,
     _OptionCategory,
     _ScanlineButton,
     _scroll,
 )
+from .doom_style import DoomButton
+from .enemy_preview import EnemyPreview
+from .option_grid import Description, TileGrid, stepper
 from .player_options import PlayerOptions
+from .strings import failure_text, option_text, record_failure
 from .strings import text as player_text
 
+QPushButton = DoomButton
 
-class PlayerFileView(QScrollArea):
+
+class PlayerFileView(QWidget):
     activity = Signal(dict)
     diagnostic = Signal(str)
     _label = staticmethod(_label)
@@ -80,21 +83,26 @@ class PlayerFileView(QScrollArea):
         self.option_rows = {}
         self.start_inventory_catalog = []
         self._syncing_create_dependencies = False
-        self._warning_state = {}
         self.dependencies = PlayerOptions(self)
         self._create_page()
 
-    def _create_page(self) -> QScrollArea:
+    def _create_page(self) -> None:
+        page = QVBoxLayout(self)
+        page.setContentsMargins(0, 0, 0, 0)
+        page.setSpacing(0)
         body = QWidget()
         layout = QVBoxLayout(body)
-        layout.setContentsMargins(28, 24, 28, 30)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
         header = self._card("hero")
         head = QVBoxLayout(header)
-        head.setContentsMargins(24, 20, 24, 20)
+        head.setSpacing(12)
+        head.setContentsMargins(0, 16, 0, 16)
         heading = QHBoxLayout()
+        heading.setSpacing(12)
         text = QVBoxLayout()
-        text.addWidget(self._label(player_text("launcher.ui", "create_player_yaml"), "title"))
+        text.setSpacing(12)
+        text.addWidget(self._label(player_text('common', 'create_player'), "title"))
         description = self._label(
             player_text("launcher.ui", "choose_your_settings_and_starting_items_then_save_your_player_fi"), "muted"
         )
@@ -107,11 +115,14 @@ class PlayerFileView(QScrollArea):
         heading.addWidget(self.difficulty_skull)
         head.addLayout(heading)
         layout.addWidget(header)
-        player = self._card()
+        player = QWidget()
         player_layout = QVBoxLayout(player)
-        player_layout.setContentsMargins(20, 18, 20, 20)
-        player_layout.addWidget(self._label(player_text("launcher.connection", "player"), "section"))
-        self.player_name = QLineEdit(player_text("launcher.app_window", "player"))
+        player_layout.setSpacing(12)
+        player_layout.setContentsMargins(0, 0, 0, 0)
+        player_layout.addWidget(self._label(player_text("launcher.connection", "player"), "fieldLabel"))
+        player_layout.setSpacing(4)
+        self.player_name = QLineEdit("Player")
+        self.player_name.setFixedWidth(480)
         self.player_name.setPlaceholderText(player_text("launcher.connection", "player_example"))
         player_layout.addWidget(self.player_name)
         self._imported_player = None
@@ -161,6 +172,8 @@ class PlayerFileView(QScrollArea):
                 player_text("launcher.player_file", "resources"),
                 (
                     "resource_profile",
+                    "trap_percentage",
+                    "enabled_traps",
                     "praetor_suit_upgrades_in_pool",
                     "item_pool_counts",
                     "filler_weights",
@@ -194,8 +207,6 @@ class PlayerFileView(QScrollArea):
                     "campaign_difficulty",
                     "logic_difficulty",
                     "reveal_ap_locations_on_automap",
-                    "trap_percentage",
-                    "enabled_traps",
                 ),
             ),
             (
@@ -221,9 +232,11 @@ class PlayerFileView(QScrollArea):
         if remaining:
             card = _OptionCategory(player_text("launcher.player_file", "other_settings"))
             self.option_categories.append(card)
+            grid = TileGrid()
+            card.contents.addWidget(grid)
             for key in options_by_key:
                 if key in remaining:
-                    card.contents.addWidget(self._option_widget(options_by_key[key]))
+                    self._add_tile(grid, options_by_key[key])
             layout.addWidget(card)
         self.enemy_option_keys = tuple(
             key
@@ -233,50 +246,47 @@ class PlayerFileView(QScrollArea):
         self._set_option_values(enemy_options_for_editing(self.option_defaults))
         self.dependencies._wire_create_dependencies()
         self.dependencies._refresh_create_dependencies()
-        actions = QHBoxLayout()
+        footer = QWidget()
+        actions = QHBoxLayout(footer)
+        actions.setContentsMargins(24, 12, 24, 24)
+        actions.setSpacing(12)
+        actions.addStretch(1)
         reset = QPushButton(player_text("launcher.ui", "reset_defaults"))
+        reset.setObjectName("link")
         reset.clicked.connect(self._reset_options)
         save = _ScanlineButton(player_text("launcher.ui", "save_player_file"))
         save.setObjectName("primary")
         self.save_button = save
         save.clicked.connect(self._save_player_options)
-        actions.addWidget(reset)
         import_button = QPushButton(player_text("launcher.ui", "import_player_file"))
         import_button.setObjectName("playerImport")
         import_button.clicked.connect(self._import_player_options)
         actions.addWidget(import_button)
-        actions.addStretch(1)
+        actions.addWidget(reset)
         actions.addWidget(save)
-        layout.addLayout(actions)
         layout.addStretch(1)
-        self.setWidgetResizable(True)
-        self.setWidget(body)
-        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll = self._scroll(body)
+        page.addWidget(self.scroll, 1)
+        page.addWidget(footer)
 
     def _option_group(self, group_id, title, keys, options_by_key):
         card = _OptionCategory(title)
         self.option_categories.append(card)
         group_layout = card.contents
+        grid = TileGrid()
+        group_layout.addWidget(grid)
         advanced_layout = None
         if group_id == "resources":
-            advanced = QWidget()
-            advanced_layout = QVBoxLayout(advanced)
-            advanced_layout.setContentsMargins(0, 0, 0, 0)
-            advanced.hide()
-            expand = QPushButton(player_text("launcher.ui", "advanced_resources"))
-            expand.setCheckable(True)
-            expand.toggled.connect(advanced.setVisible)
-            group_layout.addWidget(expand)
-            group_layout.addWidget(advanced)
+            advanced_layout = self._advanced_grid(group_layout)
         if group_id == "starting_loadout":
-            group_layout.addWidget(self._start_inventory_widget())
-        displayed = self._add_group_rows(group_id, keys, options_by_key, group_layout, advanced_layout)
+            grid.add_tile(self._start_inventory_widget(), wide=True)
+        displayed = self._add_group_rows(group_id, keys, options_by_key, grid, advanced_layout)
         sections = ()
         if group_id == "enemies":
-            self.enemy_preview = self._label("", "muted")
-            self.enemy_preview.setWordWrap(True)
-            group_layout.addWidget(self.enemy_preview)
+            self.enemy_preview = EnemyPreview()
+            grid.add_tile(self.enemy_preview, wide=True)
             category_actions = QHBoxLayout()
+            category_actions.setSpacing(12)
             for title, callback in (
                 (player_text("launcher.ui", "import_enemy_settings_6a54a4"), self._import_enemy_options),
                 (player_text("launcher.ui", "save_enemy_settings_1fc235"), self._export_enemy_options),
@@ -303,36 +313,55 @@ class PlayerFileView(QScrollArea):
         displayed.update(self._add_group_sections(sections, options_by_key, group_layout))
         return card, displayed
 
-    def _add_group_rows(self, group_id, keys, options_by_key, group_layout, advanced_layout):
+    @staticmethod
+    def _advanced_grid(layout):
+        toggle = QPushButton(player_text("launcher.help", "advanced"))
+        toggle.setObjectName("link")
+        toggle.setProperty("compact", True)
+        toggle.setCheckable(True)
+        grid = TileGrid()
+        grid.hide()
+        toggle.toggled.connect(grid.setVisible)
+        toggle.toggled.connect(lambda checked: toggle.setText(player_text('launcher.help', 'advanced_open') if checked else player_text("launcher.help", "advanced")))
+        layout.addWidget(toggle, alignment=Qt.AlignmentFlag.AlignLeft)
+        layout.addWidget(grid)
+        return grid
+
+    def _add_tile(self, grid, option):
+        grid.add_tile(self._option_widget(option), wide=option["ui_type"] in {"option_set", "option_dict"})
+
+    def _add_group_rows(self, group_id, keys, options_by_key, grid, advanced_grid):
         displayed = set()
         for key in keys:
             option = options_by_key.get(key)
             if option is not None:
-                target = advanced_layout if group_id == "resources" and key != "resource_profile" else group_layout
-                widget = self._option_widget(option)
-                if group_id == "resources" and key == "resource_profile":
-                    target.insertWidget(0, widget)
-                else:
-                    target.addWidget(widget)
+                main = key in {"resource_profile", "trap_percentage", "enabled_traps"}
+                target = advanced_grid if group_id == "resources" and not main else grid
+                self._add_tile(target, option)
                 displayed.add(key)
         return displayed
 
     def _add_group_sections(self, sections, options_by_key, group_layout):
         displayed = set()
         for title, section_keys in sections:
-            section = _OptionCategory(title, expanded=False)
-            group_layout.addWidget(section)
+            if title == player_text("launcher.player_file", "advanced"):
+                grid = self._advanced_grid(group_layout)
+            else:
+                group_layout.addSpacing(12)
+                group_layout.addWidget(self._label(title, "fieldLabel"))
+                grid = TileGrid()
+                group_layout.addWidget(grid)
             for key in section_keys:
                 if key in options_by_key:
-                    section.contents.addWidget(self._option_widget(options_by_key[key]))
+                    self._add_tile(grid, options_by_key[key])
                     displayed.add(key)
         return displayed
 
     def _effective_config_widget(self) -> QFrame:
         card = self._card("effectiveConfig")
         layout = QGridLayout(card)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(3)
+        layout.setContentsMargins(0, 12, 0, 12)
+        layout.setSpacing(12)
         layout.addWidget(self._label(player_text("launcher.ui", "selected_settings"), "eyebrow"), 0, 0, 1, 3)
         self.effective_config_values: dict[str, QLabel] = {}
         cells = (
@@ -346,11 +375,10 @@ class PlayerFileView(QScrollArea):
         for index, (key, label) in enumerate(cells):
             cell = QWidget()
             cell_layout = QVBoxLayout(cell)
-            cell_layout.setContentsMargins(0, 5, 10, 5)
-            cell_layout.setSpacing(2)
-            cell_layout.addWidget(self._label(label, "stateName"))
-            value = self._label(player_text("launcher.ui", "symbol_bda050"))
-            value.setStyleSheet("font-weight:800;")
+            cell_layout.setContentsMargins(0, 0, 12, 0)
+            cell_layout.setSpacing(4)
+            cell_layout.addWidget(self._label(label.upper(), "fieldLabel"))
+            value = self._label('—')
             cell_layout.addWidget(value)
             self.effective_config_values[key] = value
             layout.addWidget(cell, 1 + index // 3, index % 3)
@@ -402,53 +430,80 @@ class PlayerFileView(QScrollArea):
             (key, str(value)), player_text("launcher.player_file", "current_selection_value_0", value_0=f"{label}")
         )
 
-    def _option_widget(self, option: dict[str, object]) -> QWidget:
+    def _option_widget(self, option):
         key, default = str(option["key"]), option.get("default")
         self.option_defaults[key] = default
-        row = self._card()
+        row = QWidget()
+        row.setObjectName("optionRow")
         layout = QGridLayout(row)
-        layout.setContentsMargins(14, 12, 14, 12)
-        layout.setColumnStretch(0, 1)
-        title = self._label(str(option["display_name"]))
-        title.setStyleSheet("font-weight:800;")
-        layout.addWidget(title, 0, 0)
-        kind = str(option["ui_type"])
-        description = option["description"]
-        layout.addWidget(self._label(self._format_markdown(description), "muted", rich=True), 1, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        heading = QHBoxLayout()
+        heading.setSpacing(8)
+        name = option_text(key, "name", str(option["display_name"]))
+        description = option_text(key, "description", option["description"])
+        title = self._label(name)
+        title.setMinimumWidth(0)
+        title.setToolTip(self._format_markdown(description))
+        heading.addWidget(title, 1)
+        control = self._option_control(option)
+        if option["ui_type"] == "toggle":
+            heading.addWidget(control)
+        else:
+            shown = stepper(control) if isinstance(control, QSpinBox) else control
+            layout.addWidget(shown, 1, 0)
+        for action in getattr(control, "header_actions", ()):
+            heading.addWidget(action)
+        help = QPushButton('?')
+        help.setObjectName("helpIcon")
+        help.setFixedSize(14, 14)
+        help.setToolTip(title.toolTip())
+        help.setAccessibleName(name)
+        heading.addWidget(help)
+        layout.addLayout(heading, 0, 0)
+        layout.addWidget(Description(description), 3, 0)
+        self.option_controls[key] = control
+        self.option_rows[key] = row
+        return row
+
+    @staticmethod
+    def _option_control(option):
+        key, default, kind = str(option["key"]), option.get("default"), option["ui_type"]
         if kind == "toggle":
-            control: QWidget = QCheckBox(player_text("launcher.ui", "enabled"))
+            control = ToggleSwitch()
+            control.setFixedSize(36, 18)
+            control.setAccessibleName(option_text(key, "name", str(option["display_name"])))
             control.setChecked(bool(default))
         elif kind == "choice":
             control = QComboBox()
-            for choice in cast(list[dict[str, object]], option["choices"]):
+            control.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            control.setMinimumContentsLength(1)
+            for choice in option["choices"]:
                 if key == "enemy_count_mode" and choice["key"] == "preset":
                     continue
-                control.addItem(str(choice.get("label", choice["key"])), choice["key"])
+                control.addItem(option_text(key, "choice", str(choice.get("label", choice["key"])),
+                                            choice_key=choice["key"]), choice["key"])
             control.setCurrentIndex(max(0, control.findData(default)))
         elif kind == "range":
             control = QSpinBox()
-            control.setRange(cast(int, option["minimum"]), cast(int, option["maximum"]))
-            control.setValue(cast(int, default))
+            control.setRange(option["minimum"], option["maximum"])
+            control.setValue(default)
         elif kind == "option_set":
             control = OptionSetControl(option)
         elif kind == "option_dict":
             control = DictionaryControl(option)
         else:
             control = NamedRangeControl(option)
-        control.setMinimumWidth(200)
-        self.option_controls[key] = control
-        self.option_rows[key] = row
-        if kind == "option_dict":
-            layout.addWidget(control, 2, 0, 1, 2)
-        else:
-            layout.addWidget(control, 0, 1, 2, 1, Qt.AlignmentFlag.AlignVCenter)
-        return row
+        return control
 
     def _start_inventory_widget(self) -> QWidget:
-        card = self._card()
+        card = QWidget()
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(20, 18, 20, 20)
-        layout.addWidget(self._label(player_text("launcher.ui", "starting_items"), "section"))
+        layout.setSpacing(8)
+        layout.setContentsMargins(0, 0, 0, 0)
+        heading = QHBoxLayout()
+        heading.addWidget(self._label(player_text("launcher.ui", "starting_items")), 1)
+        layout.addLayout(heading)
         layout.addWidget(
             self._label(
                 player_text("launcher.ui", "choose_the_items_and_quantities_saved_in_your_player_file"), "muted"
@@ -461,43 +516,30 @@ class PlayerFileView(QScrollArea):
         except ValueError as error:
             self.start_inventory_catalog = []
             self._append_log(
-                player_text(
-                    "launcher.player_file",
-                    "starting_inventory_choices_could_not_load_value_0_check_help_for",
-                    value_0=f"{error}",
-                )
+                'Starting Inventory choices could not load: {value_0}. Check Help for details.'.format(value_0=f'{error}')
             )
         controls = QHBoxLayout()
+        controls.setSpacing(12)
         self.inventory_picker = QComboBox()
         self.inventory_picker.setMinimumContentsLength(24)
         self.inventory_quantity = QSpinBox()
         self.inventory_quantity.setRange(1, 9999)
         self.inventory_add_button = QPushButton(player_text("launcher.ui", "add"))
-        self.inventory_add_button.setObjectName("primary")
+        self.inventory_add_button.setObjectName("secondary")
         self.inventory_add_button.clicked.connect(self._add_inventory)
         enabled = bool(self.start_inventory_catalog)
         self.inventory_picker.setEnabled(enabled)
         self.inventory_quantity.setEnabled(enabled)
         self.inventory_add_button.setEnabled(enabled)
         controls.addWidget(self.inventory_picker, 1)
-        controls.addWidget(self.inventory_quantity)
+        controls.addWidget(stepper(self.inventory_quantity, compact=True))
         controls.addWidget(self.inventory_add_button)
         layout.addLayout(controls)
-        self.inventory = QTableWidget(0, 2)
-        self.inventory.setHorizontalHeaderLabels(
-            [player_text("launcher.items", "item"), player_text("launcher.ui", "count")]
-        )
-        self.inventory.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.inventory.verticalHeader().hide()
-        self.inventory.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.inventory.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.inventory.setMinimumHeight(150)
+        entries = [{"key": item["name"], "label": item["label"], "minimum": 1, "maximum": 9999} for item in self.start_inventory_catalog]
+        self.inventory = DictionaryControl({"entries": entries, "default": {}}, selected_only=True)
+        for action in self.inventory.header_actions:
+            heading.addWidget(action)
         layout.addWidget(self.inventory)
-        remove = QPushButton(player_text("launcher.ui", "remove_selected"))
-        remove.clicked.connect(
-            lambda: self.inventory.removeRow(self.inventory.currentRow()) if self.inventory.currentRow() >= 0 else None
-        )
-        layout.addWidget(remove, alignment=Qt.AlignmentFlag.AlignRight)
         return card
 
     def _refresh_inventory_picker(self, dlc_enabled: bool) -> None:
@@ -532,21 +574,12 @@ class PlayerFileView(QScrollArea):
         self.inventory_quantity.setEnabled(enabled)
         self.inventory_add_button.setEnabled(enabled)
 
-    def _add_inventory(self) -> None:
+    def _add_inventory(self):
         name = self.inventory_picker.currentData()
-        if not isinstance(name, str):
-            return
-        for row in range(self.inventory.rowCount()):
-            if self.inventory.item(row, 0).data(Qt.ItemDataRole.UserRole) == name:
-                amount = int(self.inventory.item(row, 1).text()) + self.inventory_quantity.value()
-                self.inventory.setItem(row, 1, QTableWidgetItem(str(amount)))
-                return
-        row = self.inventory.rowCount()
-        self.inventory.insertRow(row)
-        item = QTableWidgetItem(name)
-        item.setData(Qt.ItemDataRole.UserRole, name)
-        self.inventory.setItem(row, 0, item)
-        self.inventory.setItem(row, 1, QTableWidgetItem(str(self.inventory_quantity.value())))
+        if isinstance(name, str):
+            values = self.inventory.value()
+            values[name] = values.get(name, 0) + self.inventory_quantity.value()
+            self.inventory.setValue(values)
 
     def _option_values(self) -> dict[str, object]:
         values: dict[str, object] = {}
@@ -559,12 +592,7 @@ class PlayerFileView(QScrollArea):
                 values[key] = control.value()
             elif isinstance(control, NamedRangeControl | OptionSetControl | DictionaryControl):
                 values[key] = control.value()
-        inventory: dict[str, int] = {}
-        for row in range(self.inventory.rowCount()):
-            item, amount = self.inventory.item(row, 0), self.inventory.item(row, 1)
-            if item is not None and amount is not None:
-                inventory[str(item.data(Qt.ItemDataRole.UserRole))] = int(amount.text())
-        values["start_inventory"] = inventory
+        values["start_inventory"] = self.inventory.value()
         return values
 
     def _reset_options(self) -> None:
@@ -591,22 +619,14 @@ class PlayerFileView(QScrollArea):
                         control.setValue(value)
                 finally:
                     control.blockSignals(blocked)
-                if key in self._warning_state:
-                    self._warning_state[key] = bool(value)
         finally:
             self._syncing_create_dependencies = syncing
 
     def _apply_player_values(self, values: dict[str, object]) -> None:
         self._set_option_values({**values, **enemy_options_for_editing(values)})
-        self.inventory.setRowCount(0)
+        self.inventory.setValue({})
         self.dependencies._refresh_create_dependencies()
-        for name, quantity in cast(dict[str, int], values.get("start_inventory", {})).items():
-            row = self.inventory.rowCount()
-            self.inventory.insertRow(row)
-            item = QTableWidgetItem(name)
-            item.setData(Qt.ItemDataRole.UserRole, name)
-            self.inventory.setItem(row, 0, item)
-            self.inventory.setItem(row, 1, QTableWidgetItem(str(quantity)))
+        self.inventory.setValue(cast(dict[str, int], values.get("start_inventory", {})))
 
     def _apply_enemy_category_values(self, values: dict[str, object]) -> None:
         category = enemy_options_for_editing(values)
@@ -627,13 +647,13 @@ class PlayerFileView(QScrollArea):
             _name, values, _document = load_player_yaml(Path(filename), self.controller.options_schema)
             self._apply_enemy_category_values(values)
         except (OSError, ValueError) as error:
-            QMessageBox.critical(self, player_text("launcher.ui", "could_not_import_enemy_settings"), str(error))
+            QMessageBox.critical(self, player_text("launcher.ui", "could_not_import_enemy_settings"), self._file_failure(error))
 
     def _export_enemy_options(self) -> None:
         filename, _ = QFileDialog.getSaveFileName(
             self,
             player_text("launcher.ui", "save_enemy_settings"),
-            player_text("launcher.ui", "enemies_yaml"),
+            'Enemies.yaml',
             player_text("launcher.player_file", "yaml_files_yaml"),
         )
         if not filename:
@@ -655,7 +675,7 @@ class PlayerFileView(QScrollArea):
             if destination.write(payload) != len(payload) or not destination.commit():
                 raise OSError(destination.errorString())
         except (OSError, ValueError) as error:
-            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_enemy_settings"), str(error))
+            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_enemy_settings"), self._file_failure(error))
 
     def _import_player_options(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(
@@ -671,15 +691,9 @@ class PlayerFileView(QScrollArea):
             known_items = {item["name"] for item in self.start_inventory_catalog}
             unknown = set(values["start_inventory"]) - known_items
             if unknown:
-                raise ValueError(
-                    player_text(
-                        "launcher.player_file",
-                        "these_starting_items_are_unavailable_remove_them_and_try_again_v",
-                        value_0=f"{', '.join(sorted(unknown))}",
-                    )
-                )
+                raise PlayerError('launcher.player_file', 'these_starting_items_are_unavailable_remove_them_and_try_again_v', value_0=f"{', '.join(sorted(unknown))}")
         except (OSError, ValueError) as error:
-            QMessageBox.critical(self, player_text("launcher.ui", "could_not_import_player_file"), str(error))
+            QMessageBox.critical(self, player_text("launcher.ui", "could_not_import_player_file"), self._file_failure(error))
             return
         self._apply_player_values(values)
         self.player_name.setText(name)
@@ -690,7 +704,7 @@ class PlayerFileView(QScrollArea):
         try:
             suggested = suggested_yaml_filename(self.player_name.text())
         except ValueError as error:
-            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_player_file"), str(error))
+            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_player_file"), self._file_failure(error))
             return
         filename, _ = QFileDialog.getSaveFileName(
             self,
@@ -706,23 +720,25 @@ class PlayerFileView(QScrollArea):
                 str(self.inventory_picker.itemData(index)) for index in range(self.inventory_picker.count())
             }
             if unavailable:
-                raise ValueError(
-                    player_text("launcher.player_file", "remove_these_unavailable_starting_items_before_saving")
-                    + ", ".join(sorted(unavailable))
-                )
+                raise PlayerError("launcher.player_file", "remove_these_unavailable_starting_items_before_saving",
+                                  items=", ".join(sorted(unavailable)))
             saved = self.controller.save_player_options(
                 Path(filename), self.player_name.text(), self._option_values(), imported=self._imported_player
             )
         except Exception as error:
-            self._append_log(player_text("launcher.player_file", "player_yaml_save_error_value_0", value_0=f"{error}"))
-            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_player_file"), str(error))
+            self._append_log('Player YAML save error: {value_0}'.format(value_0=f'{error}'))
+            QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_player_file"), self._file_failure(error))
             return
         self._activity_event({"type": "player_yaml_saved", "path": str(saved)})
         QMessageBox.information(
             self,
             player_text("launcher.ui", "player_file_saved"),
-            player_text("launcher.ui", "saved_to") + "\n" + player_text("launcher.ui", "value_0", value_0=f"{saved}"),
+            player_text("launcher.ui", "saved_to") + "\n" + '{value_0}'.format(value_0=f'{saved}'),
         )
+
+    def _file_failure(self, error):
+        self.controller.emit("log", message=record_failure(self.controller, "player_options", error))
+        return failure_text("player_options", error)
 
     def _option_label(self, key: object) -> str:
         name = str(key)
@@ -732,7 +748,7 @@ class PlayerFileView(QScrollArea):
                 if isinstance(option, dict) and option.get("key") == name:
                     label = str(option.get("display_name") or "").strip()
                     if label:
-                        return label
+                        return option_text(name, "name", label)
         return name.replace("_", " ").title()
 
     def _option_value_text(self, value: object) -> str:

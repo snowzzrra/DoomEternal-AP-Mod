@@ -120,7 +120,7 @@ removed. A half-hooked game is worse than a game with the feature off.
 | Runtime | `delivery.py`, `delivery_runtime.py`, `delivery_plans.py` | Deciding what to send and recording the result |
 | Runtime | `native_transport.py` | Persistent pipe to Core (through a relay under Proton) |
 | Shared | `doom_eap/contracts/` | Typed data at boundaries: room data, Core distribution, evidence |
-| Shared | `data/player_strings.json`, `doom_eap/strings.py` | Every player-facing text |
+| Shared | `data/strings/`, `doom_eap/strings.py` | Every player-facing text |
 | Core | `protocol/schema.json`, `tools/generate_protocol.py` | The wire protocol; both sides generate code from it |
 | Core | `src/engine/hooks/`, `src/save_*`, `src/features/expanded/` | HookSet, save checkpoints, encounter and spawn features |
 
@@ -199,10 +199,11 @@ refactor and doesn't catch real bugs.
 
 ### Player text and languages
 
-All player text is in `data/player_strings.json`; code reads it through
-`doom_eap/strings.py`. `languages` declares each language code with a display name
-and an optional flag file. Every entry has a value for each code; `null` means
-"show English". For contributors, the short version is in the README:
+Player text lives in `data/strings/`. `en.json` has every message; each other
+language has its own file (`pt-BR.json`) with only the messages it translates, and a
+missing one falls back to English. `languages.json` lists the languages, their display
+names and optional flags, and which one is the default. Code reads the files through
+`doom_eap/strings.py`. For contributors, the short version is in the README:
 [Changing a text](../README.md#changing-a-text) and
 [Adding a language](../README.md#adding-a-language).
 
@@ -210,30 +211,53 @@ The launcher saves the chosen language as `launcher_language` in `launcher.json`
 and applies it on the next start. It doesn't change the game's language; in-game
 tables are generated for `en`/`pt-BR` and follow the game's own setting.
 
+Only text the player reads goes in the catalog. Support-report details, the technical
+details box, logs, status codes, commands and file names stay in English in the code.
+So do item, weapon, enemy and mission names: the editor shows them as the schema has
+them.
+
 Rules for entries:
 
 - Keys are stable and meaningful; never reuse one for a different message.
-- Declare each placeholder in `parameters` as `str` or `int`, and use the same names
-  in every language. No conversions, attribute/index access or format specs: format
-  numbers before passing them. Write `{{` and `}}` for literal braces.
+- Placeholders are the names in braces in the English text; every translation uses the
+  same ones. No conversions, attribute/index access or format specs: format numbers
+  before passing them. Write `{{` and `}}` for literal braces.
 - Plurals are complete messages under `.one` and `.other` (`.zero` only if needed).
+- The same English text with the same meaning gets one key under `common.*`. The check
+  rejects repeated English text unless the key is in its short list of exceptions.
+- Player options use `options.<option>.name`, `options.<option>.description` and
+  `options.<option>.choice.<choice>`. Their English must match `data/options_schema.json`,
+  so the APWorld stays the source; the check reports any difference.
 - AP item/location/player names, chat and DeathLink causes from other games are
   data, not entries. Keep their escaping where they're shown and never format them twice.
-- Telemetry, engine commands, protocol fields, error codes and support-report details
-  stay out of the catalog.
-- APWorld option help stays in `options.py`; other APWorld text comes from the catalog.
+
+#### Adding a DeathLink message
+
+When you die with DeathLink on, the launcher picks one message at random from the
+`deathlink.causes.*` keys and sends it to everyone in the room. To add one, add a line
+to `data/strings/en.json`:
+
+```json
+"deathlink.causes.ran_out_of_fuel": "{player} ran out of Chainsaw fuel.",
+```
+
+Keep `{player}`: it becomes the player's name. The key after `causes.` is any short name
+not used yet. Nothing else needs to change; the new message joins the draw on the next
+start. Don't translate these messages: other players in the room may not read your
+language, so they are sent in English.
 
 The generator writes the APWorld's `player_strings_generated.py`, Sentinel-Core's
-`src/player_strings_generated.h` and the game string tables. Text used by native
-code must be ASCII and fit its buffer, counting the final NUL: 96-byte menu titles,
-32/96-byte HUD fields, 64/80-byte counters, 160-byte controls. The check enforces it.
+`src/player_strings_generated.h` and the game string tables. The Core header gets the
+English text. Game table texts must fit their buffers in UTF-8, counting the final NUL:
+96-byte menu titles, 32/96-byte HUD fields, 64/80-byte counters, 160-byte controls.
+The check enforces it.
 
-`python -m tools.validation.player_literals` checks Python display sinks and the
-shipped `scripts/launch/run_bridge.sh`. It follows local captions and option tables
-into Qt text, event message fields and notifications. Use catalog keys for player
-text and codes for decisions. The small allow-list covers separators, HTML markup,
-numeric initialization and the bridge's technical log line; there is no baseline.
-CI runs this check beside the function complexity gate.
+`python -m tools.validation.player_literals` looks for English literals where the player
+would see them: the launcher UI and presenters, the game text the compiler writes and
+`PlayerError` messages. Use catalog keys there and codes for decisions; English in logs
+and technical details is fine. The small allow-list covers layout syntax, technical
+examples and texts that belong in the code. CI runs this check beside the function
+complexity gate.
 
 ### Generated files
 
@@ -245,7 +269,7 @@ and the regenerated files together.
 |---|---|---|
 | `doom_eap/content/native_enemy_catalog.json`, `vanilla_enemy_profiles.json`, `campaign_kill_sources.json`; `data/checked_location_visuals.json`, `campaign_stages.json`, `foundation_contracts.json`; the APWorld's `generated_content.py` and its copies of these files | `content/maps/`, `content/catalog/` | `python -m tools.content.compile_content_catalog --source-only` |
 | `data/options_schema.json` | option classes in the APWorld | `python -m tools.content.compile_options_schema` |
-| APWorld `player_strings_generated.py`, Core `src/player_strings_generated.h`, game string tables | `data/player_strings.json` | `python -m tools.content.compile_player_strings` |
+| APWorld `player_strings_generated.py`, Core `src/player_strings_generated.h`, game string tables | `data/strings/` | `python -m tools.content.compile_player_strings` |
 | `doom_eap/runtime/sentinel_protocol_generated.py` | Core `protocol/schema.json` | `tools/generate_protocol.py` in Core, then the Mod's projection |
 | `content/catalog/native_enemy_assets.json` | the installed game (Windows) | `python tools/content/capture_native_enemy_assets.py` |
 | `packaging/room_resources/<version>/` | compiled room resources | see [Building a release](RELEASING.md) |

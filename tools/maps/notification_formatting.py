@@ -130,10 +130,7 @@ def major_notification_text(
             raise ValueError("progressive notification stage is required")
         if name.startswith("Progressive "):
             name = name[len("Progressive "):]
-        name = load_catalog().text(
-            "notifications", "progressive_item", locale=GAME_LOCALES[locale],
-            item=name, stage=str(stage + 1), count=str(progressive_count),
-        )
+        name = f'{name} ({stage + 1!s}/{progressive_count!s})'
     return load_catalog().text("notifications", "major_item_received", locale=GAME_LOCALES[locale], item=name)
 
 
@@ -169,7 +166,7 @@ def _placement_identity(placement: Any) -> tuple[str, str, bool, bool]:
     return item_name, recipient_name, bool(placement.get("local")), bool(placement.get("trap"))
 
 
-def location_sent_text(placement: Any) -> str:
+def location_sent_text(placement: Any, *, locale: str = "english") -> str:
     """Return the placement-aware ``AP LOCATION SENT`` header text.
 
     Local checks report ``FOUND YOUR <ITEM>``; remote checks report
@@ -177,10 +174,8 @@ def location_sent_text(placement: Any) -> str:
     """
     item_name, recipient_name, local, _trap = _placement_identity(placement)
     if local:
-        return load_catalog().text("notifications", "local_found", item=item_name.upper())
-    return load_catalog().text(
-        "notifications", "sent_to_player", item=item_name.upper(), recipient=recipient_name.upper(),
-    )
+        return load_catalog().text('notifications', 'local_found', locale=GAME_LOCALES[locale], item=item_name.upper())
+    return load_catalog().text('notifications', 'sent_to_player', locale=GAME_LOCALES[locale], item=item_name.upper(), recipient=recipient_name.upper())
 
 
 def item_receipt_text(
@@ -190,6 +185,7 @@ def item_receipt_text(
     trap: bool,
     recipient_name: str,
     uppercase: bool = True,
+    locale: str = "english",
 ) -> str:
     """Return the placement-aware received-item subtitle text.
 
@@ -198,13 +194,10 @@ def item_receipt_text(
     """
     item = _sanitized_name(item_name)
     if trap:
-        return load_catalog().text("notifications", "trap" if uppercase else "trap_sentence")
+        return load_catalog().text('notifications', 'trap' if uppercase else 'trap_sentence', locale=GAME_LOCALES[locale])
     if uppercase:
         item = item.upper()
     if local:
-        return load_catalog().text("notifications", "local_item", item=item)
+        return load_catalog().text('notifications', 'local_item', locale=GAME_LOCALES[locale], item=item)
     recipient = _sanitized_name(recipient_name)
-    return load_catalog().text(
-        "notifications", "remote_item", item=item,
-        recipient=recipient.upper() if uppercase else recipient,
-    )
+    return load_catalog().text('notifications', 'remote_item', locale=GAME_LOCALES[locale], item=item, recipient=recipient.upper() if uppercase else recipient)

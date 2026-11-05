@@ -314,6 +314,9 @@ def test_blocked_filter_finds_old_items_and_observes_their_resolution(tmp_path):
             await ledger.apply(binding, (), (ReceiptDecision(0, ReceiptState.REJECTED, "rejected", b""),), ())
             reader, presenter = LedgerReadAdapter(path), ItemsPresenter()
             presenter.activate(ROOM, online=True)
+            presenter.observe(await reader.read(presenter.query(), online=True))
+            assert presenter.model.attention_count == 1
+            assert all(row.ap_index != 0 for row in presenter.model.rows)
             query = presenter.filter_blocked(True)
             presenter.observe(await reader.read(query, online=True))
             assert [row.ap_index for row in presenter.model.rows] == [0]
@@ -431,8 +434,9 @@ def test_play_keyboard_navigation_settings_and_progress_fit_window(ui):
     assert QApplication.clipboard().text() == option
 
 
-def test_items_inline_confirmation_uses_selected_ap_identity_and_disables_double_click(ui, owner, tmp_path):
-    from PySide6.QtWidgets import QApplication
+@pytest.mark.parametrize("kind", list(ResolutionAction))
+def test_items_confirmation_uses_selected_ap_identity_and_disables_double_click(ui, owner, tmp_path, monkeypatch, kind):
+    from PySide6.QtWidgets import QApplication, QMessageBox
 
     async def exercise(delivery, transport):
         transport.effect = 2
@@ -450,28 +454,67 @@ def test_items_inline_confirmation_uses_selected_ap_identity_and_disables_double
         presenter.capabilities(delivery.binding.room, can_resolve=True)
         view.render()
         ui.show()
-        view.table.selectRow(0)
+        view.list.setCurrentRow(0)
         QApplication.processEvents()
-        retry = view.action_buttons[ResolutionAction.TRY_AGAIN]
-        assert retry.isVisible()
-        retry.click()
-        assert view.confirm.isVisible()
-        ui.controller.resolve_item.assert_not_called()
-        view.confirm.click()
-        view.confirm.click()
+        index = page.page[0].ap_index
+        button = view.row_actions[index][kind]
+        assert button.isVisible()
+        if kind is ResolutionAction.MARK_AS_RECEIVED:
+            monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+            button.click()
+            ui.controller.resolve_item.assert_not_called()
+            assert presenter.resolution is None
+            monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+            view.row_actions[index][kind].click()
+            view._confirm()
+        else:
+            button.click()
+            assert view.row_confirm[index][0].isVisible()
+            ui.controller.resolve_item.assert_not_called()
+            view.row_confirm[index][0].click()
+            view.row_confirm[index][0].click()
         ui.controller.resolve_item.assert_called_once()
         request = ui.controller.resolve_item.call_args.args[0]
         assert request.room == delivery.binding.room
-        assert request.action == page.page[0].actions[0]
+        assert request.action == next(action for action in page.page[0].actions if action.kind is kind)
         presenter.activate(replace(request.room, seed="other"), online=False)
         view.render()
-        assert all(button.isHidden() for button in view.action_buttons.values())
+        assert not view.row_actions
         assert view.confirm.isHidden()
 
     import queue
 
     ui.controller.events = queue.Queue()
     owner(exercise)
+
+
+def test_items_hide_delivered_status_and_filter_without_attention(ui):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel
+
+    from doom_eap.runtime.ledger_records import ItemReason, ItemRow, ItemStatus
+
+    presenter, view = ui.items_presenter, ui.items_view
+    presenter.activate(ROOM, online=True)
+    delivered = ItemRow(2, 7770003, 1, ItemStatus.DELIVERED, None, (), 2)
+    waiting = replace(delivered, ap_index=1, status=ItemStatus.WAITING)
+    presenter.model = replace(presenter.model, rows=(delivered, waiting))
+    view.render()
+    assert not presenter.status(delivered)
+    assert presenter.status(waiting)
+    assert view.blocked.isHidden()
+    marked = replace(delivered, resolution=Resolution.ACCEPTED_BY_PLAYER)
+    assert presenter.status(marked)
+    blocked = replace(waiting, status=ItemStatus.BLOCKED, reason_code=ItemReason.EFFECT_UNKNOWN)
+    view.item_names[7770003] = "<b>external item</b>"
+    view.player_names[2] = "<b>external player</b>"
+    blocked = replace(blocked, sender=2)
+    presenter.model = replace(presenter.model, rows=(delivered, blocked), attention_count=1)
+    view.render()
+    assert not view.blocked.isHidden()
+    external_labels = [label for label in view.list.findChildren(QLabel) if "<b>" in label.text()]
+    assert external_labels
+    assert all(label.textFormat() is Qt.TextFormat.PlainText for label in external_labels)
 
 
 def test_save_copy_contains_consistent_ledger_and_owner_reset_preserves_sources(tmp_path, monkeypatch):

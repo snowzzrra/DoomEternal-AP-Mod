@@ -68,30 +68,30 @@ ROOM_PACKAGE_FAILURE_TITLE = player_text('launcher.ui', 'room_mod_could_not_be_b
 ROOM_PACKAGE_FAILURE_MESSAGE = (
     player_text('launcher.ui', 'open_session_and_select_rebuild_room_package_if_it_fails_again_s')
 )
-ROOM_PACKAGE_FAILURE_ACTION = player_text('launcher.integration', 'rebuild_room_package')
-APPLICATION_PACKAGE_FAILURE_TITLE = player_text('launcher.integration', 'launcher_files_missing_or_damaged')
+ROOM_PACKAGE_FAILURE_ACTION = 'REBUILD ROOM PACKAGE'
+APPLICATION_PACKAGE_FAILURE_TITLE = 'LAUNCHER FILES MISSING OR DAMAGED'
 APPLICATION_PACKAGE_FAILURE_MESSAGE = (
-    player_text('launcher.integration', 'extract_the_complete_doomeap_download_into_a_new_folder_and_run')
+    'Extract the complete DoomEAP download into a new folder and run it again.'
 )
-APPLICATION_PACKAGE_FAILURE_ACTION = player_text('launcher.integration', 'extract_the_complete_download')
+APPLICATION_PACKAGE_FAILURE_ACTION = 'EXTRACT THE COMPLETE DOWNLOAD'
 MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE = (
-    player_text('launcher.integration', 'a_required_mod_building_tool_could_not_be_prepared_check_your_co')
+    'A required mod-building tool could not be prepared. Check your connection and try rebuilding the Room Package.'
 )
 GAME_SETUP_FAILURE_TITLE = player_text('launcher.ui', 'game_setup_needs_attention')
 GAME_SETUP_FAILURE_MESSAGE = (
-    player_text('launcher.integration', 'open_help_and_select_fix_setup_if_it_fails_again_select_help_sav')
+    'Open Help and select Fix Setup. If it fails again, select Help -> SAVE SUPPORT REPORT.'
 )
-GAME_SETUP_FAILURE_ACTION = player_text('launcher.ui', 'repair_game_connection_d53210')
+GAME_SETUP_FAILURE_ACTION = player_text('common', 'repair_game_connection')
 INSTALLED_PACKAGE_FAILURE_TITLE = player_text('launcher.ui', 'room_mod_update_required')
 INSTALLED_PACKAGE_FAILURE_MESSAGE = (
-    player_text('launcher.integration', 'select_update_room_package_before_playing')
+    'Select UPDATE ROOM PACKAGE before playing.'
 )
-INSTALLED_PACKAGE_FAILURE_ACTION = player_text('launcher.integration', 'update_room_package')
+INSTALLED_PACKAGE_FAILURE_ACTION = 'UPDATE ROOM PACKAGE'
 ROOM_PACKAGE_INCOMPATIBLE_TITLE = player_text('launcher.ui', 'room_mod_needs_rebuilding')
 ROOM_PACKAGE_INCOMPATIBLE_MESSAGE = (
-    player_text('launcher.integration', 'this_room_is_incompatible_with_this_launcher_select_help_save_su')
+    'This room is incompatible with this launcher. Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.'
 )
-ROOM_PACKAGE_INCOMPATIBLE_ACTION = player_text('launcher.integration', 'rebuild_room_package')
+ROOM_PACKAGE_INCOMPATIBLE_ACTION = 'REBUILD ROOM PACKAGE'
 
 UNINSTALL_OWNED_STATES = frozenset({
     "uninstall_in_progress",
@@ -129,11 +129,11 @@ def _campaign_failure_message(error, raw_message):
     if processes:
         return player_text('launcher.ui', 'close_doom_eternal_open_ap_save_to_inspect_backups_then_select_h')
     elif channel_failure:
-        return (player_text('launcher.integration', 'the_game_connection_helper_stopped_check_that_the_selected_proto'))
+        return ('The game connection helper stopped. Check that the selected Proton version matches DOOM Eternal in Steam, then select Help -> SAVE SUPPORT REPORT before trying again. Save changes are blocked until the game connection can be confirmed.')
     elif processes is not None:
-        return player_text('launcher.integration', 'open_ap_save_to_inspect_backups_then_select_help_save_support_re')
+        return 'Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again.'
     else:
-        return (player_text('launcher.integration', 'save_changes_are_blocked_until_doom_eternal_s_process_identity_c'))
+        return ("Save changes are blocked until DOOM Eternal's process identity can be confirmed. Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again.")
 
 
 def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str, object]:
@@ -146,26 +146,26 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
     tool_unavailable = code == "mod_building_tool_unavailable"
     if failure_domain == "application_package":
         recovery_action = "reinstall_application"
-        user_title = player_text('launcher.integration', 'launcher_files_missing_or_damaged')
-        user_message = player_text('launcher.integration', 'extract_the_complete_doomeap_download_into_a_new_folder_and_run')
-        user_action = player_text('launcher.integration', 'extract_the_complete_download')
+        user_title = 'LAUNCHER FILES MISSING OR DAMAGED'
+        user_message = 'Extract the complete DoomEAP download into a new folder and run it again.'
+        user_action = 'EXTRACT THE COMPLETE DOWNLOAD'
     elif failure_domain == "room_package":
         recovery_action = "rebuild_room_package"
         if code in {"unsupported_contract", "unsupported_capabilities", "unsupported_schema", "unsupported_revision", "incompatible_bridge_protocol"}:
             user_title = player_text('launcher.ui', 'room_mod_needs_rebuilding')
-            user_message = player_text('launcher.integration', 'this_room_is_incompatible_with_this_launcher_select_help_save_su')
-            user_action = player_text('launcher.integration', 'rebuild_room_package')
+            user_message = 'This room is incompatible with this launcher. Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.'
+            user_action = 'REBUILD ROOM PACKAGE'
         elif tool_unavailable:
             user_title = player_text('launcher.ui', 'room_mod_could_not_be_built')
-            user_message = player_text('launcher.integration', 'a_required_mod_building_tool_could_not_be_prepared_check_your_co')
-            user_action = player_text('launcher.integration', 'rebuild_room_package')
+            user_message = 'A required mod-building tool could not be prepared. Check your connection and try rebuilding the Room Package.'
+            user_action = 'REBUILD ROOM PACKAGE'
         else:
             user_title = player_text('launcher.ui', 'room_mod_could_not_be_built')
             user_message = player_text('launcher.ui', 'open_session_and_select_rebuild_room_package_if_it_fails_again_s')
-            user_action = player_text('launcher.integration', 'rebuild_room_package')
+            user_action = 'REBUILD ROOM PACKAGE'
     elif failure_domain == "proton_runtime":
         recovery_action = "select_proton"
-        user_title = player_text('launcher.integration', 'select_doom_eternal_s_proton_version')
+        user_title = "Select DOOM Eternal's Proton version"
         user_message = raw_message
         user_action = player_text('launcher.ui', 'select_proton')
     elif failure_domain == "campaign_session":
@@ -176,8 +176,8 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
     else:
         recovery_action = "repair_game_integration"
         user_title = player_text('launcher.ui', 'game_setup_needs_attention')
-        user_message = player_text('launcher.integration', 'open_help_and_select_fix_setup_if_it_fails_again_select_help_sav')
-        user_action = player_text('launcher.ui', 'repair_game_connection_d53210')
+        user_message = 'Open Help and select Fix Setup. If it fails again, select Help -> SAVE SUPPORT REPORT.'
+        user_action = player_text('common', 'repair_game_connection')
     return {
         "error_type": type(error).__name__,
         "message": raw_message,
@@ -221,8 +221,8 @@ def _slot_admission_failure_payload(error, phase):
         "error_type": type(error).__name__, "message": str(error), "raw_message": str(error),
         "technical_error_type": type(error).__name__, "technical_message": str(error),
         "code": error.code, "failure_domain": error.failure_domain, "stage": phase or "slot_admission",
-        "recovery_action": "generate_room", "user_title": player_text('launcher.integration', 'room_data_is_incompatible'),
-        "user_message": str(error), "user_action": player_text('launcher.integration', 'generate_a_compatible_room'),
+        "recovery_action": "generate_room", "user_title": 'ROOM DATA IS INCOMPATIBLE',
+        "user_message": str(error), "user_action": 'GENERATE A COMPATIBLE ROOM',
     }
 
 
@@ -232,8 +232,8 @@ def installed_package_issue_payload(reason: str) -> dict[str, object]:
         "failure_domain": "installed_room_package",
         "recovery_action": "update_room_package",
         "user_title": player_text('launcher.ui', 'room_mod_update_required'),
-        "user_message": player_text('launcher.integration', 'select_update_room_package_before_playing'),
-        "user_action": player_text('launcher.integration', 'update_room_package'),
+        "user_message": 'Select UPDATE ROOM PACKAGE before playing.',
+        "user_action": 'UPDATE ROOM PACKAGE',
         "technical_message": reason,
         "raw_message": reason,
     }
@@ -396,7 +396,7 @@ class IntegratedLaunchWorkflow:
             return deepcopy(self._configuration_snapshot)
         document = json.loads(self.config_path.read_text(encoding="utf-8"))
         if not isinstance(document, dict):
-            raise ValueError(player_text('launcher.integration', 'launcher_configuration_must_contain_an_object'))
+            raise ValueError('launcher configuration must contain an object')
         return document
 
     @staticmethod
@@ -404,7 +404,7 @@ class IntegratedLaunchWorkflow:
         base = Path(str(config.get("doom_base_dir", ""))).expanduser().resolve()
         root = base.parent if base.name.casefold() == "base" else base
         if not (root / "DOOMEternalx64vk.exe").is_file() or not (root / "base").is_dir():
-            raise ValueError(player_text('launcher.integration', 'invalid_configured_doom_eternal_installation_value_0', value_0=f'{root}'))
+            raise ValueError('invalid configured DOOM Eternal installation: {value_0}'.format(value_0=f'{root}'))
         return root
 
     def _steam_plan(self, config: dict[str, object]):
@@ -445,7 +445,7 @@ class IntegratedLaunchWorkflow:
             plan.proposed + "\n", encoding="utf-8"
         )
         (self.state_dir / "steam_launch_option.diff").write_text(
-            (plan.diff or player_text('launcher.integration', 'no_change_required') + '\n' + '') + ("\n" if plan.diff else ""),
+            (plan.diff or 'No change required.' + '\n' + '') + ("\n" if plan.diff else ""),
             encoding="utf-8",
         )
         return plan
@@ -472,7 +472,7 @@ class IntegratedLaunchWorkflow:
         spec = idfile_decompressor_spec(self.platform_name)
         if spec is None or not manager.platform_supported(spec, self.platform_name):
             message = (
-                player_text('launcher.integration', 'idfiledecompressor_is_unavailable_on_unsupported_platform_value', value_0=f'{self.platform_name}')
+                'idFileDeCompressor is unavailable on unsupported platform {value_0}; no pinned codec artifact is available'.format(value_0=f'{self.platform_name}')
             )
             self._emit(
                 "prerequisite_missing",
@@ -492,7 +492,7 @@ class IntegratedLaunchWorkflow:
         spec = idfile_decompressor_spec(self.platform_name)
         manager = self._idfile_manager()
         if spec is None:
-            raise RuntimeError(player_text('launcher.integration', 'idfiledecompressor_is_unavailable_on_platform_value_0', value_0=f'{self.platform_name}'))
+            raise RuntimeError('idFileDeCompressor is unavailable on platform {value_0}'.format(value_0=f'{self.platform_name}'))
         return self._acquire(manager, spec, None)
 
     def remove_idfile_decompressor(self) -> bool:
@@ -512,7 +512,7 @@ class IntegratedLaunchWorkflow:
                                 readiness="blocked", readiness_reason=reason)
         receipt_path = self.state_dir / "launcher_setup.json"
         if not receipt_path.is_file():
-            return InstallState("install_needed", manifest.manifest_hash, reason=player_text('launcher.integration', 'no_launcher_install_record'))
+            return InstallState("install_needed", manifest.manifest_hash, reason='no launcher install record')
         try:
             receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
             staged = Path(str(receipt["staged_mod"])).resolve()
@@ -522,16 +522,16 @@ class IntegratedLaunchWorkflow:
             bool(receipt.get("windows_installation_confirmed", False))
             steam_option = str(receipt.get("steam_launch_option", ""))
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
-            return InstallState("update_required", manifest.manifest_hash, reason=player_text('launcher.integration', 'invalid_install_record_value_0', value_0=f'{error}'))
+            return InstallState("update_required", manifest.manifest_hash, reason='invalid install record: {value_0}'.format(value_0=f'{error}'))
         if adapter_state in UNINSTALL_OWNED_STATES:
             if recorded_manifest != manifest.manifest_hash:
                 return InstallState(
                     "install_needed",
                     manifest.manifest_hash,
-                    reason=player_text('launcher.integration', 'previous_room_mod_has_uninstall_state_value_0', value_0=f'{adapter_state}'),
+                    reason='previous room mod has uninstall state {value_0}'.format(value_0=f'{adapter_state}'),
                 )
             if adapter_state != "uninstalled":
-                reason = str(receipt.get("adapter_message") or player_text('launcher.integration', 'room_mod_uninstall_requires_attention'))
+                reason = str(receipt.get("adapter_message") or 'Room mod uninstall requires attention.')
                 return InstallState(
                     adapter_state,
                     manifest.manifest_hash,
@@ -546,21 +546,21 @@ class IntegratedLaunchWorkflow:
                 manifest.manifest_hash,
                 str(staged),
                 steam_option,
-                reason=player_text('launcher.integration', 'room_mod_was_intentionally_uninstalled'),
+                reason='room mod was intentionally uninstalled',
             )
         if recorded_manifest != manifest.manifest_hash:
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, player_text('launcher.integration', 'installed_manifest_belongs_to_another_room_or_build'), reason_code="room_changed")
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, 'installed manifest belongs to another room or build', reason_code="room_changed")
         recorded_static_digest = str(receipt.get("static_content_digest", ""))
         if recorded_static_digest and recorded_static_digest != manifest.static_content_digest:
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, player_text('launcher.integration', 'installed_package_static_content_is_out_of_date'))
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, 'installed package static content is out of date')
         if not staged.is_file():
-            return InstallState("update_required", manifest.manifest_hash, reason=player_text('launcher.integration', 'recorded_installed_package_is_missing'))
+            return InstallState("update_required", manifest.manifest_hash, reason='recorded installed package is missing')
         if hashlib.sha256(staged.read_bytes()).hexdigest() != expected_sha:
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, player_text('launcher.integration', 'installed_package_hash_does_not_match_record'))
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, 'installed package hash does not match record')
         if not RoomCompiler.validate_cached_package(staged, manifest):
-            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, player_text('launcher.integration', 'installed_package_embedded_content_identity_does_not_match_curre'))
+            return InstallState("update_required", manifest.manifest_hash, str(staged), steam_option, 'installed package embedded content identity does not match current room')
         if adapter_state != "applied":
-            return InstallState("install_needed", manifest.manifest_hash, reason=player_text('launcher.integration', 'previous_install_state_is_value_0', value_0=f"{adapter_state or 'unknown'}"))
+            return InstallState("install_needed", manifest.manifest_hash, reason='previous install state is {value_0}'.format(value_0=f"{adapter_state or 'unknown'}"))
 
         generated_path = Path(str(receipt.get("generated_mod", ""))).expanduser()
         generated_sha = str(receipt.get("generated_sha256", ""))
@@ -568,24 +568,24 @@ class IntegratedLaunchWorkflow:
         if not generated_path.is_file() or not generated_sha:
             return InstallState(
                 "update_required", manifest.manifest_hash, str(staged), steam_option,
-                reason=player_text('launcher.integration', 'install_record_lacks_generated_room_zip_evidence'),
+                reason='install record lacks generated room ZIP evidence',
             )
         try:
             generated_actual = hashlib.sha256(generated_path.read_bytes()).hexdigest()
         except OSError as error:
             return InstallState(
                 "update_required", manifest.manifest_hash, str(staged), steam_option,
-                reason=player_text('launcher.integration', 'generated_room_zip_evidence_unavailable_value_0', value_0=f'{error}'),
+                reason='generated room ZIP evidence unavailable: {value_0}'.format(value_0=f'{error}'),
             )
         if generated_actual != generated_sha or expected_sha != room_zip_sha or generated_sha != expected_sha:
             return InstallState(
                 "update_required", manifest.manifest_hash, str(staged), steam_option,
-                reason=player_text('launcher.doctor', 'generated_and_staged_room_zip_hashes_differ'),
+                reason='generated and staged room ZIP hashes differ',
             )
         if not RoomCompiler.validate_cached_package(generated_path, manifest):
             return InstallState(
                 "update_required", manifest.manifest_hash, str(staged), steam_option,
-                reason=player_text('launcher.integration', 'generated_cache_embedded_content_identity_does_not_match_current'),
+                reason='generated cache embedded content identity does not match current room',
             )
 
         try:
@@ -602,13 +602,13 @@ class IntegratedLaunchWorkflow:
                 if not self._linux_installation_evidence(receipt, game_root):
                     return InstallState(
                         "already_installed", manifest.manifest_hash, str(staged), steam_option,
-                        readiness="blocked", readiness_reason=player_text('launcher.integration', 'linux_install_evidence_is_incomplete'),
+                        readiness="blocked", readiness_reason='Linux install evidence is incomplete',
                     )
                 verify_linux_mod_installation(game_root, staged)
             prereqs = probe_runtime_prerequisites(game_root, self.application_dir, config)
             if not prereqs.ok:
                 meathook = prereqs.meathook
-                reason = meathook.message if meathook and not meathook.ok else player_text('launcher.integration', 'runtime_prerequisites_not_met')
+                reason = meathook.message if meathook and not meathook.ok else 'Runtime prerequisites not met'
                 return InstallState(
                     "already_installed",
                     manifest.manifest_hash,
@@ -620,13 +620,13 @@ class IntegratedLaunchWorkflow:
         except Exception as error:
             reason = str(error) or type(error).__name__
             return InstallState(
-                "already_installed",
-                manifest.manifest_hash,
-                str(staged),
-                steam_option,
-                readiness="blocked",
-                readiness_reason=reason,
-            )
+                    "already_installed",
+                    manifest.manifest_hash,
+                    str(staged),
+                    steam_option,
+                    readiness="blocked",
+                    readiness_reason=reason,
+                )
 
         return InstallState("already_installed", manifest.manifest_hash, str(staged), steam_option, readiness="ready")
 
@@ -684,7 +684,7 @@ class IntegratedLaunchWorkflow:
                 return (
                     AdapterResult(
                         state="manual_install_required",
-                        message=player_text('launcher.integration', 'automatic_eternalmodinjector_setup_could_not_be_completed_value', value_0=f'{error}'),
+                        message='Automatic EternalModInjector setup could not be completed ({value_0}). Follow the Windows Manual Mod Installer section in INSTALL.md.'.format(value_0=f'{error}'),
                         details={"installation_mode": "manual_install_required", "error": str(error)},
                     ),
                     None,
@@ -708,7 +708,7 @@ class IntegratedLaunchWorkflow:
                 return (
                     AdapterResult(
                         state="failed",
-                        message=player_text('launcher.integration', 'injector_download_was_not_approved_try_setup_again_when_ready'),
+                        message='Injector download was not approved. Try setup again when ready.',
                     ),
                     None,
                     plan.proposed,
@@ -716,7 +716,7 @@ class IntegratedLaunchWorkflow:
                 )
             adapter = LinuxModManagerAdapter(dependency, state_dir=self.state_dir, event_sink=self._emit_injector)
             return adapter, adapter.prepare(game_root, journal=journal), plan.proposed, plan.diff
-        raise RuntimeError(player_text('launcher.integration', 'unsupported_platform_value_0', value_0=f'{self.platform_name}'))
+        raise RuntimeError('unsupported platform: {value_0}'.format(value_0=f'{self.platform_name}'))
 
     def _run_injector(
         self,
@@ -766,7 +766,7 @@ class IntegratedLaunchWorkflow:
                 operation="uninstall",
             )
             return result, plan.proposed, plan.diff
-        raise RuntimeError(player_text('launcher.integration', 'unsupported_platform_value_0', value_0=f'{self.platform_name}'))
+        raise RuntimeError('unsupported platform: {value_0}'.format(value_0=f'{self.platform_name}'))
 
     def ensure_game_link(
         self,
@@ -785,7 +785,7 @@ class IntegratedLaunchWorkflow:
         from ..contracts.core_distribution import read_manifest
         selected_manifest = read_manifest(selected)
         self._emit("core_runtime_selected", path=str(selected), development_override=bool(config.get("core_runtime_manifest")),
-                   message=player_text('launcher.integration', 'core_value_0_selected_build_value_1', value_0=f"{selected_manifest['version']}", value_1=f"{selected_manifest['build_id']}"))
+                   message='Core {value_0} selected (build {value_1}).'.format(value_0=f"{selected_manifest['version']}", value_1=f"{selected_manifest['build_id']}"))
         if journal is not None:
             journal.document["evidence"]["selected_core_runtime_manifest"] = str(selected)
             journal.save()
@@ -805,7 +805,7 @@ class IntegratedLaunchWorkflow:
             if not post_probe.ok:
                 return GameLinkResult(
                     state="failed",
-                    message=player_text('launcher.integration', 'game_link_runtime_installation_could_not_be_verified_after_insta', value_0=f'{post_probe.message}'),
+                    message='Game Link runtime installation could not be verified after installation: {value_0}'.format(value_0=f'{post_probe.message}'),
                     path=result.path,
                     sha256=result.sha256,
                     ownership=result.ownership,
@@ -852,7 +852,7 @@ class IntegratedLaunchWorkflow:
             staged_mod=state.staged_mod,
             staged_sha256=str(receipt["staged_sha256"]),
             adapter_state="applied",
-            adapter_message=str(receipt.get("adapter_message", player_text('launcher.integration', 'mod_is_already_installed_for_current_room'))),
+            adapter_message=str(receipt.get("adapter_message", 'Mod is already installed for current room.')),
             adapter_command=adapter_command,
             injector_command=injector_command,
             steam_launch_option=state.steam_launch_option,
@@ -955,7 +955,7 @@ class IntegratedLaunchWorkflow:
             generated = Path(identity["generated_mod"])
             expected_room = (manifest.manifest_hash, manifest.seed_name, manifest.team, manifest.slot)
             if tuple(identity[key] for key in ("manifest_hash", "seed_name", "team", "slot")) != expected_room:
-                raise InstallationRecoveryRequired(player_text('launcher.integration', 'pending_installation_belongs_to_another_room'))
+                raise InstallationRecoveryRequired('pending installation belongs to another room')
         else:
             self._failure_phase = "room_package"
             generated = self._compile_installation(manifest)
@@ -992,7 +992,7 @@ class IntegratedLaunchWorkflow:
                     details={"path": game_link.path, "sha256": game_link.sha256, "status": "incompatible"},
                 )
                 raise RuntimeError(
-                    player_text('launcher.integration', 'installed_sentinel_core_runtime_does_not_match_the_selected_dist')
+                    'Installed Sentinel Core runtime does not match the selected distribution. Repair Game Link before preparing the room mod.'
                 )
             if game_link.state == "failed":
                 raise RuntimeError(game_link.message)
@@ -1000,11 +1000,11 @@ class IntegratedLaunchWorkflow:
             self._emit(
                 "prerequisite_missing",
                 key="meathook",
-                message=player_text('launcher.integration', 'game_link_installation_was_not_approved'),
+                message='Game Link installation was not approved.',
                 details={"status": "missing"},
             )
             raise RuntimeError(
-                player_text('launcher.integration', 'game_link_download_was_not_approved_approve_the_download_to_fini')
+                'Game Link download was not approved. Approve the download to finish setup.'
             ) from error
         except Exception as error:
             if not isinstance(error, RuntimeError | PermissionError):
@@ -1030,10 +1030,10 @@ class IntegratedLaunchWorkflow:
                     details=meathook.details,
                 )
                 raise RuntimeError(
-                    player_text('launcher.integration', 'sentinel_core_runtime_is_not_installed_repair_game_link_before_p')
+                    'Sentinel Core runtime is not installed. Repair Game Link before preparing the room mod.'
                 )
             failed = [c.message for c in prereqs.checks if not c.ok]
-            raise RuntimeError(player_text('launcher.integration', 'runtime_prerequisites_not_met_value_0', value_0=f"{'; '.join(failed)}"))
+            raise RuntimeError('Runtime prerequisites not met: {value_0}'.format(value_0=f"{'; '.join(failed)}"))
 
 
     def _compile_installation(self, manifest):
@@ -1065,9 +1065,9 @@ class IntegratedLaunchWorkflow:
         self.check_cancelled()
         staged = stage_room_mod(plan.generated, plan.game_root, plan.receipt_path,
             manifest_hash=manifest.manifest_hash, journal=journal,
-            legacy_removal_sink=lambda path: self._emit("log", message=player_text('launcher.integration', 'removed_legacy_doom_eternal_archipelago_mod_value_0', value_0=f'{path}')))
+            legacy_removal_sink=lambda path: self._emit("log", message='Removed legacy DOOM Eternal Archipelago mod: {value_0}'.format(value_0=f'{path}')))
         if file_digest(staged) != plan.identity["generated_sha256"]:
-            raise RuntimeError(player_text('launcher.integration', 'generated_and_staged_room_mod_hashes_differ'))
+            raise RuntimeError('generated and staged room mod hashes differ')
         self._emit("mod_staged", path=str(staged), manifest_hash=manifest.manifest_hash)
         self._installation_journal_port = journal
         self._prepared_injector = self._prepare_adapter(self._config(), plan.game_root, journal)
@@ -1096,7 +1096,7 @@ class IntegratedLaunchWorkflow:
         journal = self._installation_journal_port
         tool = journal.document["evidence"]["tool"]
         if file_digest(executable) != tool["sha256"]:
-            raise InstallationRecoveryRequired(player_text('launcher.integration', 'injector_tool_changed'))
+            raise InstallationRecoveryRequired('injector tool changed')
         if self.platform_name == "linux":
             self._emit_injector("injector_started", command=[str(executable)])
         result = adapter.run(plan.game_root, prepared=executable, journal=journal)
@@ -1110,7 +1110,7 @@ class IntegratedLaunchWorkflow:
     def _installation_session(self, plan, journal, snapshot, endpoint):
         config = self._config()
         if self._installation_configuration(config) != plan.identity["configuration"]:
-            raise InstallationRecoveryRequired(player_text('launcher.integration', 'installation_configuration_changed'))
+            raise InstallationRecoveryRequired('installation configuration changed')
         runtime = journal.document["evidence"].get("selected_core_runtime_manifest")
         if runtime:
             config["selected_core_runtime_manifest"] = runtime
@@ -1195,16 +1195,16 @@ class IntegratedLaunchWorkflow:
     def _verify_room_package(staged, identity):
         actual_hash = hashlib.sha256(staged.read_bytes()).hexdigest()
         if actual_hash != identity["generated_sha256"]:
-            raise RuntimeError(player_text('launcher.integration', 'post_install_room_mod_hash_validation_failed'))
+            raise RuntimeError('post-install room mod hash validation failed')
         try:
             with zipfile.ZipFile(staged) as package:
                 installed_manifest = json.loads(package.read("seed_manifest.json"))
             if installed_manifest.get("manifest_hash") != identity["manifest_hash"]:
-                raise ValueError(player_text('launcher.integration', 'room_identity_differs'))
+                raise ValueError('room identity differs')
             if identity["static_content_digest"] and installed_manifest.get("static_content_digest") != identity["static_content_digest"]:
-                raise ValueError(player_text('launcher.integration', 'room_content_identity_differs'))
+                raise ValueError('room content identity differs')
         except (KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
-            raise RuntimeError(player_text('launcher.integration', 'post_install_room_mod_validation_failed_value_0', value_0=f'{error}')) from error
+            raise RuntimeError('post-install room mod validation failed: {value_0}'.format(value_0=f'{error}')) from error
 
     def uninstall(self, snapshot: RoomSnapshot) -> UninstallResult:
         """Remove only receipt-proven room package, then run platform injector once."""
@@ -1215,36 +1215,36 @@ class IntegratedLaunchWorkflow:
             running = detect_doom_processes()
             if running:
                 names = ", ".join(str(item.get("name", "unknown")) for item in running)
-                raise RuntimeError(player_text('launcher.integration', 'cannot_uninstall_room_mod_while_game_runtime_is_running_value_0', value_0=f'{names}'))
+                raise RuntimeError('Cannot uninstall room mod while game runtime is running: {value_0}'.format(value_0=f'{names}'))
 
             receipt_path = self.state_dir / "launcher_setup.json"
             try:
                 receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
                 if not isinstance(receipt, dict):
-                    raise ValueError(player_text('launcher.integration', 'receipt_must_contain_an_object'))
+                    raise ValueError('receipt must contain an object')
                 if str(receipt.get("adapter_state", "")) != "applied":
-                    raise ValueError(player_text('launcher.integration', 'receipt_does_not_prove_an_applied_room_mod'))
+                    raise ValueError('receipt does not prove an applied room mod')
                 if str(receipt.get("manifest_hash", "")) != manifest.manifest_hash:
-                    raise ValueError(player_text('launcher.integration', 'receipt_belongs_to_another_room'))
+                    raise ValueError('receipt belongs to another room')
                 staged_input = Path(str(receipt["staged_mod"])).expanduser()
                 if staged_input.is_symlink():
-                    raise ValueError(player_text('launcher.integration', 'receipt_package_is_a_symbolic_link'))
+                    raise ValueError('receipt package is a symbolic link')
                 staged = staged_input.resolve()
                 mods_dir = (game_root / "Mods").resolve()
                 if staged.parent != mods_dir or staged.suffix.casefold() != ".zip":
-                    raise ValueError(player_text('launcher.integration', 'receipt_package_is_outside_configured_game_mods_folder'))
+                    raise ValueError('receipt package is outside configured game Mods folder')
                 if staged.is_symlink() or not staged.is_file():
-                    raise ValueError(player_text('launcher.integration', 'receipt_package_is_missing'))
+                    raise ValueError('receipt package is missing')
                 expected_sha256 = str(receipt["staged_sha256"])
                 actual_sha256 = hashlib.sha256(staged.read_bytes()).hexdigest()
                 if actual_sha256 != expected_sha256:
-                    raise ValueError(player_text('launcher.integration', 'receipt_package_hash_does_not_match'))
+                    raise ValueError('receipt package hash does not match')
                 with zipfile.ZipFile(staged) as package:
                     package_manifest = json.loads(package.read("seed_manifest.json"))
                 if not isinstance(package_manifest, dict) or package_manifest.get("manifest_hash") != manifest.manifest_hash:
-                    raise ValueError(player_text('launcher.integration', 'receipt_package_manifest_does_not_match_current_room'))
+                    raise ValueError('receipt package manifest does not match current room')
             except (OSError, RuntimeError, KeyError, TypeError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as error:
-                raise RuntimeError(player_text('launcher.integration', 'cannot_uninstall_room_mod_safely_value_0', value_0=f'{error}')) from error
+                raise RuntimeError('Cannot uninstall room mod safely: {value_0}'.format(value_0=f'{error}')) from error
 
             self.check_cancelled()
             quarantine_dir = self.state_dir / "uninstall-quarantine"
@@ -1254,7 +1254,7 @@ class IntegratedLaunchWorkflow:
             receipt.update(
                 {
                     "adapter_state": "uninstall_attention",
-                    "adapter_message": player_text('launcher.integration', 'room_mod_uninstall_is_in_progress_or_requires_attention'),
+                    "adapter_message": 'Room mod uninstall is in progress or requires attention.',
                     "installation_mode": "uninstall",
                     "uninstall_quarantine": str(quarantine),
                 }
@@ -1268,7 +1268,7 @@ class IntegratedLaunchWorkflow:
                     temporary.unlink()
                 except OSError:
                     pass
-                raise RuntimeError(player_text('launcher.integration', 'could_not_record_uninstall_attention_state_value_0', value_0=f'{error}')) from error
+                raise RuntimeError('Could not record uninstall attention state: {value_0}'.format(value_0=f'{error}')) from error
 
             def failed_result(message: str, injector_state: str = "", command: tuple[str, ...] = ()) -> UninstallResult:
                 receipt.update(
@@ -1288,7 +1288,7 @@ class IntegratedLaunchWorkflow:
                         temporary.unlink()
                     except OSError:
                         pass
-                    message = player_text('launcher.integration', 'value_0_receipt_update_failed_value_1', value_0=f'{message}', value_1=f'{error}')
+                    message = '{value_0} Receipt update failed: {value_1}'.format(value_0=f'{message}', value_1=f'{error}')
                 return UninstallResult(
                     state="attention",
                     manifest_hash=manifest.manifest_hash,
@@ -1310,12 +1310,12 @@ class IntegratedLaunchWorkflow:
             try:
                 shutil.copy2(staged, quarantine)
                 if hashlib.sha256(quarantine.read_bytes()).hexdigest() != expected_sha256:
-                    raise RuntimeError(player_text('launcher.integration', 'quarantine_package_hash_does_not_match_receipt'))
+                    raise RuntimeError('quarantine package hash does not match receipt')
                 staged.unlink()
                 if staged.exists():
-                    raise RuntimeError(player_text('launcher.integration', 'verified_room_package_remains_after_removal'))
+                    raise RuntimeError('verified room package remains after removal')
             except Exception as error:
-                raise RuntimeError(player_text('launcher.integration', 'room_package_removal_was_not_completed_safely_value_0', value_0=f'{error}')) from error
+                raise RuntimeError('Room package removal was not completed safely: {value_0}'.format(value_0=f'{error}')) from error
             self._emit(
                 "uninstall_progress",
                 phase="package_quarantined",
@@ -1338,7 +1338,7 @@ class IntegratedLaunchWorkflow:
                     staged_mod=staged.name,
                 )
             except Exception as error:
-                return failed_result(player_text('launcher.integration', 'room_package_removed_but_injector_cleanup_did_not_complete_value', value_0=f'{error}'))
+                return failed_result('Room package removed, but injector cleanup did not complete: {value_0}'.format(value_0=f'{error}'))
             self._emit(
                 "uninstall_progress",
                 phase="injector_finished",
@@ -1348,7 +1348,7 @@ class IntegratedLaunchWorkflow:
             )
             if injector.state != "applied":
                 return failed_result(
-                    player_text('launcher.integration', 'room_package_removed_but_injector_cleanup_failed_value_0', value_0=f'{injector.message}'),
+                    'Room package removed, but injector cleanup failed: {value_0}'.format(value_0=f'{injector.message}'),
                     injector.state,
                     injector.command,
                 )
@@ -1366,14 +1366,14 @@ class IntegratedLaunchWorkflow:
                         remaining.append(candidate)
             except OSError as error:
                 return failed_result(
-                    player_text('launcher.integration', 'injector_completed_but_room_package_removal_could_not_be_verifie', value_0=f'{error}'),
+                    'Injector completed, but room package removal could not be verified: {value_0}'.format(value_0=f'{error}'),
                     injector.state,
                     injector.command,
                 )
             if remaining:
                 locations = ", ".join(str(path) for path in remaining)
                 return failed_result(
-                    player_text('launcher.integration', 'injector_completed_but_managed_room_package_remains_at_value_0', value_0=f'{locations}'),
+                    'Injector completed, but managed room package remains at: {value_0}'.format(value_0=f'{locations}'),
                     injector.state,
                     injector.command,
                 )
@@ -1389,7 +1389,7 @@ class IntegratedLaunchWorkflow:
             receipt.update(
                 {
                     "adapter_state": "uninstalled",
-                    "adapter_message": player_text('launcher.integration', 'room_mod_intentionally_uninstalled'),
+                    "adapter_message": 'Room mod intentionally uninstalled.',
                     "adapter_command": list(injector.command),
                     "installation_mode": "uninstalled",
                     "steam_launch_option": steam_option or str(receipt.get("steam_launch_option", "")),
@@ -1412,7 +1412,7 @@ class IntegratedLaunchWorkflow:
                     quarantine_path=str(quarantine),
                     adapter_state="uninstall_attention",
                     injector_state=injector.state,
-                    message=player_text('launcher.integration', 'room_package_removed_and_injector_completed_but_receipt_update_f', value_0=f'{error}'),
+                    message='Room package removed and injector completed, but receipt update failed: {value_0}'.format(value_0=f'{error}'),
                     attention=True,
                 )
             return UninstallResult(
@@ -1422,7 +1422,7 @@ class IntegratedLaunchWorkflow:
                 quarantine_path=str(quarantine),
                 adapter_state="uninstalled",
                 injector_state=injector.state,
-                message=player_text('launcher.integration', 'room_mod_intentionally_uninstalled'),
+                message='Room mod intentionally uninstalled.',
             )
 
     def confirm_manual_installation(self, snapshot: RoomSnapshot, endpoint: str = "", *,
@@ -1585,13 +1585,13 @@ class RoomSetupCoordinator:
                         setup_failure_payload(error, phase="room_snapshot"),
                     )
                     room_event(
-                        'ROOM_INSTALL_RESULT',
-                        event,
-                        result="failure",
-                        state="failed",
-                        error_type=type(error).__name__,
-                        message=str(error),
-                    )
+                    'ROOM_INSTALL_RESULT',
+                    event,
+                    result="failure",
+                    state="failed",
+                    error_type=type(error).__name__,
+                    message=str(error),
+                )
                     return
                 room_event(
                     'ROOM_INSTALL_PLAN',
@@ -1628,7 +1628,7 @@ class RoomSetupCoordinator:
                             "message": record.adapter_message,
                             "recovery_required": record.adapter_details.get("recovery_required", False),
                             "injector_state": record.adapter_details.get("injector_state", ""),
-                            "guide_section": player_text('launcher.integration', 'windows_manual_mod_installer'),
+                            "guide_section": 'Windows Manual Mod Installer',
                             "guide_url": WINDOWS_MANUAL_INSTALL_GUIDE_URL,
                         },
                     )
@@ -1643,7 +1643,7 @@ class RoomSetupCoordinator:
                     )
                     return
                 if record.adapter_state != "applied":
-                    raise RuntimeError(record.adapter_message or player_text('launcher.integration', 'mod_setup_was_not_applied'))
+                    raise RuntimeError(record.adapter_message or 'Mod setup was not applied.')
                 with self._state_lock:
                     job.check()
                     self._completed.add(key)

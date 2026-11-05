@@ -99,7 +99,7 @@ def _read_processes():
         creationflags=getattr(platform.subprocess, 'CREATE_NO_WINDOW', 0),
     )
     if not completed.stdout.strip():
-        raise ValueError(player_text('launcher.installation_adapters', 'empty_injector_process_inspection'))
+        raise ValueError('empty injector process inspection')
     if os.name == "nt":
         return [
             {"pid": row["ProcessId"], "parent_pid": row["ParentProcessId"], "name": row["Name"]}
@@ -132,9 +132,9 @@ def check_injector_processes(evidence):
     try:
         running = injector_processes(evidence)
     except (OSError, platform.subprocess.SubprocessError, KeyError, ValueError) as error:
-        raise InstallationRecoveryRequired(player_text('launcher.installation_adapters', 'injector_process_inspection_failed_value_0', value_0=f'{error}')) from error
+        raise InstallationRecoveryRequired('injector process inspection failed: {value_0}'.format(value_0=f'{error}')) from error
     if running:
-        raise InstallationRecoveryRequired(player_text('launcher.installation_adapters', 'injector_or_a_child_process_is_still_running'))
+        raise InstallationRecoveryRequired('injector or a child process is still running')
 
 
 class WindowsModInjectorAdapter:
@@ -168,7 +168,7 @@ class WindowsModInjectorAdapter:
                 "injector_started",
                 command=list(command),
                 staged_mod=staged_mod,
-                message=text("launcher.setup", "action_finish_install"),
+                message='Keep this launcher open and press a key when EternalModInjector asks.',
             )
 
         try:
@@ -200,9 +200,9 @@ class WindowsModInjectorAdapter:
         return platform.AdapterResult(
             state="applied" if returncode == 0 else "failed",
             message=(
-                player_text('launcher.installation_adapters', 'installation_finished')
+                'Installation finished.'
                 if returncode == 0
-                else player_text('launcher.installation_adapters', 'installation_failed_at_injector_exit_code_value_0_select_help_sa', value_0=f'{returncode}')
+                else 'Installation failed at injector: exit code {value_0}. Select Help -> SAVE SUPPORT REPORT.'.format(value_0=f'{returncode}')
             ),
             command=command,
             returncode=returncode,
@@ -220,7 +220,7 @@ class WindowsModInjectorAdapter:
                 **getattr(error, "details", {}),
                 "original_verification_error": result.details.get("verification_error"),
             }
-            return platform._installation_failure(result, error, player_text('launcher.campaign_resources', 'prepare_banks'), self.event_sink)
+            return platform._installation_failure(result, error, 'prepare banks', self.event_sink)
 
     def prepare(self, game_root: Path, *, journal=None) -> Path:
         platform.require_doom_closed(player_text('launcher.installation_adapters', 'preparing_eternalmodinjector'))
@@ -266,7 +266,7 @@ class WindowsModInjectorAdapter:
             batch_executable = prepared or self.prepare(game_root, journal=journal)
         except Exception as error:
             return platform._installation_failure(
-                platform.AdapterResult(state="failed", message=""), error, player_text('launcher.campaign_resources', 'prepare_banks'), self.event_sink
+                platform.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
             )
 
         comspec = os.environ.get("COMSPEC", "cmd.exe")
@@ -293,7 +293,7 @@ class WindowsModInjectorAdapter:
                 "injector_post_run_confirmation",
                 operation=operation,
                 confirmed=confirmed,
-                message=confirmation_error or player_text('launcher.installation_adapters', 'uninstall_confirmation_received'),
+                message=confirmation_error or 'uninstall confirmation received',
             )
         details = {
             **result.details,
@@ -306,7 +306,7 @@ class WindowsModInjectorAdapter:
             return platform.AdapterResult(
                 state="failed",
                 message=(
-                    player_text('launcher.installation_adapters', 'removal_could_not_be_confirmed_select_help_save_support_report')
+                    'Removal could not be confirmed. Select Help -> SAVE SUPPORT REPORT.'
                     + (f" {confirmation_error}" if confirmation_error else "")
                 ),
                 command=result.command,
@@ -317,7 +317,7 @@ class WindowsModInjectorAdapter:
             )
         return platform.AdapterResult(
             state=result.state,
-            message=player_text('launcher.installation_adapters', 'removal_finished'),
+            message='Removal finished.',
             command=result.command,
             stdout=result.stdout,
             stderr=result.stderr,
@@ -434,18 +434,18 @@ class LinuxModManagerAdapter:
                 config,
                 "\n".join(
                     (
-                        player_text('launcher.installation_adapters', 'asset_version_2026_04_03'),
-                        player_text('launcher.installation_adapters', 'auto_launch_game_0'),
-                        player_text('launcher.installation_adapters', 'game_parameters'),
-                        player_text('launcher.installation_adapters', 'has_checked_resources_0'),
-                        player_text('launcher.installation_adapters', 'has_read_first_time_1'),
-                        player_text('launcher.installation_adapters', 'reset_backups_0'),
-                        player_text('launcher.installation_adapters', 'auto_update_0'),
-                        player_text('launcher.installation_adapters', 'verbose_0'),
-                        player_text('launcher.installation_adapters', 'slow_0'),
-                        player_text('launcher.installation_adapters', 'compress_textures_0'),
-                        player_text('launcher.installation_adapters', 'disable_multithreading_0'),
-                        player_text('launcher.installation_adapters', 'online_safe_0'),
+                        ':ASSET_VERSION=2026-04-03',
+                        ':AUTO_LAUNCH_GAME=0',
+                        ':GAME_PARAMETERS=',
+                        ':HAS_CHECKED_RESOURCES=0',
+                        ':HAS_READ_FIRST_TIME=1',
+                        ':RESET_BACKUPS=0',
+                        ':AUTO_UPDATE=0',
+                        ':VERBOSE=0',
+                        ':SLOW=0',
+                        ':COMPRESS_TEXTURES=0',
+                        ':DISABLE_MULTITHREADING=0',
+                        ':ONLINE_SAFE=0',
                         "",
                     )
                 ),
@@ -459,18 +459,18 @@ class LinuxModManagerAdapter:
         new_lines = []
         for line in lines:
             if line.startswith(":AUTO_UPDATE="):
-                new_lines.append(player_text('launcher.installation_adapters', 'auto_update_0'))
+                new_lines.append(':AUTO_UPDATE=0')
                 has_auto_update = True
             elif line.startswith(":AUTO_LAUNCH_GAME="):
-                new_lines.append(player_text('launcher.installation_adapters', 'auto_launch_game_0'))
+                new_lines.append(':AUTO_LAUNCH_GAME=0')
                 has_auto_launch = True
             else:
                 new_lines.append(line)
 
         if not has_auto_update:
-            new_lines.append(player_text('launcher.installation_adapters', 'auto_update_0'))
+            new_lines.append(':AUTO_UPDATE=0')
         if not has_auto_launch:
-            new_lines.append(player_text('launcher.installation_adapters', 'auto_launch_game_0'))
+            new_lines.append(':AUTO_LAUNCH_GAME=0')
 
         platform._write_installer_settings(config, "\n".join(new_lines) + "\n", journal=journal)
 
@@ -492,7 +492,7 @@ class LinuxModManagerAdapter:
             executable = prepared or self.prepare(game_root, journal=journal)
         except Exception as error:
             return platform._installation_failure(
-                platform.AdapterResult(state="failed", message=""), error, player_text('launcher.campaign_resources', 'prepare_banks'), self.event_sink
+                platform.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
             )
         environment = os.environ.copy()
         stripped_loader_environment = [
@@ -515,7 +515,7 @@ class LinuxModManagerAdapter:
             return platform._installation_failure(
                 platform.AdapterResult(state="failed", message="", command=command),
                 error,
-                player_text('launcher.campaign_resources', 'prepare_banks'),
+                'prepare banks',
                 self.event_sink,
             )
         return self._completed_result(game_root, command, completed, stripped_loader_environment)
@@ -578,7 +578,7 @@ class LinuxModManagerAdapter:
         loader_symbol_failure = _loader_symbol_failure(completed)
         prompt = _residual_prompt(completed.stdout, completed.stderr) if state == "failed" else None
         if state == "applied":
-            message = player_text('launcher.installation_adapters', 'mod_installed_start_through_steam_and_keep_the_launcher_open')
+            message = 'Mod installed. Start through Steam and keep the launcher open.'
         elif loader_symbol_failure:
             message = player_text('launcher.installation_adapters', 'installation_failed_at_injector_loader_symbol_lookup_failed_sele')
         elif prompt:

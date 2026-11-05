@@ -2,22 +2,20 @@
 
 from dataclasses import dataclass
 
-from doom_eap.strings import text as player_text
-
 AMMO_REFILL_ITEM_ID = 7770024
 AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
 AMMO_REFILL_CAPACITY = 3
 AMMO_REFILL_CONFIRMATION_TIMEOUT = 15
 AMMO_REFILL_COMMANDS = ("give ammo", "judgementMeter_Set 3")
 AMMO_UNAVAILABLE_MESSAGES = {
-    "placement_connected": player_text("ammo_refill", "disconnected"),
-    "item_state_ready": player_text("ammo_refill", "waiting_for_items"),
-    "connected": player_text("ammo_refill", "disconnected"),
-    "namespace_match": player_text("ammo_refill", "waiting_for_session"),
-    "marker_valid": player_text("ammo_refill", "waiting_for_level"),
-    "lease_match": player_text("ammo_refill", "waiting_for_level"),
-    "native_safe": player_text("ammo_refill", "unpause"),
-    "runtime_effects_ready": player_text("ammo_refill", "waiting_for_save"),
+    "placement_connected": 'Disconnected from Archipelago; reconnect before using Ammo Refill',
+    "item_state_ready": 'Ammo Refill unavailable: waiting for items from Archipelago',
+    "connected": 'Disconnected from Archipelago; reconnect before using Ammo Refill',
+    "namespace_match": "Ammo Refill unavailable: waiting for the current room's game session",
+    "marker_valid": 'Ammo Refill unavailable: waiting for the current level to finish preparing',
+    "lease_match": 'Ammo Refill unavailable: waiting for the current level to finish preparing',
+    "native_safe": 'Ammo Refill unavailable: return to DOOM and unpause before trying again',
+    "runtime_effects_ready": 'Ammo Refill unavailable: waiting for the active save and game session',
 }
 
 

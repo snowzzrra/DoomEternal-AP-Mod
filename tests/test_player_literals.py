@@ -3,6 +3,16 @@ import pytest
 from tools.validation.player_literals import issues, shell_issues
 
 
+def test_game_table_text_is_checked_without_rejecting_technical_errors():
+    source = '''
+def build_string_table():
+    raise ValueError("technical diagnostic")
+    entries.append((key, "Player message"))
+'''
+    failures = issues(source, "tools/release/build_string_table.py", game_only=True)
+    assert len(failures) == 1 and "Player message" in failures[0]
+
+
 @pytest.mark.parametrize(
     "source",
     [

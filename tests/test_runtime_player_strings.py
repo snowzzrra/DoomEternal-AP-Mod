@@ -121,4 +121,4 @@ def test_deathlink_local_message_keeps_player_data_and_fallback(monkeypatch, pla
         sent.append(cause)
 
     asyncio.run(owner.report_local_death(player, send, None))
-    assert sent == [f"{expected} didn't rip and tear enough."]
+    assert sent == [deathlink_session.DEATHLINK_MESSAGES[0].format(player=expected)]

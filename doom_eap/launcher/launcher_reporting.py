@@ -55,7 +55,7 @@ def save_report_draft(filename: Path, payload: dict, *, path: Path | None = None
         if filename.exists():
             previous = json.loads(filename.read_text(encoding="utf-8"))
             if previous.get("submitted") and previous["payload"] != payload:
-                raise ValueError(player_text('launcher.controller', 'retry_the_saved_report_before_starting_a_new_one_its_submitted_t'))
+                raise ValueError('Retry the saved report before starting a new one. Its submitted text cannot be changed.')
             submitted = submitted or previous.get("submitted", False)
             path = path or previous.get("path")
             url = url or previous.get("url")
@@ -96,7 +96,7 @@ def report_problem(controller: SupportReportGenerator, *, logs: list[str], job: 
         message = player_text('launcher.reporting', 'the_support_file_could_not_be_created_describe_the_problem_and_r')
     if job is not None:
         job.check()
-    payload = {"schema_version":1, "idempotency_key":report_id, "title":player_text('launcher.reporting', 'launcher_problem'),
+    payload = {"schema_version":1, "idempotency_key":report_id, "title":'Launcher problem',
                 "description":"", "diagnostics":str(sanitize_support_value(diagnostics))}
     if draft_path is not None:
         save_report_draft(draft_path, payload, path=path)
@@ -125,12 +125,12 @@ def submission_endpoint(bundle: Path) -> str | None:
     document = json.loads((bundle / "data/report_endpoint.json").read_text(encoding="utf-8"))
     endpoint = document.get("endpoint")
     if document.get("schema_version") != 1:
-        raise ValueError(player_text('launcher.reporting', 'unsupported_report_endpoint_configuration'))
+        raise ValueError('Unsupported report endpoint configuration')
     if endpoint is None:
         return None
     parsed = urlsplit(endpoint)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path != "/v1/reports":
-        raise ValueError(player_text('launcher.reporting', 'report_endpoint_must_be_the_project_s_https_v1_reports_url'))
+        raise ValueError("Report endpoint must be the project's HTTPS /v1/reports URL")
     return endpoint
 
 
@@ -142,10 +142,10 @@ class _NoRedirect(HTTPRedirectHandler):
 def report_body(payload: dict) -> bytes:
     sanitized = sanitize_support_value(payload)
     if not sanitized.get("title", "").strip() or not sanitized.get("description", "").strip():
-        raise ValueError(player_text('launcher.reporting', 'enter_a_title_and_describe_the_problem'))
+        raise ValueError('Enter a title and describe the problem')
     body = json.dumps(sanitized, ensure_ascii=False).encode("utf-8")
     if len(body) > 32768:
-        raise ValueError(player_text('launcher.reporting', 'report_is_too_large_shorten_the_description_and_retry'))
+        raise ValueError('Report is too large. Shorten the description and retry.')
     return body
 
 
@@ -156,5 +156,5 @@ def submit_report(endpoint: str, payload: dict) -> str:
         result = json.loads(response.read(4097))
     url = result.get("url", "")
     if not re.fullmatch(r"https://github\.com/snowzzrra/DoomEternal-AP-Mod/issues/[1-9][0-9]*", url):
-        raise ValueError(player_text('launcher.reporting', 'sending_could_not_be_confirmed_retry_the_saved_report'))
+        raise ValueError('Sending could not be confirmed. Retry the saved report.')
     return url

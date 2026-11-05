@@ -1129,7 +1129,7 @@ class Ledger:
         code = _item_reason(status, receipt, commands, blocked_reason, resolution)
         revision = receipt["revision"] + sum(command["revision"] for command in commands)
         return ItemRow(receipt["ap_index"], receipt["item"], receipt["player"], status, reason, actions,
-                       watermark, code, revision, resolution)
+                       watermark, code, revision, resolution, receipt["flags"], receipt["received_at"])
 
 
 def _item_reason(status, receipt, commands, blocked_reason, resolution):

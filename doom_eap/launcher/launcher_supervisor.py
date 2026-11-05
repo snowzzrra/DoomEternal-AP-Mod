@@ -27,7 +27,7 @@ class BridgeState(str, Enum):
     STOPPED = 'STOPPED'
     STARTING = 'STARTING'
     CONNECTING = player_text('launcher.ui', 'connecting')
-    CONNECTED = player_text('launcher.ui', 'connected')
+    CONNECTED = player_text('common', 'connected')
     DISCONNECTED = 'DISCONNECTED'
     STOPPING = 'STOPPING'
     FAILED = player_text('launcher.ui', 'failed')
@@ -91,10 +91,10 @@ class BridgeSupervisor:
 
     def start(self, *, endpoint: str, player: str, password: str = "") -> None:
         if self.running:
-            raise RuntimeError(player_text('launcher.supervisor', 'room_connection_is_already_running'))
+            raise RuntimeError('Room connection is already running.')
         with self._profiles_lock:
             if self.profile_id in self._profiles:
-                raise RuntimeError(player_text('launcher.supervisor', 'this_player_already_has_a_room_connection_close_the_other_launch'))
+                raise RuntimeError('This player already has a room connection. Close the other launcher before retrying.')
             self._profiles.add(self.profile_id)
         self._password = password
         self._intentional_stop = False
@@ -158,7 +158,7 @@ class BridgeSupervisor:
                 try:
                     event = json.loads(line[len(EVENT_PREFIX) :])
                     if not isinstance(event, dict) or not isinstance(event.get("type"), str):
-                        raise ValueError(player_text('launcher.supervisor', 'room_connection_stopped_retry_then_select_help_save_support_repo'))
+                        raise ValueError('Room connection stopped. Retry, then select Help -> SAVE SUPPORT REPORT.')
                     self._accept_event(event)
                 except Exception as error:
                     self.last_error = {
@@ -188,7 +188,7 @@ class BridgeSupervisor:
             self._failure_emitted = True
             self.last_error = {
                 "code": str(event.get("code", "bridge_error")),
-                "message": self._redact(str(event.get("message", player_text('launcher.supervisor', 'room_connection_failed_retry_then_select_help_save_support_repor')))),
+                "message": self._redact(str(event.get("message", 'Room connection failed. Retry, then select Help -> SAVE SUPPORT REPORT.'))),
             }
             event = {**event, **self.last_error}
         elif event_type == "client_stopping":
@@ -201,7 +201,7 @@ class BridgeSupervisor:
     def send_command(self, text: str) -> None:
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
+            raise RuntimeError('Connect to a room first.')
         with self._write_lock:
             process.stdin.write(text.rstrip("\r\n") + "\n")
             process.stdin.flush()
@@ -210,7 +210,7 @@ class BridgeSupervisor:
         """Send raw launcher chat through bridge control channel."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
+            raise RuntimeError('Connect to a room first.')
         control = json.dumps({"type": "say", "text": text}, separators=(",", ":"))
         with self._write_lock:
             process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
@@ -220,7 +220,7 @@ class BridgeSupervisor:
         """Request one bounded AP_SUPPORT_FILE.txt diagnostic condump."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
+            raise RuntimeError('Connect to a room first.')
         control = json.dumps({"type": "support_condump"}, separators=(",", ":"))
         with self._write_lock:
             process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
@@ -230,7 +230,7 @@ class BridgeSupervisor:
         """Request one manual inventory reconciliation through bridge control."""
         process = self._process
         if process is None or process.poll() is not None or process.stdin is None:
-            raise RuntimeError(player_text('launcher.supervisor', 'connect_to_a_room_first'))
+            raise RuntimeError('Connect to a room first.')
         control = json.dumps({"type": "inventory_resync", "domain": domain, "item_id": item_id}, separators=(",", ":"))
         with self._write_lock:
             process.stdin.write(''.join((f'AP_CONTROL {control}', ''.join(('', '\n', '')))))
@@ -263,7 +263,7 @@ class BridgeSupervisor:
         else:
             self.last_error = {
                 "code": "bridge_exited",
-                "message": player_text('launcher.supervisor', 'room_connection_stopped_retry_then_select_help_save_support_repo'),
+                "message": 'Room connection stopped. Retry, then select Help -> SAVE SUPPORT REPORT.',
             }
             self.state = BridgeState.FAILED
             if not self._failure_emitted:

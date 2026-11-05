@@ -36,6 +36,7 @@ class ItemsSnapshot(LauncherEvent):
     page: ItemPage | None
     authority: Authority | None
     online: bool
+    attention_count: int | None = None
 
 
 @dataclass(frozen=True, eq=False)

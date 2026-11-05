@@ -7,14 +7,12 @@ from types import MappingProxyType
 from typing import Protocol
 
 from doom_eap.runtime.deathlink_receive import ReceiveState
-from doom_eap.strings import text
+from doom_eap.strings import load_catalog, text
 
+# causes go to every player in the room, so they stay in English
 DEATHLINK_MESSAGES = tuple(
-    text("deathlink", key, player="{player}")
-    for key in (
-        "causes.insufficient_ripping", "causes.back_to_fortress", "causes.lost_to_hell",
-        "causes.privileges_revoked", "causes.uncontrolled_buttons",
-    )
+    text("deathlink.causes", key, player="{player}")
+    for key in sorted(load_catalog().categories["deathlink.causes"])
 )
 
 

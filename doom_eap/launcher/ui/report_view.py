@@ -21,11 +21,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPlainTextEdit,
-    QPushButton,
     QVBoxLayout,
 )
 
 from ..presenters.report_presenter import ReportPresenter
+from .doom_style import DoomButton as QPushButton
+from .strings import record_failure
 from .strings import text as player_text
 
 
@@ -107,7 +108,8 @@ class ReportDialog(QDialog):
                 try:
                     subprocess.Popen(["explorer.exe", f"/select,{filename}"])
                 except OSError as error:
-                    message.setText(player_text("launcher.ui", "could_not_show_zip_value_0", value_0=f"{error}"))
+                    self.controller.emit("log", message=record_failure(self.controller, "report", error))
+                    message.setText(player_text("launcher.ui", "could_not_open_the_zip_folder"))
             elif not QDesktopServices.openUrl(QUrl.fromLocalFile(str(filename.parent))):
                 message.setText(player_text("launcher.ui", "could_not_open_the_zip_folder"))
 

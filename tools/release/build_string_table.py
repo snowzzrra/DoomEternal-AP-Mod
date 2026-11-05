@@ -142,6 +142,7 @@ def build_string_table(
                         local=bool(record["local"]),
                         trap=bool(record["trap"]),
                         recipient_name=str(record["recipient_name"]),
+                        locale=output_path.stem,
                     )
                 if text is None:
                     text = notification_text(
@@ -207,8 +208,8 @@ def build_string_table(
                 ))
             except KeyError as error:
                 raise ValueError(
-                    f"unsupported notification locale: {output_path.stem}"
-                ) from error
+                f"unsupported notification locale: {output_path.stem}"
+            ) from error
         for key in sorted(location_keys):
             if key == LOCATION_NOTIFICATION_HEADER_KEY:
                 continue
@@ -220,7 +221,7 @@ def build_string_table(
                         f"location {location_id} has no placement metadata for "
                         "its sent presentation"
                     )
-                entries.append((key, location_sent_text(record)))
+                entries.append((key, location_sent_text(record, locale=output_path.stem)))
                 continue
             location_id = key.removeprefix("#str_ap_location_")
             if location_id in placement_names:

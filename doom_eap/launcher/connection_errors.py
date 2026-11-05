@@ -164,19 +164,19 @@ def enrich_connection_failure(event: Mapping[str, object], *, attempt_id: int) -
 def validate_server_address(value: str) -> str:
     endpoint = value.strip()
     if not endpoint or any(character.isspace() for character in endpoint):
-        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
+        raise ValueError('invalid server address')
     candidate = endpoint if "://" in endpoint else f"ws://{endpoint}"
     try:
         parsed = urlsplit(candidate)
         port = parsed.port
     except ValueError as error:
-        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c")) from error
+        raise ValueError('invalid server address') from error
     if parsed.scheme not in {"ws", "wss"} or not parsed.hostname:
-        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
+        raise ValueError('invalid server address')
     if port is not None and not 1 <= port <= 65535:
-        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
+        raise ValueError('invalid server address')
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment or parsed.username:
-        raise ValueError(player_text("launcher.connection_errors", "invalid_server_address_b0d9243c"))
+        raise ValueError('invalid server address')
     return endpoint
 
 

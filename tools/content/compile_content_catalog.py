@@ -44,7 +44,7 @@ def project_contracts(root, output, staging, payloads, write_bytes, *, check=Fal
     from tools.content.compile_player_strings import project_catalog
 
     removed = remove_asset_projection(output, check)
-    for path, payload in project_catalog(read_catalog(root / "data/player_strings.json"), output).items():
+    for path, payload in project_catalog(read_catalog(root / "data/strings"), output).items():
         write_bytes(path, payload)
     directory = root / "doom_eap/content"
     for name in CATALOG_DEPENDENCIES:
@@ -269,7 +269,7 @@ def compile_kill_sources(catalog, native):
     from doom_eap.content.native_enemy_plan import native_event_identity
     secret_locations = {(item.map_key, item.policy.get("manager", item.policy.get("manager_entity"))): item.name
                         for item in catalog.physical_locations if item.strategy == "secret_encounter"}
-    for key, estimate in reference["maps"].items():
+    for key, estimate in reference['maps'].items():
         original = kill_sources[key]
         by_id = {row["source_id"]: row for row in original["sources"]}
         alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
@@ -358,7 +358,12 @@ def _slot_restrictions():
 def compile_slot_catalog(catalog, native, kills, item_ids):
     from doom_eap.content.native_enemy_safety import COUNTER_REPLACEMENTS
     from doom_eap.content.slot_data_contract import (
-        CATALOG_DEPENDENCIES, catalog_dependency_path, catalog_target_rows, dependency_digest, native_source_rows, source_index,
+        CATALOG_DEPENDENCIES,
+        catalog_dependency_path,
+        catalog_target_rows,
+        dependency_digest,
+        native_source_rows,
+        source_index,
     )
     from doom_eap.contracts.challenge_registry import challenge_registry_document
 
@@ -413,9 +418,7 @@ def _compile_catalog(
         current = comparison_bytes(path, path.read_bytes(), output.parent) if path.is_file() else None
         if check:
             if current != payload:
-                raise ValueError(
-                    f"component=compiled_content file={path} field=synchronization value=stale"
-                )
+                raise ValueError(f"component=compiled_content file={path} field=synchronization value=stale")
         elif current != payload:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(payload)
@@ -466,9 +469,9 @@ def _compile_catalog(
     write_bytes_artifact(output.with_name("secret_encounter_timers.py"),
                          (catalog.root / "doom_eap/content/secret_encounter_timers.py").read_bytes())
     write_bytes_artifact(output.with_name("secret_encounter_timers.json"),
-                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
+                         (catalog.root / 'content/catalog/secret_encounter_timers.json').read_bytes())
     write_bytes_artifact(catalog.root / "doom_eap/content/secret_encounter_timers.json",
-                         (catalog.root / "content/catalog/secret_encounter_timers.json").read_bytes())
+                         (catalog.root / 'content/catalog/secret_encounter_timers.json').read_bytes())
     write_bytes_artifact(output.with_name("killsanity_plan.py"),
                          (catalog.root / "doom_eap/content/killsanity_plan.py").read_bytes())
     kill_catalog = compile_kill_sources(catalog, native)

@@ -15,8 +15,6 @@ import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 
-from doom_eap.launcher.ui.strings import text as player_text
-
 from .launcher_platform import installation_step
 
 CONTAINER = "gameresources_patch2.resources"
@@ -42,31 +40,31 @@ def installed_resource_fingerprints(game_root: Path) -> dict[str, str]:
 def verify_installed_resources(game_root: Path, receipt: dict) -> None:
     expected = receipt.get("installed_resources")
     if not isinstance(expected, dict) or not expected:
-        raise ValueError(player_text('launcher.campaign_resources', 'installed_game_resource_evidence_is_missing_reinstall_the_room_p'))
+        raise ValueError('Installed game resource evidence is missing; reinstall the room package')
     actual = installed_resource_fingerprints(game_root)
     if actual != expected:
         changed = ", ".join(name for name, digest in actual.items() if expected.get(name) != digest)
-        raise ValueError(player_text('launcher.campaign_resources', 'installed_game_files_changed_value_0_reinstall_the_room_package', value_0=f'{changed}'))
+        raise ValueError('Installed game files changed: {value_0}; reinstall the room package'.format(value_0=f'{changed}'))
 
 
 def resource_mapping_lines(mask: bytes, mapping: str) -> list[str]:
     if len(mask) < 8:
-        raise ValueError(player_text('launcher.campaign_resources', 'truncated_native_resource_mask'))
+        raise ValueError('Truncated native resource mask')
     offsets, position = set(), 8
     for _ in range(_u32(mask, 4)):
         if position + 12 > len(mask):
-            raise ValueError(player_text('launcher.campaign_resources', 'truncated_native_resource_mask'))
+            raise ValueError('Truncated native resource mask')
         offsets.add(position)
         position += 12 + 8 * _u32(mask, position + 8)
     if position != len(mask):
-        raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_resource_mask_boundary'))
+        raise ValueError('Invalid native resource mask boundary')
     result = []
     for line in mapping.splitlines(keepends=True):
         name, offset = line.rsplit(";", 1)
         if int(offset) not in offsets:
             if re.fullmatch(r"ap_enemy_resources/[0-9a-f]{64}\.resources", name.replace("\\", "/")):
                 continue
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_resource_mask_mapping'))
+            raise ValueError('Invalid native resource mask mapping')
         result.append(line)
     return result
 
@@ -83,18 +81,18 @@ def _records(path: Path, wanted: set[str], *, decode=None) -> dict:
     result = {}
     with path.open("rb") as source, mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as data:
         if data[:4] != b"IDCL" or _u32(data, 4) != 12:
-            raise ValueError(player_text('launcher.campaign_resources', 'unsupported_campaign_resource_container_value_0', value_0=f'{path.name}'))
+            raise ValueError('Unsupported campaign resource container: {value_0}'.format(value_0=f'{path.name}'))
         count, names_at, info_at = _u32(data, 32), _u64(data, 64), _u64(data, 80)
         ids = _u64(data, 96) + _u32(data, 40) * 4
         name_count = _u64(data, names_at)
         if info_at + count * 144 > len(data) or names_at + 8 + name_count * 8 > len(data):
-            raise ValueError(player_text('launcher.campaign_resources', 'truncated_resource_index'))
+            raise ValueError('Truncated resource index')
         names = []
         for index in range(name_count):
             start = names_at + 8 + name_count * 8 + _u64(data, names_at + 8 + index * 8)
             end = data.find(b"\0", start)
             if end < start:
-                raise ValueError(player_text('launcher.campaign_resources', 'unterminated_resource_name'))
+                raise ValueError('Unterminated resource name')
             names.append(data[start:end].decode("utf-8"))
         for index in range(count):
             row = info_at + index * 144
@@ -103,19 +101,19 @@ def _records(path: Path, wanted: set[str], *, decode=None) -> dict:
             if name not in wanted:
                 continue
             if name in result:
-                raise ValueError(player_text('launcher.campaign_resources', 'duplicate_campaign_resource_value_0', value_0=f'{name}'))
+                raise ValueError('Duplicate campaign resource: {value_0}'.format(value_0=f'{name}'))
             kind = names[_u64(data, local_names + _u64(data, row) * 8)]
             offset, size, decoded = (_u64(data, row + n) for n in (56, 64, 72))
             if (size != decoded and decode is None) or offset + size > len(data):
-                raise ValueError(player_text('launcher.campaign_resources', 'expected_decoded_post_inject_resource_value_0', value_0=f'{name}'))
+                raise ValueError('Expected decoded post-inject resource: {value_0}'.format(value_0=f'{name}'))
             payload = data[offset:offset + size]
             if size != decoded:
                 payload = decode(payload, decoded)
                 if len(payload) != decoded:
-                    raise ValueError(player_text('launcher.campaign_resources', 'decoded_resource_length_differs_value_0', value_0=f'{name}'))
+                    raise ValueError('Decoded resource length differs: {value_0}'.format(value_0=f'{name}'))
             result[name] = (index, kind, offset, payload, _u32(data, row + 112))
     if result.keys() != wanted:
-        raise ValueError(player_text('launcher.campaign_resources', 'missing_installed_campaign_resources_value_0', value_0=f'{sorted(wanted - result.keys())}'))
+        raise ValueError('Missing installed campaign resources: {value_0}'.format(value_0=f'{sorted(wanted - result.keys())}'))
     return result
 
 
@@ -124,7 +122,7 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
     index, _, payload_at, mask, flags = _records(base / "meta.resources", {"generated/buildgame/container.mask"})[
         "generated/buildgame/container.mask"]
     if flags or len(mask) < 8:
-        raise ValueError(player_text('launcher.campaign_resources', 'resource_activation_requires_an_uncompressed_native_container_ma'))
+        raise ValueError('Resource activation requires an uncompressed native container mask')
     original_mapping = (base / "idRehash.map").read_bytes()
     mapping, selected = [], {}
     lines = resource_mapping_lines(mask, original_mapping.decode("utf-8-sig"))
@@ -132,23 +130,23 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
         name, offset = line.rsplit(";", 1)
         normalized = name.replace("\\", "/").removeprefix("./")
         if normalized in selected:
-            raise ValueError(player_text('launcher.campaign_resources', 'duplicate_idrehash_container_mapping'))
+            raise ValueError('Duplicate idRehash container mapping')
         selected[normalized] = int(offset)
         mapping.append((name, int(offset), offset[len(offset.rstrip("\r\n")):]))
     if not targets.keys() <= selected.keys():
-        raise ValueError(player_text('launcher.campaign_resources', 'resource_container_lacks_an_idrehash_mapping'))
+        raise ValueError('Resource container lacks an idRehash mapping')
     by_offset = {selected[name]: name for name in targets}
     if len(by_offset) != len(targets):
-        raise ValueError(player_text('launcher.campaign_resources', 'ambiguous_idrehash_container_mapping'))
+        raise ValueError('Ambiguous idRehash container mapping')
     updated_mask, offsets, tables = bytearray(mask[:8]), {}, {}
     position = 8
     for _ in range(_u32(mask, 4)):
         if position + 12 > len(mask):
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_container_mask_table'))
+            raise ValueError('Invalid native container mask table')
         words = _u32(mask, position + 8)
         end = position + 12 + words * 8
         if end > len(mask):
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_container_mask_boundary'))
+            raise ValueError('Invalid native container mask boundary')
         offsets[position] = len(updated_mask)
         bits = bytearray(mask[position + 12:end])
         if position in by_offset:
@@ -166,7 +164,7 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
         updated_mask.extend(bits)
         position = end
     if position != len(mask) or set(tables) != set(targets) or any(offset not in offsets for _, offset, _ in mapping):
-        raise ValueError(player_text('launcher.campaign_resources', 'invalid_native_container_mask_mapping_boundary'))
+        raise ValueError('Invalid native container mask mapping boundary')
     updated = bytearray(original)
     incoming_at = payload_at
     if len(updated_mask) != len(mask) and payload_at + len(mask) != len(original):
@@ -201,7 +199,7 @@ def _activation_originals(base, updates, report):
         hashes = {"meta.resources": report["source_meta_sha256"], "idRehash.map": report["source_rehash_sha256"]}
     if set(hashes) != set(originals) or any(hashlib.sha256(originals[name]).hexdigest() != value
                                           for name, value in hashes.items()):
-        raise RuntimeError(player_text('launcher.campaign_resources', 'resource_metadata_changed_during_installation'))
+        raise RuntimeError('Resource metadata changed during installation')
     return originals
 
 
@@ -218,11 +216,11 @@ def _publish_resource_activation(base, updates, report):
                     temporary.write(payload)
         for name, path in incoming.items():
             if (base / name).read_bytes() != originals[name]:
-                raise RuntimeError(player_text('launcher.campaign_resources', 'resource_metadata_changed_during_installation'))
+                raise RuntimeError('Resource metadata changed during installation')
             published.append(name)
             publish_file(path, base / name, operation="resource_activation")
         if any((base / name).read_bytes() != payload for name, payload in updates.items()):
-            raise RuntimeError(player_text('launcher.campaign_resources', 'resource_activation_publication_did_not_match_readback'))
+            raise RuntimeError('Resource activation publication did not match readback')
     except Exception as error:
         _restore_resource_activation(base, updates, originals, incoming, published, error)
         raise
@@ -239,7 +237,7 @@ def _restore_resource_activation(base, updates, originals, incoming, published, 
         if actual == originals[name]:
             continue
         if actual != updates[name]:
-            raise RuntimeError(player_text('launcher.campaign_resources', 'resource_metadata_changed_externally_rollback_cannot_overwrite_i')) from error
+            raise RuntimeError('Resource metadata changed externally; rollback cannot overwrite it') from error
         incoming[name].write_bytes(originals[name])
         publish_file(incoming[name], base / name, operation="resource_activation_rollback")
 
@@ -260,7 +258,7 @@ def room_enemy_plan(options):
     return {"kind": "native_recipes", **plan}
 
 
-@installation_step(player_text('launcher.campaign_resources', 'prepare_banks'))
+@installation_step('prepare banks')
 def plan_campaign_resources(game_root: Path, mod_zip: Path, staging: Path) -> dict:
     """Finalize an injected room package; never enable unrelated resource records."""
     from doom_eap.launcher.native_enemy_resources import prepare_native_resource_banks
@@ -272,7 +270,7 @@ def plan_campaign_resources(game_root: Path, mod_zip: Path, staging: Path) -> di
     campaign_required = _campaign_required(manifest, expected, required)
     base = game_root / "base"
     bank_updates, banks = prepare_native_resource_banks(base, plan, roots, staging=staging,
-        hub_world_text='unified_campaign_v1' in manifest.get('required_capabilities', ()))
+        hub_world_text='unified_campaign_v1' in manifest.get("required_capabilities", ()))
     from .resource_bank import obsolete_banks
     spec = _planned_spec(base, bank_updates)
     obsolete = obsolete_banks(base, spec)
@@ -333,11 +331,11 @@ def _room_resources(mod_zip):
 
 def _activation_targets(base, campaign_required, expected, required, huds, spec):
     if campaign_required and expected.keys() != required:
-        raise ValueError(player_text('launcher.campaign_resources', 'incomplete_unified_campaign_resource_package'))
+        raise ValueError('Incomplete unified campaign resource package')
     records = _records(base / CONTAINER, required) if campaign_required else {}
     for name, (_, kind, _, payload, flags) in records.items():
         if kind != "rs_streamfile" or flags != 0 or payload != expected[name]:
-            raise ValueError(player_text('launcher.campaign_resources', 'installed_campaign_streamfile_differs_from_the_room_package_valu', value_0=f'{name}'))
+            raise ValueError('Installed campaign streamfile differs from the room package: {value_0}'.format(value_0=f'{name}'))
 
     hud_name = "swf/hud/hud_score.swf"
     targets = {CONTAINER: {row[0] for row in records.values()}} if records else {}
@@ -348,16 +346,16 @@ def _activation_targets(base, campaign_required, expected, required, huds, spec)
 def _register_resource_banks(base, banks, updates, report, obsolete, bank_paths):
     if banks.get('consolidated') or obsolete:
         from .resource_bank import register_banks
-        with installation_step(player_text('launcher.campaign_resources', 'register_banks')):
+        with installation_step('register banks'):
             report.setdefault('source_hashes', {})
             for name in ('meta.resources', 'idRehash.map'):
                 original = (base / name).read_bytes()
                 expected_hash = banks['source_hashes'].get(name, hashlib.sha256(original).hexdigest())
                 if hashlib.sha256(original).hexdigest() != expected_hash:
-                    raise RuntimeError(player_text('launcher.campaign_resources', 'resource_metadata_changed_during_bank_consolidation'))
+                    raise RuntimeError('Resource metadata changed during bank consolidation')
                 report['source_hashes'].setdefault(name, expected_hash)
                 updates.setdefault(name, original)
-            register_banks(base, banks.get('consolidated', {}), updates, obsolete, bank_paths=bank_paths)
+            register_banks(base, banks.get("consolidated", {}), updates, obsolete, bank_paths=bank_paths)
         report['updated_meta_sha256'] = hashlib.sha256(updates['meta.resources']).hexdigest()
 
 
@@ -369,15 +367,15 @@ def publish_campaign_resources(game_root, plan, staging, *, journal=None):
     updates = {}
     for name, source in plan['banks']['bank_paths'].items():
         if checked_path(Path(source)) != checked_path(staging / Path(name).name):
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_staged_resource_bank_path'))
+            raise ValueError('Invalid staged resource bank path')
     for name, info in plan['updates'].items():
         if name not in {'meta.resources', 'idRehash.map', 'packagemapspec.json', 'build-manifest.bin'}:
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_resource_metadata_target'))
+            raise ValueError('Invalid resource metadata target')
         path = checked_path(staging / name)
         if file_digest(path) != info['sha256']:
-            raise ValueError(player_text('launcher.campaign_resources', 'staged_resource_metadata_differs'))
+            raise ValueError('Staged resource metadata differs')
         if file_digest(checked_path(base / name)) not in {info['before'], info['sha256']}:
-            raise RuntimeError(player_text('launcher.campaign_resources', 'resource_metadata_changed_during_installation'))
+            raise RuntimeError('Resource metadata changed during installation')
         updates[name] = path.read_bytes()
     _verify_bank_registration(base, plan, staging)
     with installation_step('publish'):
@@ -394,7 +392,7 @@ def verify_campaign_resources(game_root, plan):
     base = game_root / 'base'
     for name, info in plan['updates'].items():
         if file_digest(checked_path(base / name)) != info['sha256']:
-            raise ValueError(player_text('launcher.campaign_resources', 'installed_resource_metadata_differs') + name)
+            raise ValueError('Installed resource metadata differs: ' + name)
     verify_native_resource_banks(base, plan['banks'])
     _verify_bank_registration(base, plan, base)
 
@@ -415,7 +413,7 @@ def _verify_bank_registration(base, plan, staging):
 def enable_campaign_resources(game_root: Path, mod_zip: Path, *, journal=None) -> dict:
     from .launcher_platform import require_doom_closed
 
-    require_doom_closed(player_text('launcher.campaign_resources', 'finalizing_campaign_resources'))
+    require_doom_closed('finalizing campaign resources')
     if journal is None:
         with tempfile.TemporaryDirectory(dir=game_root, prefix='.doomeap-resources-') as directory:
             staging = Path(directory)
@@ -440,11 +438,11 @@ def _hud_targets(base, huds, spec, targets, hud_name):
         if container == 'hub' or container.startswith('hub_patch'):
             containers = {'game/hub/' + container + '.resources'}
         if len(containers) != 1:
-            raise ValueError(player_text('launcher.campaign_resources', 'ambiguous_or_missing_hud_resource_container') + container)
+            raise ValueError('Ambiguous or missing HUD resource container: ' + container)
         bank, = containers
         index, kind, _, payload, flags = _records(base / bank, {hud_name})[hud_name]
         if kind != "cswf" or flags or payload != hud:
-            raise ValueError(player_text('launcher.campaign_resources', 'installed_hud_differs_from_the_room_package') + container)
+            raise ValueError('Installed HUD differs from the room package: ' + container)
         targets.setdefault(bank, set()).add(index)
 
 
@@ -472,10 +470,10 @@ def cleanup_resource_staging(journal, plan):
     for name, digest in expected.items():
         path = checked_path(staging / name)
         if not path.is_relative_to(staging):
-            raise ValueError(player_text('launcher.campaign_resources', 'invalid_staged_resource_path'))
+            raise ValueError('Invalid staged resource path')
         if path.exists():
             if file_digest(path) != digest:
-                raise OSError(player_text('launcher.campaign_resources', 'staged_resources_changed_before_cleanup'))
+                raise OSError('Staged resources changed before cleanup')
             path.unlink()
     if staging.exists() and not any(staging.iterdir()):
         staging.rmdir()

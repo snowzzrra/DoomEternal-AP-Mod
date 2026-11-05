@@ -10,27 +10,27 @@
         },
         {
             "name": "#str_ap_location_sent",
-            "text": "LOCALIZAÇÃO AP ENVIADA"
+            "text": "LOCAL AP ENVIADO"
         },
         {
             "name": "#str_ap_location_sent_102",
-            "text": "FOUND YOUR CANHÃO <&>"
+            "text": "VOCÊ ENCONTROU CANHÃO <&>"
         },
         {
             "name": "#str_ap_location_sent_103",
-            "text": "SENT PRAETOR POINT TO SLÁYER <&>"
+            "text": "PRAETOR POINT ENVIADO PARA SLÁYER <&>"
         },
         {
             "name": "#str_ap_notify_item_1",
-            "text": "YOUR CANHÃO <&>"
+            "text": "SEU ITEM: CANHÃO <&>"
         },
         {
             "name": "#str_ap_notify_item_2",
-            "text": "PRAETOR POINT FOR SLÁYER <&>"
+            "text": "PRAETOR POINT PARA SLÁYER <&>"
         },
         {
             "name": "#str_ap_notify_item_3",
-            "text": "A TRAP FOR SOMEONE"
+            "text": "UMA ARMADILHA PARA ALGUÉM"
         },
         {
             "name": "#str_ap_notify_item_4",

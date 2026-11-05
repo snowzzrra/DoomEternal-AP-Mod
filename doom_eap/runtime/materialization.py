@@ -9,12 +9,11 @@ from doom_eap.contracts.materialization import (
     MaterializationScope,
 )
 from doom_eap.runtime.item_reconciliation import ReconciliationPlan
-from doom_eap.strings import text
 
 
 class ReconciliationBlock(str, Enum):
-    RUNTIME_NOT_READY = text("activity", "runtime_not_ready")
-    NATIVE_APPLICATION_PENDING = text("activity", "materialization_pending")
+    RUNTIME_NOT_READY = 'runtime effects are not level-ready'
+    NATIVE_APPLICATION_PENDING = 'materialization queued; awaiting native application'
 
     def __str__(self):
         return self.value

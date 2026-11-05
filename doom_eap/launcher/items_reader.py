@@ -48,14 +48,26 @@ class LedgerReadAdapter:
             )
             # the read adapter cannot authorize mutations, even when the database belongs to an owner
             page = replace(page, rows=tuple(replace(row, actions=()) for row in page)) if not online else page
-            return self._event(query, LedgerAvailability.AVAILABLE, page, room.authority, online)
+            attention_count = await self._attention_count(ledger, query.room, page.watermark)
+            return self._event(query, LedgerAvailability.AVAILABLE, page, room.authority, online, attention_count)
         finally:
             await ledger.close()
 
     @staticmethod
-    def _event(query, availability, page=None, authority=None, online=False):
+    async def _attention_count(ledger, room, watermark):
+        count, before = 0, None
+        while True:
+            page = await ledger.items(room, -1, 256, watermark=watermark, before_index=before,
+                                      newest_first=True, blocked_only=True)
+            count += len(page)
+            if len(page) < 256:
+                return count
+            before = page[-1].ap_index
+
+    @staticmethod
+    def _event(query, availability, page=None, authority=None, online=False, attention_count=None):
         changed = query.since is not None
         kind = "items_changed" if changed else "items_snapshot"
         context = EventContext(EventOrigin.APPLICATION, room=tuple(vars(query.room).values()))
         event = ItemsChanged if changed else ItemsSnapshot
-        return event(context, kind, MappingProxyType({"type": kind}), query, availability, page, authority, online)
+        return event(context, kind, MappingProxyType({"type": kind}), query, availability, page, authority, online, attention_count)

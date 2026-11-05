@@ -29,6 +29,7 @@ class ItemsModel:
     more: bool = False
     loading: bool = False
     message: str = ""
+    attention_count: int = 0
 
 
 class ItemsPresenter:
@@ -85,7 +86,7 @@ class ItemsPresenter:
             self.model, availability=event.availability, online=event.online, loading=False, message=""
         )
         if event.page is None:
-            self.model = replace(self.model, can_resolve=False, rows=(), more=False)
+            self.model = replace(self.model, can_resolve=False, rows=(), more=False, attention_count=0)
             self.snapshot_watermark = self.watermark = self.oldest = None
             self.resolution = None
             self.submitted = False
@@ -131,8 +132,15 @@ class ItemsPresenter:
                 row = replace(row, status=status, actions=(), resolution=None, reason_code=code)
             rows[row.ap_index] = row
         self.model = replace(self.model, rows=tuple(rows[index] for index in sorted(rows, reverse=True)))
+        self._update_attention_count(event)
         if self.resolution and not self.submitted and self.resolution.action not in self.actions():
             self.resolution = None
+
+    def _update_attention_count(self, event):
+        count = event.attention_count
+        if count is None:
+            count = sum(row.status is ItemStatus.BLOCKED for row in self.model.rows)
+        self.model = replace(self.model, attention_count=count)
 
     def capabilities(self, room, *, can_resolve: bool, can_spend: bool = False):
         if room == self.model.room:
@@ -174,18 +182,19 @@ class ItemsPresenter:
             return False
         self.resolution = None
         self.submitted = False
-        self.model = replace(self.model, message=text("launcher.items", "resolution_ok" if ok else "resolution_failed"))
+        self.model = replace(self.model, message=(text('launcher.items', 'resolution_ok') if ok else text('launcher.items', 'resolution_failed')))
         return True
 
     @staticmethod
     def status(row: ItemRow) -> str:
         resolved = row.status is ItemStatus.DELIVERED and row.resolution is Resolution.ACCEPTED_BY_PLAYER
+        if row.status is ItemStatus.DELIVERED and not resolved:
+            return ""
         key = "player_resolved" if resolved else row.status.value
-        return text("launcher.items", key)
+        return text("common", "waiting_for_game") if key in {"received", "waiting"} else text("launcher.items", key)
 
     @staticmethod
-    def details(row: ItemRow) -> str:
-        detail = text("launcher.items", "reason_" + row.reason_code.value)
-        if row.resolution is not None and row.reason_code is not ItemReason.PLAYER_RESOLVED:
-            detail += "\n" + text("launcher.items", "reason_player_resolved")
-        return detail
+    def status_tone(row: ItemRow) -> str:
+        if row.status is ItemStatus.BLOCKED:
+            return "warn"
+        return "muted" if row.status is ItemStatus.DELIVERED else "ap"

@@ -352,6 +352,8 @@ class ItemRow:
     reason_code: ItemReason = ItemReason.NONE
     revision: int = 0
     resolution: Resolution | None = None
+    flags: int | None = None
+    received_at: int | None = None
 
 
 @dataclass(frozen=True)

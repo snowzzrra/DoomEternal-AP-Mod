@@ -55,7 +55,7 @@ def checked_path(path: Path) -> Path:
     for part in (path, *path.parents):
         junction = getattr(os.path, "isjunction", lambda _path: False)
         if part.is_symlink() or junction(part):
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'linked_path_value_0', value_0=f'{part}'))
+            raise InstallationRecoveryRequired('linked path: {value_0}'.format(value_0=f'{part}'))
     return path.resolve()
 
 
@@ -84,7 +84,7 @@ class InstallJournal:
             document = json.loads(self.path.read_text(encoding="utf-8"))
             self._check_document(document)
         except (OSError, ValueError, KeyError, TypeError) as error:
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'invalid_installation_journal_value_0', value_0=f'{error}')) from error
+            raise InstallationRecoveryRequired('invalid installation journal: {value_0}'.format(value_0=f'{error}')) from error
         self.document = document
         return True
 
@@ -96,13 +96,13 @@ class InstallJournal:
         if InstallPhase(document["phase"]) in {InstallPhase.COMPLETE, InstallPhase.ROLLED_BACK}:
             return
         if "injector_files" in document["evidence"]:
-            raise ValueError(player_text('launcher.install_journal', 'installation_journal_contains_injector_game_file_backups'))
+            raise ValueError('installation journal contains injector game-file backups')
         for entry in document["files"]:
             self._check_hashes(entry)
             self._allow_external_recovery(entry, document["transaction_id"])
             target = self._target(entry["path"])
             if entry["backup"] != str(self._local_directory(target, document["transaction_id"]) / entry["key"]):
-                raise ValueError(player_text('launcher.install_journal', 'installation_backup_path'))
+                raise ValueError('installation backup path')
 
     @staticmethod
     def _check_outcome(value):
@@ -116,27 +116,27 @@ class InstallJournal:
             value["steam_diff"],
         ):
             if not isinstance(text, str):
-                raise ValueError(player_text('launcher.install_journal', 'installation_result_text'))
+                raise ValueError('installation result text')
         if not isinstance(adapter["command"], list | tuple) or not all(
             isinstance(arg, str) for arg in adapter["command"]
         ):
-            raise ValueError(player_text('launcher.install_journal', 'installation_command'))
+            raise ValueError('installation command')
         if adapter["returncode"] is not None and type(adapter["returncode"]) is not int:
-            raise ValueError(player_text('launcher.install_journal', 'installation_exit_code'))
+            raise ValueError('installation exit code')
         InstallJournal._check_adapter_details(adapter["details"])
 
     @staticmethod
     def _check_adapter_details(details):
         if not isinstance(details, dict):
-            raise ValueError(player_text('launcher.install_journal', 'installation_result_details'))
+            raise ValueError('installation result details')
         for key in ("installation_mode", "injector_version", "post_install_verification"):
             if key in details and not isinstance(details[key], str):
-                raise ValueError(player_text('launcher.install_journal', 'installation_result_details'))
+                raise ValueError('installation result details')
         if "user_confirmed" in details and type(details["user_confirmed"]) is not bool:
-            raise ValueError(player_text('launcher.install_journal', 'installation_confirmation'))
+            raise ValueError('installation confirmation')
         rows = details.get("required_resources", ())
         if not isinstance(rows, list | tuple) or not all(isinstance(row, dict) for row in rows):
-            raise ValueError(player_text('launcher.install_journal', 'installation_resource_evidence'))
+            raise ValueError('installation resource evidence')
 
     def _allow_external_recovery(self, entry, token):
         target = checked_path(Path(entry["path"]))
@@ -148,7 +148,7 @@ class InstallJournal:
         accepted = record.pop("accepted")
         expected.pop("accepted")
         if record != expected or not set(entry["accepted"]).issubset(accepted):
-            raise ValueError(player_text('launcher.install_journal', 'external_installation_intent_differs'))
+            raise ValueError('external installation intent differs')
         if target not in self.external_paths:
             self.external_paths += (target,)
 
@@ -167,30 +167,30 @@ class InstallJournal:
 
     def _check_header(self, document: dict) -> None:
         if document["schema"] != 1 or document["game_root"] != str(self.root):
-            raise ValueError(player_text('launcher.install_journal', 'installation_journal_identity'))
+            raise ValueError('installation journal identity')
         token = document["transaction_id"]
         if len(token) != 32 or any(char not in "0123456789abcdef" for char in token):
-            raise ValueError(player_text('launcher.install_journal', 'installation_transaction_identity'))
+            raise ValueError('installation transaction identity')
         InstallPhase(document["phase"])
         if not isinstance(document["revision"], int) or not isinstance(document["files"], list):
-            raise ValueError(player_text('launcher.install_journal', 'installation_journal_fields'))
+            raise ValueError('installation journal fields')
         if not isinstance(document["identity"], dict) or not isinstance(document["evidence"], dict):
-            raise ValueError(player_text('launcher.install_journal', 'installation_journal_identity_fields'))
+            raise ValueError('installation journal identity fields')
 
     @staticmethod
     def _check_hashes(entry: dict) -> None:
         for digest in (entry["before"], *entry["accepted"]):
             if digest is not None and (len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest)):
-                raise ValueError(player_text('launcher.install_journal', 'installation_file_hash'))
+                raise ValueError('installation file hash')
         if entry["key"] != hashlib.sha256(entry["path"].encode()).hexdigest():
-            raise ValueError(player_text('launcher.install_journal', 'installation_file_key'))
+            raise ValueError('installation file key')
 
     def _target(self, value: str) -> Path:
         path = checked_path(Path(value))
         if path not in self.external_paths and not path.is_relative_to(self.root):
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'unexpected_installation_target_value_0', value_0=f'{path}'))
+            raise InstallationRecoveryRequired('unexpected installation target: {value_0}'.format(value_0=f'{path}'))
         if path.is_relative_to(self.directory):
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'journal_cannot_replace_itself'))
+            raise InstallationRecoveryRequired('journal cannot replace itself')
         return path
 
     def include_paths(self, paths: tuple[Path, ...]) -> None:
@@ -235,7 +235,7 @@ class InstallJournal:
             entry = self._capture(target)
             self.document["files"].append(entry)
         elif file_digest(target) not in entry["accepted"]:
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'externally_changed_value_0', value_0=f'{target}'))
+            raise InstallationRecoveryRequired('externally changed: {value_0}'.format(value_0=f'{target}'))
         if digest not in entry["accepted"]:
             entry["accepted"].append(digest)
         self._save_external_intent(entry)
@@ -254,7 +254,7 @@ class InstallJournal:
                 stream.flush()
                 os.fsync(stream.fileno())
             if file_digest(backup) != before:
-                raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'backup_differs_value_0', value_0=f'{target}'))
+                raise InstallationRecoveryRequired('backup differs: {value_0}'.format(value_0=f'{target}'))
         return {
             "path": str(target),
             "key": key,
@@ -286,7 +286,7 @@ class InstallJournal:
                 stream.flush()
                 os.fsync(stream.fileno())
             if file_digest(incoming) != file_digest(source):
-                raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'staged_file_changed_value_0', value_0=f'{source}'))
+                raise InstallationRecoveryRequired('staged file changed: {value_0}'.format(value_0=f'{source}'))
             if entry['mode'] is not None:
                 incoming.chmod(entry['mode'])
             publish_file(incoming, target, operation=operation)
@@ -301,7 +301,7 @@ class InstallJournal:
         parent = next(path for path in target.parents if path.exists())
         before = target.stat().st_size if target.exists() else 0
         if shutil.disk_usage(parent).free < before + incoming_size:
-            raise OSError(28, player_text('launcher.install_journal', 'insufficient_installation_backup_space'), str(target))
+            raise OSError(28, 'insufficient installation backup space', str(target))
 
     def _write(self, target: Path, content: bytes, operation: str) -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -335,7 +335,7 @@ class InstallJournal:
     def record_publication(self, path: Path) -> None:
         entry = next(item for item in self.document["files"] if item["path"] == str(path.resolve()))
         if file_digest(path) not in entry["accepted"]:
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'publication_differs_value_0', value_0=f'{path}'))
+            raise InstallationRecoveryRequired('publication differs: {value_0}'.format(value_0=f'{path}'))
         entry["published"] = True
         self.save()
 
@@ -364,9 +364,9 @@ class InstallJournal:
         for entry in self.document["files"]:
             target = self._target(entry["path"])
             if file_digest(target) not in entry["accepted"]:
-                raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'externally_changed_value_0', value_0=f'{target}'))
+                raise InstallationRecoveryRequired('externally changed: {value_0}'.format(value_0=f'{target}'))
             if file_digest(checked_path(Path(entry["backup"]))) != entry["before"]:
-                raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'damaged_backup_value_0', value_0=f'{target}'))
+                raise InstallationRecoveryRequired('damaged backup: {value_0}'.format(value_0=f'{target}'))
 
     def cleanup(self) -> None:
         if self.document.get("cleanup_complete"):
@@ -384,13 +384,13 @@ class InstallJournal:
         self._check_hashes(entry)
         backup = checked_path(Path(entry["backup"]))
         if backup != self._local_directory(checked_path(Path(entry["path"])), self.transaction_id) / entry["key"]:
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'unexpected_cleanup_path'))
+            raise InstallationRecoveryRequired('unexpected cleanup path')
         if entry.get("cleanup_complete"):
             return backup
         self._allow_external_recovery(entry, self.transaction_id)
         self._target(entry["path"])
         if backup.exists() and file_digest(backup) != entry["before"]:
-            raise InstallationRecoveryRequired(player_text('launcher.install_journal', 'installation_backup_changed_before_cleanup'))
+            raise InstallationRecoveryRequired('installation backup changed before cleanup')
         backup.unlink(missing_ok=True)
         entry["cleanup_complete"] = True
         self.save()

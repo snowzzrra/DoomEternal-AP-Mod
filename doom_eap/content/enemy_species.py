@@ -152,4 +152,4 @@ def speed_capability_notice(labels=None):
                  for species, status in capabilities.items() if status == "qualified"]
     if supported:
         return player_text("apworld.notices", "speed_supported", species=str(", ".join(supported)))
-    return player_text("apworld.notices", "speed_fixed")
+    return player_text('common', 'enemy_speed_fixed')

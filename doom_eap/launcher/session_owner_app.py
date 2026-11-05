@@ -10,7 +10,6 @@ from pathlib import Path
 from doom_eap.launcher.launcher_core import RoomSnapshot
 from doom_eap.launcher.launcher_platform import restore_standard_streams
 from doom_eap.launcher.launcher_session import SESSION_PIPE_LIMIT, APSessionOwner
-from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
 
 
@@ -49,16 +48,16 @@ def main():
     try:
         while raw := sys.stdin.buffer.readline(SESSION_PIPE_LIMIT + 1):
             if len(raw) > SESSION_PIPE_LIMIT:
-                raise ValueError(player_text('launcher.session_owner_app', 'session_request_is_too_large'))
+                raise ValueError('Session request is too large')
             try:
                 request = json.loads(raw)
                 action = request["action"]
                 if action == "prepare":
                     if owner is not None:
-                        raise RuntimeError(player_text('launcher.session_owner_app', 'a_session_owner_is_already_prepared'))
+                        raise RuntimeError('A session owner is already prepared')
                     executable = Path(request["client_dir"]) / "ap_client.exe"
                     if not executable.is_file():
-                        raise RuntimeError(player_text('launcher.session_owner_app', 'the_packaged_windows_integration_helper_is_unavailable'))
+                        raise RuntimeError('The packaged Windows integration helper is unavailable')
                     owner = APSessionOwner(Path(request["client_dir"]), Path(request["data_dir"]), Path(request["state_dir"]))
                     snapshot = RoomSnapshot.from_event(request["room"])
                     status = owner.prepare(snapshot, request["config"], recover_prelaunch=bool(request.get("recover_prelaunch")))
@@ -67,7 +66,7 @@ def main():
                                               stdout=log, stderr=log, creationflags=subprocess.CREATE_NO_WINDOW)
                     respond({"status": status, "can_close": owner.can_close()})
                 elif owner is None:
-                    raise RuntimeError(player_text('launcher.session_owner_app', 'prepare_a_session_before_observing_it'))
+                    raise RuntimeError('Prepare a session before observing it')
                 elif action == "observe":
                     respond({"status": owner.observe(), "can_close": owner.can_close()})
                 elif action == "can_close":
@@ -77,7 +76,7 @@ def main():
                     respond({"status": owner.status, "can_close": True})
                     return 0
                 else:
-                    raise ValueError(player_text('launcher.session_owner_app', 'unsupported_session_action'))
+                    raise ValueError('Unsupported session action')
             except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError) as error:
                 respond(failure_response(owner, error))
     finally:

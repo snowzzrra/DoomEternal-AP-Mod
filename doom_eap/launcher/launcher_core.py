@@ -24,7 +24,6 @@ from doom_eap.content.physical_options import (
     project_room_config,
 )
 from doom_eap.content.slot_data_contract import placement_digest
-from doom_eap.launcher.ui.strings import text as player_text
 from doom_eap.runtime.context_registry import (
     SlotAdmissionError,
     admit_slot_data,
@@ -117,7 +116,9 @@ def _sha256(path: Path) -> str:
 
 
 def release_identity() -> dict[str, Any]:
-    return json.loads((ROOT / "data" / "content_identity.json").read_text(encoding="utf-8"))
+    return json.loads(
+    (ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
+)
 
 
 def _normalize_slot_data(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -143,32 +144,32 @@ class PlacementRecord:
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> PlacementRecord:
         if not isinstance(value, Mapping):
-            raise ValueError(player_text('launcher.core', 'placement_must_be_an_object'))
+            raise ValueError('placement must be an object')
         required = {
             "location_id", "location_name", "item_id", "item_name",
             "recipient_slot", "recipient_name", "classification", "trap", "local",
         }
         if set(value) != required:
             raise ValueError(
-                player_text('launcher.core', 'placement_fields_must_be_exactly') + ", ".join(sorted(required))
+                'placement fields must be exactly ' + ", ".join(sorted(required))
             )
         integer_fields = ("location_id", "item_id", "recipient_slot", "classification")
         for field in integer_fields:
             field_value = value[field]
             if not isinstance(field_value, int) or isinstance(field_value, bool):
-                raise ValueError(player_text('launcher.core', 'placement_value_0_must_be_an_integer', value_0=f'{field}'))
+                raise ValueError('placement {value_0} must be an integer'.format(value_0=f'{field}'))
         if value["location_id"] <= 0 or value["recipient_slot"] < 1:
-            raise ValueError(player_text('launcher.core', 'placement_location_id_and_recipient_slot_must_be_positive'))
+            raise ValueError('placement location_id and recipient_slot must be positive')
         if value["classification"] < 0:
-            raise ValueError(player_text('launcher.core', 'placement_classification_must_be_non_negative'))
+            raise ValueError('placement classification must be non-negative')
         for field in ("location_name", "item_name", "recipient_name"):
             if not isinstance(value[field], str) or not value[field].strip():
-                raise ValueError(player_text('launcher.core', 'placement_value_0_must_be_non_empty_text', value_0=f'{field}'))
+                raise ValueError('placement {value_0} must be non-empty text'.format(value_0=f'{field}'))
         if not isinstance(value["trap"], bool) or not isinstance(value["local"], bool):
-            raise ValueError(player_text('launcher.core', 'placement_trap_and_local_must_be_boolean'))
+            raise ValueError('placement trap and local must be boolean')
         expected_trap = bool(value["classification"] & 0b00100)
         if value["trap"] != expected_trap:
-            raise ValueError(player_text('launcher.core', 'placement_trap_does_not_match_classification'))
+            raise ValueError('placement trap does not match classification')
         return cls(**dict(value))
 
     def document(self) -> dict[str, Any]:
@@ -179,24 +180,24 @@ def _normalize_placements(
     placements: object, active_location_ids: tuple[int, ...], slot: int
 ) -> tuple[PlacementRecord, ...]:
     if not isinstance(placements, list | tuple):
-        raise ValueError(player_text('launcher.core', 'placements_must_be_a_list'))
+        raise ValueError('placements must be a list')
     records = tuple(
         value if isinstance(value, PlacementRecord) else PlacementRecord.from_mapping(value)
         for value in placements
     )
     ids = [record.location_id for record in records]
     if len(ids) != len(set(ids)):
-        raise ValueError(player_text('launcher.core', 'placements_contain_duplicate_location_ids'))
+        raise ValueError('placements contain duplicate location IDs')
     expected = set(active_location_ids)
     actual = set(ids)
     if actual != expected:
         raise ValueError(
-            player_text('launcher.core', 'placement_set_is_incomplete_or_unknown_missing_value_0_unknown_v', value_0=f'{sorted(expected - actual)}', value_1=f'{sorted(actual - expected)}')
+            'placement set is incomplete or unknown: missing={value_0}, unknown={value_1}'.format(value_0=f'{sorted(expected - actual)}', value_1=f'{sorted(actual - expected)}')
         )
     for record in records:
         if record.local != (record.recipient_slot == slot):
             raise ValueError(
-                player_text('launcher.core', 'placement_local_flag_disagrees_with_recipient_slot_at_value_0', value_0=f'{record.location_id}')
+                'placement local flag disagrees with recipient slot at {value_0}'.format(value_0=f'{record.location_id}')
             )
     return tuple(sorted(records, key=lambda record: record.location_id))
 
@@ -212,7 +213,7 @@ def _room_placements(slot_data, placements, active, slot):
         raise SlotAdmissionError("slot_placement", str(error)) from error
     rows = [[record.location_id, record.item_id, record.recipient_slot] for record in records]
     if placement_digest(rows) != slot_data["placement_digest"]:
-        raise SlotAdmissionError("slot_digest", player_text('launcher.core', 'room_placements_digest_mismatch'))
+        raise SlotAdmissionError("slot_digest", 'Room placements digest mismatch.')
     return records
 
 
@@ -220,13 +221,13 @@ def _validate_manifest_starting(options):
     if "starting_inventory" in options:
         inventory = options["starting_inventory"]
         if not isinstance(inventory, dict):
-            raise ValueError(player_text('launcher.core', 'manifest_starting_inventory_must_be_an_object'))
+            raise ValueError('manifest starting_inventory must be an object')
         for name, quantity in inventory.items():
             if not isinstance(name, str) or type(quantity) is not int or quantity < 1:
-                raise ValueError(player_text('launcher.core', 'manifest_starting_inventory_has_invalid_name_or_quantity'))
+                raise ValueError('manifest starting_inventory has invalid name or quantity')
     weapon = options.get("starting_weapon")
     if weapon is not None and not isinstance(weapon, str):
-        raise ValueError(player_text('launcher.core', 'manifest_starting_weapon_must_be_string_or_null'))
+        raise ValueError('manifest starting_weapon must be string or null')
 
 
 def _admit_manifest(manifest):
@@ -252,25 +253,25 @@ class RoomSnapshot:
         slot = connected.get("slot")
         raw_slot_data = connected.get("slot_data")
         if not isinstance(seed_name, str) or not seed_name:
-            raise ValueError(player_text('launcher.core', 'roominfo_seed_name_is_required'))
+            raise ValueError('RoomInfo.seed_name is required')
         if not isinstance(team, int) or isinstance(team, bool) or team < 0:
-            raise ValueError(player_text('launcher.core', 'connected_team_must_be_a_non_negative_integer'))
+            raise ValueError('Connected.team must be a non-negative integer')
         if not isinstance(slot, int) or isinstance(slot, bool) or slot < 1:
-            raise ValueError(player_text('launcher.core', 'connected_slot_must_be_a_positive_integer'))
+            raise ValueError('Connected.slot must be a positive integer')
         slot_data = _normalize_slot_data(raw_slot_data)
 
         def locations(field: str) -> tuple[int, ...]:
             values = connected.get(field)
             if not isinstance(values, list | tuple | set):
-                raise ValueError(player_text('launcher.core', 'connected_value_0_must_be_a_location_list', value_0=f'{field}'))
+                raise ValueError('Connected.{value_0} must be a location list'.format(value_0=f'{field}'))
             if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
-                raise ValueError(player_text('launcher.core', 'connected_value_0_contains_invalid_location_id', value_0=f'{field}'))
+                raise ValueError('Connected.{value_0} contains invalid location ID'.format(value_0=f'{field}'))
             return tuple(sorted(set(values)))
 
         missing = locations("missing_locations")
         checked = locations("checked_locations")
         if set(missing) & set(checked):
-            raise ValueError(player_text('launcher.core', 'connected_missing_locations_and_checked_locations_overlap'))
+            raise ValueError('Connected missing_locations and checked_locations overlap')
         raw_placements = connected.get("placements")
         active = tuple(sorted(set(missing) | set(checked)))
         placements = _room_placements(slot_data, raw_placements, active, slot)
@@ -331,7 +332,7 @@ class SeedManifest:
         resolved = admit_slot_data(options)
         records = _room_placements(options, placements, tuple(sorted(set(active_location_ids))), slot)
         if static_content_digest and not re.fullmatch(r"[0-9a-f]{64}", static_content_digest):
-            raise ValueError(player_text('launcher.core', 'static_content_digest_must_be_an_empty_string_or_sha_256'))
+            raise ValueError('static_content_digest must be an empty string or SHA-256')
         identity = release_identity()
         compatibility = resolved.compatibility
         payload = {
@@ -353,7 +354,7 @@ class SeedManifest:
     def _from_resolved_room(cls, snapshot, known_location_ids, static_content_digest):
         unknown = set(snapshot.active_location_ids) - known_location_ids - _resolved_kill_ids(snapshot.slot_data)
         if unknown:
-            raise SlotAdmissionError("slot_reference", player_text('launcher.core', 'room_contains_unknown_location_ids_value_0', value_0=f'{sorted(unknown)}'))
+            raise SlotAdmissionError("slot_reference", 'Room contains unknown location IDs: {value_0}'.format(value_0=f'{sorted(unknown)}'))
         return cls.create(
             seed_name=snapshot.seed_name, team=snapshot.team, slot=snapshot.slot, options=snapshot.slot_data,
             active_location_ids=list(snapshot.active_location_ids), placements=snapshot.placements,
@@ -387,24 +388,24 @@ class SeedManifest:
         for key in PHYSICAL_OPTION_KEYS:
             normalized_options.setdefault(key, False)
             if not isinstance(normalized_options[key], bool):
-                raise ValueError(player_text('launcher.core', 'manifest_option_value_0_must_be_boolean', value_0=f'{key}'))
+                raise ValueError('manifest option {value_0} must be boolean'.format(value_0=f'{key}'))
         normalized_options.setdefault(REVEAL_AP_LOCATIONS_OPTION_KEY, False)
         if not isinstance(normalized_options[REVEAL_AP_LOCATIONS_OPTION_KEY], bool):
             raise ValueError(
-                player_text('launcher.core', 'manifest_option_value_0_must_be_boolean', value_0=f'{REVEAL_AP_LOCATIONS_OPTION_KEY}')
+                'manifest option {value_0} must be boolean'.format(value_0=f'{REVEAL_AP_LOCATIONS_OPTION_KEY}')
             )
         normalized_options.setdefault("use_dlc_content", True)
         normalized_options.setdefault("include_dlc_missions", True)
         for key in ("use_dlc_content", "include_dlc_missions"):
             if not isinstance(normalized_options[key], bool):
-                raise ValueError(player_text('launcher.core', 'manifest_option_value_0_must_be_boolean', value_0=f'{key}'))
+                raise ValueError('manifest option {value_0} must be boolean'.format(value_0=f'{key}'))
         project_room_config(normalized_options)
         _validate_manifest_starting(normalized_options)
         active_ids = tuple(sorted(set(active_location_ids)))
         if not isinstance(static_precompile, bool):
-            raise ValueError(player_text('launcher.core', 'static_precompile_must_be_boolean'))
+            raise ValueError('static_precompile must be boolean')
         if static_content_digest and not re.fullmatch(r"[0-9a-f]{64}", static_content_digest):
-            raise ValueError(player_text('launcher.core', 'static_content_digest_must_be_an_empty_string_or_sha_256'))
+            raise ValueError('static_content_digest must be an empty string or SHA-256')
         normalized_placements = ()
         required_capabilities = {
             "room_mod_v2",
@@ -462,7 +463,7 @@ class SeedManifest:
             return ()
         if not self.placements:
             raise ValueError(
-                player_text('launcher.core', 'real_room_compilation_requires_complete_placement_mapping')
+                'real-room compilation requires complete placement mapping'
             )
         return _room_placements(self.options, self.placements, self.active_location_ids, self.slot)
 
@@ -562,7 +563,7 @@ class RoomCompiler:
         ]
         if missing:
             raise FileNotFoundError(
-                player_text('launcher.core', 'release_package_is_incomplete_or_corrupted_re_extract_the_full_d')
+                'Release package is incomplete or corrupted. Re-extract the full DOOM Eternal Archipelago package.'
             )
         self.base_resource = base_resource
         self.payload_resource = payload_resource
@@ -720,12 +721,13 @@ class RoomCompiler:
                     local=record.local,
                     trap=record.trap,
                     recipient_name=record.recipient_name,
+                    locale=locale,
                 )
             for record in placements:
                 sent_key = f"#str_ap_location_sent_{record.location_id}"
                 by_name[sent_key] = {
                     "name": sent_key,
-                    "text": location_sent_text(record.document()),
+                    "text": location_sent_text(record.document(), locale=locale),
                 }
             table["strings"] = sorted(by_name.values(), key=lambda entry: entry["name"])
             assembled[member] = (
@@ -772,33 +774,33 @@ class RoomCompiler:
                 compressed.write_bytes(content)
                 try:
                     subprocess.run(
-                        [str(decompressor), "--decompress", str(compressed), str(decoded)],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
-                    )
+                    [str(decompressor), "--decompress", str(compressed), str(decoded)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+                )
                 except subprocess.CalledProcessError as error:
                     detail = (error.stderr or error.stdout or "").strip()[:500]
                     raise ValueError(
-                        player_text('launcher.core', 'could_not_decompress_packaged_entities_member_value_0_value_1', value_0=f'{member}', value_1=f'{detail}')
+                        'could not decompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
                     ) from error
                 if not decoded.is_file():
                     raise ValueError(
-                        player_text('launcher.core', 'idfiledecompressor_produced_no_decoded_entities_member_value_0', value_0=f'{member}')
+                        'idFileDeCompressor produced no decoded entities member: {value_0}'.format(value_0=f'{member}')
                     )
                 try:
                     text = decoded.read_bytes().decode("utf-8")
                 except UnicodeDecodeError as error:
                     raise ValueError(
-                        player_text('launcher.core', 'packaged_entities_member_is_not_utf_8_after_decompression_value', value_0=f'{member}')
+                        'packaged entities member is not UTF-8 after decompression: {value_0}'.format(value_0=f'{member}')
                     ) from error
 
                 def replace_header(match: re.Match[str]) -> str:
                     location_id = int(match.group(2))
                     if location_id not in placement_by_id:
                         raise ValueError(
-                            player_text('launcher.core', 'packaged_location_notification_lacks_placement_mapping_value_0', value_0=f'{location_id}')
+                            'packaged location notification lacks placement mapping: {value_0}'.format(value_0=f'{location_id}')
                         )
                     return (
                         match.group(1)
@@ -832,12 +834,12 @@ class RoomCompiler:
                     for location_id in sorted(inactive):
                         bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
                         if bounds is None:
-                            raise ValueError(player_text('launcher.core', 'notification_entity_missing_value_0', value_0=f'{location_id}'))
+                            raise ValueError('notification entity missing: {value_0}'.format(value_0=f'{location_id}'))
                         text = text[:bounds[0]] + text[bounds[1]:]
                 rewritten_text = notification_header.sub(replace_header, text)
                 if member.endswith(fortress_member_suffix):
                     if fortress_labels_written:
-                        raise ValueError(player_text('launcher.core', 'room_package_contains_multiple_fortress_hub_entity_members'))
+                        raise ValueError('room package contains multiple Fortress hub entity members')
                     if not economy_enabled:
                         rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
                     fortress_labels_written = True
@@ -854,11 +856,11 @@ class RoomCompiler:
                 except subprocess.CalledProcessError as error:
                     detail = (error.stderr or error.stdout or "").strip()[:500]
                     raise ValueError(
-                        player_text('launcher.core', 'could_not_recompress_packaged_entities_member_value_0_value_1', value_0=f'{member}', value_1=f'{detail}')
+                        'could not recompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
                     ) from error
                 if not recompressed.is_file():
                     raise ValueError(
-                        player_text('launcher.core', 'idfiledecompressor_produced_no_encoded_entities_member_value_0', value_0=f'{member}')
+                        'idFileDeCompressor produced no encoded entities member: {value_0}'.format(value_0=f'{member}')
                     )
                 assembled[member] = recompressed.read_bytes()
                 LOGGER.info(
@@ -870,14 +872,14 @@ class RoomCompiler:
                 )
         if not fortress_labels_written:
             raise ValueError(
-                player_text('launcher.core', 'room_package_lacks_fortress_hub_entities_required_for_battery_pl')
+                'room package lacks Fortress hub entities required for Battery placement labels'
             )
 
     @staticmethod
     def _doom_gui_text(value: str) -> str:
         normalized = " ".join(value.split())
         if not normalized:
-            raise ValueError(player_text('launcher.core', 'fortress_battery_placement_text_contains_empty_display_name'))
+            raise ValueError('Fortress Battery placement text contains empty display name')
         return normalized.replace("\\", "\\\\").replace('"', '\\"')
 
     def _fortress_battery_label_entities(
@@ -901,19 +903,19 @@ class RoomCompiler:
         missing = sorted(expected - set(placement_by_id))
         if missing:
             raise ValueError(
-                player_text('launcher.core', 'fortress_battery_placement_scout_is_incomplete_missing_location')
+                'Fortress Battery placement scout is incomplete; missing location IDs: '
                 + ", ".join(str(value) for value in missing)
             )
         document = json.loads(self.FORTRESS_BATTERY_LABEL_SPEC_PATH.read_text(encoding="utf-8"))
         if document.get("schema_version") != 1:
-            raise ValueError(player_text('launcher.core', 'fortress_battery_label_specification_schema_is_unsupported'))
+            raise ValueError('Fortress Battery label specification schema is unsupported')
         member_suffix = document.get("map_member_suffix")
         primitive = document.get("primitive")
         rows = document.get("labels")
         if not isinstance(member_suffix, str) or not member_suffix.endswith(".entities"):
-            raise ValueError(player_text('launcher.core', 'fortress_battery_label_map_member_is_invalid'))
+            raise ValueError('Fortress Battery label map member is invalid')
         if not isinstance(primitive, dict) or not isinstance(rows, list):
-            raise ValueError(player_text('launcher.core', 'fortress_battery_label_specification_is_incomplete'))
+            raise ValueError('Fortress Battery label specification is incomplete')
         required_primitive = {
             "inherit": "gui/text",
             "class": "idGuiEntity_Text",
@@ -921,12 +923,12 @@ class RoomCompiler:
             "swf": "swf/guientity/generic_text.swf",
         }
         if primitive != required_primitive:
-            raise ValueError(player_text('launcher.core', 'fortress_battery_label_primitive_contract_is_invalid'))
+            raise ValueError('Fortress Battery label primitive contract is invalid')
         rows_by_id: dict[int, tuple[float, float, float]] = {}
         orientations_by_id: dict[int, list[list[float]]] = {}
         for row in rows:
             if not isinstance(row, dict) or not {"location_id", "source_entity", "position"}.issubset(set(row)):
-                raise ValueError(player_text('launcher.core', 'fortress_battery_label_transform_row_is_invalid'))
+                raise ValueError('Fortress Battery label transform row is invalid')
             location_id = row["location_id"]
             position = row["position"]
             orientation = row.get("orientation", [
@@ -950,21 +952,21 @@ class RoomCompiler:
                 )
                 or location_id in rows_by_id
             ):
-                raise ValueError(player_text('launcher.core', 'fortress_battery_label_transform_row_is_invalid'))
+                raise ValueError('Fortress Battery label transform row is invalid')
             rows_by_id[location_id] = tuple(float(value) for value in position)  # type: ignore[assignment]
             orientations_by_id[location_id] = [
                 [float(val) for val in vec] for vec in orientation
             ]
         if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
-            raise ValueError(player_text('launcher.core', 'fortress_placement_label_specification_must_cover_exactly_13_anc'))
+            raise ValueError('Fortress placement label specification must cover exactly 13 anchors')
 
         entities: list[str] = []
         for location_id in sorted(expected - {7770171}):
             record = placement_by_id[location_id]
             if record.trap:
-                display = player_text('launcher.core', 'a_trap_nfor_someone')
+                display = 'A TRAP\\nFOR SOMEONE'
             elif record.local:
-                display = player_text('launcher.core', 'your') + self._doom_gui_text(record.item_name).upper()
+                display = 'YOUR ' + self._doom_gui_text(record.item_name).upper()
             else:
                 display = (
                     self._doom_gui_text(record.item_name).upper()
@@ -1044,7 +1046,7 @@ class RoomCompiler:
         if self.decompressor is None:
             if self.dependency_manager is None or not callable(self.consent):
                 raise FileNotFoundError(
-                    player_text('launcher.core', 'idfiledecompressor_is_unavailable_in_verified_dependency_cache')
+                    'idFileDeCompressor is unavailable in verified dependency cache'
                 )
             installed = self.dependency_manager.acquire(  # type: ignore[attr-defined]
                 IDFILE_DECOMPRESSOR,
@@ -1056,12 +1058,12 @@ class RoomCompiler:
         decompressor = decompressor.expanduser().resolve()
         if not decompressor.is_file():
             raise FileNotFoundError(
-                player_text('launcher.core', 'idfiledecompressor_is_unavailable_in_verified_dependency_cache')
+                'idFileDeCompressor is unavailable in verified dependency cache'
             )
         actual_sha256 = hashlib.sha256(decompressor.read_bytes()).hexdigest()
         if actual_sha256 != IDFILE_DECOMPRESSOR.sha256:
             raise ValueError(
-                player_text('launcher.core', 'cached_idfiledecompressor_sha_256_mismatch_expected_value_0_got', value_0=f'{IDFILE_DECOMPRESSOR.sha256}', value_1=f'{actual_sha256}')
+                'Cached idFileDeCompressor SHA-256 mismatch: expected {value_0}, got {value_1}'.format(value_0=f'{IDFILE_DECOMPRESSOR.sha256}', value_1=f'{actual_sha256}')
             )
         return decompressor
 
@@ -1083,17 +1085,17 @@ class RoomCompiler:
             except subprocess.CalledProcessError as error:
                 detail = (error.stderr or error.stdout or "").strip()[:500]
                 raise ValueError(
-                    player_text('launcher.core', 'could_not_decompress_compiled_entities_member_value_0_value_1', value_0=f'{member}', value_1=f'{detail}')
+                    'could not decompress compiled entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
                 ) from error
             if not decoded.is_file():
                 raise ValueError(
-                    player_text('launcher.core', 'idfiledecompressor_produced_no_decoded_entities_member_value_0', value_0=f'{member}')
+                    'idFileDeCompressor produced no decoded entities member: {value_0}'.format(value_0=f'{member}')
                 )
             try:
                 return decoded.read_bytes().decode("utf-8")
             except UnicodeDecodeError as error:
                 raise ValueError(
-                    player_text('launcher.core', 'compiled_entities_member_is_not_utf_8_after_decompression_value', value_0=f'{member}')
+                    'compiled entities member is not UTF-8 after decompression: {value_0}'.format(value_0=f'{member}')
                 ) from error
 
     def _compress_entities_text(self, text: str) -> bytes:
@@ -1113,9 +1115,9 @@ class RoomCompiler:
                 )
             except subprocess.CalledProcessError as error:
                 detail = (error.stderr or error.stdout or "").strip()[:500]
-                raise ValueError(player_text('launcher.core', 'could_not_compress_generated_entity_overlay_value_0', value_0=f'{detail}')) from error
+                raise ValueError('could not compress generated entity overlay: {value_0}'.format(value_0=f'{detail}')) from error
             if not compressed.is_file():
-                raise ValueError(player_text('launcher.core', 'idfiledecompressor_produced_no_encoded_overlay'))
+                raise ValueError('idFileDeCompressor produced no encoded overlay')
             return compressed.read_bytes()
 
     @staticmethod
@@ -1201,7 +1203,7 @@ class RoomCompiler:
                     [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
                     for body in recipe["bodies"])
         except (KeyError, TypeError) as error:
-            raise ValueError(player_text('launcher.core', 'enemy_generation_source_references_are_malformed')) from error
+            raise ValueError('Enemy generation source references are malformed') from error
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
         from tools.maps.ap_map_generator import find_entity_block_bounds
         precache = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes())["bodies"]
@@ -1215,7 +1217,7 @@ class RoomCompiler:
             for map_key, entity, sha in sorted(references):
                 profile = precache.get(sha)
                 if profile is None or profile["source"] != {"map_key": map_key, "entity": entity, "sha256": sha}:
-                    raise ValueError(player_text('launcher.core', 'native_enemy_resource_catalog_lacks_frozen_body_value_0_value_1', value_0=f'{map_key}', value_1=f'{entity}'))
+                    raise ValueError('Native enemy resource catalog lacks frozen body: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{entity}'))
                 for entry in profile["assets"]:
                     assets.setdefault((entry["mapResourceType"], entry["name"]), None)
                 source = sources[map_key]
@@ -1231,10 +1233,10 @@ class RoomCompiler:
             staged = Path(temporary)
             for map_key, row in sorted(changed_maps.items()):
                 if map_key not in self.payload_manifest["maps"]:
-                    raise ValueError(player_text('launcher.core', 'enemy_generation_map_is_not_packaged_value_0', value_0=f'{map_key}'))
+                    raise ValueError('Enemy generation map is not packaged: {value_0}'.format(value_0=f'{map_key}'))
                 member = self.payload_manifest["maps"][map_key]["target_member"]
                 if member not in assembled:
-                    raise ValueError(player_text('launcher.core', 'enemy_generation_map_is_not_active_value_0', value_0=f'{map_key}'))
+                    raise ValueError('Enemy generation map is not active: {value_0}'.format(value_0=f'{map_key}'))
                 materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
                     enemy_revision=9, diagnostics=spawn_diagnostics)
                 source_path = staged / f"{map_key}.source"
@@ -1246,9 +1248,9 @@ class RoomCompiler:
                                                      {map_key: output_path}, staged / "publishers",
                                                      source_maps=sources, retained_overrides=assembled)
                 if audit["unrelated_generated_entity_diff_count"]:
-                    raise ValueError(player_text('launcher.core', 'enemy_map_publisher_patch_changed_unrelated_entities_value_0', value_0=f'{map_key}'))
+                    raise ValueError('Enemy map publisher patch changed unrelated entities: {value_0}'.format(value_0=f'{map_key}'))
                 assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
-                assets_path = member.split("/", 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
+                assets_path = member.split('/', 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
                 assets = json.loads(assembled.get(assets_path, b"{}"))
                 entries = assets.setdefault("assets", [])
                 existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
@@ -1264,9 +1266,9 @@ class RoomCompiler:
         return resource_roots
 
     def _apply_boon_resources(self, assembled, manifest, resource_roots):
-        profiles = json.loads((ROOT / 'content/catalog/native_enemy_assets.json').read_bytes()).get('powerups', {})
+        profiles = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes()).get('powerups', {})
         if set(profiles) != {'berserk', 'onslaught', 'overdrive'}:
-            raise ValueError(player_text('launcher.core', 'powerup_resource_catalog_is_incomplete'))
+            raise ValueError('Powerup resource catalog is incomplete')
         entries = dict.fromkeys((entry['mapResourceType'], entry['name'])
                                 for profile in profiles.values() for entry in profile['assets'])
         roots = {name for _, name in entries} | {f'pickup/powerup/{effect}' for effect in profiles}
@@ -1291,7 +1293,7 @@ class RoomCompiler:
         self._resolved_enemy_plan(manifest)
         options = self._compile_options(manifest.options)
         if manifest.static_content_digest != self.static_content_digest:
-            raise ValueError(player_text('launcher.core', 'room_static_content_identity_drifted'))
+            raise ValueError('room static content identity drifted')
         output_root.mkdir(parents=True, exist_ok=True)
         destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
         if not force and self.validate_cached_package(destination, manifest):
@@ -1328,13 +1330,13 @@ class RoomCompiler:
         assembled[hub_devinv_path] = devinv_source.encode("utf-8")
         # Mars Core's inherited replay loadout grants weapons outside AP ownership.
         assembled["e2m3_core/generated/decls/devinvloadout/devinvloadout/sp/e2m3.decl"] = (
-            ''.join((player_text('launcher.core', 'player_text'), '\n', '', '\t', player_text('launcher.core', 'edit'), '\n', '', '\t', '', '\t', player_text('launcher.core', 'clearallbeforeapply_false'), '\n', '', '\t', '', '\t', player_text('launcher.core', 'startinginventory_num_0'), '\n', '', '\t', '', '\t', player_text('launcher.core', 'currencytogive_num_0'), '\n', '', '\t', player_text('launcher.core', 'player_text_2f86e39b'), '\n', player_text('launcher.core', 'player_text_2f86e39b'), '\n', ''))
+            ''.join(('{{', '\n', '', '\t', 'edit = {{', '\n', '', '\t', '', '\t', 'clearAllBeforeApply = false;', '\n', '', '\t', '', '\t', 'startingInventory = {{ num = 0; }}', '\n', '', '\t', '', '\t', 'currencyToGive = {{ num = 0; }}', '\n', '', '\t', '}}', '\n', '}}', '\n', ''))
         ).encode("utf-8")
         from tools.decls.campaign_builder import build_campaign_overrides
         holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
         if hashlib.sha256(assembled[holt_member]).hexdigest() != \
                 "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19":
-            raise ValueError(player_text('launcher.core', 'credits_overlay_drifted'))
+            raise ValueError('credits overlay drifted')
         assembled.update(build_campaign_overrides(
             assembled["hub_patch2/EternalMod/assetsinfo/hub.json"],
             skip_dlc1_credits=True,
@@ -1357,21 +1359,21 @@ class RoomCompiler:
             catalog = load_content_catalog()
             for context in dlc_contexts():
                 if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
-                    raise ValueError(player_text('launcher.core', 'dlc_context_overlay_requires_one_exact_map_value_0', value_0=f'{context.identity}'))
+                    raise ValueError('DLC context overlay requires one exact map: {value_0}'.format(value_0=f'{context.identity}'))
                 overlay_member = self.payload_manifest["context_targets"].get(context.identity)
                 if not isinstance(overlay_member, str):
-                    raise ValueError(player_text('launcher.core', 'dlc_context_lacks_room_payload_target_value_0', value_0=f'{context.identity}'))
+                    raise ValueError('DLC context lacks room payload target: {value_0}'.format(value_0=f'{context.identity}'))
                 map_key = context.map_keys[0]
                 spec = catalog.maps.get(map_key)
                 if spec is None:
-                    raise ValueError(player_text('launcher.core', 'dlc_context_map_spec_missing_value_0', value_0=f'{map_key}'))
+                    raise ValueError('DLC context map spec missing: {value_0}'.format(value_0=f'{map_key}'))
                 member = overlay_member
                 compiled_content = assembled.get(member)
                 if compiled_content is None:
-                    raise ValueError(player_text('launcher.core', 'dlc_map_compiled_payload_is_missing_value_0_value_1', value_0=f'{map_key}', value_1=f'{member}'))
+                    raise ValueError('DLC map compiled payload is missing: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
                 compiled_text = self._decompress_entities_text(compiled_content, member)
                 if "idWorldspawn" not in compiled_text:
-                    raise ValueError(player_text('launcher.core', 'dlc_map_compiled_payload_is_incomplete_value_0_value_1', value_0=f'{map_key}', value_1=f'{member}'))
+                    raise ValueError('DLC map compiled payload is incomplete: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
                 patched_text, _publisher_audit = patch_generated_map_text(
                     map_key, compiled_text, ROOT
                 )
@@ -1399,19 +1401,19 @@ class RoomCompiler:
         with zipfile.ZipFile(destination) as output:
             expected = set(assembled)
             if set(output.namelist()) != expected:
-                raise ValueError(player_text('launcher.core', 'assembled_room_package_member_set_drifted'))
+                raise ValueError('assembled room package member set drifted')
             if json.loads(output.read("seed_manifest.json")) != seed_document:
-                raise ValueError(player_text('launcher.core', 'assembled_room_manifest_validation_failed'))
+                raise ValueError('assembled room manifest validation failed')
             if json.loads(output.read("room_config.json")) != room_config:
-                raise ValueError(player_text('launcher.core', 'assembled_room_config_validation_failed'))
+                raise ValueError('assembled room config validation failed')
             if json.loads(output.read("seed_receipt.json")) != receipt:
-                raise ValueError(player_text('launcher.core', 'assembled_room_receipt_validation_failed'))
+                raise ValueError('assembled room receipt validation failed')
             if devinv_path is not None and devinv_source is not None and output.read(devinv_path) != devinv_source.encode("utf-8"):
-                raise ValueError(player_text('launcher.core', 'assembled_devinv_validation_failed'))
+                raise ValueError('assembled DevInv validation failed')
             if (self.ENHANCED_MELEE_PATH in output.namelist()) != bool(
                 options.get("enhanced_melee_damage", False)
             ):
-                raise ValueError(player_text('launcher.core', 'assembled_enhanced_melee_damage_validation_failed'))
+                raise ValueError('assembled Enhanced Melee Damage validation failed')
         return destination
 
 
@@ -1451,7 +1453,7 @@ class ModCompiler:
         }
         if map_key not in campaign_keys:
             raise ValueError(
-                player_text('launcher.core', 'map_local_room_transforms_are_unsupported_for_map_value_0', value_0=f'{map_key}')
+                'map-local room transforms are unsupported for map: {value_0}'.format(value_0=f'{map_key}')
             )
         package = self.root / f"content/maps/{map_key}"
         config = json.loads((package / "locations.json").read_text(encoding="utf-8"))
@@ -1553,24 +1555,24 @@ class LaunchWorkflow:
             or remote.parent.parent.parent.name.casefold() != "userdata"
         ):
             raise ValueError(
-                player_text('launcher.core', 'the_steam_save_account_could_not_be_identified_select_the_correc')
+                'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
             )
         account = remote.parent.parent.name
         if not account.isascii() or not account.isdigit() or int(account) <= 0:
             raise ValueError(
-                player_text('launcher.core', 'the_steam_save_account_could_not_be_identified_select_the_correc')
+                'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
             )
         inferred = int(account)
         if configured is not None:
             if isinstance(configured, bool) or not isinstance(configured, int | str):
-                raise ValueError(player_text('launcher.core', 'the_steam_save_account_could_not_be_identified_select_the_correc'))
+                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.')
             try:
                 configured_id = int(configured)
             except ValueError as error:
-                raise ValueError(player_text('launcher.core', 'the_steam_save_account_could_not_be_identified_select_the_correc')) from error
+                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.') from error
             if configured_id <= 0 or configured_id != inferred:
                 raise ValueError(
-                    player_text('launcher.core', 'the_steam_save_account_could_not_be_identified_select_the_correc')
+                    'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
                 )
         return inferred
 
@@ -1588,7 +1590,7 @@ class LaunchWorkflow:
         path.parent.mkdir(parents=True, exist_ok=True)
         config = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
         if not isinstance(config, dict):
-            raise ValueError(player_text('launcher.core', 'the_game_connection_settings_could_not_be_read_select_help_save'))
+            raise ValueError('The game connection settings could not be read. Select Help -> SAVE SUPPORT REPORT.')
 
         previous_base = config.get("doom_base_dir")
         source = dict(runtime_config or {})
