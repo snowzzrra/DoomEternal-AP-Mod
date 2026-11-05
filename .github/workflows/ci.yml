@@ -2,6 +2,8 @@ name: DOOM mod smoke
 on: [push, pull_request]
 permissions:
   contents: read
+env:
+  CORE_REF: ${{ (github.base_ref || github.ref_name) == 'main' && '3ed7cdb932207df458069be6e9225eddfa16546e' || (github.base_ref || github.ref_name) }}
 jobs:
   smoke:
     runs-on: ubuntu-24.04
@@ -25,7 +27,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: snowzzrra/Sentinel-Core
-          ref: 3ed7cdb932207df458069be6e9225eddfa16546e
+          ref: ${{ env.CORE_REF }}
           path: Sentinel-Core
           persist-credentials: false
       - name: Check packaged protocol projection
@@ -71,12 +73,11 @@ jobs:
     runs-on: windows-2022
     env:
       CORE_REPO: snowzzrra/Sentinel-Core
-      CORE_REF: 3ed7cdb932207df458069be6e9225eddfa16546e
       SENTINEL_CORE_SOURCE: ${{ github.workspace }}/Sentinel-Core
       SENTINEL_TRANSPORT_RELAY: ${{ github.workspace }}/.tmp/native-transport-ci/save_death_probe.exe
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Checkout pinned Core source
+      - name: Checkout Core source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ${{ env.CORE_REPO }}
