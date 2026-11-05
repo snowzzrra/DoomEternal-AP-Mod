@@ -1026,7 +1026,7 @@ class LauncherUI(QMainWindow):
                 player_text("launcher.ui", "resume") if has_session else player_text("launcher.ui", "join_a_room"),
                 player_text("launcher.ui", "action_needed"),
             )
-        if not self.start_inventory_catalog:
+        if not self.player_view.start_inventory_catalog:
             self._append_log(
                 player_text("launcher.app_window", "starting_items_could_not_load_open_help_and_select_check_setup")
             )
@@ -2512,11 +2512,6 @@ class LauncherUI(QMainWindow):
 
     def _on_problem_report_submitted(self, event):
         self._append_log(player_text("launcher.app_window", "problem_report_submitted") + event["url"])
-        if getattr(self, "_report_send", None) is not None:
-            self._report_event["url"] = event["url"]
-            self._report_send.setEnabled(True)
-            self._report_send.setText(player_text("launcher.ui", "new_report"))
-            self._report_message.setText(player_text("launcher.ui", "report_confirmed") + event["url"])
         QMessageBox.information(self, player_text("launcher.ui", "report_submitted"), event["url"])
         return
 
@@ -2526,10 +2521,6 @@ class LauncherUI(QMainWindow):
             + event["message"]
         )
         self._append_log(message)
-        if getattr(self, "_report_send", None) is not None:
-            self._report_send.setEnabled(True)
-            self._report_send.setText(player_text("launcher.ui", "retry_report"))
-            self._report_message.setText(message)
         return
 
     def _on_integration_status(self, event):
