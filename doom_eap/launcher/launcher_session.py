@@ -355,7 +355,7 @@ class _ProtonSessionOwner:
 
     def retire(self):
         if self.process is None:
-            return
+            return False
         if self.process.poll() is None and not self.process.stdin.closed:
             self.request("retire")
             self.process.stdin.close()
@@ -364,6 +364,19 @@ class _ProtonSessionOwner:
         self.process.wait(timeout=10)
         self.process = None
         self.closable = True
+        return True
+
+
+def stop_native_client(process):
+    if process is None or process.poll() is not None:
+        return False
+    process.terminate()
+    try:
+        process.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=1.0)
+    return True
 
 
 class APSessionOwner:
@@ -1036,7 +1049,7 @@ class APSessionOwner:
         processes = windows_game_processes()
         return processes == ()
 
-    def retire(self, processes=_UNSET) -> None:
+    def retire(self, processes=_UNSET) -> bool:
         from .launcher_core_install import game_write_lock
         while True:
             with self._lock:
@@ -1047,14 +1060,14 @@ class APSessionOwner:
                 if self._control == control:
                     return self._retire(processes)
 
-    def _retire(self, processes=_UNSET) -> None:
+    def _retire(self, processes=_UNSET) -> bool:
         with self._lock:
             if self._remote is not None:
-                self._remote.retire()
+                stopped = self._remote.retire()
                 self.status = {"state": "not_prepared", "ready": False}
-                return
+                return stopped
             if not self._handle:
-                return
+                return False
             processes = windows_game_processes() if processes is _UNSET else processes
             if processes != ():
                 raise PlayerError('launcher.ui', 'close_doom_eternal_before_closing_this_launcher')
@@ -1066,3 +1079,4 @@ class APSessionOwner:
             self._process = None
             self._instance = None
             self.status = {"state": "not_prepared", "ready": False}
+            return True

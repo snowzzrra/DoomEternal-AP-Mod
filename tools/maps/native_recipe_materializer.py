@@ -7,9 +7,17 @@ import re
 from doom_eap.content.enemy_species import validate_enemy_speed_percent
 from doom_eap.content.native_enemy_plan import native_body_name, native_recipe_metadata
 from tools.maps.ap_map_generator import entity_definition_index, find_entity_block_bounds
-from tools.maps.encounter_catalog import ENTITY_HEADER, SPAWN_CLASSES, entity_records, list_items, walk_values
+from tools.maps.encounter_catalog import (
+    ENTITY_HEADER,
+    SPAWN_CLASSES,
+    entity_records,
+    list_items,
+    load_encounter_profiles,
+    walk_values,
+)
 from tools.maps.enemy_attribute_baselines import resolve_enemy_attribute_baselines
 from tools.maps.enemy_attributes import _MISSING, _attribute_source, _edit, _get, _render, materialize_enemy_attributes
+from tools.maps.native_enemy_inventory import _protection, _spawn_constraints
 
 MAX_POSITION_DIAGNOSTICS_PER_MAP = 512
 MAX_POSITION_DIAGNOSTICS = MAX_POSITION_DIAGNOSTICS_PER_MAP * 64
@@ -841,12 +849,36 @@ def _source_fallback_definition(record):
                   '; class = "idTarget_Spawn"; edit = ' + _render(settings, 2) + ' } }')
 
 
+def _native_event_target(owner, path, binding):
+    call = _get(owner["edit"], path)
+    if call is _MISSING or call["eventDef"] != binding["event_def"]:
+        raise ValueError("Native recipe event binding differs from the source")
+    argument = binding["argument"]
+    if type(argument) is not int or argument < 0:
+        raise ValueError("Invalid native recipe argument binding")
+    target = _get(call, ("args", f"item[{argument}]", "entity"))
+    if target is _MISSING or target != binding["reference"]:
+        raise ValueError("Native recipe target binding differs from the source")
+    return target
+
+
+def _protected_native_event(profile, path, bodies):
+    if not profile:
+        return False
+    script, event = int(path[2][5:-1]), int(path[4][5:-1])
+    if _protection(profile, script, event):
+        return True
+    allowed = _spawn_constraints(profile, script, event).get("allowed_species", ())
+    return bool(allowed) and any(body["species"] not in allowed for body in bodies)
+
+
 def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
     prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision, diagnostics=diagnostics)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
     source_index = entity_definition_index(source)
     owners = {}
+    profiles = load_encounter_profiles().get(map_key, {})
     for origin, limit in _refill_limits(source, plan['maps'][map_key]['recipes']).items():
         alias = 'ap_v070_refill_r' + origin
         if alias in names or limit > 0x7fffffff:
@@ -922,15 +954,12 @@ def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy
         if name not in owners:
             owners[name], = entity_records(block, include_names={name})
         owner = owners[name]
-        call = _get(owner["edit"], path)
-        if call is _MISSING or call["eventDef"] != binding["event_def"]:
-            raise ValueError("Native recipe event binding differs from the source")
+        target = _native_event_target(owner, path, binding)
+        # preserve native calls when frozen recipes conflict with encounter safety.
+        if _protected_native_event(profiles.get(name, {}), path, recipe["bodies"]):
+            continue
         argument = binding["argument"]
-        if type(argument) is not int or argument < 0:
-            raise ValueError("Invalid native recipe argument binding")
-        target = _get(call, ("args", f"item[{argument}]", "entity"))
-        if target is _MISSING or target != binding["reference"]:
-            raise ValueError("Native recipe target binding differs from the source")
+        call = _get(owner["edit"], path)
         alias = "ap_v070_request_r" + recipe["origin"]
         if alias in names:
             raise ValueError("Duplicate native recipe request alias")

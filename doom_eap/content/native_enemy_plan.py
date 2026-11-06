@@ -665,6 +665,12 @@ def _build_source_recipe(source, bodies, supplies, vanilla_balance, seed, map_ke
     return recipe
 
 
+def _compatible_origins(origins, candidates):
+    return [{**source, "protected_reason": "native spawn has no enabled compatible species"}
+            if source.get("allowed_species") and not set(source["allowed_species"]).intersection(candidates)
+            else source for source in origins]
+
+
 def _stage_recipes(origins, phase_bodies, supplies, vanilla_balance, seed, map_key, catalog, settings, revision):
     recipes, protected, inactive = [], [], []
     for source in origins:
@@ -756,7 +762,8 @@ def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
                                  or limits["combined_special"] > 0))
         recipes, protected, inactive = [], [], []
         phases = {}
-        origins = [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])]
+        origins = _compatible_origins(
+            [*catalog["maps"][map_key]["origins"], *catalog["maps"][map_key].get("runtime_origins", [])], candidates)
         if 14 <= revision < 19 and map_key == 'e5m4_boss':
             phantom_types = {catalog['species'][name]['spawn_type'] for name in
                              ('hell_knight', 'mancubus', 'baron', 'tyrant')}

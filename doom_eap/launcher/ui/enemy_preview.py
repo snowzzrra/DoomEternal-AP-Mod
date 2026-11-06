@@ -51,7 +51,7 @@ class EnemyPreview(QWidget):
     def render(self, values):
         self.error.hide()
         self.content.show()
-        self.mode.show()
+        self.mode.setVisible(bool(values["mode"]))
         self.mode.setText(values["mode"])
         for key, label in self.values.items():
             label.setText(values[key])

@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+from pathlib import Path
 
 from tools.maps.ap_map_generator import find_matching_brace
 
@@ -11,6 +12,11 @@ ENTITY_START = re.compile(r"(?m)^entity\s*\{")
 ENTITY_HEADER = re.compile(r'entityDef\s+(\S+)\s*\{\s*inherit\s*=\s*"([^"]*)";\s*class\s*=\s*"([^"]+)";')
 MEMBER = re.compile(r'\s*([\w.\[\]-]+)\s*=\s*(\{|"(?:\\.|[^"\\])*"|[^;{}]+;)')
 SPAWN_CLASSES = {"idTarget_Spawn", "idTarget_Spawn_Parent", "idTargetSpawnGroup"}
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def load_encounter_profiles(root=ROOT):
+    return json.loads((root / "content/catalog/encounter_profiles.json").read_bytes())["maps"]
 
 
 def parse_object(text):

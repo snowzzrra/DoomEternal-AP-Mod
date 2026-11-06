@@ -151,6 +151,60 @@
         },
         "evidence": "Tutorials Off; map source SHA256 5d8d1a6c6a377a77e5c8246c5eaf5034a1f4f917e82621645bf70e143b43d4a6. Shared ordinary priest-room and Chainsaw hall fights are separate occurrences."
       }
+    },
+    "e4m3_mcity": {
+      "platformarea_samuel_encounter_manager_dlc1_1": {
+        "category": "boss",
+        "protection": {
+          "spawn_events": [
+            {
+              "script": 5,
+              "event": 1
+            }
+          ],
+          "reason": "Samur checkpoint entry requires the native boss and its phase flags."
+        },
+        "evidence": "vanillamaps/e4m3_mcity.map: script 5 spawns Samur through platformarea_samuel_target_spawn_3."
+      },
+      "platformarena_encounter_manager_phasetwo": {
+        "category": "boss_adds",
+        "spawn_constraints": [
+          {
+            "script": 0,
+            "event": 1,
+            "allowed_species": [
+              "gargoyle",
+              "cacodemon",
+              "pain_elemental",
+              "lost_soul",
+              "blood_angel"
+            ]
+          },
+          {
+            "script": 0,
+            "event": 2,
+            "allowed_species": [
+              "gargoyle",
+              "cacodemon",
+              "pain_elemental",
+              "lost_soul",
+              "blood_angel"
+            ]
+          },
+          {
+            "script": 0,
+            "event": 5,
+            "allowed_species": [
+              "gargoyle",
+              "cacodemon",
+              "pain_elemental",
+              "lost_soul",
+              "blood_angel"
+            ]
+          }
+        ],
+        "evidence": "vanillamaps/e4m3_mcity.map: phase-two air spawns run while the arena floor is disabled."
+      }
     }
   }
 }

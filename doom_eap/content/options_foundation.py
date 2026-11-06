@@ -6,6 +6,7 @@ import json
 import os
 import re
 import uuid
+from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping, cast
 
@@ -13,12 +14,13 @@ import yaml
 
 from doom_eap.content.enemy_options import normalize_enemy_options
 from doom_eap.content.enemy_species import speed_capability_notice
+from doom_eap.strings import PlayerError
 
 
 OPTIONS_SCHEMA_VERSION = 3
 SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "option_set", "option_dict", "range", "named_range"})
 GAME_NAME = "DOOM Eternal"
-START_INVENTORY_KEY = "start_inventory"
+START_INVENTORY_KEYS = ("start_inventory", "start_inventory_from_pool")
 
 
 def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -203,7 +205,7 @@ def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
     validated = validate_options_schema(schema)
     return {
         **{option["key"]: option["default"] for option in validated["options"]},
-        START_INVENTORY_KEY: {},
+        **{key: {} for key in START_INVENTORY_KEYS},
     }
 
 
@@ -235,17 +237,43 @@ def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
     return sorted(catalog, key=lambda item: item["label"].casefold())
 
 
-def validate_start_inventory(value: Any) -> dict[str, int]:
+def validate_start_inventory(value: Any, key="start_inventory") -> dict[str, int]:
     if not isinstance(value, Mapping):
-        raise ValueError("start_inventory must be an item-to-quantity map")
+        raise ValueError(f"{key} must be an item-to-quantity map")
     result: dict[str, int] = {}
     for name, quantity in value.items():
         if not isinstance(name, str) or not name.strip():
-            raise ValueError("start_inventory item names must be text")
-        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
-            raise ValueError("start_inventory quantities must be positive integers")
+            raise ValueError(f"{key} item names must be text")
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 0:
+            raise ValueError(f"{key} quantities must be nonnegative integers")
         result[name] = quantity
     return result
+
+
+def _starting_item_counts(options, values):
+    counts = Counter(values["start_inventory"]) + Counter(values["start_inventory_from_pool"])
+    weapon = next((option for option in options if option["key"] == "starting_weapon"), {})
+    name = next((choice["label"] for choice in weapon.get("choices", [])
+                 if choice["key"] == values.get("starting_weapon")), None)
+    if name in counts:
+        counts[name] += 1
+    return counts
+
+
+def _validate_starting_limits(options, values):
+    counts = _starting_item_counts(options, values)
+    if counts["Blood Punch"]:
+        raise PlayerError("apworld.errors", "legacy_blood_punch")
+    pool_option = next((option for option in options if option["key"] == "item_pool_counts"), {})
+    limits = {entry["key"]: entry["maximum"] for entry in pool_option.get("entries", [])}
+    for name, quantity in counts.items():
+        # the seed planner resolves the battery economy after mission selection.
+        if name != "Sentinel Battery" and quantity > limits.get(name, 1):
+            raise PlayerError("apworld.errors", "inventory_maximum", item=name, maximum=limits.get(name, 1))
+    for name, quantity in values["start_inventory_from_pool"].items():
+        available = values.get("item_pool_counts", {}).get(name, quantity)
+        if quantity > available:
+            raise PlayerError("apworld.errors", "starting_pool_copies", item=name, quantity=quantity, available=available)
 
 
 def validate_option_values(
@@ -254,7 +282,7 @@ def validate_option_values(
     validated = validate_options_schema(schema)
     if not isinstance(values, Mapping):
         raise ValueError("option values must be an object")
-    expected = {option["key"] for option in validated["options"]} | {START_INVENTORY_KEY}
+    expected = {option["key"] for option in validated["options"]} | set(START_INVENTORY_KEYS)
     if set(values) != expected:
         missing = sorted(expected - set(values))
         extra = sorted(set(values) - expected)
@@ -302,7 +330,9 @@ def validate_option_values(
                     f"{key} must be between {option['minimum']} and {option['maximum']} or a named range"
                 )
         result[key] = value
-    result[START_INVENTORY_KEY] = validate_start_inventory(values[START_INVENTORY_KEY])
+    result["start_inventory"] = validate_start_inventory(values["start_inventory"])
+    result["start_inventory_from_pool"] = validate_start_inventory(values["start_inventory_from_pool"], "start_inventory_from_pool")
+    _validate_starting_limits(validated["options"], result)
     overlap = set(result.get("local_items", ())) & set(result.get("non_local_items", ()))
     if overlap:
         raise ValueError("Items cannot be both local and non-local: " + ", ".join(sorted(overlap)))
@@ -442,7 +472,8 @@ def load_player_yaml(path: Path, schema: Mapping[str, Any]) -> tuple[str, dict[s
             value = list(dict.fromkeys(next((choice["key"] for choice in option["choices"]
                                             if item in choice.get("aliases", ())), item) for item in value))
         values[key] = value
-    values[START_INVENTORY_KEY] = raw_options.get(START_INVENTORY_KEY, {})
+    values["start_inventory"] = raw_options.get("start_inventory", {})
+    values["start_inventory_from_pool"] = raw_options.get("start_inventory_from_pool", {})
     try:
         values = validate_option_values(schema, values)
     except ValueError as error:

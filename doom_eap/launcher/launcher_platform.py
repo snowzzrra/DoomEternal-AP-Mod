@@ -35,6 +35,7 @@ from pathlib import Path, PurePosixPath
 from typing import ClassVar, Protocol
 
 from doom_eap.launcher.ui.strings import text as player_text
+from doom_eap.strings import PlayerError
 
 DOOM_ETERNAL_APP_ID = "782330"
 REQUIRED_DLL_OVERRIDE = "msimg32=n,b"
@@ -3049,26 +3050,47 @@ class ProcessInspectionError(RuntimeError):
 
 
 def require_doom_closed(operation: str) -> None:
-    processes = detect_doom_processes()
+    processes = detect_doom_processes(include_clients=True)
+    clients = [item for item in processes if str(item["name"]).startswith("ap_client")]
+    processes = [item for item in processes if item not in clients]
     if processes:
         detected = ", ".join('{value_0} (PID {value_1})'.format(value_0=f"{item['name']}", value_1=f"{item['pid']}") for item in processes)
         error = RuntimeError('Close DOOM Eternal before {value_0}. Detected: {value_1}'.format(value_0=f'{operation}', value_1=f'{detected}'))
         error.processes = processes
         raise error
+    if clients:
+        raise PlayerError("launcher.setup", "another_session_running")
+
+
+def _running_processes():
+    windows = os.name == "nt"
+    command = ["tasklist", "/fo", "csv", "/nh"] if windows else ["ps", "-eo", "pid=,comm=,args="]
+    try:
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=3, check=False,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if windows else 0)
+        completed.check_returncode()
+        if windows:
+            return tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
+        return tuple(tuple(line.split(None, 2)) for line in completed.stdout.splitlines() if line.strip())
+    except (OSError, subprocess.SubprocessError, IndexError, UnicodeError) as error:
+        raise ProcessInspectionError(
+            'Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry.'
+        ) from error
 
 
 def detect_doom_processes(
     *,
     process_list: Sequence[Sequence[str]] | None = None,
+    include_clients: bool = False,
 ) -> tuple[dict[str, object], ...]:
     """Return bounded process facts suitable for diagnostics."""
     supported_names = {
         "doometernalx64vk.exe": "doometernalx64vk.exe",
         "doometernalx64vk": "doometernalx64vk",
         "doometernalx64v": "doometernalx64vk.exe",
-        "ap_client.exe": "ap_client.exe",
-        "ap_client": "ap_client",
     }
+    if include_clients:
+        supported_names.update({"ap_client.exe": "ap_client.exe", "ap_client": "ap_client"})
 
     def basename(value: object) -> str:
         text = str(value).strip().strip("\"'")
@@ -3076,38 +3098,7 @@ def detect_doom_processes(
 
     rows: list[dict[str, object]] = []
     if process_list is None:
-        if os.name == "nt":
-            try:
-                completed = subprocess.run(
-                    ["tasklist", "/fo", "csv", "/nh"],
-                    capture_output=True, text=True, timeout=3, check=False,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-                completed.check_returncode()
-                process_list = tuple((row[0], row[1]) for row in csv.reader(completed.stdout.splitlines()) if row)
-            except (OSError, subprocess.SubprocessError, IndexError, UnicodeError) as error:
-                raise ProcessInspectionError(
-                    'Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry.'
-                ) from error
-        else:
-            try:
-                completed = subprocess.run(
-                    ["ps", "-eo", "pid=,comm=,args="],
-                    capture_output=True,
-                    text=True,
-                    timeout=3,
-                    check=False,
-                )
-                completed.check_returncode()
-                process_list = tuple(
-                    tuple(line.split(None, 2))
-                    for line in completed.stdout.splitlines()
-                    if line.strip()
-                )
-            except (OSError, subprocess.SubprocessError, UnicodeError) as error:
-                raise ProcessInspectionError(
-                    'Could not inspect running processes. Cannot safely change game files; close DOOM Eternal and retry.'
-                ) from error
+        process_list = _running_processes()
     for row in process_list:
         values = tuple(row)
         if len(values) < 2:

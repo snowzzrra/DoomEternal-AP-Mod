@@ -11,7 +11,7 @@ from pathlib import Path
 from doom_eap.content.enemy_plan import BASE_COMBAT_COST
 from doom_eap.content.enemy_species import enemy_spawn_mask, project_species_profiles
 
-from .encounter_catalog import ENTITY_HEADER, ENTITY_START, SPAWN_CLASSES, entity_records, list_items, walk_values
+from .encounter_catalog import ENTITY_HEADER, ENTITY_START, SPAWN_CLASSES, entity_records, list_items, load_encounter_profiles, walk_values
 
 
 EMITTERS = {
@@ -34,11 +34,16 @@ def _at(value, path):
     return value
 
 
-def _protection(record, profile, script, event):
+def _protection(profile, script, event):
     rule = profile.get("protection", {})
     if rule.get("entire_encounter") or {"script": script, "event": event} in rule.get("spawn_events", []):
         return rule["reason"]
     return None
+
+
+def _spawn_constraints(profile, script, event):
+    return next(({"allowed_species": rule["allowed_species"]} for rule in profile.get("spawn_constraints", [])
+                 if (rule["script"], rule["event"]) == (script, event)), {})
 
 
 def extract_native_inventory(source, map_key, *, profiles=None):
@@ -120,7 +125,8 @@ def extract_native_inventory(source, map_key, *, profiles=None):
             if "entityEvents" in parts:
                 owner_path = ".".join(parts[:parts.index("entityEvents") + 2])
                 owner = _at(edit, owner_path).get("entity") or owner
-            reason = _protection(record, profiles.get(record["name"], {}), script, index)
+            profile = profiles.get(record["name"], {})
+            reason = _protection(profile, script, index)
             owner_protection = profiles.get(owner, {}).get("protection", {})
             if owner_protection.get("entire_encounter"):
                 reason = owner_protection["reason"]
@@ -130,11 +136,12 @@ def extract_native_inventory(source, map_key, *, profiles=None):
                       "phase": f"{record['name']}/{script_path}/{phases.get(script_path, 0)}",
                       "wave": f"{record['name']}/{script_path}/{waves.get(script_path, 0)}",
                       "tutorial_hint": any("tutorial" in value.lower() for value in [record["name"], *record["layers"]]),
-                      "protected_reason": reason, "arguments": arguments}
+                      "protected_reason": reason, "arguments": arguments,
+                      "spawn_constraints": _spawn_constraints(profile, script, index)}
             emitters.append(origin)
             legacy = profiles.get(record['name'], {}).get('legacy_protection')
             if legacy:
-                origin['legacy_protected_reason'] = _protection(record, {'protection': legacy}, script, index)
+                origin['legacy_protected_reason'] = _protection({'protection': legacy}, script, index)
     for record in records.values():
         if record["class"] != "idAI2":
             continue
@@ -143,7 +150,7 @@ def extract_native_inventory(source, map_key, *, profiles=None):
                        "identity_inherit": record["edit"].get("goreComponent", {}).get("goreContainer"),
                        "layers": record["layers"], "point_template": name in templates,
                        "adopted": name in adopted, "protected_reason": protected_entities.get(name) or
-                       _protection(record, {}, None, None)})
+                       _protection({}, None, None)})
     return {"map_key": map_key, "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
             "emitters": sorted(emitters, key=lambda row: row["id"]),
             "actors": sorted(actors, key=lambda row: row["entity"]),
@@ -155,7 +162,7 @@ def extract_native_inventory(source, map_key, *, profiles=None):
 
 def build_native_inventory(root, map_keys=None):
     root = Path(root)
-    profiles = json.loads((root / "content/catalog/encounter_profiles.json").read_bytes())["maps"]
+    profiles = load_encounter_profiles(root)
     maps = {}
     for descriptor_path in sorted((root / "content/maps").glob("*/descriptor.json")):
         key = descriptor_path.parent.name
@@ -263,6 +270,7 @@ def native_recipe_catalog(inventory, registry):
                 "phase": origin.get("phase", origin["id"]),
                 **({"wave": origin['wave']} if 'wave' in origin else {}),
                 **({"legacy_protected_reason": origin['legacy_protected_reason']} if origin.get('legacy_protected_reason') else {}),
+                **origin.get("spawn_constraints", {}),
                 "spawn_type": original_type, "logical_types": logical_types,
                 "logical_count": count, "maximum_emissions": maximum,
                 "binding": binding,

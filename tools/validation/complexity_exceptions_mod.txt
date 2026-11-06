@@ -76,7 +76,6 @@ doom_eap/launcher/connection_errors.py::validate_server_address 10 14
 doom_eap/launcher/launcher_app.py::_run_self_test 65 59
 doom_eap/launcher/launcher_controller.py::LauncherController._capture_support_condump 39 28
 doom_eap/launcher/launcher_controller.py::LauncherController._ensure_native_client 20 18
-doom_eap/launcher/launcher_controller.py::LauncherController._sample_game_lifecycle 20 9
 doom_eap/launcher/launcher_controller.py::LauncherController._setup_event 36 33
 doom_eap/launcher/launcher_controller.py::LauncherController._worker_event 36 29
 doom_eap/launcher/launcher_controller.py::LauncherController.connect 10 11

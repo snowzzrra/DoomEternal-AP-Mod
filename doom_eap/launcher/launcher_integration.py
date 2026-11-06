@@ -35,7 +35,6 @@ from .launcher_platform import (
     GameLinkResult,
     SteamLaunchOptionsManager,
     cleanup_stale_doom_config_bind,
-    detect_doom_processes,
     finalize_mod_installation,
     idfile_decompressor_spec,
     install_meathook,
@@ -43,12 +42,14 @@ from .launcher_platform import (
     probe_meathook,
     probe_runtime_prerequisites,
     publish_file,
+    require_doom_closed,
     stage_room_mod,
     verify_linux_mod_installation,
     verify_mod_installation,
 )
 from .launcher_session import APSessionOwner
 from .launcher_workers import LauncherJob, LauncherWorkCancelled, LauncherWorkers
+from .ui.strings import failure_text
 
 EventSink = Callable[[str, dict[str, object]], None]
 ConsentCallback = Callable[[object], bool]
@@ -176,7 +177,7 @@ def setup_failure_payload(error: BaseException, *, phase: str = "") -> dict[str,
     else:
         recovery_action = "repair_game_integration"
         user_title = player_text('launcher.ui', 'game_setup_needs_attention')
-        user_message = 'Open Help and select Fix Setup. If it fails again, select Help -> SAVE SUPPORT REPORT.'
+        user_message = failure_text("game_setup", error)
         user_action = player_text('common', 'repair_game_connection')
     return {
         "error_type": type(error).__name__,
@@ -308,12 +309,14 @@ class IntegratedLaunchWorkflow:
         confirmation: ConfirmationCallback | None = None,
         uninstall_confirmation: ConfirmationCallback | None = None,
         session_owner: APSessionOwner | None = None,
+        stop_native_client: Callable[[], None] | None = None,
     ):
         self.base_workflow = LaunchWorkflow()
         self.application_dir = application_dir
         self.state_dir = state_dir
         self.data_dir = data_dir or state_dir.parent / "data"
         self.session_owner = session_owner or APSessionOwner(application_dir, self.data_dir, state_dir)
+        self.stop_native_client = stop_native_client or (lambda: None)
         self.config_path = config_path
         self.platform_name = platform_name or ("windows" if os.name == "nt" else "linux")
         self.event_sink = event_sink or (lambda _kind, _payload: None)
@@ -340,6 +343,7 @@ class IntegratedLaunchWorkflow:
             confirmation=interactions.confirmation,
             uninstall_confirmation=interactions.uninstall_confirmation,
             session_owner=self.session_owner,
+            stop_native_client=self.stop_native_client,
         )
         workflow._configuration_snapshot = configuration
         workflow._job = job
@@ -912,6 +916,7 @@ class IntegratedLaunchWorkflow:
 
     def _execute_installation(self, snapshot, endpoint, config, game_root, pre_install_state,
                               *, manual=False, transaction_id=None, retry=False):
+        self.stop_native_client()
         manifest = self._manifest_for(snapshot)
         plan = self._installation_plan(manifest, snapshot, game_root, pre_install_state)
         self._prepared_injector = None
@@ -1212,10 +1217,8 @@ class IntegratedLaunchWorkflow:
         config = self._config()
         game_root = self._game_root(config)
         with installation_write(game_root):
-            running = detect_doom_processes()
-            if running:
-                names = ", ".join(str(item.get("name", "unknown")) for item in running)
-                raise RuntimeError('Cannot uninstall room mod while game runtime is running: {value_0}'.format(value_0=f'{names}'))
+            self.stop_native_client()
+            require_doom_closed(player_text('launcher.installation', 'uninstalling_a_room_mod'))
 
             receipt_path = self.state_dir / "launcher_setup.json"
             try:

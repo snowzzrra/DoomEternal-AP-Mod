@@ -1,5 +1,5 @@
 {
-  "catalog_digest": "5a6f502038db54baa9a8e9cd7dfdada86e5f8f320f23597a5491c6defbc45a6b",
+  "catalog_digest": "a6abe1cd68e66283624e5a622e4e11e769986bce2fc61c8257d4f353ee612dd9",
   "catalog_source": "content/maps + content/catalog + qualified native inventory",
   "files": {
     "campaign_kill_sources.json": "26b4b90c9d823f7d8909bac011a1a1519440a99edfab20b2df0c63c9652549ab",
@@ -14,16 +14,16 @@
     "generated_content.py": "e9e58627ef09cb2a9bd50b9c1e793a67dd6c69bd95c0daaab55f1ba61616ea82",
     "killsanity_plan.py": "6654aa3ea3dc7789ade8df5942124c58af4132cd936473c15b91da85171d17f4",
     "native_enemy_balance.py": "ea6cae418b0aef62f62015257a4e5e5b36522a6b6170b649865a621b087f00cf",
-    "native_enemy_catalog.json": "2170cbf822059894397fc38847c731d98877d3d081ef7d6dc13d7bc25f9c3629",
-    "native_enemy_plan.py": "c8a789a2997a68b712cd30a479c46495c2d29a08dbd0d0d10386eaa43bf33fb3",
+    "native_enemy_catalog.json": "1c7dbe7fd31e65a89f97b066b16051baf6f0a464fdf6bd996e7880ec0d7b369b",
+    "native_enemy_plan.py": "f045b62ed3c189647a0247a70e9d8e3e1966f455ab4d54f4125ef87b1a5c2630",
     "native_enemy_safety.py": "7cbb7b0767ea6a6b20cde200ad459a9de6186a51bacc969d60c15688f5518373",
-    "player_strings_generated.py": "8547c8f5d926d7f64cb2a0090a700b2b70c6f1ce695e2ec137157f3a8ee1a9c1",
+    "player_strings_generated.py": "e8a1a9c618e4d74e5c36bc0fbbbd9f619a9fcbb1433f8cae0c64d9b00660e2f1",
     "recipe_codec.py": "0cc72f784806886ec2e1d26092212560d235461e5630954640be9a28135c0656",
     "secret_encounter_timers.json": "376397784d5378a6d2c1f1578e4a1999230c20f87c1ff7ba00e4f7c428bd0806",
     "secret_encounter_timers.py": "298833b279cd62d2e0fcbb09f9e6739db56bd0e633fb77d748273046a89e3b4e",
-    "slot_catalog.json": "6e2ce2c7f9e5f1713f240a0ddb24895f2fe4f5bc15360b3faa7ffecb07463558",
+    "slot_catalog.json": "a6232c39055e99485dfe6caf5c7bdea1fb298f0203a53e0d1f967ad22283cd5e",
     "slot_data_contract.py": "7e9dd4cc941ed37f3d69edca96a87e1c417bc64a5b74b2d3b358047b57c1a0bb",
-    "vanilla_enemy_profiles.json": "8c69bf095946acfa7699eab2381646a3ec55a41b5f6414cd386a1685debd3f65",
+    "vanilla_enemy_profiles.json": "346f1f30a3096dd99d88ac649b11f71efc3e8bf1a2d59a8c4439bcde94c9d1ca",
     "vanilla_enemy_profiles.py": "190ba4ce1b70c201fe213c337b3d27a82f2c1b171668d636cd0987fe4d255d55"
   },
   "generated": "python -m tools.content.compile_content_catalog"

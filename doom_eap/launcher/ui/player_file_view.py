@@ -295,6 +295,7 @@ class PlayerFileView(QWidget):
                 button = QPushButton(title)
                 button.clicked.connect(callback)
                 category_actions.addWidget(button)
+            category_actions.addStretch()
             group_layout.addLayout(category_actions)
             sections = (
                 (player_text("launcher.player_file", "bestiary"), ("enemy_weights",)),
@@ -525,22 +526,36 @@ class PlayerFileView(QWidget):
         self.inventory_picker.setMinimumContentsLength(24)
         self.inventory_quantity = QSpinBox()
         self.inventory_quantity.setRange(1, 9999)
-        self.inventory_add_button = QPushButton(player_text("launcher.ui", "add"))
+        self.inventory_add_button = QPushButton(player_text("launcher.player_file", "add_extra"))
         self.inventory_add_button.setObjectName("secondary")
         self.inventory_add_button.clicked.connect(self._add_inventory)
+        self.inventory_pool_add_button = QPushButton(player_text("launcher.player_file", "add_from_pool"))
+        self.inventory_pool_add_button.setObjectName("secondary")
+        self.inventory_pool_add_button.clicked.connect(lambda: self._add_inventory(from_pool=True))
         enabled = bool(self.start_inventory_catalog)
         self.inventory_picker.setEnabled(enabled)
         self.inventory_quantity.setEnabled(enabled)
         self.inventory_add_button.setEnabled(enabled)
+        self.inventory_pool_add_button.setEnabled(enabled)
         controls.addWidget(self.inventory_picker, 1)
         controls.addWidget(stepper(self.inventory_quantity, compact=True))
         controls.addWidget(self.inventory_add_button)
+        controls.addWidget(self.inventory_pool_add_button)
         layout.addLayout(controls)
         entries = [{"key": item["name"], "label": item["label"], "minimum": 1, "maximum": 9999} for item in self.start_inventory_catalog]
         self.inventory = DictionaryControl({"entries": entries, "default": {}}, selected_only=True)
-        for action in self.inventory.header_actions:
-            heading.addWidget(action)
-        layout.addWidget(self.inventory)
+        self.inventory_pool = DictionaryControl({"entries": entries, "default": {}}, selected_only=True)
+        inventories = QHBoxLayout()
+        for key, control in (("extra_starting_items", self.inventory), ("starting_items_from_pool", self.inventory_pool)):
+            column = QVBoxLayout()
+            title = QHBoxLayout()
+            title.addWidget(self._label(player_text("launcher.player_file", key)), 1)
+            for action in control.header_actions:
+                title.addWidget(action)
+            column.addLayout(title)
+            column.addWidget(control)
+            inventories.addLayout(column, 1)
+        layout.addLayout(inventories)
         return card
 
     def _refresh_inventory_picker(self, dlc_enabled: bool) -> None:
@@ -574,13 +589,15 @@ class PlayerFileView(QWidget):
         self.inventory_picker.setEnabled(enabled)
         self.inventory_quantity.setEnabled(enabled)
         self.inventory_add_button.setEnabled(enabled)
+        self.inventory_pool_add_button.setEnabled(enabled)
 
-    def _add_inventory(self):
+    def _add_inventory(self, *, from_pool=False):
         name = self.inventory_picker.currentData()
         if isinstance(name, str):
-            values = self.inventory.value()
+            control = self.inventory_pool if from_pool else self.inventory
+            values = control.value()
             values[name] = values.get(name, 0) + self.inventory_quantity.value()
-            self.inventory.setValue(values)
+            control.setValue(values)
 
     def _option_values(self) -> dict[str, object]:
         values: dict[str, object] = {}
@@ -594,6 +611,7 @@ class PlayerFileView(QWidget):
             elif isinstance(control, NamedRangeControl | OptionSetControl | DictionaryControl):
                 values[key] = control.value()
         values["start_inventory"] = self.inventory.value()
+        values["start_inventory_from_pool"] = self.inventory_pool.value()
         return values
 
     def _reset_options(self) -> None:
@@ -626,8 +644,10 @@ class PlayerFileView(QWidget):
     def _apply_player_values(self, values: dict[str, object]) -> None:
         self._set_option_values({**values, **enemy_options_for_editing(values)})
         self.inventory.setValue({})
+        self.inventory_pool.setValue({})
         self.dependencies._refresh_create_dependencies()
         self.inventory.setValue(cast(dict[str, int], values.get("start_inventory", {})))
+        self.inventory_pool.setValue(cast(dict[str, int], values.get("start_inventory_from_pool", {})))
 
     def _apply_enemy_category_values(self, values: dict[str, object]) -> None:
         category = enemy_options_for_editing(values)
@@ -690,7 +710,7 @@ class PlayerFileView(QWidget):
         try:
             name, values, document = load_player_yaml(Path(filename), self.controller.options_schema)
             known_items = {item["name"] for item in self.start_inventory_catalog}
-            unknown = set(values["start_inventory"]) - known_items
+            unknown = (set(values["start_inventory"]) | set(values["start_inventory_from_pool"])) - known_items
             if unknown:
                 raise PlayerError('launcher.player_file', 'these_starting_items_are_unavailable_remove_them_and_try_again_v', value_0=f"{', '.join(sorted(unknown))}")
         except (OSError, ValueError) as error:
@@ -716,7 +736,7 @@ class PlayerFileView(QWidget):
         if not filename:
             return
         try:
-            inventory = self._option_values()["start_inventory"]
+            inventory = self.inventory.value().keys() | self.inventory_pool.value().keys()
             unavailable = set(inventory) - {
                 str(self.inventory_picker.itemData(index)) for index in range(self.inventory_picker.count())
             }

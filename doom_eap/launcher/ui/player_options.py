@@ -158,7 +158,7 @@ class PlayerOptions:
         other = sum(weight for _, weight in ranked[2:])
         if other:
             parts.append(player_text("launcher.player_file", "other_value_0", value_0=f"{100 * other / total:.1f}"))
-        mode = player_text("launcher.player_file", "multiplier_value_0", value_0=str(values["count_multiplier"])) if multiplier else player_text('common', 'auto')
+        mode = player_text("launcher.player_file", "multiplier_value_0", value_0=str(values["count_multiplier"])) if multiplier else ""
         pool = (player_text('launcher.player_file', 'base_game_enemies') if self._choice_value("use_dlc_content") is False else player_text('launcher.player_file', 'base_game_and_dlc_enemies'))
         self.view.enemy_preview.render({
             "mode": mode,

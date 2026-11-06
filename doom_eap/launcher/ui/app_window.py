@@ -2398,11 +2398,11 @@ class LauncherUI(QMainWindow):
             return player_text('common', 'archipelago'), self.COLORS["ap"], detail[:512]
         if kind in {"ammo_refill", "stage_restart"}:
             return self._action_activity(event, kind)
-        if kind == "setup_ready":
+        if kind in {"setup_ready", "native_client_stopped_for_install"}:
             return (
                 player_text("launcher.support", "activity_installation"),
                 self.COLORS["accent"],
-                player_text("launcher.app_window", "installation_complete"),
+                player_text("launcher.app_window", {"setup_ready": "installation_complete"}.get(kind, kind)),
             )
         if kind == "room_install_state":
             if self._is_room_package_failure(event) or str(event.get("readiness")) == "blocked":

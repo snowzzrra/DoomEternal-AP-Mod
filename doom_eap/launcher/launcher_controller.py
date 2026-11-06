@@ -199,6 +199,7 @@ class LauncherController:
             consent=self._request_consent,
             confirmation=self._request_installation_confirmation,
             uninstall_confirmation=self._request_uninstall_confirmation,
+            stop_native_client=self._stop_native_client_for_installation,
         )
         self.setup = RoomSetupCoordinator(
             self.workflow,
@@ -434,26 +435,26 @@ class LauncherController:
                 )
                 return False
 
-    def _stop_native_client(self) -> None:
+    def _stop_native_client_for_installation(self) -> None:
+        if self.game_running_or_unknown():
+            return
+        stopped = self._stop_native_client()
+        if os.name != "nt":
+            stopped = self.workflow.session_owner.retire() or stopped
+        if stopped:
+            self.emit("native_client_stopped_for_install")
+
+    def _stop_native_client(self) -> bool:
+        from .launcher_session import stop_native_client
+
         if hasattr(self, "workflow") and not self.workflow.session_owner.can_close():
-            return
+            return False
         with self._lifecycle_lock:
-            process = self._native_client_process
+            stopped = stop_native_client(self._native_client_process)
             self._native_client_process = None
-        if process is None:
-            return
-        if process.poll() is not None:
-            return
-        try:
-            process.terminate()
-            try:
-                process.wait(timeout=2.0)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=1.0)
-        except Exception:
-            pass
-        self.emit("native_client_stopped")
+        if stopped:
+            self.emit("native_client_stopped")
+        return stopped
 
     def _load_config(self) -> dict[str, object]:
         if self.config_path.is_file():
@@ -667,7 +668,6 @@ class LauncherController:
         return found
 
     def game_processes(self) -> tuple[dict[str, object], ...]:
-        """Return bounded facts for supported game/client processes."""
         return detect_doom_processes()
 
     def game_running_or_unknown(self) -> bool:
@@ -944,9 +944,6 @@ class LauncherController:
                         config.update(workflow._config())
                         status = workflow.session_owner.prepare(RoomSnapshot.from_event(repair_event), config, recover_prelaunch=True)
                         job.check()
-                        if os.name == "nt" and not self._ensure_native_client(generation=job.generation):
-                            job.check()
-                            raise RuntimeError('The game integration helper could not start')
                         with self._lifecycle_lock:
                             job.check()
                             self.last_setup_failure = None
@@ -1459,8 +1456,6 @@ class LauncherController:
                 except (OSError, RuntimeError) as error:
                     self.emit("core_runtime_rebind_pending", message=str(error))
             self._stop_native_client()
-        if kind == "setup_ready" and payload.get("adapter_state") == "applied":
-            self._ensure_native_client(generation=generation)
 
     def _setup_progress_context(self, payload):
         if "launcher_job_generation" not in payload:
@@ -1712,8 +1707,6 @@ class LauncherController:
                 readiness_reason=state.readiness_reason,
                 **(installed_package_issue_payload(state.reason) if state.state == "update_required" else {}),
             )
-            if state.state == "already_installed" and state.readiness != "blocked":
-                self._ensure_native_client(generation=job.generation)
 
         return self.workers.submit(("room_readiness", self.setup.room_key(event)), operation, generation=generation)
 
@@ -1803,22 +1796,28 @@ class LauncherController:
                 except ProcessInspectionError:
                     current_running = None
                 status = self.workflow.session_owner.observe()
-            semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
-                        status.get("process_created"),
-                        status.get("admission", {}).get("instance_id"), status.get("ready"),
-                        status.get("recovery_state"), status.get("resume_verified"), status.get("recovery_reason"))
-            if semantic != getattr(self, "_last_ap_session_status", None):
-                self._last_ap_session_status = semantic
-                self.emit("process_state_changed", running=current_running)
-                self.emit("ap_session_status", **status)
-                if status.get("state") == "game_exited" and current_running is False:
-                    with self._lifecycle_lock:
-                        event = self.setup.current_event
-                        if event is not None:
-                            self._queue_room_readiness(event)
+            self._observe_game_lifecycle(current_running, status)
             with self._game_lifecycle_sample_lock:
                 self._game_lifecycle_sample = current_running
             self._game_lifecycle_stop.wait(1.0)
+
+    def _observe_game_lifecycle(self, current_running, status):
+        if current_running:
+            self._ensure_native_client()
+        semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
+                    status.get("process_created"),
+                    status.get("admission", {}).get("instance_id"), status.get("ready"),
+                    status.get("recovery_state"), status.get("resume_verified"), status.get("recovery_reason"))
+        if semantic != getattr(self, "_last_ap_session_status", None):
+            self._last_ap_session_status = semantic
+            self.emit("process_state_changed", running=current_running)
+            self.emit("ap_session_status", **status)
+            if status.get("state") == "game_exited" and current_running is False:
+                self._stop_native_client()
+                with self._lifecycle_lock:
+                    event = self.setup.current_event
+                    if event is not None:
+                        self._queue_room_readiness(event)
 
     def set_ammo_refill_keybind(self, keybind: str) -> None:
         self.set_ap_keybinds(keybind, str(self.config.get("special_toggle_keybind", "F10")))
