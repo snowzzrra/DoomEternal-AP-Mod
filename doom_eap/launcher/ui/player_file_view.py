@@ -165,6 +165,7 @@ class PlayerFileView(QWidget):
                     "mastery_requirements",
                     "include_slayer_gates",
                     "include_secret_encounters",
+                    "arena_checks",
                 ),
             ),
             (

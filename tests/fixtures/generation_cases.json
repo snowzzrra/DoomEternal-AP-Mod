@@ -41,8 +41,8 @@
         "remote_placements": false,
         "battery_economy": {
           "cost": 16,
-          "surplus": 1,
-          "total": 17,
+          "surplus": 4,
+          "total": 20,
           "surplus_percent": 25,
           "native_first_battery": 0
         }

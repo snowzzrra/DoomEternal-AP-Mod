@@ -214,8 +214,9 @@ def test_schema_7_package_uses_one_plan_for_base_and_tag(tmp_path):
 def test_runtime_mastery_counts_are_the_resolved_targets():
     from doom_eap.content.mastery_requirements import mastery_entries_for_counts
     from doom_eap.contracts.challenge_registry import load_challenge_registry
+    from tests.room_fixture import current_room_fixture
 
-    room = json.loads((ROOT / "tests/fixtures/resolved_room_slot_data.json").read_text())
+    room = current_room_fixture()
     counts = room["runtime"]["mastery_requirement_counts"]
     entries = mastery_entries_for_counts(load_challenge_registry()["weapon_masteries"], counts)
     assert {entry["signal"]["unlockable"]: entry["signal"]["rule_0_statCount"] for entry in entries} == counts

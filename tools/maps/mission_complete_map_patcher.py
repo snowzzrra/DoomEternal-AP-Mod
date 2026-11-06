@@ -215,13 +215,14 @@ def _append_standard_event_target(path: Path, ap_check: str, location_id: int) -
     path.write_text(text.rstrip() + "\n" + addition, encoding="utf-8", newline="")
 
 
-def _render_relay(name: str, targets: list[str], delay: float) -> str:
+def _render_relay(name: str, targets: list[str], delay: float, layer=None) -> str:
     items = "\n".join(
         f'\t\t\t\titem[{index}] = "{target}";'
         for index, target in enumerate(targets)
     )
+    membership = f'\tlayers {{ "{layer}" }}\n' if layer else ""
     return f'''entity {{
-\tentityDef {name} {{
+{membership}\tentityDef {name} {{
 \t\tinherit = "target/relay";
 \t\tclass = "idTarget_Count";
 \t\texpandInheritance = false;
@@ -286,7 +287,7 @@ def compile_publishers(publishers: tuple[PublisherContract, ...]) -> dict:
         owner_targets.append(relay)
         offset = index * 0.35
         entities.extend([
-            _render_relay(relay, [marker, dump_delay], offset),
+            _render_relay(relay, [marker, dump_delay], offset, trigger.get("layer")),
             _render_command(marker, f"echo {trigger['marker']}"),
             _render_relay(dump_delay, [dump], 0.10),
             _render_command(dump, f"condump {trigger['filename']}"),
@@ -458,7 +459,8 @@ def _patch_declared_terminal_text(
         if relay_bounds is None:
             raise ValueError(f"{map_key}: could not build terminal publisher relay")
         patched = relay_entity[relay_bounds[0]:relay_bounds[1]] + "\n" + native
-        compiled["entities"] += _render_relay(native_delay, [native_owner], 0.25)
+        delay = max(compiled["publishers"].values(), key=lambda row: row["offset"])["offset"] + 0.25
+        compiled["entities"] += _render_relay(native_delay, [native_owner], delay)
         compiled["native_owner"] = native_owner
         compiled["native_delay"] = native_delay
     else:

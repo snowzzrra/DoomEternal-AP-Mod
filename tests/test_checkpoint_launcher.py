@@ -14,8 +14,9 @@ from doom_eap.runtime.weapon_points import namespace_id
 @pytest.fixture
 def campaign(tmp_path, monkeypatch):
     from doom_eap.launcher import launcher_session as session
+    from tests.room_fixture import current_room_fixture
 
-    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text())
+    slot_data = current_room_fixture()
     snapshot = SimpleNamespace(seed_name="fixture", team=0, slot=1, slot_data=slot_data)
     namespace = namespace_id(snapshot.seed_name, 0, 1, slot_data["native_generation_fingerprint"])
     owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")

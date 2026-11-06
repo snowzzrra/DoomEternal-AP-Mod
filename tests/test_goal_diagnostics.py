@@ -126,7 +126,8 @@ def test_campaign_goal_reports_admission_before_publishing_server_progress(tmp_p
     campaign = bridge.UnifiedCampaign.__new__(bridge.UnifiedCampaign)
     campaign.plan = {"sequence": ["e1m2_war", "e5m4_boss"], "goal_stage": "e5m4_boss", "goal_as_item": False}
     objective = bridge.STAGES["e5m4_boss"]["completion_id"]
-    monkeypatch.setattr(bridge, "GOAL_POLICY", SimpleNamespace(objective_ids=lambda *_: frozenset({objective})))
+    monkeypatch.setattr(bridge, "GOAL_POLICY", SimpleNamespace(
+        objective_ids=lambda *_: frozenset({objective}), threshold=lambda *_: (frozenset(), 0)))
     packets = []
 
     async def send(messages):

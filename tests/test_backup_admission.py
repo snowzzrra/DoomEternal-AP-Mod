@@ -60,7 +60,7 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
         steam_app_root=str(steam), local_provider_root=str(local), backup_directory=str(tmp_path / 'backup'),
         ap_root=str(tmp_path / 'campaign'), uninstall_root=[str(tmp_path / 'uninstall')],
         run_backup_parent=None, reference_directory=None,
-        slot_data_revision=json.loads((root / "data/content_identity.json").read_text())["slot_data_revision"],
+        slot_data_revision="0.7.0",
         mod_contract_revision=2))
     assert result['result'] == 'protective_backup_ready'
     assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}

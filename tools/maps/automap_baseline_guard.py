@@ -7,6 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from doom_eap.content.master_levels import load_master_levels
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds, generate_map
 
 ROOT = Path(__file__).resolve().parent.parent.parent
@@ -51,6 +52,12 @@ def _assert_close(actual, expected, context: str) -> None:
         raise ValueError(f"Automap helper position drift: {context}: {actual} != {expected}")
 
 
+def master_helper_names(map_key):
+    return {f"ap_automap_location_{pickup['location_id']}"
+            for stage in load_master_levels(ROOT).values() if stage["map_key"] == map_key
+            for pickup in stage["pickups"]}
+
+
 def assert_separate_automap_helper_guard() -> int:
     """Verify all physical checks own exactly one retained-schema marker helper."""
     sources = json.loads((ROOT / "data" / "map_sources.json").read_text())["maps"]
@@ -85,7 +92,7 @@ def assert_separate_automap_helper_guard() -> int:
             } | {
                 f"ap_automap_location_{location_id}"
                 for location_id in secret_automap_owners
-            }
+            } | master_helper_names(map_key)
             if len(helper_names) != len(set(helper_names)) or set(helper_names) != expected_names:
                 raise ValueError(
                     f"Automap helper set drift in {map_key}: "

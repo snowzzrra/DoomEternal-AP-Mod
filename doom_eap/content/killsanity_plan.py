@@ -44,17 +44,23 @@ def load_campaign_kill_sources():
     return json.loads(files(__package__).joinpath("campaign_kill_sources.json").read_bytes())
 
 
-def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
-    if catalog is None:
-        catalog = load_campaign_kill_sources()
+def _campaign_kill_stages(campaign, catalog):
     if catalog.get("schema_version") != 2 or not isinstance(catalog.get("maps"), dict):
         raise ValueError("Unsupported finite campaign source catalog")
-    missing = [key for key in campaign["stage_ids"]
+    stages = [key for key in campaign["stage_ids"] if key not in campaign.get("master_level_stage_ids", ())]
+    missing = [key for key in stages
                if type(catalog["maps"].get(key, {}).get("estimated_kills")) is not int]
     if missing:
         raise ValueError("Campaign kill estimate is missing for: " + ", ".join(missing))
+    return stages
+
+
+def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
+    if catalog is None:
+        catalog = load_campaign_kill_sources()
+    stages = _campaign_kill_stages(campaign, catalog)
     result, estimated_kills = [], 0
-    for key in campaign["stage_ids"]:
+    for key in stages:
         original = catalog["maps"][key]
         stage_estimate_before = estimated_kills
         sources = _finite_sources(original["sources"], allow_empty=True)

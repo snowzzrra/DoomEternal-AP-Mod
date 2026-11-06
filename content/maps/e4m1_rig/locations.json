@@ -14,7 +14,13 @@
     "AP_CHECK_PICKUPS_PROGRESS_CODEX_6": 7770430,
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_11": 7770431,
     "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": 7770507,
-    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_2": 7770516
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_2": 7770516,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_1": 7772001,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_3": 7772002,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_4": 7772003,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_HEALTH_5": 7772004,
+    "AP_CHECK_PICKUPS_PICKUP_AMMO_BFG_1": 7772005,
+    "AP_CHECK_PICKUPS_PICKUP_AMMO_BFG_3": 7772006
   },
   "secret_encounters": [
     {
@@ -46,7 +52,13 @@
     "7770430": "UAC Atlantica Facility - Book of the Seraphs - Part I Codex",
     "7770431": "UAC Atlantica Facility - Extra Life - Exterior Crane Walkway",
     "7770507": "UAC Atlantica Facility - Automap Station",
-    "7770516": "UAC Atlantica Facility - Soulsphere - Underwater Facility Secret"
+    "7770516": "UAC Atlantica Facility - Soulsphere - Underwater Facility Secret",
+    "7772001": "UAC Atlantica Facility - Soulsphere - Landing Pad Side Platform",
+    "7772002": "UAC Atlantica Facility - Soulsphere - Yellow-Key Room Vent",
+    "7772003": "UAC Atlantica Facility - Soulsphere - Flooded Lab Secret",
+    "7772004": "UAC Atlantica Facility - Soulsphere - Generator Tower Platform",
+    "7772005": "UAC Atlantica Facility - BFG Ammo - Yellow-Key Room",
+    "7772006": "UAC Atlantica Facility - BFG Ammo - Underwater Facility Platform"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -97,6 +109,24 @@
       "permanent_resource_budget": false
     },
     "pickups_pickup_mega_health_2": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_3": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_4": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_health_5": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_ammo_bfg_3": {
       "permanent_resource_budget": false
     }
   }

@@ -11,7 +11,7 @@ from typing import Any, cast
 from doom_eap.contracts.source_bytes import first_party_text_bytes
 
 SCHEMA_VERSION = 1
-REGISTRY_REVISION = "checked-location-visuals-v2"
+REGISTRY_REVISION = "checked-location-visuals-v3"
 ENTITY_NAME_RE = re.compile(r"^ap_[A-Za-z0-9_]+$")
 FORBIDDEN_VISUAL_TERMS = (
     "targets", "reward", "useable", "inventory", "currency", "functional",
@@ -63,8 +63,6 @@ def _manifest_rows(root: Path) -> list[dict[str, Any]]:
     sources = json.loads((root / "data" / "map_sources.json").read_text(encoding="utf-8"))["maps"]
     rows = []
     for map_key, source in sorted(sources.items()):
-        if not source.get("enabled", True):
-            continue
         manifest = json.loads(
             (root / "manifests" / f"{map_key}.json").read_text(encoding="utf-8")
         )
@@ -90,9 +88,8 @@ def _catalog_fingerprint(root: Path) -> str:
 
 def _authoritative_fingerprint(root: Path, catalog: Any) -> str:
     maps = []
-    for map_key, spec in sorted(catalog.maps.items()):
-        if not spec.enabled:
-            continue
+    compiler_maps = {spec.key: spec for spec in catalog.compiler_maps()}
+    for map_key, spec in sorted(compiler_maps.items()):
         descriptor = root / "content" / "maps" / map_key / "descriptor.json"
         maps.append({
             "map_key": map_key,
@@ -104,7 +101,7 @@ def _authoritative_fingerprint(root: Path, catalog: Any) -> str:
     locations = []
     from doom_eap.content.content_catalog import thaw_content
     for location in sorted(catalog.physical_locations, key=lambda item: (item.map_key, item.location_id)):
-        if not catalog.maps[location.map_key].enabled:
+        if location.map_key not in compiler_maps:
             continue
         locations.append({
             "name": location.name,
@@ -126,21 +123,28 @@ def _resolved_visual_policy(location_id: int, policy: dict[str, Any]) -> dict[st
     return resolved_automap_visual_policy(location_id, policy)
 
 
+def _location_visual_source(root, location, spec):
+    from doom_eap.content.content_catalog import thaw_content
+
+    if location.strategy == "arena":
+        return root / "content/catalog/arena_checks.json", {"classification": "event_only", "policy": "arena"}
+    if location.strategy == "secret_encounter":
+        return spec.level_config_path, {"classification": "event_only", "policy": "secret_encounter"}
+    return spec.level_config_path, _resolved_visual_policy(location.location_id, thaw_content(location.policy))
+
+
 def build_authorial_registry(root: Path) -> dict[str, Any]:
     from doom_eap.content.content_catalog import load_content_catalog, thaw_content
 
     catalog = load_content_catalog(root)
+    compiler_maps = {spec.key: spec for spec in catalog.compiler_maps()}
     identity = json.loads((root / "data" / "content_identity.json").read_text(encoding="utf-8"))
     entries = []
     for location in sorted(catalog.physical_locations, key=lambda item: (item.map_key, item.location_id)):
         spec = catalog.maps[location.map_key]
-        if not spec.enabled:
+        if location.map_key not in compiler_maps:
             continue
-        source_path = spec.level_config_path
-        if location.strategy == "secret_encounter":
-            resolved = {"classification": "event_only", "policy": "secret_encounter"}
-        else:
-            resolved = _resolved_visual_policy(location.location_id, thaw_content(location.policy))
+        source_path, resolved = _location_visual_source(root, location, spec)
         source_identity = {
             "source_file": source_path.relative_to(root).as_posix(),
             "source_sha256": _sha256(source_path),
@@ -168,6 +172,8 @@ def build_authorial_registry(root: Path) -> dict[str, Any]:
             "classification": resolved["classification"],
             "source_identity": source_identity,
         }
+        if location.strategy == "arena":
+            entry["arena_suppression_entity"] = f"ap_suppress_arena_{location.location_id}"
         if resolved["classification"] == "visible_cleanup":
             entry.update({
                 "presentation_entity": resolved["presentation_entity"],
@@ -195,12 +201,22 @@ def build_authorial_registry(root: Path) -> dict[str, Any]:
                 "resource": _resource_identity(spec),
                 "resource_sha256": _canonical_hash(_resource_identity(spec)),
             }
-            for map_key, spec in sorted(catalog.maps.items()) if spec.enabled
+            for map_key, spec in sorted(compiler_maps.items())
         },
         "authoritative_fingerprint": _authoritative_fingerprint(root, catalog),
         "counts": counts,
         "entries": entries,
     }
+
+
+def render_authorial_registry(document):
+    entries = []
+    for entry in document["entries"]:
+        indent = None if entry["classification"] == "event_only" else 2
+        payload = json.dumps(entry, indent=indent, sort_keys=True)
+        entries.append("\n".join("    " + line for line in payload.splitlines()))
+    rendered = json.dumps({**document, "entries": []}, indent=2, sort_keys=True)
+    return rendered.replace('"entries": []', '"entries": [\n' + ',\n'.join(entries) + '\n  ]', 1) + "\n"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -241,6 +257,7 @@ def _validate_common(document: Any) -> dict[str, Any]:
         _require(isinstance(source_identity.get("resource"), dict), "invalid source identity resource")
         _require(source_identity["resource_sha256"] == _canonical_hash(source_identity["resource"]), "source resource hash drift")
         _require(entry["classification"] in {"visible_cleanup", "no_visual", "event_only"}, "invalid visual classification")
+        _validate_arena_suppression(entry)
         if entry["classification"] == "visible_cleanup":
             for field in (
                 "presentation_entity", "cleanup_entity", "reconciliation_entity",
@@ -273,6 +290,17 @@ def _validate_common(document: Any) -> dict[str, Any]:
     return document
 
 
+def _validate_arena_suppression(entry):
+    if "arena_suppression_entity" in entry:
+        _require(entry["classification"] == "event_only" and entry["source_identity"]["resolved_policy"] == "arena"
+                 and entry["arena_suppression_entity"] == f"ap_suppress_arena_{entry['location_id']}",
+                 "invalid arena suppression endpoint")
+
+
+def checked_reconciliation_entity(entry):
+    return entry.get("arena_suppression_entity", entry.get("reconciliation_entity"))
+
+
 def load_automap_visual_registry(path: Path | None = None) -> dict[str, Any]:
     if path is None:
         path = REPO_ROOT / "data" / "checked_location_visuals.json"
@@ -299,7 +327,7 @@ def load_automap_visual_registry(path: Path | None = None) -> dict[str, Any]:
                 "resource": _packaged_resource_identity(source),
             }
             for map_key, source in json.loads((REPO_ROOT / "data" / "map_sources.json").read_text(encoding="utf-8"))["maps"].items()
-            if source.get("enabled", True)
+            if map_key in document["maps"]
         }
         for map_key, expected_map in expected_maps.items():
             actual_map = document["maps"].get(map_key)

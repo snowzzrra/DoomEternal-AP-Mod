@@ -14,10 +14,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from doom_eap.content.arena_checks import arena_automap_classification, arena_manifest
 from doom_eap.content.automap_visual_registry import build_authorial_registry, load_automap_visual_registry
-from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.content_catalog import load_content_catalog, physical_manifest
 from doom_eap.content.item_classification import load_item_classification_identity
 from doom_eap.content.map_registry import load_map_registry, validation_plan
+from doom_eap.content.master_levels import load_master_levels
 from doom_eap.contracts.challenge_registry import all_location_entries, load_challenge_registry
 from doom_eap.contracts.foundation import (
     compile_all_item_plans,
@@ -329,6 +331,15 @@ def runtime_automap_families(families: dict) -> dict[int, str]:
     return classified
 
 
+def automap_pickup_sources(map_key, config):
+    checks = list(config.get("entities", {}).items())
+    for stage in load_master_levels(ROOT).values():
+        if stage["map_key"] == map_key:
+            checks.extend(("AP_CHECK_" + pickup["source_entity"].upper(), pickup["location_id"])
+                          for pickup in stage["pickups"])
+    return checks
+
+
 def validate_automap_family_registry(
     location_ids: dict[str, int], runtime_locations: set[int]
 ) -> list[str]:
@@ -362,7 +373,7 @@ def validate_automap_family_registry(
         source_text = (ROOT / "vanillamaps" / source["source_file"]).read_text(
             encoding="utf-8"
         )
-        for ap_check, location_id in config.get("entities", {}).items():
+        for ap_check, location_id in automap_pickup_sources(map_key, config):
             if config.get("target_policies", {}).get(ap_check.removeprefix("AP_CHECK_").lower(), {}).get("legacy_alias_of"):
                 continue
             entity_name, bounds = find_check_source(source_text, ap_check, config["entities"])
@@ -431,6 +442,7 @@ def validate_automap_family_registry(
             f"{sorted(set(runtime_families) - runtime_locations)}"
         )
     classified.update(runtime_families)
+    classified.update(arena_automap_classification(ROOT))
 
     all_location_values = set(location_ids.values())
     if set(classified) != all_location_values:
@@ -787,7 +799,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     errors: list[str] = []
     warnings: list[str] = []
-    aliases = {location.location_id for location in load_content_catalog(ROOT).physical_locations
+    catalog = load_content_catalog(ROOT)
+    aliases = {location.location_id for location in catalog.physical_locations
                if location.policy.get("legacy_alias_of")}
 
     try:
@@ -1129,6 +1142,8 @@ def main(argv: list[str] | None = None) -> int:
             errors.append(f"Reserved location IDs remain in {path.name}: {reused_config_ids}")
         for encounter in config_data.get("secret_encounters", []):
             config[encounter["ap_check"]] = encounter["location_id"]
+        config.update(arena_manifest(catalog, map_key))
+        config.update(physical_manifest(catalog, map_key))
         manifest_path = ROOT / map_sources[map_key]["manifest"]
         if not manifest_path.exists():
             errors.append(f"Missing manifest for {path.name}")
@@ -1136,9 +1151,9 @@ def main(argv: list[str] | None = None) -> int:
         manifest = read_json(manifest_path)
         if config != manifest:
             errors.append(f"Config/manifest mismatch: {path.name}")
-    if physical_location_count != 377:
+    if physical_location_count != 402:
         errors.append(
-            f"Expected 377 physical entity locations, found {physical_location_count}"
+            f"Expected 402 physical entity locations, found {physical_location_count}"
         )
     expected_praetor_policy_count = sum(
         "Praetor Suit Token" in name for name in location_ids

@@ -39,7 +39,77 @@ touches a real install. `-m pytest tests -q` runs the fast suite; some tests ski
 without a compiler, the sibling checkouts or PySide6. For launcher work also
 install `requirements-launcher.txt`. The Windows native client needs x64 MSVC, the
 Windows SDK and a configured `Sentinel-Core` checkout; Core itself is built and
-tested in its own repository.
+tested in its own repository. Map and content work also needs files from your own copy
+of the game; see [Game files for map and content work](#game-files-for-map-and-content-work).
+
+### Game files for map and content work
+
+The map compiler, the content validators and the room resource build read the retail
+game files, which can't be in this repository. You need two folders at the repository
+root, both ignored by git:
+
+- `vanillamaps/`: one `.map` file per map, dumped from the running game;
+- `vanilla_decls/`: `.decl` files extracted from the game's `.resources` files.
+
+Launcher, runtime and most unit tests work without them.
+
+What you need:
+
+- DOOM Eternal from Steam at the version in `data/map_sources.json`
+  (`supported_game_revision`, currently Steam 6.66 Rev 3.1), with no mods installed;
+- [Meathook](https://github.com/brongo/m3337ho0o0ok/releases/latest) v7.2 (v7.1 crashes on 6.66);
+- [EternalResourceExtractor](https://github.com/PowerBall253/EternalResourceExtractor/releases/latest);
+- [idFileDeCompressor](https://github.com/brunoanc/idFileDeCompressorGo/releases/latest), to read
+  `.entities` files taken straight from the `.resources`; `vanillamaps/` doesn't need it.
+
+**Maps.** Meathook unlocks the developer console:
+
+1. Put Meathook's `XINPUT1_3.dll` in the game folder, next to `DOOMEternalx64vk.exe`.
+   DoomEAP's own runtime doesn't work alongside it, so remove it when you're done
+   (see [Installing](INSTALL.md)).
+2. Start the game and load the map: pick the mission in Mission Select, or open the
+   console and use its `runtime_map` from `data/map_sources.json`, for example
+   `map maps/game/sp/e1m1_intro/e1m1_intro` (`mh_spmap e1m1_intro` is the shortcut for
+   campaign maps).
+3. Run `mh_dumpmap` in the console. It writes the loaded map as a `.map` text file in
+   the game's save folder (`Saved Games/id Software/DOOMEternal/base` on Windows), the
+   same place `condump` writes to.
+4. Copy it to `vanillamaps/<source_file>`, using `source_file` from the same entry.
+   Exultia is `e1m2_battle` in the game but `e1m2_war.map` here.
+
+Repeat for every map in `data/map_sources.json`, then check that each file is the one
+the project was built from:
+
+```sh
+python -c "import hashlib, json; m = json.load(open('data/map_sources.json', encoding='utf-8'))['maps']; [print(k, 'ok' if hashlib.sha256(open('vanillamaps/' + v['source_file'], 'rb').read()).hexdigest() == v['source_sha256'] else 'DIFFERENT') for k, v in m.items()]"
+```
+
+A `DIFFERENT` map means another game version or a modded install; don't use it.
+
+**Decls.** Each folder under `vanilla_decls/owners/` and `vanilla_decls/resource_owners/`
+is named after the `.resources` file it came from. Extract only the decls:
+
+```sh
+EternalResourceExtractor.exe "<game>/base/gameresources_patch2.resources" vanilla_decls/owners/gameresources_patch2 -f "*.decl"
+```
+
+The tools read `owners/` for `gameresources`, `gameresources_patch1`, `gameresources_patch2`,
+`hub`, `e1m1_intro`, `e1m2_battle`, `e1m3_cult_patch3`, `e3m4_boss_patch3` and
+`e5m4_boss_patch1`, and `resource_owners/` for `e2m3_core`, `e2m3_core_patch2`,
+`e2m3_core_patch3` and `e5m1_spear_patch1`. Map resources live under
+`base/game/<sp|dlc|dlc2|hub>/<map>/`. If you have installed mods, extract from the
+`.resources.backup` files the injector keeps, so you get the original files.
+Extract every decl of each file. A partial folder hides decls without any error; the Master Level
+maploads of Cultist Base, ARC Complex and Taras Nabad, for example, come from `gameresources_patch1`.
+
+`../Tools/idFileDeCompressor` is also used by the room resource build; see
+[Building a release](RELEASING.md).
+
+The [DOOM Eternal modding wiki](https://wiki.eternalmods.com/) is the best reference for
+this work: [level modding and `.entities`](https://wiki.eternalmods.com/books/eternal-level-modding),
+[extracting resources](https://wiki.eternalmods.com/books/eternal-how-to-create-mods/page/extracting-resources),
+[creating mods and `.decl` files](https://wiki.eternalmods.com/books/eternal-how-to-create-mods) and
+[Meathook commands](https://wiki.eternalmods.com/books/eternal-command-console/page/meath00k-commands).
 
 Format only what you changed: `python -m ruff format path/to/file.py` and
 `clang-format -i native/path/to/file.cpp`. `pre-commit install` sets that up as a
@@ -59,6 +129,35 @@ hook if you want it.
                  (what you own,      (what's missing,       (named pipe,       (runs it on
                   what happened)      when to send)          protocol v2)       the game frame)
 ```
+
+### How a check works in the game
+
+The whole mod sits on DOOM Eternal's own map scripting. For each room, the compiler
+(`tools/maps/`) rewrites the retail `.entities` files and adds plain entities to them;
+nothing in the game's code has to change for a check to work. Take the Frag Grenade
+pickup in Hell on Earth, location `7770003`:
+
+1. The original pickup is replaced by `ap_location_visual_7770003`, an `idProp2` showing
+   the AP model, and an invisible trigger in the same spot.
+2. When you touch the trigger, it fires `AP_CHECK_SUBWAY_PICKUP_EQUIPMENT_FRAG_GRENADE_1`,
+   a relay named after the original pickup, and removes the model.
+3. The relay fires `ap_notify_location_7770003`, the in-game notification, and
+   `ap_event_7770003`, an `idTarget_Command` that runs
+   `echo AP_CHECK_EVENT_7770003; condump ap_event_7770003.txt;`.
+4. `condump` writes the console to `ap_event_7770003.txt` in the game's save folder.
+   The bridge watches that folder, reads the file and sends location `7770003` to the
+   AP server.
+
+Items travel the other way. The map also gets one `idTarget_Command` per item, such
+as `ap_rpc_v3_7770003` with `give weapon/player/double_barrel;`. To deliver it, Sentinel
+Core runs `ai_ScriptCmdEnt ap_rpc_v3_7770003 activate` on the game frame. Effects a
+console command can't do or prove (currencies, upgrades, mission access) go through
+Core's native code instead.
+
+The map files also get the automap markers, the Kill Reward counters and the
+randomized enemies, but checks and deliveries all follow this pattern: map entity →
+console command → file or Core → bridge. Anything that fires a relay can be a check,
+which is why new check kinds (arena clears, for example) are mostly compiler work.
 
 A few decisions shape everything else. Knowing why they were made saves you from
 undoing them by accident.

@@ -2,6 +2,8 @@
 
 import json
 
+from .master_levels import load_master_levels
+
 
 def _validate_stage_id(key, row):
     if not isinstance(row, dict) or row.get("status") not in ("active", "tombstone"):
@@ -28,12 +30,12 @@ def _load_stage_ids(catalog):
         numbers = [row[field] for row in rows.values()]
         if len(set(numbers)) != len(numbers):
             raise ValueError(f"Campaign stages reuse {field}, including reserved tombstones")
-    if active != set(catalog.maps) - {"hub"}:
+    if active != (set(catalog.maps) - {"hub"}) | set(load_master_levels(catalog.root)):
         raise ValueError("Active campaign stage identities must match mission descriptors")
     return rows
 
 
-def campaign_stages(catalog):
+def campaign_stages(catalog, *, include_master_levels=True):
     stage_ids = _load_stage_ids(catalog)
     stages = []
     for spec in sorted(catalog.maps.values(), key=lambda spec: spec.data["order"]):
@@ -60,5 +62,22 @@ def campaign_stages(catalog):
             "entry_region": regions[0][0], "regions": [name for name, _ in regions],
             "access_id": stage_ids[spec.key]["access_id"],
             "native_index": stage_ids[spec.key]["native_index"],
+            "variant": "mission", "map_key": spec.key,
         })
+    stages.extend(_master_stages(catalog, stage_ids, include_master_levels))
+    return stages
+
+
+def _master_stages(catalog, stage_ids, enabled):
+    stages = []
+    if not enabled:
+        return stages
+    for key, master in load_master_levels(catalog.root).items():
+        spec = catalog.maps[master["map_key"]]
+        stages.append({"name": master["name"], "map_key": master["map_key"], "variant": master["variant"],
+                       "entry": master["entry"], "layers": master["layers"], "checkpoint": master["checkpoint"],
+                       "entry_region": master["entry_region"], "completion_id": master["completion_id"], "id": key, "kind": "master", "map": spec.runtime_map,
+                       "source": "tag2" if spec.requires_dlc_content else "base",
+                       "completion": master["name"] + " - Mission Complete", "regions": [master["entry_region"]],
+                       "access_id": stage_ids[key]["access_id"], "native_index": stage_ids[key]["native_index"]})
     return stages

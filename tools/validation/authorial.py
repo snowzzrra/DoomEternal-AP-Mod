@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.content_catalog import load_content_catalog, physical_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 JSON_ROOTS = ("content", "data", "level_configs", "manifests")
@@ -67,7 +67,7 @@ def check_authorial() -> dict[str, int]:
         raise ValueError("data/content_identity.json: invalid game identity")
     if identity["apworld_revision"] != "0.8.0":
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
-    if identity["content_revision"] != "0.7.0":
+    if identity["content_revision"] != "0.8.0":
         raise ValueError("data/content_identity.json: invalid content revision")
     if identity["release_version"] != "0.8.0":
         raise ValueError("data/content_identity.json: invalid release revision")
@@ -97,6 +97,9 @@ def check_authorial() -> dict[str, int]:
         expected.update(
             {encounter["ap_check"]: encounter["location_id"] for encounter in config.get("secret_encounters", [])}
         )
+        from doom_eap.content.arena_checks import arena_manifest
+        expected.update(arena_manifest(catalog, map_key))
+        expected.update(physical_manifest(catalog, map_key))
         expected_manifests[map_key] = expected
         actual = read_json(ROOT / "manifests" / f"{map_key}.json")
         if actual != expected:

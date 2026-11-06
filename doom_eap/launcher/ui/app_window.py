@@ -2396,12 +2396,8 @@ class LauncherUI(QMainWindow):
                 event.get("message") or event.get("plain") or player_text("launcher.app_window", "archipelago_update")
             )
             return player_text('common', 'archipelago'), self.COLORS["ap"], detail[:512]
-        if kind == "ammo_refill":
-            status = str(event.get("status", ""))
-            if status not in {"used", "empty", "blocked", "error"}:
-                return None
-            detail = self._ammo_refill_message(event, status)
-            return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], detail[:512]
+        if kind in {"ammo_refill", "stage_restart"}:
+            return self._action_activity(event, kind)
         if kind == "setup_ready":
             return (
                 player_text("launcher.support", "activity_installation"),
@@ -2421,6 +2417,18 @@ class LauncherUI(QMainWindow):
                 player_text("launcher.app_window", "preparing_this_room_for_play"),
             )
         return None
+
+    def _action_activity(self, event, kind):
+        status = str(event.get("status", ""))
+        if kind == "stage_restart":
+            if status not in {"pending", "done", "failed"}:
+                return None
+            return ("Ultra-Nightmare", self.COLORS["warn"],
+                    player_text("stage_restart", status, stage=str(event.get("stage", ""))))
+        if status not in {"used", "empty", "blocked", "error"}:
+            return None
+        detail = self._ammo_refill_message(event, status)
+        return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], detail[:512]
 
     def _archipelago_activity_detail(self, event: dict[str, object]) -> str:
         plain = str(event.get("plain") or "")

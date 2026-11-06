@@ -46,7 +46,7 @@ _CONTRACT_IDENTITY = json.loads(
 MANIFEST_SCHEMA_VERSION = int(_CONTRACT_IDENTITY["manifest_schema_version"])
 SLOT_DATA_SCHEMA_VERSION = int(_CONTRACT_IDENTITY["slot_data_schema_version"])
 REVEAL_AP_LOCATIONS_OPTION_KEY = "reveal_ap_locations_on_automap"
-RESOLVED_ROOM_CAPABILITIES = frozenset({"unified_campaign_v1", "fortress_economy_v1", "progressive_blood_punch_v1"})
+RESOLVED_ROOM_CAPABILITIES = frozenset({"unified_campaign_v1", "fortress_economy_v1", "progressive_blood_punch_v1", "master_levels_v1"})
 ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "use_dlc_content": True,
     "include_dlc_missions": True,
@@ -67,6 +67,7 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "include_weapon_mastery_challenges": True,
     "include_slayer_gates": True,
     "include_secret_encounters": True,
+    "arena_checks": 1,
     "easier_secret_encounters": False,
     REVEAL_AP_LOCATIONS_OPTION_KEY: False,
     "starting_weapon": "Combat Shotgun",
@@ -1193,7 +1194,8 @@ class RoomCompiler:
         plan = self._resolved_enemy_plan(manifest)
         if plan is None:
             return {}
-        changed_maps = {key: row for key, row in plan["maps"].items() if row["recipes"]}
+        from tools.maps.arena_checks import room_compile_maps
+        changed_maps = room_compile_maps(plan["maps"], manifest.active_location_ids, ROOT)
         if not changed_maps:
             return {}
         required_sources = set(changed_maps)
@@ -1272,8 +1274,7 @@ class RoomCompiler:
         entries = dict.fromkeys((entry['mapResourceType'], entry['name'])
                                 for profile in profiles.values() for entry in profile['assets'])
         roots = {name for _, name in entries} | {f'pickup/powerup/{effect}' for effect in profiles}
-        stages = manifest.options.get('campaign_plan', {}).get('sequence', ())
-        for key in [*stages, 'hub']:
+        for key in manifest.options['recipes']['maps']:
             row = self.payload_manifest['maps'].get(key)
             if row is None or row['target_member'] not in assembled:
                 continue
@@ -1422,8 +1423,10 @@ class ModCompiler:
         self.root = root
 
     def active_location_ids(self, options: dict[str, Any]) -> list[int]:
+        from doom_eap.content.arena_checks import inactive_arena_ids
         names = json.loads((self.root / "data" / "location_names.json").read_text(encoding="utf-8"))["locations"]
         ids = sorted(int(location_id) for location_id in names)
+        ids = sorted(set(ids) - inactive_arena_ids(self.root, options.get("arena_checks", 1)))
         physical_ids = {
             int(spec["location_id"])
             for spec in PHYSICAL_OPTIONS.values()
@@ -1440,7 +1443,7 @@ class ModCompiler:
         return sorted(active)
 
     def known_location_ids(self) -> set[int]:
-        return set(self.active_location_ids({key: True for key in PHYSICAL_OPTION_KEYS}))
+        return set(self.active_location_ids({**{key: True for key in PHYSICAL_OPTION_KEYS}, "arena_checks": 0}))
 
     def project_map_config(self, manifest: SeedManifest, map_key: str) -> dict[str, Any]:
         """Project supported campaign config for one map-local transform state."""
@@ -1468,6 +1471,11 @@ class ModCompiler:
                 "assets": assets.get("assets", []),
                 "default_visual_asset": assets.get("default_visual_asset"),
             }
+        from doom_eap.content.arena_checks import load_arena_checks
+
+        entry = load_arena_checks(self.root).get(map_key, {})
+        config["arena_checks"] = [arena for arena in entry.get("arenas", [])
+                                  if arena["location_id"] in manifest.active_location_ids]
         return project_map_config(config, manifest.options)
 
     def compile_map(self, manifest: SeedManifest, vanilla_entities: Path, output_entities: Path,

@@ -2114,26 +2114,31 @@
       7770419
     ],
     "UAC Atlantica Facility - UAC Facility (Intact) - Landing Pad": [
-      7770420
+      7770420,
+      7772001
     ],
     "UAC Atlantica Facility - UAC Facility (Intact) - Service Elevator": [
       7770421,
       7770422
     ],
     "UAC Atlantica Facility - UAC Facility (Intact) - Generator Tower": [
-      7770423
+      7770423,
+      7772004
     ],
     "UAC Atlantica Facility - UAC Facility (Intact) - Cargo Storage": [],
     "UAC Atlantica Facility - UAC Facility (Destroyed) - Destroyed Chamber": [
       7770424,
       7770425,
-      7770426
+      7770426,
+      7772002,
+      7772005
     ],
     "UAC Atlantica Facility - UAC Facility (Destroyed) - Flooded Lab": [
       7770427,
       7770428,
       7770429,
-      7770507
+      7770507,
+      7772003
     ],
     "UAC Atlantica Facility - UAC Facility (Destroyed) - Burning Shipyard": [
       7770430,
@@ -2141,7 +2146,8 @@
     ],
     "UAC Atlantica Facility - Underwater Facility": [
       7770432,
-      7770516
+      7770516,
+      7772006
     ],
     "The Blood Swamps - Swamp Entrance": [
       7770433,
@@ -2151,7 +2157,10 @@
     "The Blood Swamps - Sunken Courtyard": [
       7770434,
       7770435,
-      7770436
+      7770436,
+      7772013,
+      7772054,
+      7772055
     ],
     "The Blood Swamps - Betruger Castle": [
       7770437
@@ -2159,11 +2168,16 @@
     "The Blood Swamps - Forest of the Torch": [
       7770438,
       7770439,
-      7770440
+      7770440,
+      7772010,
+      7772014,
+      7772053
     ],
     "The Blood Swamps - Ishii Castle Gate": [
       7770441,
-      7770442
+      7770442,
+      7772012,
+      7772015
     ],
     "The Blood Swamps - Ishii Castle Keep": [
       7770443
@@ -2176,14 +2190,16 @@
       7770446,
       7770447,
       7770509,
-      7770515
+      7770515,
+      7772021
     ],
     "The Holt - Maykr Pillars": [
       7770448,
       7770449,
       7770450,
       7770451,
-      7770452
+      7770452,
+      7772022
     ],
     "The Holt - Ivory Path": [
       7770453,
@@ -2191,7 +2207,8 @@
       7770455
     ],
     "The Holt - Pantheon of Khans": [
-      7770456
+      7770456,
+      7772023
     ],
     "The Holt - Holy Chamber": [
       7770457
@@ -2199,7 +2216,8 @@
     "The World Spear - Sentinel Village - Village Outskirts": [],
     "The World Spear - Sentinel Village - Village Entrance": [],
     "The World Spear - Sentinel Village - Sentinel Village": [
-      7770461
+      7770461,
+      7772030
     ],
     "The World Spear - Sentinel Village - Village Sanctum": [],
     "The World Spear - Sentinel Village - Ancient Tower": [],
@@ -2211,7 +2229,8 @@
     ],
     "The World Spear - Sentinel Mountain - Mountain Cliffs": [
       7770459,
-      7770460
+      7770460,
+      7772031
     ],
     "The World Spear - Sentinel Mountain - Mountain Ruins": [
       7770463,
@@ -2232,13 +2251,16 @@
       7770467,
       7770473,
       7770474,
-      7770511
+      7770511,
+      7772041
     ],
     "Reclaimed Earth - Overgrown Offices": [
-      7770468
+      7770468,
+      7772042
     ],
     "Reclaimed Earth - Upper Overgrown Offices": [
-      7770471
+      7770471,
+      7772040
     ],
     "Reclaimed Earth - Lockdown": [
       7770472
@@ -2255,7 +2277,8 @@
       7770482,
       7770483,
       7770484,
-      7770512
+      7770512,
+      7772051
     ],
     "Immora - Immora Assault - Walls of Immora": [
       7770480
@@ -2268,10 +2291,12 @@
     ],
     "Immora - Immora Assault - Tower Seige": [],
     "Immora - Immora Interior - Escape Platform": [
-      7770479
+      7770479,
+      7772050
     ],
     "Immora - Final Plunge - Final Plunge": [
-      7770485
+      7770485,
+      7772052
     ]
   }
 }

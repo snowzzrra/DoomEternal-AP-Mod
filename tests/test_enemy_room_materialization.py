@@ -6,12 +6,12 @@ import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
 from doom_eap.content.native_enemy_plan import build_native_recipes, encode_native_recipes
-from doom_eap.launcher.launcher_core import ModCompiler, RoomCompiler, SeedManifest
-from tools.maps.encounter_catalog import text_sha256
+from doom_eap.launcher.launcher_core import RoomCompiler, SeedManifest
 from tools.maps.ap_map_generator import find_entity_block_bounds
-from tools.release.room_payloads import map_physical_option_keys
+from tools.maps.encounter_catalog import text_sha256
 from tools.maps.mission_complete_map_patcher import _patch_hell
 from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
+from tools.release.room_payloads import map_physical_option_keys
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
@@ -21,7 +21,10 @@ def options_for_plan(plan):
     from tests.test_slot_data_contract import sign_slot
 
     catalog = load_slot_catalog()
-    data = json.loads((ROOT / "tests/fixtures/resolved_room_slot_data.json").read_text())
+    from tests.room_fixture import current_room_fixture
+
+    data = current_room_fixture()
+    data["runtime"]["checks"]["arena_checks"] = 0
     data["recipes"] = encode_native_recipes(plan, catalog, active_maps=[*data["campaign"]["sequence"], "hub"])
     return sign_slot(data, catalog)
 
@@ -72,8 +75,10 @@ def cold_case(tmp_path, monkeypatch):
         "source_snapshots": snapshots,
     }
     compiler._compress_entities_text = lambda text: text.encode()
+    from doom_eap.content.content_catalog import load_content_catalog
+    active = [item.location_id for item in load_content_catalog().physical_locations if item.map_key == "e1m1_intro"]
     manifest = SeedManifest.create(seed_name="Cold", team=0, slot=1,
-        active_location_ids=ModCompiler(ROOT).known_location_ids(),
+        active_location_ids=active,
         options=options_for_plan(plan), static_precompile=True)
     from dataclasses import replace
     return compiler, replace(manifest, options=options_for_plan(plan))
@@ -86,6 +91,7 @@ def base_files(compiler):
 
 def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow(tmp_path, monkeypatch):
     from dataclasses import replace
+
     from doom_eap.content.native_enemy_plan import build_native_recipes, native_event_identity
     from tools.maps.encounter_catalog import entity_records, list_items
 

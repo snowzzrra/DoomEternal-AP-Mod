@@ -19,24 +19,42 @@ from doom_eap.runtime.save_decrypt import decrypt, steam_id64
 
 
 def read_checkpoint_recovery(config, process_identity, namespace):
-    from doom_eap.launcher.sentinel_diagnostics import diagnostics_directory
-
     blocked = CheckpointRecoveryState.BLOCKED
     try:
-        _, pid, created = process_identity.split(":")
-        directory = diagnostics_directory(config)
-        with (directory / f"{int(pid)}-{int(created)}.latest.json").open("rb") as stream:
-            raw = stream.read(131073)
-        if len(raw) > 131072:
-            raise ValueError("checkpoint diagnostics too large")
-        record = json.loads(raw)
-        if (record["schema"] != "sentinel-startup-v1" or record["pid"] != int(pid)
-                or record["process_created"] != created
-                or record["admission"]["namespace_id"] != namespace):
-            raise ValueError("checkpoint diagnostics identity mismatch")
-        return _checkpoint_recovery(record, process_identity)
+        return _checkpoint_recovery(_read_startup_record(config, process_identity, namespace), process_identity)
     except (OSError, ValueError, KeyError, TypeError) as error:
         return CheckpointRecovery(blocked, f"checkpoint_diagnostics_unavailable: {error}")
+
+
+def _read_startup_record(config, process_identity, namespace):
+    from doom_eap.launcher.sentinel_diagnostics import diagnostics_directory
+
+    _, pid, created = process_identity.split(":")
+    directory = diagnostics_directory(config)
+    if directory is None:
+        raise ValueError("native diagnostics directory unavailable")
+    with (directory / f"{int(pid)}-{int(created)}.latest.json").open("rb") as stream:
+        raw = stream.read(131073)
+    if len(raw) > 131072:
+        raise ValueError("checkpoint diagnostics too large")
+    record = json.loads(raw)
+    if (record["schema"] != "sentinel-startup-v1" or record["pid"] != int(pid)
+            or record["process_created"] != created
+            or record["admission"]["namespace_id"] != namespace):
+        raise ValueError("checkpoint diagnostics identity mismatch")
+    return record
+
+
+def read_stage_restart(config, process_identity, namespace):
+    try:
+        campaign = _read_startup_record(config, process_identity, namespace)["campaign"]
+        sequence, status = campaign["restart_sequence"], campaign["restart_status"]
+        if type(sequence) is not int or sequence < 0 or type(status) is not int or status not in (1, 2, 3):
+            return None
+        return {"sequence": sequence, "status": status, "map": campaign["restart_map"],
+                "stage_id": campaign["restart_stage_id"], "reason": campaign["restart_reason"]}
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def _checkpoint_recovery(record, process_identity):

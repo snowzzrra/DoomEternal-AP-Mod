@@ -306,7 +306,10 @@ def dispatch_window(ui, *events):
 
 def test_window_keeps_installer_progress_inventory_result_and_session_navigation(ui):
     from PySide6.QtWidgets import QApplication
-    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_bytes())
+
+    from tests.room_fixture import current_room_fixture
+
+    slot_data = current_room_fixture()
     dispatch_window(ui, {"type": "connected", "seed_name": "room", "team": 0, "slot": 1, "slot_data": slot_data},
                     {"type": "mod_staged"}, {"type": "injector_started"})
     assert "EternalModInjector" in ui.session_setup_detail.text()
@@ -358,7 +361,9 @@ def test_window_offers_preservation_for_interrupted_save(ui, monkeypatch):
 
 def test_room_summary_displays_tracker_options(ui):
     ui.controller.item_history_status = None
-    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text(encoding="utf-8"))
+    from tests.room_fixture import current_room_fixture
+
+    slot_data = current_room_fixture()
     ui._render_room({"seed_name": "room", "team": 0, "slot": 1, "slot_data": slot_data})
     summary = ui.room_summary.text()
     assert "Complete the Full Saga" in summary and "Standard" in summary

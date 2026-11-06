@@ -19,11 +19,23 @@
     {
       "content_revision": "0.7.0",
       "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "add fixed optional DLC pickups and independent BFG ammo checks"
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "Arena completion checks with explicit catalog addresses."
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "Integration of arena checks and standard Master Level pickups"
     }
   ],
   "asset_package_contract_sha256": "5e6e9aaacd11591988a4dc4aebd5243b7518880349298b38b93594f7cde2cd53",
-  "content_revision": "0.7.0",
-  "manifest_sha256": "6b0197c7c44e9d79aae2b12c4ae1d933c6771c8376af2ef4bbb6d41fc4c8b99f",
+  "content_revision": "0.8.0",
+  "manifest_sha256": "61df70cf0a303d5cf6a812e6cdfcc5dd0a70432a3da0fd7ca03047ec00b2bab0",
   "map_key": "e5m1_spear",
   "physical_ap_ids": [
     7770458,
@@ -33,11 +45,62 @@
     7770462,
     7770463,
     7770464,
-    7770510
+    7770510,
+    7772030,
+    7772031,
+    7772301,
+    7772302,
+    7772303,
+    7772304,
+    7772305,
+    7772306,
+    7772307,
+    7772308,
+    7772309,
+    7772310,
+    7772311,
+    7772312,
+    7772901,
+    7772902,
+    7772903,
+    7772904,
+    7772905,
+    7772906,
+    7772907,
+    7772908,
+    7772909,
+    7772910,
+    7772911,
+    7772912,
+    7772913,
+    7772914,
+    7772915,
+    7772916,
+    7772917,
+    7772918,
+    7772919,
+    7772920,
+    7772921,
+    7772922,
+    7772923,
+    7772924,
+    7774601,
+    7774602,
+    7774603,
+    7774604,
+    7774605,
+    7774606,
+    7774607,
+    7774608,
+    7774609,
+    7774610,
+    7774611,
+    7774612,
+    7774613
   ],
   "runtime_location_ids": [
     7770465
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "b6a8960658a35726d28105dfc5306c1875218990b07a6c540e8068ff19cd19e6"
+  "scripted_contract_sha256": "77fb2cf8ca993302fc5708624b42158766b6564345d1e31900a416fcff356920"
 }

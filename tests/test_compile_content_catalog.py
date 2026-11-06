@@ -11,7 +11,19 @@ from doom_eap.content.recipe_codec import recipe_references
 from doom_eap.content.slot_data_contract import load_slot_catalog
 from doom_eap.contracts.source_bytes import first_party_text_bytes
 from tools.content import compile_content_catalog as compiler
-from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
+from tools.release import prebuilt_room_resources
+
+
+@pytest.fixture(autouse=True)
+def enemy_catalog_provenance(tmp_path, monkeypatch):
+    bundle = tmp_path / "enemy-catalog-provenance"
+    bundle.mkdir()
+    hashes = {"doom_eap/content/" + name: hashlib.sha256(first_party_text_bytes(
+        (compiler.MOD_ROOT / "doom_eap/content" / name).read_bytes())).hexdigest()
+        for name in ("native_enemy_catalog.json", "vanilla_enemy_profiles.json")}
+    # isolated provenance keeps catalog drift tests independent of the pinned release bundle.
+    (bundle / "ROOM_RESOURCES_PROVENANCE.json").write_text(json.dumps({"source_hashes": hashes}), encoding="utf-8")
+    monkeypatch.setattr(prebuilt_room_resources, "get_frozen_bundle_dir", lambda root: bundle)
 
 
 @pytest.mark.parametrize("check", [False, True])
@@ -39,16 +51,14 @@ def test_cli_reports_relative_changes_and_uses_explicit_source(monkeypatch, caps
 
 def test_prebuilt_enemy_catalogs_reject_content_and_source_drift(tmp_path):
     root = compiler.MOD_ROOT
-    bundle = get_frozen_bundle_dir(root).relative_to(root)
-    paths = [bundle / "ROOM_RESOURCES_PROVENANCE.json",
-             Path("doom_eap/content/native_enemy_catalog.json"),
+    paths = [Path("doom_eap/content/native_enemy_catalog.json"),
              Path("doom_eap/content/vanilla_enemy_profiles.json")]
     paths.extend(path.relative_to(root) for path in (root / "content/maps").glob("*/descriptor.json"))
     for path in paths:
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(root / path, tmp_path / path)
     compiler._prebuilt_enemy_catalogs(tmp_path)
-    for path in paths[1:3]:
+    for path in paths[:2]:
         original = (tmp_path / path).read_bytes()
         document = json.loads(original)
         document["maps"]["e1m1_intro"]["source_sha256"] = "0" * 64

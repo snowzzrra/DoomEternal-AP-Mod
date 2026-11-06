@@ -15,6 +15,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from doom_eap.content.arena_checks import arena_check_name, assign_arena_regions, load_arena_checks
+from doom_eap.content.master_levels import append_master_publishers, assign_master_level_regions, load_master_levels
 from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
 from doom_eap.contracts.publisher_contracts import (
     EFFECT_STRATEGIES,
@@ -27,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT
 PHYSICAL_STRATEGIES = frozenset({
     "prop_pickup", "interactable", "codex", "audio_terminal",
-    "secret_encounter", "armor_terminal", "independent_trigger",
+    "secret_encounter", "armor_terminal", "independent_trigger", "arena",
 })
 RUNTIME_STRATEGIES = frozenset({
     "native_transition", "map_terminal", "unlockable_record", "stat_threshold",
@@ -263,6 +265,8 @@ def _map_content_packages(root: Path) -> tuple[dict[str, Any], ...]:
 def _load_region_topology(root: Path) -> tuple[Mapping[str, Any], Mapping[int, str]]:
     path = root / "content" / "catalog" / "region_topology.json"
     topology = _json(path)
+    assign_master_level_regions(root, topology)
+    assign_arena_regions(root, topology)
     if topology.get("schema_version") != 1:
         raise ValueError("region topology schema_version must be 1")
     regions = topology.get("regions", [])
@@ -328,6 +332,32 @@ def _asset(raw_asset: Mapping[str, Any], spec: MapSpec) -> AssetSpec:
         _freeze(raw_asset.get("donor", {})), raw_asset.get("replacement_slot_policy", ""),
         _freeze(raw_asset.get("replacement_slot", {})), raw_asset.get("usage_policy", ""),
         tuple(raw_asset.get("preserve", [])), _freeze(raw_asset.get("visual_presentation_policy", {})))
+
+
+def _append_arena_locations(root, physical, names):
+    for map_key, entry in load_arena_checks(root).items():
+        for arena in entry["arenas"]:
+            names[arena["location_id"]] = arena["name"]
+            physical.append(PhysicalLocationSpec(arena["name"], arena["location_id"], entry.get("map_key", map_key),
+                            arena_check_name(arena), arena["region"], "arena", _freeze({**arena, "stage_id": map_key})))
+
+
+def physical_manifest(catalog, map_key):
+    return {item.ap_check: item.location_id for item in catalog.physical_locations if item.map_key == map_key}
+
+
+def _append_master_locations(root, maps, physical, runtime, names):
+    for key, stage in load_master_levels(root).items():
+        for pickup in stage["pickups"]:
+            names[pickup["location_id"]] = pickup["name"]
+            physical.append(PhysicalLocationSpec(pickup["name"], pickup["location_id"], stage["map_key"],
+                pickup["ap_check"], stage["entry_region"], "prop_pickup", _freeze({**pickup, "stage_id": key})))
+        entry = {"name": stage["name"] + " - Mission Complete", "location_id": stage["completion_id"],
+                 "strategy": "map_terminal", "category": "mission_complete", "mission_key": key,
+                 "signal": {"kind": "map_terminal", "owner": stage["completion_owner"], "stage_id": key,
+                            "runtime_map": maps[stage["map_key"]].runtime_map}}
+        runtime.append(RuntimeLocationSpec(entry["name"], entry["location_id"], "map_terminal", key,
+                       _freeze(entry["signal"]), _freeze(entry), "mission_complete", stage["entry_region"]))
 
 
 def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
@@ -407,6 +437,9 @@ def load_content_catalog(root: Path = ROOT) -> ContentCatalog:
             challenges.append(ChallengeSpec(item.name, item.location_id, item.mission_key, item.strategy, signal))
     if goal is None:
         raise ValueError("campaign goal has no package owner")
+    _append_arena_locations(root, physical, names)
+    _append_master_locations(root, maps, physical, runtime, names)
+    append_master_publishers(root, publishers)
     runtime.sort(key=lambda item: item.data.get("order", len(runtime)))
     physical = [PhysicalLocationSpec(names.get(item.location_id, ""), item.location_id,
         item.map_key, item.ap_check, item.region, item.strategy, item.policy) for item in physical]
@@ -469,7 +502,7 @@ def validate_content_catalog(catalog: ContentCatalog) -> None:
             raise ValueError(f"{item.name}: region assignment is not canonical")
     for item in catalog.physical_locations:
         region_mission = catalog.region_metadata[item.region].get("mission_key")
-        if item.map_key != "hub" and region_mission != item.map_key:
+        if item.map_key != "hub" and region_mission != item.policy.get("stage_id", item.map_key):
             raise ValueError(f"{item.name}: physical location is outside its mission topology")
     for item in catalog.runtime_locations:
         metadata = catalog.region_metadata[item.region]

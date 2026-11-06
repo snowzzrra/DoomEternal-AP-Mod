@@ -59,24 +59,29 @@ def source_replenishment(source, catalog):
                 source['id'] in recorded.get('source_lifetimes', {}))
 
 
-def reference_source(source, catalog=None):
+def source_is_master(source):
+    binding = source.get('binding') or {}
+    owner = binding.get('owner', binding.get('entity', '')).lower()
+    layers = source.get('layers', ())
+    return ('masterlevel' in owner or 'master_level' in owner or
+            (bool(layers) and all('master' in layer.lower() for layer in layers)))
+
+
+def reference_source(source, catalog=None, *, master=False):
     from .native_enemy_safety import CINEMATIC_BOSS_ACTORS
 
     if (source.get('protected_reason') or source.get('inactive_reason') or source.get('runtime_only')
             or source.get('family') == 'summon'):
         return False
     if ((source.get('native_identity') or {}).get('status') == 'unknown_native_choice' or
-            catalog is not None and native_source_identity(source, catalog)['status'] == 'unknown_native_choice'):
+            (catalog is not None and native_source_identity(source, catalog)['status'] == 'unknown_native_choice')):
         return False
     binding = source.get('binding') or {}
     owner = binding.get('owner', binding.get('entity', ''))
     map_key = source['id'].split('/', 1)[0]
     if binding.get('entity') in CINEMATIC_BOSS_ACTORS.get(map_key, ()):
         return False
-    layers = source.get('layers', ())
-    return not ('telemetry' in owner.lower() or 'masterlevel' in owner.lower()
-                or 'master_level' in owner.lower() or
-                layers and all('master' in layer.lower() for layer in layers))
+    return 'telemetry' not in owner.lower() and source_is_master(source) == master
 
 
 def request_peak(slots):
@@ -92,15 +97,15 @@ def request_peak(slots):
                   for name in sorted(SPECIAL_SPECIES)})
 
 
-def catalog_profile(catalog, map_key):
+def catalog_profile(catalog, map_key, *, master=False):
     stage = catalog['maps'][map_key]
     waves, excluded, unknown = {}, [], []
     for source in stage['origins']:
-        if not reference_source(source, catalog):
+        if not reference_source(source, catalog, master=master):
             excluded.append(source['id'])
             identity = native_source_identity(source, catalog) if source.get('logical_count') else {}
             if (identity.get('status') == 'unknown_native_choice' and reference_source(
-                    {**source, 'native_identity': {**identity, 'status': 'known_category'}}, catalog)):
+                    {**source, 'native_identity': {**identity, 'status': 'known_category'}}, catalog, master=master)):
                 unknown.append(dict(source_id=source['id'], family=source['family'],
                     logical_count=source['logical_count'], maximum_emissions=source['maximum_emissions'],
                     renewable=not source['maximum_emissions'] or bool(source.get('effective_replenishment')),
@@ -148,11 +153,7 @@ def catalog_profile(catalog, map_key):
                 boss=map_key in BOSS_MAPS, waves=ordered, finite_counts=dict(totals),
                 finite_total=sum(wave['finite_total'] for wave in ordered),
                 renewable_targets=sum(wave['renewable_targets'] for wave in ordered),
-                summon_templates=[dict(source_id=source['id'], count=source['logical_count'],
-                    species=list(source_species(source, catalog)), family='summon',
-                    maximum_emissions=source['maximum_emissions'])
-                    for source in stage['origins'] if source.get('family') == 'summon'
-                    and not source.get('protected_reason') and not source.get('inactive_reason')],
+                summon_templates=_summon_templates(stage, catalog, master),
                 excluded_sources=excluded,
                 unknown_sources=unknown,
                 quantity_basis='authored_spawn_templates_including_conditional_scripts')
@@ -230,3 +231,12 @@ def vanilla_profile(catalog, map_key):
     if recorded and source_hash and recorded['source_sha256'] == source_hash:
         return recorded
     return catalog_profile(catalog, map_key)
+
+
+def _summon_templates(stage, catalog, master):
+    return [dict(source_id=source['id'], count=source['logical_count'],
+                    species=list(source_species(source, catalog)), family='summon',
+                    maximum_emissions=source['maximum_emissions'])
+                    for source in stage['origins'] if source.get('family') == 'summon'
+                    and not source.get('protected_reason') and not source.get('inactive_reason')
+                    and source_is_master(source) == master]

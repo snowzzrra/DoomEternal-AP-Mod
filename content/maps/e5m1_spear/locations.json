@@ -10,7 +10,9 @@
     "AP_CHECK_VILLAGE_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770462,
     "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770463,
     "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE": 7770464,
-    "AP_CHECK_MOUNTAIN_PASS_INTERACT_AUTOMAP_1": 7770510
+    "AP_CHECK_MOUNTAIN_PASS_INTERACT_AUTOMAP_1": 7770510,
+    "AP_CHECK_VILLAGE_PICKUP_MEGA_HEALTH_1": 7772030,
+    "AP_CHECK_AI_COMBAT_PICKUP_AMMO_BFG_2": 7772031
   },
   "names": {
     "7770458": "The World Spear - Codex - Shard Altar",
@@ -20,7 +22,9 @@
     "7770462": "The World Spear - Extra Life - Ancient Bridge Pipe",
     "7770463": "The World Spear - Escalation Encounter Wave 1",
     "7770464": "The World Spear - Escalation Encounter Wave 2",
-    "7770510": "The World Spear - Automap Station"
+    "7770510": "The World Spear - Automap Station",
+    "7772030": "The World Spear - Soulsphere - Sentinel Village Secret",
+    "7772031": "The World Spear - BFG Ammo - Mountain Cliffs Secret"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -81,6 +85,12 @@
       }
     },
     "mountain_pass_interact_automap_1": {
+      "permanent_resource_budget": false
+    },
+    "village_pickup_mega_health_1": {
+      "permanent_resource_budget": false
+    },
+    "ai_combat_pickup_ammo_bfg_2": {
       "permanent_resource_budget": false
     }
   }

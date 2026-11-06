@@ -43,8 +43,10 @@ def _install_core_fixture(game_root: Path) -> Path:
 
 
 def _snapshot() -> RoomSnapshot:
-    ids = ModCompiler().active_location_ids({"randomize_dash": False})
-    slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_bytes())
+    from tests.room_fixture import current_room_fixture
+
+    slot_data = current_room_fixture()
+    ids = ModCompiler().active_location_ids({**slot_data["runtime"]["checks"], "randomize_dash": False})
     placements = [
         {
             "location_id": location_id,

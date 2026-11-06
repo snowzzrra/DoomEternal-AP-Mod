@@ -3,6 +3,7 @@ import time
 from collections.abc import Mapping
 from types import MappingProxyType
 
+from doom_eap.content.automap_visual_registry import checked_reconciliation_entity
 from doom_eap.contracts.command_publication import (
     CHECKED_VISUAL_HIDE,
     MAP_ENTITY_SAFE,
@@ -60,7 +61,7 @@ class CheckedVisuals:
         return self._epoch
 
     async def reconcile(self, trigger, *, map_identity, room_identity, state_key, checked, checked_ready, runtime_ready, rpc_ready, send):
-        """Remove only isolated AP visuals for server-checked map locations."""
+        """Suppress confirmed AP entities for the current map."""
         marker = map_identity.cached_marker
         self.advance_epoch(marker.get("gameplay_epoch") if isinstance(marker, Mapping) else None)
         if not runtime_ready:
@@ -85,7 +86,7 @@ class CheckedVisuals:
             return False
         entries = [
             entry for entry in self._visuals.get(map_key or "", {}).values()
-            if entry["classification"] == "visible_cleanup"
+            if checked_reconciliation_entity(entry)
         ]
         if not entries:
             return False
@@ -120,7 +121,7 @@ class CheckedVisuals:
             location_id = entry["location_id"]
             if location_id not in checked:
                 continue
-            entity_name = entry["reconciliation_entity"]
+            entity_name = checked_reconciliation_entity(entry)
             delivery_key = (room_identity, map_name, str(location_id))
             runtime_key = (epoch, *delivery_key)
             retry = self._retry.setdefault(runtime_key, {"attempt": 0, "deadline": 0.0})

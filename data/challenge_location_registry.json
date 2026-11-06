@@ -1076,6 +1076,84 @@
     },
     {
       "category": "mission_complete",
+      "location_id": 7772100,
+      "mission_key": "ml_e2m1_nest",
+      "name": "Super Gore Nest Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_1",
+        "runtime_map": "game/sp/e2m1_nest/e2m1_nest",
+        "stage_id": "ml_e2m1_nest"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7772200,
+      "mission_key": "ml_e2m3_core",
+      "name": "Mars Core Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "hell_chunk_2_target_level_transition_1",
+        "runtime_map": "game/sp/e2m3_core/e2m3_core",
+        "stage_id": "ml_e2m3_core"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7772300,
+      "mission_key": "ml_e5m1_spear",
+      "name": "The World Spear Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "crystal_target_level_transition_1",
+        "runtime_map": "game/dlc2/e5m1_spear/e5m1_spear",
+        "stage_id": "ml_e5m1_spear"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7772130,
+      "mission_key": "ml_e1m3_cult",
+      "name": "Cultist Base Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_1",
+        "runtime_map": "game/sp/e1m3_cult/e1m3_cult",
+        "stage_id": "ml_e1m3_cult"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7772230,
+      "mission_key": "ml_e2m2_base",
+      "name": "ARC Complex Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "game_target_level_transition_to_shell",
+        "runtime_map": "game/sp/e2m2_base/e2m2_base",
+        "stage_id": "ml_e2m2_base"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
+      "location_id": 7772330,
+      "mission_key": "ml_e3m1_slayer",
+      "name": "Taras Nabad Master Level - Mission Complete",
+      "signal": {
+        "kind": "map_terminal",
+        "owner": "ai_target_level_transition_1",
+        "runtime_map": "game/sp/e3m1_slayer/e3m1_slayer",
+        "stage_id": "ml_e3m1_slayer"
+      },
+      "strategy": "map_terminal"
+    },
+    {
+      "category": "mission_complete",
       "location_id": 7770123,
       "mission_key": "e1m2_war",
       "name": "Exultia - Mission Complete",

@@ -54,11 +54,13 @@
       "triggers": [
         {
           "filename": "ap_stage_e1m3_cult_complete.txt",
+          "layer": "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel",
           "marker": "AP_STAGE_COMPLETE_E1M3_CULT",
           "owner": "game_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/e1m3_cult/e1m3_cult/e1m3_mainlevel",
           "owner": "game_target_level_transition_1",
           "strategy": "terminal_owner"
         }
@@ -98,11 +100,13 @@
       "triggers": [
         {
           "filename": "ap_stage_e2m1_nest_complete.txt",
+          "layer": "game/sp/e2m1_nest/main_level",
           "marker": "AP_STAGE_COMPLETE_E2M1_NEST",
           "owner": "game_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/e2m1_nest/main_level",
           "owner": "game_target_level_transition_1",
           "strategy": "terminal_owner"
         }
@@ -122,6 +126,7 @@
       "triggers": [
         {
           "filename": "ap_event_7770248.txt",
+          "layer": "game/sp/e2m2_base/main_level",
           "marker": "AP_CHECK_EVENT_7770248",
           "owner": "fort_map_exit_level_transition_relay_393966306",
           "strategy": "map_event_file"
@@ -142,11 +147,13 @@
       "triggers": [
         {
           "filename": "ap_stage_e2m3_core_complete.txt",
+          "layer": "game/sp/e2m3_core/main_level",
           "marker": "AP_STAGE_COMPLETE_E2M3_CORE",
           "owner": "hell_chunk_2_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/e2m3_core/main_level",
           "owner": "hell_chunk_2_target_level_transition_1",
           "strategy": "terminal_owner"
         }
@@ -218,11 +225,13 @@
       "triggers": [
         {
           "filename": "ap_mission_taras_nabad_complete.txt",
+          "layer": "game/sp/e3m1_slayer/main_level",
           "marker": "AP_MISSION_EVENT_TARAS_NABAD_COMPLETE",
           "owner": "ai_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/e3m1_slayer/main_level",
           "owner": "ai_target_level_transition_1",
           "strategy": "terminal_owner"
         }
@@ -242,16 +251,19 @@
       "triggers": [
         {
           "filename": "ap_goal_taras_nabad_complete.txt",
+          "layer": "game/sp/e3m1_slayer/main_level",
           "marker": "AP_GOAL_EVENT_TARAS_NABAD_COMPLETE",
           "owner": "game_map_exit_level_transition_relay_852698944",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/e3m1_slayer/main_level",
           "owner": "game_map_exit_level_transition_relay_852698944",
           "strategy": "terminal_owner"
         },
         {
           "from_map": "game/sp/e3m1_slayer/e3m1_slayer",
+          "layer": "game/sp/e3m1_slayer/main_level",
           "strategy": "native_transition",
           "to_map": "game/hub/hub"
         }
@@ -443,11 +455,13 @@
       "triggers": [
         {
           "filename": "ap_mission_world_spear_complete.txt",
+          "layer": "game/sp/dlc2/e5m1_spear/main",
           "marker": "AP_MISSION_EVENT_WORLD_SPEAR_COMPLETE",
           "owner": "crystal_target_level_transition_1",
           "strategy": "map_event_file"
         },
         {
+          "layer": "game/sp/dlc2/e5m1_spear/main",
           "owner": "crystal_target_level_transition_1",
           "strategy": "terminal_owner"
         }
@@ -521,6 +535,156 @@
         },
         {
           "owner": "stage_3_target_level_transition_1",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772100,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e2m1_nest_complete",
+      "map_key": "e2m1_nest",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e2m1_nest_complete.txt",
+          "layer": "game/sp/e2m1_nest/master_level",
+          "marker": "AP_STAGE_COMPLETE_ML_E2M1_NEST",
+          "owner": "game_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_1",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772200,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e2m3_core_complete",
+      "map_key": "e2m3_core",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e2m3_core_complete.txt",
+          "layer": "game/sp/e2m3_core/master_level",
+          "marker": "AP_STAGE_COMPLETE_ML_E2M3_CORE",
+          "owner": "hell_chunk_2_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "hell_chunk_2_target_level_transition_1",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772300,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e5m1_spear_complete",
+      "map_key": "e5m1_spear",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e5m1_spear_complete.txt",
+          "layer": "game/sp/dlc2/e5m1_spear/master_level",
+          "marker": "AP_STAGE_COMPLETE_ML_E5M1_SPEAR",
+          "owner": "crystal_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "crystal_target_level_transition_1",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772130,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e1m3_cult_complete",
+      "map_key": "e1m3_cult",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e1m3_cult_complete.txt",
+          "layer": "game/sp/e1m3_cult/e1m3_masterlevel",
+          "marker": "AP_STAGE_COMPLETE_ML_E1M3_CULT",
+          "owner": "game_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_1",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772230,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e2m2_base_complete",
+      "map_key": "e2m2_base",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e2m2_base_complete.txt",
+          "layer": "game/sp/e2m2_base/master_level",
+          "marker": "AP_STAGE_COMPLETE_ML_E2M2_BASE",
+          "owner": "game_target_level_transition_to_shell",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "game_target_level_transition_to_shell",
+          "strategy": "terminal_owner"
+        }
+      ]
+    },
+    {
+      "dedupe_scope": "ap_session_location",
+      "effects": [
+        {
+          "location_id": 7772330,
+          "strategy": "location_check"
+        }
+      ],
+      "fallback_policy": "first_success_wins",
+      "key": "ml_e3m1_slayer_complete",
+      "map_key": "e3m1_slayer",
+      "triggers": [
+        {
+          "filename": "ap_stage_ml_e3m1_slayer_complete.txt",
+          "layer": "game/sp/e3m1_slayer/master_level",
+          "marker": "AP_STAGE_COMPLETE_ML_E3M1_SLAYER",
+          "owner": "ai_target_level_transition_1",
+          "strategy": "map_event_file"
+        },
+        {
+          "owner": "ai_target_level_transition_1",
           "strategy": "terminal_owner"
         }
       ]

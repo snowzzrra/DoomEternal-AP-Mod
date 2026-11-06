@@ -23,11 +23,19 @@
     {
       "content_revision": "0.7.0",
       "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "add fixed optional DLC pickups and independent BFG ammo checks"
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "Arena completion checks with explicit catalog addresses."
     }
   ],
   "asset_package_contract_sha256": "4220cf0685ec649c969a0bc2d4d54387ffa58ba5fc74050c6c436dff842c0bc6",
-  "content_revision": "0.7.0",
-  "manifest_sha256": "4271f7e1f2611851e2e7ac2e8083b63d85f2324afa554e743dc6a107736143dd",
+  "content_revision": "0.8.0",
+  "manifest_sha256": "a629f79e1e845cba7194f4e8eab805c82d812fc4897ff26fa8fff669bea05cd2",
   "map_key": "e5m3_hell",
   "physical_ap_ids": [
     7770476,
@@ -39,11 +47,22 @@
     7770482,
     7770483,
     7770484,
-    7770512
+    7770512,
+    7772050,
+    7772051,
+    7772052,
+    7774801,
+    7774802,
+    7774803,
+    7774804,
+    7774805,
+    7774806,
+    7774807,
+    7774808
   ],
   "runtime_location_ids": [
     7770485
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "07b1aa20de2a630cf2c5294e327cd944119d0fbbdd75b8a38b7c9c16e0a16dd0"
+  "scripted_contract_sha256": "6647aa730821c4788dda0fe221f46488bae76e67302f8d45eee5d87ffa87e366"
 }

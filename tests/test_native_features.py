@@ -27,7 +27,11 @@ def test_feature_consumers_share_v2_connection_and_ack_results(relay):
         assert link.deathlink_request(1, enabled=True)['kind'] == 1
         assert link.deathlink_request(2, event_id=7, event_hash=bytes([1] * 16))['kind'] == 2
         assert link.publish_ammo_refill(dict(authoritative=True, available=2), connected=True)['refill_balance'] == 2
-        assert link.publish_checked_locations({7770000}, 10)['revision'] == 10
+        assert link.publish_checked_locations({7770000, 7772055, 7774901}, 10)['revision'] == 10
+        published = replies.submissions[-1][2]['checked_locations']
+        for location in (7770000, 7772055, 7774901):
+            offset = location - 7770000
+            assert published[offset // 64] & (1 << (offset % 64))
         assert link.publish_combat_progress(3, 6)['total'] == 3
         assert link.request(52)['outcome'] == 1
         assert [i for i, _, _ in replies.submissions] == [41, 41, 37, 45, 51, 52]
@@ -37,7 +41,7 @@ def test_feature_consumers_share_v2_connection_and_ack_results(relay):
         assert [i for i, _, _ in replies.submissions][-2:] == [22, 23]
         assert replies.submissions[-2][2]['rewards_known'] == 1
         assert replies.submissions[-1][2] == dict(revision=1, count=1, selected_id=1)
-        assert replies.reference['payload_revision'] == 4
+        assert replies.reference['payload_revision'] == 5
         link.namespace = 'b' * 64
         assert link.request(46, 8, {'variable': 2, 'value': '0'})['outcome'] == 1
         assert bytes(replies.reference['namespace_id']) == b'a' * 64

@@ -16,6 +16,7 @@ from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hin
 from .fortress_economy import battery_surplus_limit
 
 __all__ = (
+    "ULTRA_NIGHTMARE_CAPABILITY",
     "MAX_PAYLOAD_BYTES", "MAX_JSON_NODES", "MAX_JSON_DEPTH", "MAX_COLLECTION", "MAX_REFERENCE_ENTRIES",
     "MAX_LIMIT_SETS", "MAX_PROFILES", "MAX_PATTERNS", "MAX_EXPANDED_BODIES", "MAX_KILL_REWARDS",
     "ContractError", "StructureError", "ReferenceError", "DigestError", "ExpansionError", "PayloadSizeError",
@@ -26,6 +27,9 @@ __all__ = (
     "CATALOG_DEPENDENCIES", "SlotCatalog", "catalog_tables", "source_reference", "source_index",
     "native_source_rows", "catalog_target_rows", "dependency_digest", "catalog_dependency_path", "installed_catalog_tables",
 )
+
+ULTRA_NIGHTMARE_CAPABILITY = "ultra_nightmare_restart_stage"
+MASTER_LEVELS_CAPABILITY = "master_levels_v1"
 
 # compact uncompressed JSON stays below half the 16 MiB message allowance.
 MAX_PAYLOAD_BYTES = 8_000_000
@@ -165,6 +169,7 @@ class Checks:
     include_slayer_gates: bool
     include_secret_encounters: bool
     include_weapon_mastery_challenges: bool
+    arena_checks: Literal[0, 1, 2, 3, 4]
 
 
 @dataclass(frozen=True)
@@ -543,7 +548,8 @@ def _catalog_references(catalog):
 
 def _catalog_maps(catalog, stages):
     maps = _catalog_map(catalog, "maps")
-    _require(set(stages) <= set(maps), "Catalog maps must cover campaign stages", ReferenceError)
+    _require({row.get("map_key", key) for key, row in stages.items()} <= set(maps),
+             "Catalog maps must cover campaign stages", ReferenceError)
     for name in maps:
         row = _catalog_map(maps, name)
         _require("stage_id" in row, "Catalog map must declare its stage ownership")
@@ -554,7 +560,8 @@ def _catalog_maps(catalog, stages):
 
 
 def _active_maps(catalog, stages):
-    return {name for name, row in catalog["maps"].items() if row["stage_id"] is None or row["stage_id"] in stages}
+    physical = {catalog["stages"][key].get("map_key", key) for key in stages}
+    return {name for name, row in catalog["maps"].items() if row["stage_id"] is None or name in physical}
 
 
 def _catalog_source_stages(catalog, name, stages):
@@ -582,7 +589,23 @@ def _stage_refs(campaign, catalog):
         access.append(_read(Positive, row.get("access_id"), "catalog.access_id"))
     _unique(access, "catalog.access_ids", ordered=True)
     _refs(campaign.access_items, access, "campaign.access_items")
+    for key in campaign.master_level_stage_ids:
+        _require(stages[key].get("variant") == "master", "Master Level stage has an invalid variant")
+        _require(stages[key]["access_id"] in campaign.access_items, "Master Level needs its Access item")
+    _require(all(stages[key].get("variant") != "master" for key in campaign.sequence), "Master Level in normal sequence")
+    _master_level_goal(campaign)
     return active
+
+
+def _master_level_goal(campaign):
+    goal = campaign.goal
+    if goal.kind == "Complete N Master Levels":
+        _require(goal.stage_id is None and 1 <= goal.count <= len(campaign.master_level_stage_ids),
+                 "Complete N Master Levels needs a count within the active Master Levels")
+    else:
+        _require(goal.count == 0, "Only Complete N Master Levels accepts a goal count")
+    if "Complete all Master Levels" in goal.additional_requirements:
+        _require(bool(campaign.master_level_stage_ids), "Complete all Master Levels needs active Master Levels")
 
 
 def _campaign_decisions(campaign, catalog):
@@ -766,8 +789,12 @@ def validate_slot_data(slot_data: dict, catalog: dict | None = None, *, placemen
     data = _read_record(SlotData, slot_data, "slot_data")
     _catalog_references(catalog)
     _unique(data.compatibility.required_capabilities, "required_capabilities")
+    _difficulty(data.runtime.difficulty, data.compatibility.required_capabilities)
     _require(set(data.compatibility.required_capabilities) <= supported_capabilities, "Room requires unsupported capabilities")
     active = _stage_refs(data.campaign, catalog)
+    if data.campaign.master_level_stage_ids:
+        _require(MASTER_LEVELS_CAPABILITY in data.compatibility.required_capabilities,
+                 "Master Levels require stage identity support")
     _battery(data.campaign, catalog)
     _require(data.campaign.fortress.battery_economy.native_first_battery == (not data.runtime.randomize_first_battery),
              "Native first Battery setting disagrees with runtime")
@@ -781,6 +808,12 @@ def validate_slot_data(slot_data: dict, catalog: dict | None = None, *, placemen
     _unique(data.campaign.goal.additional_requirements, "goal.additional_requirements")
     _digests(data, slot_data, document, placements)
     return data
+
+
+def _difficulty(difficulty, capabilities):
+    if difficulty.death_policy == "restart_stage":
+        _require(difficulty.engine == 3, "Ultra-Nightmare requires engine Nightmare")
+        _require(ULTRA_NIGHTMARE_CAPABILITY in capabilities, "Ultra-Nightmare requires restart support")
 
 
 def _recipe_table_bounds(recipes):

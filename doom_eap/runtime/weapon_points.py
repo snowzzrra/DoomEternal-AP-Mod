@@ -225,10 +225,10 @@ class SentinelWeaponPoints:
         return self.request(37, 4, dict(balance=balance, flags=flags))
 
     def publish_checked_locations(self, checked_locations, revision):
-        bits = [0] * 9
+        bits = [0] * codec.SCHEMA['limits']['automap_words']
         for location in checked_locations:
             offset = location - 7770000
-            if 0 <= offset < 576:
+            if 0 <= offset < len(bits) * 64:
                 bits[offset // 64] |= 1 << (offset % 64)
         return self.request(45, 1, dict(known=1, revision=revision, checked_locations=bits))
 

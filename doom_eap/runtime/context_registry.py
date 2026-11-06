@@ -33,6 +33,8 @@ SUPPORTED_SLOT_CAPABILITIES = frozenset({
     "randomize_dash_v1", "starting_inventory_v1", "starting_weapon_v1",
     "special_weapon_progression_v1", "ammo_refill_v1", "physical_options_v1",
     "room_options_v1", "cross_campaign_materialization_v1", "deathlink_mode_v1",
+    slot_data_contract.ULTRA_NIGHTMARE_CAPABILITY,
+    slot_data_contract.MASTER_LEVELS_CAPABILITY,
 })
 
 

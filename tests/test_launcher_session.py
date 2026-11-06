@@ -108,8 +108,9 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
             raise failure from cause
     with patch.object(owner, "_prepare", side_effect=refuse):
         with pytest.raises(RuntimeError) as refused:
-            from pathlib import Path
-            slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text())
+            from tests.room_fixture import current_room_fixture
+
+            slot_data = current_room_fixture()
             owner.prepare(SimpleNamespace(seed_name="fixture", team=0, slot=1, slot_data=slot_data), {})
     assert refused.value is failure and classify_setup_failure(failure) == "campaign_session"
     assert setup_failure_payload(failure)["stage"] == "copy_and_readback"
@@ -357,7 +358,9 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         installed = install_meathook(game, DependencyManager(state / "deps"), state_dir=state,
                                     consent=lambda _: True, local_artifact=runtime / "distribution.json")
         assert installed.state == "installed"
-        slot_data = json.loads((Path(__file__).parent / "fixtures/resolved_room_slot_data.json").read_text())
+        from tests.room_fixture import current_room_fixture
+
+        slot_data = current_room_fixture()
         from doom_eap.content.slot_data_contract import generation_fingerprint
         slot_data["runtime"]["difficulty"]["engine"] = 1
         slot_data["starting"] = {"items": [[7770011, 1], [7770900, 1]], "weapon_item_id": 7770900}

@@ -3,7 +3,6 @@ __init__.py::DoomEternalWorld.create_items 45 44
 __init__.py::DoomEternalWorld.create_regions 79 59
 __init__.py::DoomEternalWorld.generate_early 45 40
 __init__.py::DoomEternalWorld.pre_fill 19 15
-__init__.py::DoomEternalWorld.set_rules 18 17
 campaign.py::make_plan 168 191
 campaign.py::resolve_dependencies 20 9
 campaign.py::solve_stage_bootstrap 71 40
@@ -11,11 +10,9 @@ classification.py::apply_dynamic_progression_classification 76 72
 combat_rating.py::_apply_special 17 11
 combat_rating.py::_evaluate_with_rune_selection 36 32
 combat_rating.py::evaluate_player_loadout_cr 26 17
-combat_readiness.py::_enemy_counter_penalties 6 11
 combat_readiness.py::_resolve_readiness_options 16 12
 combat_readiness.py::evaluate_mission_readiness 31 33
 combat_readiness.py::get_mission_cr_range 12 13
-combat_readiness.py::get_mission_effort_per_check 6 11
 enemy_options.py::_attribute 24 17
 enemy_options.py::normalize_enemy_options 78 69
 enemy_plan.py::_limit_suffix 26 25
@@ -29,7 +26,6 @@ killsanity_plan.py::build_killsanity_plan 16 17
 killsanity_plan.py::collapse_source_alternatives 20 31
 logic.py::_validate_requirement 11 18
 logic.py::build_location_prerequisites 72 60
-logic.py::effective_victory_requirements 2 11
 logic.py::requirement_satisfied 37 27
 native_enemy_balance.py::_allocate_counts 22 24
 native_enemy_balance.py::_category 14 11

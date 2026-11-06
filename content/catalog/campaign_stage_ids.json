@@ -20,6 +20,12 @@
     "e5m1_spear": {"access_id": 7771016, "native_index": 16, "status": "active"},
     "e5m2_earth": {"access_id": 7771017, "native_index": 17, "status": "active"},
     "e5m3_hell": {"access_id": 7771018, "native_index": 18, "status": "active"},
-    "e5m4_boss": {"access_id": 7771019, "native_index": 19, "status": "active"}
+    "e5m4_boss": {"access_id": 7771019, "native_index": 19, "status": "active"},
+    "ml_e2m1_nest": {"access_id": 7776001, "native_index": 28, "status": "active", "variant": "master", "map_key": "e2m1_nest"},
+    "ml_e2m3_core": {"access_id": 7776002, "native_index": 29, "status": "active", "variant": "master", "map_key": "e2m3_core"},
+    "ml_e5m1_spear": {"access_id": 7776003, "native_index": 30, "status": "active", "variant": "master", "map_key": "e5m1_spear"},
+    "ml_e1m3_cult": {"access_id": 7776004, "native_index": 31, "status": "active", "variant": "master", "map_key": "e1m3_cult"},
+    "ml_e2m2_base": {"access_id": 7776005, "native_index": 32, "status": "active", "variant": "master", "map_key": "e2m2_base"},
+    "ml_e3m1_slayer": {"access_id": 7776006, "native_index": 33, "status": "active", "variant": "master", "map_key": "e3m1_slayer"}
   }
 }

@@ -141,7 +141,7 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         compile_options.update(options)
         manifest = SeedManifest.create(
             seed_name=f"room-payload-{key}-state", team=0, slot=1, options=options,
-            active_location_ids=compiler.active_location_ids(compile_options), static_precompile=True,
+            active_location_ids=compiler.active_location_ids({**compile_options, "arena_checks": 4}), static_precompile=True,
         )
         compiler.compile_map(manifest, vanilla, entities, key)
         with tempfile.TemporaryDirectory(prefix=f"room-{key}-patch-") as patch_root:

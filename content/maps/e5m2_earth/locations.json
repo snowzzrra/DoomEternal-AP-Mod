@@ -12,7 +12,10 @@
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_3": 7770472,
     "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770473,
     "AP_CHECK_TARGET_RELAY_ESCALATION_3_DONE": 7770474,
-    "AP_CHECK_GAME_INTERACT_AUTOMAP_E5M2_EARTH": 7770511
+    "AP_CHECK_GAME_INTERACT_AUTOMAP_E5M2_EARTH": 7770511,
+    "AP_CHECK_GAME_PICKUP_AMMO_BFG_3": 7772040,
+    "AP_CHECK_GAME_PICKUP_AMMO_BFG_2": 7772041,
+    "AP_CHECK_GAME_PICKUP_AMMO_BFG_1": 7772042
   },
   "names": {
     "7770466": "Reclaimed Earth - Codex - City Entrance Streetlight",
@@ -24,7 +27,10 @@
     "7770472": "Reclaimed Earth - Extra Life - Lockdown Red Door",
     "7770473": "Reclaimed Earth - Escalation Encounter Wave 1",
     "7770474": "Reclaimed Earth - Escalation Encounter Wave 2",
-    "7770511": "Reclaimed Earth - Automap Station"
+    "7770511": "Reclaimed Earth - Automap Station",
+    "7772040": "Reclaimed Earth - BFG Ammo - Upper Offices Secret",
+    "7772041": "Reclaimed Earth - BFG Ammo - Escalation Rooftop",
+    "7772042": "Reclaimed Earth - BFG Ammo - Skyscraper Approach"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -92,6 +98,15 @@
       }
     },
     "game_interact_automap_e5m2_earth": {
+      "permanent_resource_budget": false
+    },
+    "game_pickup_ammo_bfg_3": {
+      "permanent_resource_budget": false
+    },
+    "game_pickup_ammo_bfg_2": {
+      "permanent_resource_budget": false
+    },
+    "game_pickup_ammo_bfg_1": {
       "permanent_resource_budget": false
     }
   }

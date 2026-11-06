@@ -35,11 +35,23 @@
     {
       "content_revision": "0.7.0",
       "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "add fixed optional DLC pickups and independent BFG ammo checks"
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "replace common armor DLC checks with normal-layer Mega Armor"
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "Arena completion checks with explicit catalog addresses."
     }
   ],
   "asset_package_contract_sha256": "5f1c55d3fc72d85b26f7f7b7448b0d6ecb97b0c0c86b27d2d835540976d30812",
-  "content_revision": "0.7.0",
-  "manifest_sha256": "99b16010dd4feafd9ab7fa8a279e3d8b5d40b6a956e613a0e23ad5ab35a8bb49",
+  "content_revision": "0.8.0",
+  "manifest_sha256": "229efe13226748c77dd37eb4b6b2309ed72c83d506f864c2b1e6f07ec4c18c6f",
   "map_key": "e4m3_mcity",
   "physical_ap_ids": [
     7770444,
@@ -56,11 +68,23 @@
     7770455,
     7770456,
     7770509,
-    7770515
+    7770515,
+    7772021,
+    7772022,
+    7772023,
+    7774501,
+    7774502,
+    7774503,
+    7774504,
+    7774505,
+    7774506,
+    7774507,
+    7774508,
+    7774509
   ],
   "runtime_location_ids": [
     7770457
   ],
   "schema_version": 2,
-  "scripted_contract_sha256": "fea88cb6277447adf06dc726f07ddbc34f65d27be74f60049b33efa667be07b3"
+  "scripted_contract_sha256": "20f500ce84d40e002329d1c3d1372adaf489023ed2c90a6f4e6fa16c9740b334"
 }

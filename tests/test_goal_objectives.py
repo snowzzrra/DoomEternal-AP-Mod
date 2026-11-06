@@ -1,5 +1,11 @@
 """Victory requirements use the connected world's real location set."""
+import asyncio
+import logging
+from unittest.mock import AsyncMock
+
+from doom_eap.contracts.check_observation import CheckObservation
 from doom_eap.contracts.goal_policy import GoalPolicy
+from doom_eap.runtime.goal_progress import GoalProgress
 
 
 def test_resolved_goal_uses_active_dlc_missions_without_dlc_equipment():
@@ -40,3 +46,33 @@ def test_short_world_requirements_exclude_unselected_missions():
     assert policy.objective_ids(slot, set()) == {1}
     slot['goal_endpoint_available'] = False
     assert not policy.objective_ids(slot, set(catalog))
+
+
+def test_master_level_threshold_counts_distinct_checked_completions():
+    stages = [{"id": f"ml_{key}", "completion_id": code} for key, code in (("a", 11), ("b", 12), ("c", 13))]
+    policy = GoalPolicy({11: "A - Mission Complete", 12: "B - Mission Complete", 13: "C - Mission Complete",
+                         21: "Fortress - Unmaykr Acquired"}, (), {"goal"}, {"Acquire the Unmaykr": 21}, (), stages)
+    room = {"campaign": {"master_level_stage_ids": [stage["id"] for stage in stages],
+            "goal": {"kind": "Complete N Master Levels", "count": 2, "stage_id": None,
+                     "endpoint_event": "Internal Goal Endpoint: Complete N Master Levels",
+                     "additional_requirements": ["Acquire the Unmaykr"]}}}
+    objectives = policy.objective_ids(room, {11, 12, 13, 21})
+    candidates, count = policy.threshold(room)
+    progress = GoalProgress("", "", logging.getLogger(__name__))
+    publication = AsyncMock()
+
+    async def evaluate(checked, submitted=()):
+        facts = CheckObservation(frozenset(checked), frozenset(submitted), objectives, True, True)
+        return await progress.evaluate("room update", objectives, facts, publication,
+                                       threshold_ids=candidates, threshold=count)
+
+    assert not asyncio.run(evaluate([11, 11, 21], [12]))
+    assert not asyncio.run(evaluate([11, 12]))
+    assert asyncio.run(evaluate([11, 12, 21]))
+    assert asyncio.run(evaluate([11, 12, 21]))
+    publication.goal.assert_awaited_once()
+    room["campaign"]["goal"]["additional_requirements"] = ["Complete all Master Levels"]
+    assert policy.threshold(room) == (candidates, 3)
+    room["campaign"]["goal"].update(kind="Acquire the Unmaykr", endpoint_event="Internal Goal Endpoint: Acquire the Unmaykr")
+    assert policy.objective_ids(room, {11, 12, 13, 21}) == {11, 12, 13, 21}
+    assert policy.threshold(room) == (frozenset(), 0)

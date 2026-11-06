@@ -99,6 +99,10 @@
           "label": "ARC Complex Access"
         },
         {
+          "key": "ARC Complex Master Level Access",
+          "label": "ARC Complex Master Level Access"
+        },
+        {
           "key": "Air Control",
           "label": "Air Control"
         },
@@ -213,6 +217,10 @@
         {
           "key": "Cultist Base Access",
           "label": "Cultist Base Access"
+        },
+        {
+          "key": "Cultist Base Master Level Access",
+          "label": "Cultist Base Master Level Access"
         },
         {
           "key": "Dash",
@@ -405,6 +413,10 @@
         {
           "key": "Mars Core Access",
           "label": "Mars Core Access"
+        },
+        {
+          "key": "Mars Core Master Level Access",
+          "label": "Mars Core Master Level Access"
         },
         {
           "key": "Meat Hook",
@@ -647,6 +659,10 @@
           "label": "Super Gore Nest Access"
         },
         {
+          "key": "Super Gore Nest Master Level Access",
+          "label": "Super Gore Nest Master Level Access"
+        },
+        {
           "key": "Super Shotgun",
           "label": "Super Shotgun"
         },
@@ -657,6 +673,10 @@
         {
           "key": "Taras Nabad Access",
           "label": "Taras Nabad Access"
+        },
+        {
+          "key": "Taras Nabad Master Level Access",
+          "label": "Taras Nabad Master Level Access"
         },
         {
           "key": "The Blood Swamps Access",
@@ -681,6 +701,10 @@
         {
           "key": "The World Spear Access",
           "label": "The World Spear Access"
+        },
+        {
+          "key": "The World Spear Master Level Access",
+          "label": "The World Spear Master Level Access"
         },
         {
           "key": "Tyrant Trap",
@@ -718,6 +742,10 @@
           "label": "ARC Complex Access"
         },
         {
+          "key": "ARC Complex Master Level Access",
+          "label": "ARC Complex Master Level Access"
+        },
+        {
           "key": "Air Control",
           "label": "Air Control"
         },
@@ -832,6 +860,10 @@
         {
           "key": "Cultist Base Access",
           "label": "Cultist Base Access"
+        },
+        {
+          "key": "Cultist Base Master Level Access",
+          "label": "Cultist Base Master Level Access"
         },
         {
           "key": "Dash",
@@ -1024,6 +1056,10 @@
         {
           "key": "Mars Core Access",
           "label": "Mars Core Access"
+        },
+        {
+          "key": "Mars Core Master Level Access",
+          "label": "Mars Core Master Level Access"
         },
         {
           "key": "Meat Hook",
@@ -1266,6 +1302,10 @@
           "label": "Super Gore Nest Access"
         },
         {
+          "key": "Super Gore Nest Master Level Access",
+          "label": "Super Gore Nest Master Level Access"
+        },
+        {
           "key": "Super Shotgun",
           "label": "Super Shotgun"
         },
@@ -1276,6 +1316,10 @@
         {
           "key": "Taras Nabad Access",
           "label": "Taras Nabad Access"
+        },
+        {
+          "key": "Taras Nabad Master Level Access",
+          "label": "Taras Nabad Master Level Access"
         },
         {
           "key": "The Blood Swamps Access",
@@ -1300,6 +1344,10 @@
         {
           "key": "The World Spear Access",
           "label": "The World Spear Access"
+        },
+        {
+          "key": "The World Spear Master Level Access",
+          "label": "The World Spear Master Level Access"
         },
         {
           "key": "Tyrant Trap",
@@ -1617,10 +1665,15 @@
           "key": "nightmare",
           "label": "Nightmare",
           "value": 3
+        },
+        {
+          "key": "ultra_nightmare",
+          "label": "Ultra-Nightmare",
+          "value": 4
         }
       ],
       "default": "ultra_violence",
-      "description": "Choose the game's combat difficulty for your campaign.\n\nI'm Too Young to Die: The easiest fights, with more room for mistakes.\nHurt Me Plenty: A moderate challenge.\nUltra-Violence: Tough fights that reward good weapon use and movement.\nNightmare: The hardest setting, with aggressive enemies and punishing damage.",
+      "description": "Choose the game's combat difficulty for your campaign.\n\nI'm Too Young to Die: The easiest fights, with more room for mistakes.\nHurt Me Plenty: A moderate challenge.\nUltra-Violence: Tough fights that reward good weapon use and movement.\nNightmare: Aggressive enemies and punishing damage.\nUltra-Nightmare: Nightmare combat. Only a death without Extra Life or Saving Throw\nrestarts the current mission from the beginning through Mission Select. Quitting or\ncrashing resumes the last checkpoint. Inventory follows the game's Mission Select\nbehavior. Received items are not delivered again. Sent checks stay sent. Differs from\nvanilla Ultra-Nightmare. Requires a runtime with Ultra-Nightmare support.",
       "display_name": "Campaign Difficulty",
       "group": "Game Options",
       "key": "campaign_difficulty",
@@ -1704,6 +1757,17 @@
       "key": "resource_profile",
       "source_class": "ResourceProfile",
       "ui_type": "choice"
+    },
+    {
+      "default": 75,
+      "description": "Choose how many Fortress battery room rewards hold something useful.\n\nThis percentage of the battery room rewards only holds progression or useful items, from any world. The others can hold filler and traps from other worlds; your own filler and traps only go there in a single-player seed.\n0%: no restriction. 100%: every battery room reward is useful.",
+      "display_name": "Useful Fortress Rewards",
+      "group": "Game Options",
+      "key": "useful_fortress_rewards",
+      "maximum": 100,
+      "minimum": 0,
+      "source_class": "UsefulFortressRewards",
+      "ui_type": "range"
     },
     {
       "default": {},
@@ -2471,15 +2535,40 @@
           "key": "complete_the_full_saga",
           "label": "Complete the Full Saga",
           "value": 3
+        },
+        {
+          "key": "complete_n_master_levels",
+          "label": "Complete N Master Levels",
+          "value": 4
         }
       ],
       "default": "acquire_the_unmaykr",
-      "description": "Choose what you need to do to win.\n\nAcquire the Unmaykr: Beat the six base game Slayer Gates and collect the Unmaykr in the Fortress.\nKill the Icon of Sin: Defeat the base game's final boss.\nKill the Dark Lord: Defeat Davoth, the final boss of The Ancient Gods Part Two.\nComplete the Full Saga: Include the base game and both DLC campaigns, with your chosen boss as the finale.\nVictory Requirements adds extra objectives to your goal.",
+      "description": "Choose what you need to do to win.\n\nAcquire the Unmaykr: Beat the six base game Slayer Gates and collect the Unmaykr in the Fortress.\nKill the Icon of Sin: Defeat the base game's final boss.\nKill the Dark Lord: Defeat Davoth, the final boss of The Ancient Gods Part Two.\nComplete the Full Saga: Include the base game and both DLC campaigns, with your chosen boss as the finale.\nComplete N Master Levels: Finish the selected number of distinct included Master Levels.\nVictory Requirements adds extra objectives to your goal.",
       "display_name": "Goal",
       "group": "Game Options",
       "key": "goal",
       "source_class": "Goal",
       "ui_type": "choice"
+    },
+    {
+      "default": false,
+      "description": "Include every qualified standard Master Level, each with its own Access item.\n\nMaster Levels are independent of Mission Pool and Mission Order. Their enemies stay vanilla.",
+      "display_name": "Include Master Levels",
+      "group": "Game Options",
+      "key": "include_master_levels",
+      "source_class": "IncludeMasterLevels",
+      "ui_type": "toggle"
+    },
+    {
+      "default": 1,
+      "description": "Choose how many distinct Master Levels to finish for Complete N Master Levels.\n\nInclude Master Levels must be enabled. Replaying a completed Master Level counts once.",
+      "display_name": "Master Level Count",
+      "group": "Game Options",
+      "key": "master_level_count",
+      "maximum": 6,
+      "minimum": 1,
+      "source_class": "MasterLevelCount",
+      "ui_type": "range"
     },
     {
       "choices": [
@@ -2510,10 +2599,14 @@
         {
           "key": "Complete All Weapon Mastery Challenges",
           "label": "Complete All Weapon Mastery Challenges"
+        },
+        {
+          "key": "Complete all Master Levels",
+          "label": "Complete all Master Levels"
         }
       ],
       "default": [],
-      "description": "Choose extra tasks to finish before you win. An empty selection uses just your Goal.\n\nComplete All Included Missions: Finish every mission in your campaign.\nComplete All Slayer Gates: Beat every included Slayer Gate.\nComplete All Escalation Encounters: Beat both waves of every included Escalation Encounter.\nComplete All Secret Encounters: Beat every included timed Secret Encounter.\nComplete All Mission Challenges: Finish the Mission Challenges in each included mission.\nComplete All Weapon Mastery Challenges: Finish every included weapon mastery challenge.\nAcquire the Unmaykr: Collect the Unmaykr from its case in the Fortress.",
+      "description": "Choose extra tasks to finish before you win. An empty selection uses just your Goal.\n\nComplete All Included Missions: Finish every mission in your campaign.\nComplete All Slayer Gates: Beat every included Slayer Gate.\nComplete All Escalation Encounters: Beat both waves of every included Escalation Encounter.\nComplete All Secret Encounters: Beat every included timed Secret Encounter.\nComplete All Mission Challenges: Finish the Mission Challenges in each included mission.\nComplete All Weapon Mastery Challenges: Finish every included weapon mastery challenge.\nComplete all Master Levels: Finish every included Master Level.\nAcquire the Unmaykr: Collect the Unmaykr from its case in the Fortress.",
       "display_name": "Additional Victory Requirements",
       "group": "Game Options",
       "key": "additional_victory_requirements",
@@ -2611,6 +2704,42 @@
       "key": "include_secret_encounters",
       "source_class": "IncludeSecretEncounters",
       "ui_type": "toggle"
+    },
+    {
+      "choices": [
+        {
+          "key": "all_levels",
+          "label": "All Levels",
+          "value": 0
+        },
+        {
+          "key": "dlc_and_master_levels",
+          "label": "DLC + Master Levels",
+          "value": 1
+        },
+        {
+          "key": "only_dlc_levels",
+          "label": "Only DLC Levels",
+          "value": 2
+        },
+        {
+          "key": "only_master_levels",
+          "label": "Only Master Levels",
+          "value": 3
+        },
+        {
+          "key": "no_levels",
+          "label": "No Levels",
+          "value": 4
+        }
+      ],
+      "default": "dlc_and_master_levels",
+      "description": "Choose which levels give a check for each arena you clear.\n\nAll Levels: every campaign mission, DLC mission and Master Level.\nDLC + Master Levels: DLC missions and Master Levels.\nOnly DLC Levels: DLC missions only.\nOnly Master Levels: Master Levels only.\nNo Levels: no arena checks.",
+      "display_name": "Arena Checks",
+      "group": "Game Options",
+      "key": "arena_checks",
+      "source_class": "ArenaChecks",
+      "ui_type": "choice"
     },
     {
       "default": false,
@@ -9318,5 +9447,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "20549e9465f7705167121dfd8f5def6e16740d3df91fbb691feb73d58f991052"
+  "source_sha256": "444c582a18838b9ace123585dbe60419cabf9a4e83bcae1f5e879582a174c545"
 }

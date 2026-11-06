@@ -84,7 +84,7 @@ def _campaign_projection(snapshot, namespace):
         (
             1,
             1 | 2 | 16,
-            len(STAGES) + snapshot["fortress_phase"],
+            20 + snapshot["fortress_phase"],
             snapshot["hub_map"],
             player_text("notifications", "fortress_title"),
         )

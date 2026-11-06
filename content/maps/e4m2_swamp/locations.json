@@ -11,7 +11,15 @@
     "AP_CHECK_DESOLATE_CAVERN_PROGRESS_SUPPORT_RUNE_1": 7770439,
     "AP_CHECK_COLLECTIBLES_PROGRESS_CODEX_7": 7770441,
     "AP_CHECK_COLLECTIBLES_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770442,
-    "AP_CHECK_AUTOMAP_INTERACT_AUTOMAP_1": 7770508
+    "AP_CHECK_AUTOMAP_INTERACT_AUTOMAP_1": 7770508,
+    "AP_CHECK_COLLECTIBLES_PICKUP_MEGA_HEALTH_1": 7772010,
+    "AP_CHECK_PICKUPS_PICKUP_AMMO_BFG_2": 7772012,
+    "AP_CHECK_PICKUPS_PICKUP_AMMO_BFG_1": 7772013,
+    "AP_CHECK_ARENA_PICKUP_AMMO_BFG_1": 7772014,
+    "AP_CHECK_ARENA_PICKUP_AMMO_BFG_2": 7772015,
+    "AP_CHECK_AI_PICKUP_MEGA_ARMOR_1": 7772053,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_ARMOR_1": 7772054,
+    "AP_CHECK_PICKUPS_PICKUP_MEGA_ARMOR_3": 7772055
   },
   "secret_encounters": [
     {
@@ -40,7 +48,15 @@
     "7770440": "The Blood Swamps - Secret Encounter - Toxic Mire Tree",
     "7770441": "The Blood Swamps - Book of the Seraphs - Part IV Codex",
     "7770442": "The Blood Swamps - Extra Life - Castle Keep Catacombs",
-    "7770508": "The Blood Swamps - Automap Station"
+    "7770508": "The Blood Swamps - Automap Station",
+    "7772010": "The Blood Swamps - Soulsphere - Lost Woods Secret",
+    "7772012": "The Blood Swamps - BFG Ammo - Sunken Ruins Secret",
+    "7772013": "The Blood Swamps - BFG Ammo - Sunken Ruins",
+    "7772014": "The Blood Swamps - BFG Ammo - Lost Woods Arena",
+    "7772015": "The Blood Swamps - BFG Ammo - Sunken Arena",
+    "7772053": "The Blood Swamps - Mega Armor - Lost Woods",
+    "7772054": "The Blood Swamps - Mega Armor - Sunken Ruins",
+    "7772055": "The Blood Swamps - Mega Armor - Sunken Ruins Puzzle"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -50,6 +66,30 @@
   },
   "target_policies": {
     "automap_interact_automap_1": {
+      "permanent_resource_budget": false
+    },
+    "collectibles_pickup_mega_health_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_ammo_bfg_2": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "arena_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "arena_pickup_ammo_bfg_2": {
+      "permanent_resource_budget": false
+    },
+    "ai_pickup_mega_armor_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_armor_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_mega_armor_3": {
       "permanent_resource_budget": false
     }
   }

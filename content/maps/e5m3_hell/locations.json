@@ -12,7 +12,10 @@
     "AP_CHECK_PICKUPS_PICKUP_EXTRA_LIFE_EXTRA_LIFE_2UP_1": 7770482,
     "AP_CHECK_TARGET_RELAY_ESCALATION_1_DONE": 7770483,
     "AP_CHECK_TARGET_RELAY_ESCALATION_2_DONE": 7770484,
-    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": 7770512
+    "AP_CHECK_PICKUPS_INTERACT_AUTOMAP_1": 7770512,
+    "AP_CHECK_CITY_LOWER_PICKUP_AMMO_BFG_1": 7772050,
+    "AP_CHECK_PICKUPS_PICKUP_AMMO_BFG_1": 7772051,
+    "AP_CHECK_HANGAR_PICKUP_AMMO_BFG_1": 7772052
   },
   "names": {
     "7770476": "Immora - Codex - Battlefield Second Bend",
@@ -24,7 +27,10 @@
     "7770482": "Immora - Extra Life - Plateau Battle 2-Up",
     "7770483": "Immora - Escalation Encounter Wave 1",
     "7770484": "Immora - Escalation Encounter Wave 2",
-    "7770512": "Immora - Automap Station"
+    "7770512": "Immora - Automap Station",
+    "7772050": "Immora - BFG Ammo - City Lower Secret",
+    "7772051": "Immora - BFG Ammo - Plateau Battle",
+    "7772052": "Immora - BFG Ammo - Hangar"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -92,6 +98,15 @@
       }
     },
     "pickups_interact_automap_1": {
+      "permanent_resource_budget": false
+    },
+    "city_lower_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "pickups_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "hangar_pickup_ammo_bfg_1": {
       "permanent_resource_budget": false
     }
   }

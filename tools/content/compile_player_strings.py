@@ -46,6 +46,7 @@ NATIVE_FIELDS = {
     "game.menu.items_found": (96, {}),
     "game.menu.return_to_fortress": (96, {}),
     "game.menu.resume_checkpoint": (96, {}),
+    "game.menu.restart_stage": (96, {}),
     "game.menu.choose_mission": (96, {}),
     "game.menu.mastery_reward": (
         None,

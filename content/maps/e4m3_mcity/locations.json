@@ -15,7 +15,10 @@
     "AP_CHECK_GAME_PICKUP_EXTRA_LIFE_EXTRA_LIFE_1_2": 7770454,
     "AP_CHECK_GAME_PROGRESS_CODEX_5": 7770456,
     "AP_CHECK_GAME_INTERACT_AUTOMAP_E4M3_MCITY": 7770509,
-    "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_2": 7770515
+    "AP_CHECK_GAME_PICKUP_MEGA_HEALTH_2": 7770515,
+    "AP_CHECK_GAME_PICKUP_AMMO_BFG_3": 7772021,
+    "AP_CHECK_ARENA_PICKUP_AMMO_BFG_1": 7772022,
+    "AP_CHECK_GAME_PICKUP_AMMO_BFG_2": 7772023
   },
   "secret_encounters": [
     {
@@ -48,7 +51,10 @@
     "7770455": "The Holt - Secret Encounter - Ivory Bridge Alcove",
     "7770456": "The Holt - Book of the Seraphs - Part VIII Codex",
     "7770509": "The Holt - Automap Station",
-    "7770515": "The Holt - Soulsphere - Crimson Forest Secret Wall"
+    "7770515": "The Holt - Soulsphere - Crimson Forest Secret Wall",
+    "7772021": "The Holt - BFG Ammo - Crimson Forest Secret Wall",
+    "7772022": "The Holt - BFG Ammo - Maykropolis Arena",
+    "7772023": "The Holt - BFG Ammo - Pantheon Approach"
   },
   "location_feedback": {
     "default_policy": "ap_only",
@@ -84,6 +90,15 @@
       "permanent_resource_budget": false
     },
     "game_pickup_mega_health_2": {
+      "permanent_resource_budget": false
+    },
+    "game_pickup_ammo_bfg_3": {
+      "permanent_resource_budget": false
+    },
+    "arena_pickup_ammo_bfg_1": {
+      "permanent_resource_budget": false
+    },
+    "game_pickup_ammo_bfg_2": {
       "permanent_resource_budget": false
     }
   }

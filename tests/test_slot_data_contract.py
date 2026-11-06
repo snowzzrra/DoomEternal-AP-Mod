@@ -14,6 +14,7 @@ from doom_eap.content.slot_data_contract import (
     MAX_PAYLOAD_BYTES,
     MAX_PROFILES,
     MAX_REFERENCE_ENTRIES,
+    ULTRA_NIGHTMARE_CAPABILITY,
     DigestError,
     ExpansionError,
     PayloadSizeError,
@@ -62,7 +63,7 @@ def sample_slot(catalog=None, recipes=None):
                      "unprepared_start_stages": [], "opening_stage": None, "goal_as_item": True,
                      "active_masteries_count": 0,
                      "access_items": [7771000], "fixed_dash_completion_stage": None,
-                     "goal": {"kind": "stage", "stage_id": "a", "count": 1, "endpoint_event": "complete",
+                     "goal": {"kind": "stage", "stage_id": "a", "count": 0, "endpoint_event": "complete",
                               "additional_requirements": []},
                      "fortress": {"active_spend_group_ids": ["room"], "phase_thresholds": [0, 1],
                                   "battery_economy": {"cost": 2, "surplus": 0, "total": 2, "surplus_percent": 25,
@@ -74,7 +75,7 @@ def sample_slot(catalog=None, recipes=None):
                     "enhanced_melee_damage": False, "easier_secret_encounters": True,
                     "reveal_ap_locations_on_automap": False,
                     "checks": {"include_slayer_gates": True, "include_secret_encounters": True,
-                               "include_weapon_mastery_challenges": True},
+                               "include_weapon_mastery_challenges": True, "arena_checks": 1},
                     "special_weapon": "The Crucible", "mastery_requirement_counts": {"challenge": 2}},
         "recipes": sample_recipes() if recipes is None else recipes,
         "stage_profiles": {"a": {"cr_min": 10, "cr_max": 20, "opening_cr_min": None, "opening_cr_max": None,
@@ -92,6 +93,23 @@ def set_path(data, path, value):
     for key in path[:-1]:
         data = data[key]
     data[path[-1]] = value
+
+
+def test_restart_policy_requires_nightmare_and_compatible_runtime():
+    catalog = sample_catalog()
+    data = sample_slot(catalog)
+    data["runtime"]["difficulty"] = {"engine": 3, "death_policy": "restart_stage"}
+    with pytest.raises(StructureError, match="restart support"):
+        validate_slot_data(sign_slot(data, catalog), catalog)
+    data["compatibility"]["required_capabilities"] = [ULTRA_NIGHTMARE_CAPABILITY]
+    with pytest.raises(StructureError, match="unsupported capabilities"):
+        validate_slot_data(sign_slot(data, catalog), catalog)
+    support = frozenset({ULTRA_NIGHTMARE_CAPABILITY})
+    result = validate_slot_data(data, catalog, supported_capabilities=support)
+    assert result.runtime.difficulty.death_policy == "restart_stage"
+    data["runtime"]["difficulty"]["engine"] = 2
+    with pytest.raises(StructureError, match="engine Nightmare"):
+        validate_slot_data(sign_slot(data, catalog), catalog, supported_capabilities=support)
 
 
 def test_canonical_order_and_ascii_are_stable():

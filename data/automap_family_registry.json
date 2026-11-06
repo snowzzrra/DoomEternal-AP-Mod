@@ -20,7 +20,14 @@
   "families": {
     "secret_resources": {
       "match": {
-        "inherit_prefixes": ["pickup/armor/large", "pickup/mega_health"]
+        "inherit_prefixes": [
+          "pickup/armor/large",
+          "pickup/mega_armor",
+          "pickup/mega_health",
+          "pickup/powerup/berserk",
+          "pickup/powerup/overdrive",
+          "pickup/powerup/onslaught"
+        ]
       },
       "vanilla_class": "idProp2",
       "automap_marker_source": "generated AP marker helper",
@@ -30,6 +37,24 @@
       "reward_edge": "armor/sp_armor_50 or mega_health useableComponentDecl",
       "safe_cut": null,
       "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
+    "bfg_ammo": {
+      "match": {
+        "inherit_prefixes": [
+          "pickup/ammo/bfg"
+        ]
+      },
+      "vanilla_class": "idProp2",
+      "automap_marker_source": "original entity automapPropertiesDecl",
+      "automap_properties": [
+        "bfg_ammo"
+      ],
+      "dossier_total_owner": null,
+      "collected_state_writer": "native idProp2 pickup transaction",
+      "reward_edge": "ammo/bfg useableComponentDecl",
+      "safe_cut": null,
+      "vanilla_automap": true,
       "vanilla_exploration": false
     },
     "toys_collectibles": {
@@ -171,8 +196,8 @@
       "vanilla_class": "idProp2",
       "automap_marker_source": "original entity automapPropertiesDecl",
       "automap_properties": [
-          "extra_life",
-          "extra_life_2up"
+        "extra_life",
+        "extra_life_2up"
       ],
       "dossier_total_owner": null,
       "collected_state_writer": "native sp_extra_life useable transaction",
@@ -220,10 +245,16 @@
       "vanilla_exploration": true
     },
     "support_runes": {
-      "match": {"inherit_prefixes": ["progress/support_rune"]},
+      "match": {
+        "inherit_prefixes": [
+          "progress/support_rune"
+        ]
+      },
       "vanilla_class": "idInteractable_Rune",
       "automap_marker_source": "original entity automapPropertiesDecl",
-      "automap_properties": ["rune_support"],
+      "automap_properties": [
+        "rune_support"
+      ],
       "dossier_total_owner": null,
       "collected_state_writer": null,
       "reward_edge": null,
@@ -474,6 +505,22 @@
       "reward_edge": null,
       "safe_cut": "frozen runtime contract",
       "vanilla_automap": false,
+      "vanilla_exploration": false
+    },
+    "arena_checks": {
+      "match": {
+        "source_types": [
+          "arena"
+        ]
+      },
+      "vanilla_class": "idEncounterManager or idTarget_Count completion join",
+      "automap_marker_source": "none",
+      "automap_properties": [],
+      "dossier_total_owner": "combat encounter manager",
+      "collected_state_writer": "native arena completion activates the AP count relay",
+      "reward_edge": "standard AP notification and event chain",
+      "safe_cut": "remove only the AP check relay after server confirmation",
+      "vanilla_automap": true,
       "vanilla_exploration": false
     }
   }

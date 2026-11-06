@@ -984,9 +984,9 @@ def _spawn_position_from_block(block):
         axis_match = re.search(
             rf'\b{axis}\s*=\s*([-+0-9.eE]+);', match.group(1)
         )
-        if axis_match is None:
+        if axis_match is None and re.search(rf'\b{axis}\s*=', match.group(1)):
             return None
-        values.append(float(axis_match.group(1)))
+        values.append(float(axis_match.group(1)) if axis_match else 0.0)
     return tuple(values)
 
 
@@ -2803,6 +2803,8 @@ def generate_map(
     map_key = level_config.get("map_key")
     if not isinstance(map_key, str):
         raise ValueError("map config requires string map_key")
+    from doom_eap.content.arena_checks import map_arena_config
+    map_arena_config(level_config, descriptor_path)
     preserve_rotation = level_config.get("preserve_rotation", False)
     if not isinstance(preserve_rotation, bool):
         raise ValueError("map config preserve_rotation must be boolean")
@@ -3317,6 +3319,12 @@ def generate_map(
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
 
+    from tools.maps.arena_checks import compile_arena_checks
+    map_content, arena_manifest = compile_arena_checks(
+        map_content, level_config.get("arena_checks", []), placement_by_id,
+        notifications=enable_notifications,
+    )
+    manifest_data.update(arena_manifest)
     final_content = (
         map_content
         + "\n"
@@ -3333,6 +3341,12 @@ def generate_map(
         + generate_ap_lifecycle_entity(map_key)
         + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
+    from tools.maps.master_levels import compile_master_pickups
+    final_content, master_manifest = compile_master_pickups(
+        final_content, source_metadata["content"], level_config, default_visual_model, placement_by_id,
+        Path(__file__).resolve().parents[2], enable_notifications,
+    )
+    manifest_data.update(master_manifest)
     final_content = apply_runtime_map_correctives(final_content, map_key)
     if map_key == "hub":
         from tools.maps.fortress_campaign import project_fortress

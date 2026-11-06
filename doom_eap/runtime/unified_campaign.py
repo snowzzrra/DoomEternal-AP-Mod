@@ -24,6 +24,7 @@ def _navigation_plan(plan):
     goal = plan["goal"]["stage_id"]
     return {
         "mode": plan["mode"], "sequence": plan["sequence"], "starting_stages": plan["starting_stages"],
+        "master_level_stage_ids": plan["master_level_stage_ids"],
         "goal_stage": goal, "goal_as_item": plan["goal_as_item"], "access_items": access,
         "fixed_dash_completion_stage": plan["fixed_dash_completion_stage"],
         "fortress_phase_thresholds": plan["fortress"]["phase_thresholds"],
@@ -52,6 +53,16 @@ class UnifiedCampaign:
                 (self.plan["goal_as_item"] and any(item.item == STAGES[goal]["access_id"]
                                                   for item in received_items)))
 
+    def _unlock_access_items(self, received_items, revealed, unlocked):
+        plan = self.plan
+        masters = plan["master_level_stage_ids"]
+        for item in received_items:
+            key = plan["access_items"].get(str(item.item))
+            if key in masters or (key is not None and plan["mode"] == "Mission Access as Items"):
+                unlocked.add(key)
+                if key not in revealed:
+                    revealed.append(key)
+
     def snapshot(self, checked_locations, received_items):
         """Derive progression from server checks/items, including out-of-logic checks.
 
@@ -60,16 +71,12 @@ class UnifiedCampaign:
         """
         plan = self.plan
         sequence = plan["sequence"]
-        completed = {key for key in sequence if STAGES[key]["completion_id"] in checked_locations}
+        masters = plan["master_level_stage_ids"]
+        completed = {key for key in [*sequence, *masters] if STAGES[key]["completion_id"] in checked_locations}
         revealed = list(plan["starting_stages"])
         unlocked = set(revealed) | completed
+        self._unlock_access_items(received_items, revealed, unlocked)
         if plan["mode"] == "Mission Access as Items":
-            for item in received_items:
-                key = plan["access_items"].get(str(item.item))
-                if key is not None:
-                    unlocked.add(key)
-                    if key not in revealed:
-                        revealed.append(key)
             for key in sequence:
                 if key in completed and key not in revealed:
                     revealed.append(key)
@@ -87,14 +94,15 @@ class UnifiedCampaign:
             unlocked.add(goal)
         if goal and goal not in revealed:
             revealed.append(goal)  # Explicit goal identity is the locked-row exception.
-        order = (revealed + [key for key in sequence if key not in revealed]
-                 if plan["mode"] == "Mission Access as Items" else sequence)
+        order = (revealed + [key for key in [*sequence, *masters] if key not in revealed]
+                 if plan["mode"] == "Mission Access as Items" else [*sequence, *masters])
         rows = []
         for key in order:
             visible = key in revealed or key in completed
             stage = STAGES[key]
             rows.append({
                 "stage": key, "title": stage["name"] if visible else "???",
+                "variant": stage.get("variant", "mission"),
                 "map": stage["map"] if visible else "",
                 "revealed": visible, "unlocked": key in unlocked,
                 "completed": key in completed, "goal": key == goal,

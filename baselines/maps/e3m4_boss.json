@@ -107,11 +107,15 @@
     {
       "content_revision": "0.7.0",
       "reason": "0.7.0 CI audit: retain authorial Automap stations and secret resource checks; shared extra-life checks use their primary pickup."
+    },
+    {
+      "content_revision": "0.8.0",
+      "reason": "Arena completion checks with explicit catalog addresses."
     }
   ],
   "asset_package_contract_sha256": "c60492caddbdc3b60b521189e62c243e74e6aa46bc79ad47ef1cce44c7c1fdb2",
-  "content_revision": "0.7.0",
-  "manifest_sha256": "c89070d2467dadfe72fd32ec7f79293b1ab3b2a3748048b29992d41633e55c0b",
+  "content_revision": "0.8.0",
+  "manifest_sha256": "d91ccf11749d59b1ddf9aed7792eda512c0b6a043c69e77924ffa209530563f8",
   "map_key": "e3m4_boss",
   "physical_ap_ids": [
     7770412,
@@ -119,7 +123,15 @@
     7770415,
     7770416,
     7770417,
-    7770506
+    7770506,
+    7774201,
+    7774202,
+    7774203,
+    7774204,
+    7774205,
+    7774206,
+    7774207,
+    7774208
   ],
   "runtime_location_ids": [
     7770414

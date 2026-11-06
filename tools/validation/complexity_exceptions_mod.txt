@@ -176,7 +176,7 @@ doom_eap/launcher/resource_bank.py::select_resources 50 22
 doom_eap/launcher/sentinel_diagnostics.py::collect 22 19
 doom_eap/launcher/session_owner_app.py::main 30 20
 doom_eap/launcher/ui/app_window.py::LauncherUI._archipelago_activity_detail 18 13
-doom_eap/launcher/ui/app_window.py::LauncherUI._normalize_activity_event 17 17
+doom_eap/launcher/ui/app_window.py::LauncherUI._normalize_activity_event 14 15
 doom_eap/launcher/ui/app_window.py::LauncherUI._render_native_health 16 10
 doom_eap/launcher/ui/app_window.py::LauncherUI._request_dependency_consent 9 11
 doom_eap/launcher/ui/app_window.py::LauncherUI._room_option_value 18 11
@@ -236,7 +236,6 @@ doom_eap/runtime/killsanity.py::Killsanity.publish 7 11
 doom_eap/runtime/lifecycle.py::RuntimeLifecycle.classify_native_load 16 16
 doom_eap/runtime/location_setup.py::LocationSetup.consume 19 15
 doom_eap/runtime/materialization.py::authored_effects_allowed 1 11
-doom_eap/runtime/mission_presentation.py::MissionPresentations.__init__ 3 11
 doom_eap/runtime/mission_presentation.py::MissionPresentations.challenge_snapshot 6 14
 doom_eap/runtime/observer_lifecycle.py::_windows_process_running 19 11
 doom_eap/runtime/observer_lifecycle.py::windows_game_processes 19 13

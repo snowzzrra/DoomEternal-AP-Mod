@@ -80,10 +80,11 @@ class GoalProgress:
                 return "publish"
         return "pending"
 
-    def _diagnose(self, source, objective_ids, facts, admitted, admission_missing, decision):
-        missing = objective_ids - facts.checked
+    def _diagnose(self, source, objective_ids, facts, admitted, admission_missing, decision, threshold_ids, threshold):
+        missing = objective_ids - threshold_ids - facts.checked
+        count = len(threshold_ids & facts.checked)
         diagnostic = (objective_ids, missing, facts.checked_ready, facts.connected,
-                      admitted, tuple(admission_missing), self._sent, self._in_flight, decision)
+                      admitted, tuple(admission_missing), self._sent, self._in_flight, decision, count, threshold)
         self._diagnostic_count += 1
         now = monotonic()
         if diagnostic == self._diagnostic and now - self._diagnostic_time < 30:
@@ -91,10 +92,10 @@ class GoalProgress:
         self._logger.info(
             "[Goal] EVALUATION source=%s evaluations=%s checked_ready=%s connected=%s "
             "admitted=%s admission_missing=%s objective_count=%s objective_ids=%s "
-            "missing_count=%s missing=%s sent=%s in_flight=%s decision=%s",
+            "missing_count=%s missing=%s sent=%s in_flight=%s decision=%s threshold_count=%s threshold=%s",
             str(source)[:160], self._diagnostic_count, facts.checked_ready, facts.connected,
             admitted, list(admission_missing)[:32], len(objective_ids), sorted(objective_ids)[:32],
-            len(missing), sorted(missing)[:32], self._sent, self._in_flight, decision,
+            len(missing), sorted(missing)[:32], self._sent, self._in_flight, decision, count, threshold,
         )
         self._diagnostic, self._diagnostic_time, self._diagnostic_count = diagnostic, now, 0
 
@@ -110,22 +111,23 @@ class GoalProgress:
         return None
 
     async def evaluate(self, source_description, objective_ids, facts: CheckObservation, publication: CheckPublicationPort,
-                       *, admitted=True, admission_missing=()):
+                       *, admitted=True, admission_missing=(), threshold_ids=frozenset(), threshold=0):
         def diagnose(decision):
-            self._diagnose(source_description, objective_ids, facts, admitted, admission_missing, decision)
+            self._diagnose(source_description, objective_ids, facts, admitted, admission_missing, decision, threshold_ids, threshold)
 
         decision = self._publication_block(admitted, facts)
         if decision:
             diagnose(decision)
             return self._sent if admitted else False
         checked_locations = facts.checked
-        missing = frozenset(objective_ids - checked_locations)
-        pending = (bool(objective_ids), missing)
+        missing = frozenset(objective_ids - threshold_ids - checked_locations)
+        count = len(threshold_ids & checked_locations)
+        pending = (bool(objective_ids), missing, count, threshold)
         if pending != self._pending_objectives:
             self._pending_objectives = pending
             self._logger.info("[Goal] OBJECTIVES_OBSERVED contract_ready=%s missing=%s",
                               bool(objective_ids), sorted(missing))
-        if not objective_ids or missing:
+        if not objective_ids or missing or count < threshold:
             diagnose("missing_objectives" if objective_ids else "objectives_unavailable")
             return False
         if not facts.connected:

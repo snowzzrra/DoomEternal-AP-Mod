@@ -34,6 +34,11 @@ from .checkpoint import CheckpointPlan, CheckpointState, RecoveryState, recovery
 from .ui.strings import checkpoint_blocked
 
 
+def _death_policy_line(slot_data):
+    policy = slot_data.get("runtime", {}).get("difficulty", {}).get("death_policy", "normal")
+    return "death_policy=restart_stage\n" if policy == "restart_stage" else ""
+
+
 class SessionSupervisorError(RuntimeError):
     code = "session_supervisor_failed"
     failure_domain = "campaign_session"
@@ -570,16 +575,18 @@ class APSessionOwner:
                     raise ValueError('Invalid AP backup basename')
                 intent = "recover"
             difficulty = snapshot.slot_data["runtime"]["difficulty"]["engine"]
+            death_policy = _death_policy_line(snapshot.slot_data)
             if type(difficulty) is not int or not 0 <= difficulty <= 3:
                 raise ValueError('Room campaign difficulty is unsupported')
             descriptor = (f"sentinel-test-session-v3\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\nteam={snapshot.team}\nslot={snapshot.slot}\n"
                           f"generation_fingerprint={snapshot.slot_data['native_generation_fingerprint']}\n"
                           "slot_data_revision=0.7.0\nsession_mod_contract_revision=2\n"
                           f"provenance=synthetic-fixture\nroot={campaign_root}\ncampaign=unified\nstarting_stage=hub\n"
-                          f"difficulty={difficulty}\nintent={intent}\n")
+                          f"difficulty={difficulty}\n{death_policy}intent={intent}\n")
             if intent in {"resume", "recover"}:
                 expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
-                            f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty={difficulty}\nslot=AUTOSAVE0\n")
+                            f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\n"
+                            f"difficulty={difficulty}\n{death_policy}slot=AUTOSAVE0\n")
                 if contract.read_bytes() != expected.encode("utf-8"):
                     raise RuntimeError('AP campaign identity or immutable options differ from this room')
             self.state_dir.mkdir(parents=True, exist_ok=True)
@@ -731,7 +738,8 @@ class APSessionOwner:
                 paths[name] = {"status": "not_configured", "path": None}
         expected = (f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={snapshot.slot_data['native_generation_fingerprint']}\n"
                     f"provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\n"
-                    f"difficulty={snapshot.slot_data['runtime']['difficulty']['engine']}\nslot=AUTOSAVE0\n").encode()
+                    f"difficulty={snapshot.slot_data['runtime']['difficulty']['engine']}\n"
+                    f"{_death_policy_line(snapshot.slot_data)}slot=AUTOSAVE0\n").encode()
         _inspect_campaign_metadata(directory, paths, expected)
         statuses = {item["status"] for item in paths.values()}
         metadata = [paths[name]["status"] == "present" for name in ("campaign.contract", "campaign.checkpoint")]

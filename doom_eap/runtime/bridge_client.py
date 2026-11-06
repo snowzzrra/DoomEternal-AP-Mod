@@ -2199,7 +2199,9 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output(f"logs={BRIDGE_LOG_DIR}")
 
 
-GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABILITIES, GOAL_ENDPOINT_LOCATION_IDS, GOAL_REQUIREMENT_SUFFIXES)
+GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABILITIES,
+                        GOAL_ENDPOINT_LOCATION_IDS, GOAL_REQUIREMENT_SUFFIXES,
+                        (stage for stage in STAGES.values() if stage["kind"] == "master"))
 
 
 def _remove_acknowledged_event(path):
@@ -3476,6 +3478,7 @@ class DoomEternalContext(CommonContext):
     async def checkpoint_recovery_ready(self, link=None):
         try:
             link = link or await self._native_game_link_async()
+            await self.synchronize_stage_restart(link)
             recovery = await self._blocking_native_worker().call(
                 save_files.read_checkpoint_recovery, config, link._process_identity, link.namespace,
                 process=link._process_identity)
@@ -3494,6 +3497,26 @@ class DoomEternalContext(CommonContext):
             self.save_observer.invalidate_proof()
             return False
         return True
+
+    async def synchronize_stage_restart(self, link):
+        data = getattr(self, "_connected_slot_data", None) or {}
+        if data.get("runtime", {}).get("difficulty", {}).get("death_policy") != "restart_stage":
+            return
+        from doom_eap.runtime.stage_restart import activity_events
+
+        current = await self._blocking_native_worker().call(
+            save_files.read_stage_restart, config, link._process_identity, link.namespace,
+            process=link._process_identity)
+        identity = (link._process_identity, link.namespace)
+        prior_identity, previous = getattr(self, "_stage_restart_activity", (None, None))
+        previous = previous if prior_identity == identity else None
+        stage = next((row["title"] for row in self.campaign_projection()["rows"]
+                      if current and STAGES[row["stage"]]["access_id"] == current["stage_id"]), player_text("stage_restart", "stage"))
+        for event in activity_events(previous, current, stage):
+            logger.info("[Campaign] Restart %s: %s", event["status"], stage)
+            emit_launcher_event("stage_restart", **event)
+        if current is not None:
+            self._stage_restart_activity = identity, current
 
     async def _admitted_campaign_root(self):
         try:
@@ -3546,24 +3569,24 @@ class DoomEternalContext(CommonContext):
             generation = self._connected_slot_data["native_generation_fingerprint"]
             projection["summaries"] = {
                 row["stage"]: self._mission_presentations.snapshot(
-                    link.namespace, generation, row["map"], revealed=row["revealed"], facts=facts, pending=pending)
+                    link.namespace, generation, row["stage"], revealed=row["revealed"], facts=facts, pending=pending)
                 for row in projection["rows"]
             }
             placements = {entry["location_id"]: entry for entry in resolve_placement_records(
                 self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot
             )}
             projection["hub_summary"] = self._mission_presentations.snapshot(
-                link.namespace, generation, projection["hub_map"], revealed=True, facts=facts, pending=pending)
+                link.namespace, generation, "hub", revealed=True, facts=facts, pending=pending)
             projection["challenge_rewards"] = {
                 row["stage"]: self._mission_presentations.challenge_snapshot(
-                    link.namespace, generation, row["map"], revealed=row["revealed"], facts=facts,
+                    link.namespace, generation, row["stage"], revealed=row["revealed"], facts=facts,
                     placements=placements, aggregates=ALL_MISSION_CHALLENGES_ENTRIES)
                 for row in projection["rows"]
             }
             projection["masteries"] = self._mission_presentations.mastery_snapshot(
                 facts, placements, WEAPON_MASTERY_ENTRIES)
             projection['encounter_rewards'] = {row['stage']: self._mission_presentations.encounter_snapshot(
-                row['map'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
+                row['stage'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
                 for row in projection['rows']}
             ratings = {key: {"skull_tier": row["skulls"]} for key, row in
                        self._connected_slot_data.get("stage_profiles", {}).items()}
@@ -4958,11 +4981,14 @@ class DoomEternalContext(CommonContext):
             if key != campaign.plan["goal_stage"] and STAGES[key]["completion_id"] not in self.checked_locations
         ) if campaign else ()
         observation = DoomEternalContext.check_observation(self)
+        slot_data = getattr(self, "_connected_slot_data", {})
+        threshold_ids, threshold = GOAL_POLICY.threshold(slot_data)
         return await self.goals.evaluate(
             source_description,
-            GOAL_POLICY.objective_ids(getattr(self, "_connected_slot_data", {}), observation.server_locations),
+            GOAL_POLICY.objective_ids(slot_data, observation.server_locations),
             observation, DoomEternalContext.check_publication(self),
             admitted=admitted, admission_missing=admission_missing,
+            threshold_ids=threshold_ids, threshold=threshold,
         )
 
     async def execute_publisher(self, publisher, trigger_strategy, source_description):

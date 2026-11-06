@@ -207,7 +207,9 @@ def test_required_room_message_comes_from_packaged_metadata(resolved_room, tmp_p
 def test_packaged_schema_accepts_resolved_rooms_and_rejects_legacy():
     assert registry.slot_schema_version() == 7
     fixture = Path(__file__).parent / "fixtures"
-    room = json.loads((fixture / "resolved_room_slot_data.json").read_text())
+    from tests.room_fixture import current_room_fixture
+
+    room = current_room_fixture()
     assert registry.validate_slot_contract(room) == room
     with pytest.raises(registry.SlotAdmissionError) as caught:
         registry.validate_slot_contract(json.loads((fixture / "full_campaign_slot_data.json").read_text()))

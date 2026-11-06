@@ -82,7 +82,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
     # new-game/checkpoint layers, including World Spear's early mission setup.
     from doom_eap.content.content_catalog import load_content_catalog
     from doom_eap.content.campaign_stages import campaign_stages
-    stages = campaign_stages(load_content_catalog(SOURCES.parents[1]))
+    stages = campaign_stages(load_content_catalog(SOURCES.parents[1]), include_master_levels=False)
     authored = {}
     for key in ("missionlist", "missionlist_dlc1", "missionlist_dlc2"):
         for entry in _entries(_source(key, manifest)):

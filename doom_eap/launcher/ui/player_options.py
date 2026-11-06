@@ -188,6 +188,7 @@ class PlayerOptions:
             "hurt_me_plenty": "hurtmeplenty",
             "ultra_violence": "ultraviolence",
             "nightmare": "nightmare",
+            "ultra_nightmare": "nightmare",
         }.get(key)
         if name is None:
             self.view.difficulty_skull.clear()
