@@ -33,8 +33,20 @@ private:
     void Detach();
     DWORD FindGameProcess() const;
     bool FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) const;
+    bool ReadDosHeader(uintptr_t& ntHeaderAddress) const;
+    bool ScanSignatureRegion(uintptr_t regionStart, uintptr_t regionEnd, uintptr_t& matchAddress, size_t& matchCount) const;
+    struct PlayerObservation {
+        unsigned char gameWasPaused = 0, hideReticle = 0, hideHudForCinematic = 0;
+        bool available = false;
+        std::string status;
+    };
+    bool ReadGlobalState(std::string& state, unsigned char& isLoading, unsigned char& isInGame, int32_t& cutsceneId) const;
+    void ReadPlayerState(PlayerObservation& sample) const;
+    static std::string FormatMemoryState(const PlayerObservation& sample, unsigned char isLoading, unsigned char isInGame, int32_t cutsceneId, bool cutsceneActive, bool gameplayLoaded, bool safeCandidate, bool mapEntitySafe);
     bool ReadPeHeaders(DWORD& sizeOfImage, DWORD& peTimestamp, DWORD& entryPoint) const;
     const GameBuildProfile* DetectBuildProfile(DWORD sizeOfImage, DWORD peTimestamp, DWORD entryPoint) const;
+    bool ResolveGameSystemMatch(uintptr_t matchAddress, uintptr_t imageEnd, uintptr_t& address) const;
+    void ReadPlayerFlags(uintptr_t player, PlayerObservation& sample) const;
     bool FindIdGameSystemLocal(uintptr_t& address) const;
     bool ReadState(std::string& state, bool& safeForRpc, bool& mapEntitySafe);
     void Report(const std::string& state);

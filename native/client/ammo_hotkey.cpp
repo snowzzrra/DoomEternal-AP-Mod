@@ -53,48 +53,40 @@ std::string AmmoHotkeyHandler::CanonicalToken(const std::string& input) {
     return upper;
 }
 
+
+namespace {
+int FunctionVirtualKey(const std::string& token) {
+    int number = 0;
+    for (size_t i = 1; i < token.size(); ++i) {
+        if (token[i] < '0' || token[i] > '9' || number > 12) return 0;
+        number = number * 10 + token[i] - '0';
+    }
+    return number >= 1 && number <= 12 ? VK_F1 + number - 1 : 0;
+}
+
+int NamedVirtualKey(const std::string& token) {
+    static const std::pair<const char*, int> keys[] = {
+        {"SPACE", VK_SPACE}, {"TAB", VK_TAB}, {"BACKSPACE", VK_BACK},
+        {"INSERT", VK_INSERT}, {"DELETE", VK_DELETE}, {"HOME", VK_HOME},
+        {"END", VK_END}, {"PAGEUP", VK_PRIOR}, {"PAGEDOWN", VK_NEXT},
+        {"UP", VK_UP}, {"DOWN", VK_DOWN}, {"LEFT", VK_LEFT}, {"RIGHT", VK_RIGHT},
+    };
+    for (const auto& key : keys) if (token == key.first) return key.second;
+    return 0;
+}
+}
+
 int AmmoHotkeyHandler::TokenToVirtualKey(const std::string& token) {
     const std::string canonical = CanonicalToken(token);
-    if (canonical == "UNBOUND") {
-        return 0;
-    }
-
-    // function keys f1..f12
+    if (canonical == "UNBOUND") return 0;
     if (canonical.size() >= 2 && canonical.size() <= 15 && canonical[0] == 'F') {
-        int num = 0;
-        for (size_t i = 1; i < canonical.size(); ++i) {
-            if (canonical[i] < '0' || canonical[i] > '9' || num > 12) return 0;
-            num = num * 10 + canonical[i] - '0';
-        }
-        if (num >= 1 && num <= 12) return VK_F1 + num - 1;
+        return FunctionVirtualKey(canonical);
     }
-
-    // letters a..z
-    if (canonical.size() == 1 && canonical[0] >= 'A' && canonical[0] <= 'Z') {
-        return static_cast<int>(canonical[0]);
+    if (canonical.size() == 1) {
+        if (canonical[0] >= 'A' && canonical[0] <= 'Z') return static_cast<int>(canonical[0]);
+        if (canonical[0] >= '0' && canonical[0] <= '9') return static_cast<int>(canonical[0]);
     }
-
-    // digits 0..9
-    if (canonical.size() == 1 && canonical[0] >= '0' && canonical[0] <= '9') {
-        return static_cast<int>(canonical[0]);
-    }
-
-    // common named keys
-    if (canonical == "SPACE") return VK_SPACE;
-    if (canonical == "TAB") return VK_TAB;
-    if (canonical == "BACKSPACE") return VK_BACK;
-    if (canonical == "INSERT") return VK_INSERT;
-    if (canonical == "DELETE") return VK_DELETE;
-    if (canonical == "HOME") return VK_HOME;
-    if (canonical == "END") return VK_END;
-    if (canonical == "PAGEUP") return VK_PRIOR;
-    if (canonical == "PAGEDOWN") return VK_NEXT;
-    if (canonical == "UP") return VK_UP;
-    if (canonical == "DOWN") return VK_DOWN;
-    if (canonical == "LEFT") return VK_LEFT;
-    if (canonical == "RIGHT") return VK_RIGHT;
-
-    return 0;
+    return NamedVirtualKey(canonical);
 }
 
 bool AmmoHotkeyHandler::IsDoomForeground(DWORD doomPid) {
@@ -110,6 +102,24 @@ bool AmmoHotkeyHandler::IsDoomForeground(DWORD doomPid) {
     return foregroundPid == doomPid;
 }
 
+static std::string ReadHotkeyToken(const std::string& path) {
+    std::ifstream file(path, std::ios::binary);
+    char bytes[128]{};
+    std::string newToken = "UNBOUND";
+    if (file && file.read(bytes, sizeof(bytes) - 1).eof() &&
+        std::find(bytes, bytes + file.gcount(), '\0') == bytes + file.gcount()) {
+        std::istringstream stream(std::string(bytes, static_cast<size_t>(file.gcount())));
+        std::string first, second, extra;
+        if (stream >> first) {
+            if (!(stream >> second)) newToken = AmmoHotkeyHandler::CanonicalToken(first);
+            else if (first == "AP_AMMO_REFILL_HOTKEY_V1" && !(stream >> extra))
+                newToken = AmmoHotkeyHandler::CanonicalToken(second);
+        }
+    }
+
+    return newToken;
+}
+
 void AmmoHotkeyHandler::CheckConfigFile() {
     WIN32_FILE_ATTRIBUTE_DATA attr = {};
     const BOOL exists = GetFileAttributesExA(
@@ -119,17 +129,7 @@ void AmmoHotkeyHandler::CheckConfigFile() {
     );
 
     if (!exists) {
-        if (fileExisted_) {
-            fileExisted_ = false;
-            token_ = "UNBOUND";
-            vk_ = 0;
-            wasDown_ = false;
-            latched_ = false;
-            releaseStartTick_ = 0;
-            if (log_) {
-                log_("AMMO_HOTKEY_CONFIG token=UNBOUND state=disabled");
-            }
-        }
+        DisableMissingConfig();
         return;
     }
 
@@ -143,20 +143,7 @@ void AmmoHotkeyHandler::CheckConfigFile() {
     fileExisted_ = true;
     lastWriteTime_ = attr.ftLastWriteTime;
 
-    std::ifstream file(stateFilePath_, std::ios::binary);
-    char bytes[128]{};
-    std::string newToken = "UNBOUND";
-    if (file && file.read(bytes, sizeof(bytes) - 1).eof() &&
-        std::find(bytes, bytes + file.gcount(), '\0') == bytes + file.gcount()) {
-        std::istringstream stream(std::string(bytes, static_cast<size_t>(file.gcount())));
-        std::string first, second, extra;
-        if (stream >> first) {
-            if (!(stream >> second)) newToken = CanonicalToken(first);
-            else if (first == "AP_AMMO_REFILL_HOTKEY_V1" && !(stream >> extra))
-                newToken = CanonicalToken(second);
-        }
-    }
-
+    const std::string newToken = ReadHotkeyToken(stateFilePath_);
     const int newVk = TokenToVirtualKey(newToken);
     if (newToken != token_ || newVk != vk_) {
         token_ = newToken;
@@ -164,19 +151,18 @@ void AmmoHotkeyHandler::CheckConfigFile() {
         wasDown_ = false;
         latched_ = true;
         releaseStartTick_ = 0;
-        if (log_) {
-            if (vk_ != 0) {
-                log_(
-                    "AMMO_HOTKEY_CONFIG path=" + stateFilePath_
-                    + " token=" + token_
-                    + " vk=" + HexVk(vk_)
-                    + " state=loaded"
-                );
-            } else {
-                log_("AMMO_HOTKEY_CONFIG token=" + (token_.empty() ? "UNBOUND" : token_) + " state=disabled");
-            }
-        }
+        LogConfiguration();
     }
+}
+
+
+static std::string RefillRefusal(bool foreground, bool session, bool rpcReady, bool armed, bool safe) {
+    if (!foreground) return "game_not_foreground";
+    if (!session) return "session_unavailable";
+    if (!rpcReady) return "rpc_unavailable";
+    if (!armed) return "rpc_disarmed";
+    if (!safe) return "unsafe_gameplay";
+    return {};
 }
 
 void AmmoHotkeyHandler::Poll(
@@ -186,7 +172,6 @@ void AmmoHotkeyHandler::Poll(
     bool rpcArmed,
     bool safeForRpc,
     ExecuteCommandFunction executeConsoleCommand,
-    int rpcLastResult,
     int rpcLastTransportStatus
 ) {
     const DWORD now = GetTickCount();
@@ -206,6 +191,61 @@ void AmmoHotkeyHandler::Poll(
     const bool isDown = (keyState & 0x8000) != 0;
 
     if (latched_) {
+        UpdateLatch(now, isDown);
+        return;
+    }
+
+    const bool risingEdge = isDown && !wasDown_;
+    wasDown_ = isDown;
+
+    if (!risingEdge) {
+        return;
+    }
+
+    const bool foreground = IsDoomForeground(doomPid);
+    LogPress(foreground, sessionActive, rpcTransportReady, rpcArmed, safeForRpc);
+
+    latched_ = true;
+    releaseStartTick_ = 0;
+
+    const std::string reason = RefillRefusal(foreground, sessionActive, rpcTransportReady, rpcArmed, safeForRpc);
+    if (reason.empty()) {
+        ExecuteRefill(executeConsoleCommand, rpcLastTransportStatus);
+    } else if (log_) {
+        log_("AMMO_HOTKEY_REFUSED key=" + token_ + " reason=" + reason);
+    }
+}
+
+void AmmoHotkeyHandler::LogConfiguration() {
+        if (log_) {
+            if (vk_ != 0) {
+                log_(
+                    "AMMO_HOTKEY_CONFIG path=" + stateFilePath_
+                    + " token=" + token_
+                    + " vk=" + HexVk(vk_)
+                    + " state=loaded"
+                );
+            } else {
+                log_("AMMO_HOTKEY_CONFIG token=" + (token_.empty() ? "UNBOUND" : token_) + " state=disabled");
+            }
+        }
+}
+
+void AmmoHotkeyHandler::DisableMissingConfig() {
+        if (fileExisted_) {
+            fileExisted_ = false;
+            token_ = "UNBOUND";
+            vk_ = 0;
+            wasDown_ = false;
+            latched_ = false;
+            releaseStartTick_ = 0;
+            if (log_) {
+                log_("AMMO_HOTKEY_CONFIG token=UNBOUND state=disabled");
+            }
+        }
+}
+
+void AmmoHotkeyHandler::UpdateLatch(DWORD now, bool isDown) {
         wasDown_ = isDown;
         if (isDown) {
             releaseStartTick_ = 0;
@@ -222,36 +262,9 @@ void AmmoHotkeyHandler::Poll(
         releaseStartTick_ = 0;
         wasDown_ = false;
         return;
-    }
+}
 
-    const bool risingEdge = isDown && !wasDown_;
-    wasDown_ = isDown;
-
-    if (!risingEdge) {
-        return;
-    }
-
-    const bool foreground = IsDoomForeground(doomPid);
-    const bool session = sessionActive;
-    const bool rpcReady = rpcTransportReady;
-    const bool armed = rpcArmed;
-    const bool safe = safeForRpc;
-
-    if (log_) {
-        log_(
-            "AMMO_HOTKEY_PRESS key=" + token_
-            + " foreground=" + (foreground ? "true" : "false")
-            + " session=" + (session ? "true" : "false")
-            + " rpc_ready=" + (rpcReady ? "true" : "false")
-            + " rpc_armed=" + (rpcArmed ? "true" : "false")
-            + " safe=" + (safe ? "true" : "false")
-        );
-    }
-
-    latched_ = true;
-    releaseStartTick_ = 0;
-
-    if (foreground && session && rpcReady && armed && safe) {
+void AmmoHotkeyHandler::ExecuteRefill(ExecuteCommandFunction executeConsoleCommand, int rpcLastTransportStatus) {
         const std::string command = "condump AP_REFILL_REQUEST.txt";
         const bool success = executeConsoleCommand(command);
         if (log_) {
@@ -262,23 +275,15 @@ void AmmoHotkeyHandler::Poll(
                 + " transport_status=" + std::to_string(rpcLastTransportStatus)
             );
         }
-    } else {
-        std::string reason;
-        if (!foreground) {
-            reason = "game_not_foreground";
-        } else if (!session) {
-            reason = "session_unavailable";
-        } else if (!rpcReady) {
-            reason = "rpc_unavailable";
-        } else if (!armed) {
-            reason = "rpc_disarmed";
-        } else if (!safe) {
-            reason = "unsafe_gameplay";
-        } else {
-            reason = "rejected";
-        }
-        if (log_) {
-            log_("AMMO_HOTKEY_REFUSED key=" + token_ + " reason=" + reason);
-        }
+}
+
+void AmmoHotkeyHandler::LogPress(bool foreground, bool session, bool rpcReady, bool armed, bool safe) {
+    if (log_) {
+        log_("AMMO_HOTKEY_PRESS key=" + token_
+            + " foreground=" + (foreground ? "true" : "false")
+            + " session=" + (session ? "true" : "false")
+            + " rpc_ready=" + (rpcReady ? "true" : "false")
+            + " rpc_armed=" + (armed ? "true" : "false")
+            + " safe=" + (safe ? "true" : "false"));
     }
 }

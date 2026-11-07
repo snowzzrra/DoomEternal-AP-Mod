@@ -18,7 +18,6 @@ public:
         bool rpcArmed,
         bool safeForRpc,
         ExecuteCommandFunction executeConsoleCommand,
-        int rpcLastResult = 0,
         int rpcLastTransportStatus = 0
     );
 
@@ -32,6 +31,11 @@ public:
 
 private:
     void CheckConfigFile();
+    void DisableMissingConfig();
+    void LogConfiguration();
+    void UpdateLatch(DWORD now, bool isDown);
+    void LogPress(bool foreground, bool session, bool rpcReady, bool armed, bool safe);
+    void ExecuteRefill(ExecuteCommandFunction executeConsoleCommand, int rpcLastTransportStatus);
 
     LogFunction log_;
     std::string stateFilePath_;

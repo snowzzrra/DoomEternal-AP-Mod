@@ -153,14 +153,7 @@ bool GameStateProbe::FindGameModule(uintptr_t& baseAddress, DWORD& imageSize) co
     return found;
 }
 
-bool GameStateProbe::ReadPeHeaders(
-    DWORD& sizeOfImage,
-    DWORD& peTimestamp,
-    DWORD& entryPoint
-) const {
-    sizeOfImage = 0;
-    peTimestamp = 0;
-    entryPoint = 0;
+bool GameStateProbe::ReadDosHeader(uintptr_t& ntHeaderAddress) const {
     if (!process_ || !moduleBase_) {
         return false;
     }
@@ -173,7 +166,20 @@ bool GameStateProbe::ReadPeHeaders(
         return false;
     }
 
-    const uintptr_t ntHeaderAddress = moduleBase_ + static_cast<uintptr_t>(dos.e_lfanew);
+    ntHeaderAddress = moduleBase_ + static_cast<uintptr_t>(dos.e_lfanew);
+    return true;
+}
+
+bool GameStateProbe::ReadPeHeaders(
+    DWORD& sizeOfImage,
+    DWORD& peTimestamp,
+    DWORD& entryPoint
+) const {
+    sizeOfImage = 0;
+    peTimestamp = 0;
+    entryPoint = 0;
+    uintptr_t ntHeaderAddress = 0;
+    if (!ReadDosHeader(ntHeaderAddress)) return false;
     DWORD ntSignature = 0;
     if (!Read(ntHeaderAddress, ntSignature) || ntSignature != IMAGE_NT_SIGNATURE) {
         return false;
@@ -221,6 +227,59 @@ const GameBuildProfile* GameStateProbe::DetectBuildProfile(
     return nullptr;
 }
 
+static bool CountSignatureMatches(const std::vector<unsigned char>& buffer, SIZE_T bytesRead, uintptr_t chunkStart, uintptr_t& matchAddress, size_t& matchCount) {
+                    for (SIZE_T index = 0;
+                         index + sizeof(kGameSystemSignature) <= bytesRead;
+                         ++index) {
+                        if (MatchesSignature(buffer.data() + index)) {
+                            matchAddress = chunkStart + index;
+                            ++matchCount;
+                            if (matchCount > 1) {
+                                return false;
+                            }
+                        }
+                    }
+    return true;
+}
+
+bool GameStateProbe::ScanSignatureRegion(uintptr_t regionStart, uintptr_t regionEnd, uintptr_t& matchAddress, size_t& matchCount) const {
+            uintptr_t chunkStart = regionStart;
+            while (chunkStart < regionEnd) {
+                const SIZE_T remaining = regionEnd - chunkStart;
+                const SIZE_T chunkSize = std::min(kScanChunkSize, remaining);
+                std::vector<unsigned char> buffer(chunkSize);
+                SIZE_T bytesRead = 0;
+                if (ReadProcessMemory(
+                        process_,
+                        reinterpret_cast<const void*>(chunkStart),
+                        buffer.data(),
+                        chunkSize,
+                        &bytesRead
+                    ) && bytesRead >= sizeof(kGameSystemSignature)) {
+                    if (!CountSignatureMatches(buffer, bytesRead, chunkStart, matchAddress, matchCount)) return false;
+                }
+
+                if (chunkSize == remaining) {
+                    break;
+                }
+                chunkStart += chunkSize - (sizeof(kGameSystemSignature) - 1);
+            }
+    return true;
+}
+
+bool GameStateProbe::ResolveGameSystemMatch(uintptr_t matchAddress, uintptr_t imageEnd, uintptr_t& address) const {
+    int32_t displacement = 0;
+    if (!Read(matchAddress + 3, displacement)) {
+        return false;
+    }
+    const uintptr_t resolved = matchAddress + 7 + static_cast<intptr_t>(displacement);
+    if (resolved < moduleBase_ || resolved >= imageEnd) {
+        return false;
+    }
+    address = resolved;
+    return true;
+}
+
 bool GameStateProbe::FindIdGameSystemLocal(uintptr_t& address) const {
     const uintptr_t imageEnd = moduleBase_ + moduleSize_;
     uintptr_t cursor = moduleBase_;
@@ -248,37 +307,7 @@ bool GameStateProbe::FindIdGameSystemLocal(uintptr_t& address) const {
         );
 
         if (memory.State == MEM_COMMIT && IsReadableProtection(memory.Protect)) {
-            uintptr_t chunkStart = regionStart;
-            while (chunkStart < regionEnd) {
-                const SIZE_T remaining = regionEnd - chunkStart;
-                const SIZE_T chunkSize = std::min(kScanChunkSize, remaining);
-                std::vector<unsigned char> buffer(chunkSize);
-                SIZE_T bytesRead = 0;
-                if (ReadProcessMemory(
-                        process_,
-                        reinterpret_cast<const void*>(chunkStart),
-                        buffer.data(),
-                        chunkSize,
-                        &bytesRead
-                    ) && bytesRead >= sizeof(kGameSystemSignature)) {
-                    for (SIZE_T index = 0;
-                         index + sizeof(kGameSystemSignature) <= bytesRead;
-                         ++index) {
-                        if (MatchesSignature(buffer.data() + index)) {
-                            matchAddress = chunkStart + index;
-                            ++matchCount;
-                            if (matchCount > 1) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-
-                if (chunkSize == remaining) {
-                    break;
-                }
-                chunkStart += chunkSize - (sizeof(kGameSystemSignature) - 1);
-            }
+            if (!ScanSignatureRegion(regionStart, regionEnd, matchAddress, matchCount)) return false;
         }
 
         if (regionEnd <= cursor) {
@@ -291,16 +320,7 @@ bool GameStateProbe::FindIdGameSystemLocal(uintptr_t& address) const {
         return false;
     }
 
-    int32_t displacement = 0;
-    if (!Read(matchAddress + 3, displacement)) {
-        return false;
-    }
-    const uintptr_t resolved = matchAddress + 7 + static_cast<intptr_t>(displacement);
-    if (resolved < moduleBase_ || resolved >= imageEnd) {
-        return false;
-    }
-    address = resolved;
-    return true;
+    return ResolveGameSystemMatch(matchAddress, imageEnd, address);
 }
 
 bool GameStateProbe::Attach(DWORD processId) {
@@ -373,20 +393,7 @@ void GameStateProbe::Detach() {
     consecutiveReadFailures_ = 0;
 }
 
-bool GameStateProbe::ReadState(
-    std::string& state,
-    bool& safeForRpc,
-    bool& mapEntitySafe
-) {
-    safeForRpc = false;
-    mapEntitySafe = false;
-    if (!activeProfile_) {
-        state = "Memory state unavailable: no active build profile.";
-        return false;
-    }
-    unsigned char isLoading = 0;
-    unsigned char isInGame = 0;
-    int32_t cutsceneId = 0;
+bool GameStateProbe::ReadGlobalState(std::string& state, unsigned char& isLoading, unsigned char& isInGame, int32_t& cutsceneId) const {
     DWORD winErr = 0;
     if (!Read(moduleBase_ + activeProfile_->isLoadingRva, isLoading, &winErr)) {
         state = "Memory state unavailable: global read failed field=isLoading winerr="
@@ -412,69 +419,89 @@ bool GameStateProbe::ReadState(
         return false;
     }
 
+    return true;
+}
 
+void GameStateProbe::ReadPlayerFlags(uintptr_t player, PlayerObservation& sample) const {
+    if (!Read(player + kGameWasPausedOffset, sample.gameWasPaused)
+                || !Read(player + kHideReticleOffset, sample.hideReticle)
+                || !Read(player + kHideHudForCinematicOffset, sample.hideHudForCinematic)) {
+            sample.status = "flags_read_failed";
+        } else if (sample.gameWasPaused > 1 || sample.hideReticle > 1 || sample.hideHudForCinematic > 1) {
+            sample.status = "flags_unexpected";
+        } else {
+            sample.available = true;
+            sample.status = "available";
+        }
+}
+
+void GameStateProbe::ReadPlayerState(PlayerObservation& sample) const {
     uintptr_t mapInstance = 0;
     uintptr_t player = 0;
-    unsigned char gameWasPaused = 0;
-    unsigned char hideReticle = 0;
-    unsigned char hideHudForCinematic = 0;
-    std::string playerState;
-    bool playerAvailable = false;
 
     if (!Read(idGameSystemLocal_ + kMapInstanceOffset, mapInstance)) {
-        playerState = "map_read_failed";
+        sample.status = "map_read_failed";
     } else if (!IsPlausiblePointer(mapInstance)) {
-        playerState = mapInstance == 0 ? "map_null" : "map_invalid";
+        sample.status = mapInstance == 0 ? "map_null" : "map_invalid";
     } else {
         if (!Read(mapInstance + kPlayerOffset, player)) {
-            playerState = "player_read_failed";
+            sample.status = "player_read_failed";
         } else if (!IsPlausiblePointer(player)) {
-            playerState = player == 0 ? "player_null" : "player_invalid";
-        } else if (!Read(player + kGameWasPausedOffset, gameWasPaused)
-                || !Read(player + kHideReticleOffset, hideReticle)
-                || !Read(player + kHideHudForCinematicOffset, hideHudForCinematic)) {
-            playerState = "flags_read_failed";
-        } else if (gameWasPaused > 1 || hideReticle > 1 || hideHudForCinematic > 1) {
-            playerState = "flags_unexpected";
+            sample.status = player == 0 ? "player_null" : "player_invalid";
         } else {
-            playerAvailable = true;
-            playerState = "available";
+            ReadPlayerFlags(player, sample);
         }
     }
+}
 
-    const bool cutsceneActive = cutsceneId > 1;
-    const bool gameplayLoaded = playerAvailable
-        && !isLoading
-        && isInGame;
-    loading_ = isLoading != 0;
-    const bool safeCandidate = playerAvailable
-        && !isLoading
-        && isInGame
-        && !cutsceneActive
-        && !gameWasPaused
-        && !hideReticle
-        && !hideHudForCinematic;
-    safeForRpc = safeCandidate;
-    mapEntitySafe = gameplayLoaded && !cutsceneActive;
-    gameplayLoaded_ = gameplayLoaded;
-
-    state = std::string("Memory state: gameplay_loaded=")
+std::string GameStateProbe::FormatMemoryState(
+    const PlayerObservation& sample,
+    unsigned char isLoading,
+    unsigned char isInGame,
+    int32_t cutsceneId,
+    bool cutsceneActive,
+    bool gameplayLoaded,
+    bool safeCandidate,
+    bool mapEntitySafe
+) {
+    std::string state = std::string("Memory state: gameplay_loaded=")
         + (gameplayLoaded ? "YES" : "NO")
-        + " safe_candidate="
-        + (safeCandidate ? "YES" : "NO")
-        + " map_entity_safe="
-        + (mapEntitySafe ? "YES" : "NO")
+        + " safe_candidate=" + (safeCandidate ? "YES" : "NO")
+        + " map_entity_safe=" + (mapEntitySafe ? "YES" : "NO")
         + " isLoading=" + BoolText(isLoading)
         + " isInGame=" + BoolText(isInGame)
         + " cutsceneID=" + std::to_string(cutsceneId)
         + " cutscene_active=" + (cutsceneActive ? "1" : "0")
-        + " player=" + playerState;
-    if (playerAvailable) {
-        state += " gameWasPaused=" + std::string(BoolText(gameWasPaused))
-            + " hideReticle=" + BoolText(hideReticle)
-            + " hideHudForCinematic=" + BoolText(hideHudForCinematic);
+        + " player=" + sample.status;
+    if (sample.available) {
+        state += " gameWasPaused=" + std::string(BoolText(sample.gameWasPaused))
+            + " hideReticle=" + BoolText(sample.hideReticle)
+            + " hideHudForCinematic=" + BoolText(sample.hideHudForCinematic);
     }
-    state += ".";
+    return state + ".";
+}
+
+bool GameStateProbe::ReadState(std::string& state, bool& safeForRpc, bool& mapEntitySafe) {
+    safeForRpc = false;
+    mapEntitySafe = false;
+    if (!activeProfile_) {
+        state = "Memory state unavailable: no active build profile.";
+        return false;
+    }
+    unsigned char isLoading = 0;
+    unsigned char isInGame = 0;
+    int32_t cutsceneId = 0;
+    if (!ReadGlobalState(state, isLoading, isInGame, cutsceneId)) return false;
+    PlayerObservation sample;
+    ReadPlayerState(sample);
+    const bool cutsceneActive = cutsceneId > 1;
+    gameplayLoaded_ = sample.available && !isLoading && isInGame;
+    loading_ = isLoading != 0;
+    safeForRpc = gameplayLoaded_ && !cutsceneActive && !sample.gameWasPaused
+        && !sample.hideReticle && !sample.hideHudForCinematic;
+    mapEntitySafe = gameplayLoaded_ && !cutsceneActive;
+    state = FormatMemoryState(sample, isLoading, isInGame, cutsceneId, cutsceneActive,
+                              gameplayLoaded_, safeForRpc, mapEntitySafe);
     return true;
 }
 
@@ -495,13 +522,9 @@ bool GameStateProbe::IsLoading() const {
 }
 
 void GameStateProbe::Report(const std::string& state) {
-    if (state == lastReport_) {
-        return;
-    }
+    if (state == lastReport_) return;
     lastReport_ = state;
-    if (log_) {
-        log_(state);
-    }
+    if (log_) log_(state);
 }
 
 void GameStateProbe::Poll() {

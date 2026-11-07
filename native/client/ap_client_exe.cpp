@@ -18,6 +18,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -119,43 +120,15 @@ std::string JsonUnescape(const std::string& value) {
     bool escaped = false;
     for (char character : value) {
         if (!escaped) {
-            if (character == '\\') {
-                escaped = true;
-            } else {
-                result.push_back(character);
-            }
+            if (character == '\\') escaped = true;
+            else result.push_back(character);
             continue;
         }
-
-        switch (character) {
-            case '\\':
-            case '"':
-            case '/':
-                result.push_back(character);
-                break;
-            case 'b':
-                result.push_back('\b');
-                break;
-            case 'f':
-                result.push_back('\f');
-                break;
-            case 'n':
-                result.push_back('\n');
-                break;
-            case 'r':
-                result.push_back('\r');
-                break;
-            case 't':
-                result.push_back('\t');
-                break;
-            default:
-                result.push_back(character);
-                break;
-        }
+        const std::string codes = "\\\"/bfnrt";
+        const std::string values = "\\\"/\b\f\n\r\t";
+        const auto index = codes.find(character);
+        result.push_back(index == std::string::npos ? character : values[index]);
         escaped = false;
-    }
-    if (escaped) {
-        result.push_back('\\');
     }
     return result;
 }
@@ -182,7 +155,9 @@ std::optional<unsigned long long> ExtractJsonUnsigned(
     }
     try {
         return std::stoull(match[1].str());
-    } catch (...) {
+    } catch (const std::invalid_argument&) {
+        return std::nullopt;
+    } catch (const std::out_of_range&) {
         return std::nullopt;
     }
 }
@@ -356,25 +331,9 @@ DWORD CountProcessesNamed(const char* executableName) {
     return count;
 }
 
-void LogCoreRuntimeModule(DWORD processId, const std::filesystem::path& expectedPath) {
-    HANDLE snapshot = CreateToolhelp32Snapshot(
-        TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
-        processId
-    );
-    if (snapshot == INVALID_HANDLE_VALUE) {
-        LogDebug(
-            "CORE_RUNTIME_MODULE status=unavailable doom_pid="
-            + std::to_string(processId)
-            + " expected_game_root_path=" + expectedPath.string()
-            + " error=" + std::to_string(GetLastError())
-        );
-        return;
-    }
-
+static DWORD FindCoreRuntimeModule(HANDLE snapshot, bool& loaded, std::string& loadedPath) {
     MODULEENTRY32 module = {};
     module.dwSize = sizeof(module);
-    bool loaded = false;
-    std::string loadedPath;
     DWORD enumerationError = ERROR_SUCCESS;
     if (Module32First(snapshot, &module)) {
         do {
@@ -391,6 +350,27 @@ void LogCoreRuntimeModule(DWORD processId, const std::filesystem::path& expected
     } else {
         enumerationError = GetLastError();
     }
+    return enumerationError;
+}
+
+void LogCoreRuntimeModule(DWORD processId, const std::filesystem::path& expectedPath) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(
+        TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32,
+        processId
+    );
+    if (snapshot == INVALID_HANDLE_VALUE) {
+        LogDebug(
+            "CORE_RUNTIME_MODULE status=unavailable doom_pid="
+            + std::to_string(processId)
+            + " expected_game_root_path=" + expectedPath.string()
+            + " error=" + std::to_string(GetLastError())
+        );
+        return;
+    }
+
+    bool loaded = false;
+    std::string loadedPath;
+    const DWORD enumerationError = FindCoreRuntimeModule(snapshot, loaded, loadedPath);
     CloseHandle(snapshot);
 
     if (enumerationError != ERROR_SUCCESS) {
@@ -666,23 +646,51 @@ public:
 
     void Poll(bool gameplayLoaded, bool loading, bool nativeSafe) {
         const DWORD now = GetTickCount();
-        const bool stateChanged = !gameplayStateInitialized_
+        const bool stateChanged = StateChanged(gameplayLoaded, loading, nativeSafe);
+        if (!PollDue(stateChanged, now)) {
+            return;
+        }
+        nextPollTick_ = now + kGoalMonitorPollMs;
+        const bool nativeSafeChanged = ObserveNativeSafety(nativeSafe);
+
+        if (!EnsureConfigured()) {
+            return;
+        }
+        if (!BindSaveAdmission()) return;
+
+        ObserveLoading(loading);
+
+        if (!gameplayStateInitialized_ || gameplayLoaded != gameplayLoaded_) {
+            ObserveGameplayLoad(gameplayLoaded);
+            return;
+        }
+
+        if (!gameplayLoaded_) {
+            return;
+        }
+
+        if (nativeSafeChanged && !lastSnapshot_.path.empty()) {
+            WriteGameplayEvidence(lastSnapshot_, lastSnapshotProvisional_);
+        }
+
+        ObserveGameplaySnapshot();
+    }
+
+private:
+    bool PollDue(bool stateChanged, DWORD now) const {
+        return !((!stateChanged || nativeRoot_.empty()) && now < nextPollTick_);
+    }
+
+    bool StateChanged(bool gameplayLoaded, bool loading, bool nativeSafe) const {
+        return !gameplayStateInitialized_
             || gameplayLoaded != gameplayLoaded_
             || !loadingStateInitialized_
             || loading != loading_
             || !nativeSafeInitialized_
             || nativeSafe != nativeSafe_;
-        if ((!stateChanged || nativeRoot_.empty()) && now < nextPollTick_) {
-            return;
-        }
-        nextPollTick_ = now + kGoalMonitorPollMs;
-        const bool nativeSafeChanged = !nativeSafeInitialized_ || nativeSafe != nativeSafe_;
-        nativeSafeInitialized_ = true;
-        nativeSafe_ = nativeSafe;
+    }
 
-        if (!EnsureConfigured()) {
-            return;
-        }
+    bool BindSaveAdmission() {
         const auto admission = g_ApRpc ? g_ApRpc->SaveAdmission() : sentinel::Inspection{};
         if (admission.result != sentinel::ProbeResult::ok
                 || admission.admission.state != SC_SAVE_SESSION_ADMITTED
@@ -693,7 +701,7 @@ public:
             lastSnapshot_ = {};
             nativeRoot_.clear();
             WriteGameplayEvidence(std::nullopt);
-            return;
+            return false;
         }
         const std::string root(admission.admission.native_root);
         if (saveIdentity_.process_created != admission.snapshot.process_created
@@ -709,7 +717,12 @@ public:
         nativeRoot_ = root;
         namespace_ = admission.admission.namespace_id;
 
-        if (!loadingStateInitialized_ || loading != loading_) {
+        return true;
+    }
+
+    void ObserveLoading(bool loading) {
+        if (loadingStateInitialized_ && loading == loading_) return;
+
             loadingStateInitialized_ = true;
             loading_ = loading;
             if (loading_) {
@@ -718,9 +731,10 @@ public:
                 CaptureMenuSlotTokens();
                 sawLoadingForEpoch_ = true;
             }
-        }
+            }
 
-        if (!gameplayStateInitialized_ || gameplayLoaded != gameplayLoaded_) {
+    void ObserveGameplayLoad(bool gameplayLoaded) {
+
             const bool firstObservedState = !gameplayStateInitialized_;
             gameplayStateInitialized_ = true;
             gameplayLoaded_ = gameplayLoaded;
@@ -763,16 +777,9 @@ public:
             lastSnapshotProvisional_ = provisional;
             WriteGameplayEvidence(entered, provisional);
             return;
-        }
+            }
 
-        if (!gameplayLoaded_) {
-            return;
-        }
-
-        if (nativeSafeChanged && !lastSnapshot_.path.empty()) {
-            WriteGameplayEvidence(lastSnapshot_, lastSnapshotProvisional_);
-        }
-
+    void ObserveGameplaySnapshot() {
         const std::optional<SaveSnapshot> changed = ReadChangedSnapshot(menuSlotTokens_);
         const std::optional<SaveSnapshot> latest = changed.has_value()
             ? changed
@@ -796,17 +803,7 @@ public:
         WriteGameplayEvidence(latest, provisional);
     }
 
-private:
-    bool EnsureConfigured() {
-        const DWORD now = GetTickCount();
-        if (configured_) {
-            return true;
-        }
-        if (now < nextConfigRetryTick_) {
-            return false;
-        }
-        nextConfigRetryTick_ = now + 5000;
-
+    std::optional<std::pair<std::filesystem::path, std::string>> ReadConfiguration() {
         const std::optional<std::filesystem::path> configPath =
             FindFirstExistingPath(runtimePaths_.configCandidates);
         if (!configPath.has_value()) {
@@ -821,7 +818,7 @@ private:
                 LogDebug(message.str());
                 loggedConfigurationFailure_ = true;
             }
-            return false;
+            return std::nullopt;
         }
 
         const std::string configContents = ReadTextFile(*configPath);
@@ -833,9 +830,51 @@ private:
                 );
                 loggedConfigurationFailure_ = true;
             }
-            return false;
+            return std::nullopt;
         }
         loggedConfigurationFailure_ = false;
+
+        return std::make_pair(*configPath, configContents);
+    }
+
+    void InferSteamId() {
+
+            try {
+                const auto remotePath = std::filesystem::path(steamRemoteDir_);
+                steamId3_ = std::stoull(remotePath.parent_path().parent_path().filename().string());
+            } catch (const std::invalid_argument& error) {
+                LogDebug(std::string("[Goal] Invalid Steam account: ") + error.what());
+                steamId3_ = 0;
+            } catch (const std::out_of_range& error) {
+                LogDebug(std::string("[Goal] Steam account out of range: ") + error.what());
+                steamId3_ = 0;
+            } catch (const std::filesystem::filesystem_error& error) {
+                LogDebug(std::string("[Goal] Steam account path unavailable: ") + error.what());
+                steamId3_ = 0;
+            }
+            }
+
+    bool ObserveNativeSafety(bool nativeSafe) {
+        const bool changed = !nativeSafeInitialized_ || nativeSafe != nativeSafe_;
+        nativeSafeInitialized_ = true;
+        nativeSafe_ = nativeSafe;
+        return changed;
+    }
+
+    bool EnsureConfigured() {
+        const DWORD now = GetTickCount();
+        if (configured_) {
+            return true;
+        }
+        if (now < nextConfigRetryTick_) {
+            return false;
+        }
+        nextConfigRetryTick_ = now + 5000;
+
+        const auto document = ReadConfiguration();
+        if (!document) return false;
+        const auto& configPath = document->first;
+        const auto& configContents = document->second;
 
         steamRemoteDir_.clear();
         steamId3_ = 0;
@@ -847,34 +886,27 @@ private:
         }
 
         if (steamRemoteDir_.empty()) {
-            if (!loggedConfigurationFailure_) {
-                LogDebug(
-                    "[Goal] steam_remote_dir missing from " + configPath->string()
-                    + ". Complete setup in the DOOM Eternal Client, then restart "
-                    + "ap_client.exe if needed."
-                );
-                loggedConfigurationFailure_ = true;
-            }
+
+            LogDebug(
+                "[Goal] steam_remote_dir missing from " + configPath.string()
+                + ". Complete setup in the DOOM Eternal Client, then restart "
+                + "ap_client.exe if needed."
+            );
+            loggedConfigurationFailure_ = true;
+
             return false;
         }
 
-        if (steamId3_ == 0) {
-            try {
-                const auto remotePath = std::filesystem::path(steamRemoteDir_);
-                steamId3_ = std::stoull(remotePath.parent_path().parent_path().filename().string());
-            } catch (...) {
-                steamId3_ = 0;
-            }
-        }
+        if (steamId3_ == 0) InferSteamId();
 
         if (steamId3_ == 0) {
-            if (!loggedConfigurationFailure_) {
-                LogDebug(
-                    "[Goal] steam_id3 missing and could not be inferred from "
-                    + configPath->string() + "."
-                );
-                loggedConfigurationFailure_ = true;
-            }
+
+            LogDebug(
+                "[Goal] steam_id3 missing and could not be inferred from "
+                + configPath.string() + "."
+            );
+            loggedConfigurationFailure_ = true;
+
             return false;
         }
 
@@ -949,15 +981,7 @@ private:
         return snapshot.mapName.empty() ? std::nullopt : std::optional<SaveSnapshot>(snapshot);
     }
 
-    void WriteGameplayEvidence(
-        const std::optional<SaveSnapshot>& snapshot,
-        bool provisional = false
-    ) {
-        const std::string temporaryPath = std::string(kGameplaySaveEvidencePath) + ".tmp";
-        FILE* output = fopen(temporaryPath.c_str(), "wb");
-        if (!output) {
-            return;
-        }
+    std::string GameplayEvidence(const std::optional<SaveSnapshot>& snapshot, bool provisional) const {
         std::string contents =
             "state=" + std::string(
                 !gameplayLoaded_ ? "menu" : snapshot.has_value() ? "gameplay" : "unproven"
@@ -978,6 +1002,19 @@ private:
                 + "process_created=" + std::to_string(saveIdentity_.process_created) + "\n"
                 + "instance_id=" + instance.str() + "\n";
         }
+        return contents;
+    }
+
+    void WriteGameplayEvidence(
+        const std::optional<SaveSnapshot>& snapshot,
+        bool provisional = false
+    ) {
+        const std::string temporaryPath = std::string(kGameplaySaveEvidencePath) + ".tmp";
+        FILE* output = fopen(temporaryPath.c_str(), "wb");
+        if (!output) {
+            return;
+        }
+        const std::string contents = GameplayEvidence(snapshot, provisional);
         fwrite(contents.data(), 1, contents.size(), output);
         fflush(output);
         const int handle = _fileno(output);
@@ -1181,20 +1218,7 @@ private:
 
 
 
-int main(int argc, char** argv) {
-    if (argc > 1 && !SetCurrentDirectoryA(argv[1])) {
-        printf("Failed to set DOOM working directory: %s\n", argv[1]);
-        return 1;
-    }
-    RotateClientLog();
-    LogDebug("NATIVE_START process=ap_client.exe");
-
-    char executablePath[MAX_PATH] = {};
-    if (GetModuleFileNameA(nullptr, executablePath, MAX_PATH) == 0) {
-        printf("Failed to resolve ap_client.exe path.\n");
-        return 1;
-    }
-    const std::string workingDirectory = CurrentWorkingDirectory();
+static RuntimeEnvSignals RuntimeEnvironment() {
     RuntimeEnvSignals envSignals;
     if (const char* value = getenv("WINEDLLOVERRIDES")) {
         envSignals.wineDllOverrides = value;
@@ -1211,6 +1235,226 @@ int main(int argc, char** argv) {
     if (const char* value = getenv("PROTON_LOG")) {
         envSignals.protonLog = value;
     }
+
+    return envSignals;
+}
+
+static void LogClientPreflight(const CorePreflightResult& preflight) {
+    LogDebug(
+        "NATIVE_PREFLIGHT status="
+        + std::string(preflight.deliveryAllowed ? "passed" : "failed")
+    );
+    LogDebug(
+        "XINPUT_DISK_PREFLIGHT status="
+        + std::string(preflight.corePresent ? "present" : "missing")
+        + " path=" + preflight.corePath
+        + " sha256=" + (preflight.sha256.empty() ? "unavailable" : preflight.sha256)
+        + " launcher_game_link_verification=authoritative"
+    );
+    LogDebug(
+        "Native delivery requires the ledger and safe gameplay."
+    );
+
+}
+
+static void PollRuntimeProbe(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor) {
+    gameStateProbe.Poll();
+    if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
+    const DWORD doomPid = gameStateProbe.GetProcessId();
+    if (doomPid != 0 && doomPid != moduleProbePid) {
+        LogCoreRuntimeModule(
+            doomPid,
+            runtimePaths.gameRootDir / "sentinel_core.dll"
+        );
+        moduleProbePid = doomPid;
+    }
+    missionTransitionMonitor.Poll(
+        gameStateProbe.IsGameplayLoaded(),
+        gameStateProbe.IsLoading(),
+        gameStateProbe.IsSafeForRpc()
+    );
+}
+
+
+struct RpcWaitDiagnostics {
+    DWORD started = GetTickCount();
+    unsigned long long attempts = 0;
+    DWORD nextSummary = started;
+    std::tuple<DWORD, bool, bool, int, DWORD> last{MAXDWORD, false, false, INT_MIN, MAXDWORD};
+
+    void Log(const char* reason, const GameStateProbe& probe) const {
+        LogDebug("RPC_SERVER_WAIT reason=" + std::string(reason)
+            + " elapsed_ms=" + std::to_string(GetTickCount() - started)
+            + " attempts=" + std::to_string(attempts)
+            + " last_rpc_result=" + RpcCallResultName(g_ApRpc->LastResult())
+            + " last_transport_state=" + std::to_string(g_ApRpc->LastTransportStatus())
+            + " doom_process_detected=" + (probe.GetProcessId() != 0 ? "yes" : "no")
+            + " doom_pid=" + std::to_string(probe.GetProcessId())
+            + " gameplay_loaded=" + (probe.IsGameplayLoaded() ? "yes" : "no")
+            + " native_safe=" + (probe.IsSafeForRpc() ? "yes" : "no"));
+    }
+
+    void Observe(const GameStateProbe& probe) {
+        const auto current = std::make_tuple(probe.GetProcessId(), probe.IsGameplayLoaded(), probe.IsSafeForRpc(),
+            static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus());
+        const bool transition = current != last;
+        const DWORD now = GetTickCount();
+        if (transition || now >= nextSummary) {
+            Log(transition ? "transition" : "periodic", probe);
+            nextSummary = now + 5000;
+            last = current;
+        }
+    }
+};
+
+static void WaitForRpc(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor, ApRpcHealthStatePublisher& healthStatePublisher) {
+    g_ApRpcOwner = std::make_unique<SentinelCommandClient>();
+    g_ApRpc = g_ApRpcOwner.get();
+    LogDebug("RPC_CLIENT_CREATED binding=Meathook");
+    RpcWaitDiagnostics wait;
+    wait.Log("initial", gameStateProbe);
+    while (!g_ApRpc->PollHealth()) {
+        ++wait.attempts;
+        healthStatePublisher.PublishHealth(false, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus());
+        PollRuntimeProbe(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor);
+        wait.Observe(gameStateProbe);
+        Sleep(100);
+    }
+    if (gameStateProbe.GetProcessId() != 0 && gameStateProbe.GetProcessId() != moduleProbePid) {
+        LogCoreRuntimeModule(
+            gameStateProbe.GetProcessId(),
+            runtimePaths.gameRootDir / "sentinel_core.dll"
+        );
+    } else if (gameStateProbe.GetProcessId() == 0) {
+        LogDebug(
+            "CORE_RUNTIME_MODULE status=unavailable doom_pid=0"
+            " module_path=unavailable expected_game_root_path="
+            + (runtimePaths.gameRootDir / "sentinel_core.dll").string()
+            + " error=0 reason=doom_process_not_detected"
+        );
+    }
+    healthStatePublisher.PublishHealth(
+        true, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
+    );
+    LogDebug(
+        "RPC_SERVER_VERIFIED elapsed_ms="
+        + std::to_string(GetTickCount() - wait.started)
+        + " attempts=" + std::to_string(wait.attempts)
+        + " doom_pid=" + std::to_string(gameStateProbe.GetProcessId())
+        + " transport=" + RpcCallResultName(g_ApRpc->LastResult())
+        + "/" + std::to_string(g_ApRpc->LastTransportStatus())
+    );
+}
+
+class TransientBaseline {
+    bool ready = false;
+    unsigned long long epoch = 0;
+    void Restore(ApRpcHealthStatePublisher& healthStatePublisher) {
+        static const std::array<const char*, 3> baselineCommands = {
+            "g_damageScaleAllToAI 1",
+            "g_damageScaleAllToSlayer 1",
+            "g_infiniteAmmo 0",
+        };
+        ready = true;
+        for (const char* command : baselineCommands) {
+            if (!g_ApRpc->ExecuteConsoleCommand(command)) {
+                ready = false;
+                break;
+            }
+        }
+        healthStatePublisher.PublishEffectBaseline(
+            ready, epoch
+        );
+    }
+public:
+    void Poll(bool rpcTransportReady, const GameStateProbe& gameStateProbe, ApRpcHealthStatePublisher& healthStatePublisher) {
+        if (!rpcTransportReady) {
+            ready = false;
+            healthStatePublisher.PublishEffectBaseline(false, 0);
+        } else if (g_ApRpc->AttachmentEpoch() != epoch) {
+            epoch = g_ApRpc->AttachmentEpoch();
+            ready = false;
+            healthStatePublisher.PublishEffectBaseline(false, epoch);
+        }
+        if (rpcTransportReady && g_ApRpc->Ready() && gameStateProbe.IsSafeForRpc()
+                && !ready) {
+            Restore(healthStatePublisher);
+        }
+    }
+};
+
+static void LogGateChanges(bool rpcTransportReady, const GameStateProbe& gameStateProbe, bool& lastRpcEnabled, std::string& lastGateReason) {
+    const bool rpcEnabled =
+        rpcTransportReady && gameStateProbe.IsSafeForRpc();
+    const std::string gateReason = RpcGateReason(
+        rpcTransportReady, gameStateProbe
+    );
+    if (rpcEnabled != lastRpcEnabled) {
+        LogDebug(rpcEnabled
+            ? "RPC memory gate OPEN; command execution ENABLED."
+            : "RPC memory gate CLOSED.");
+        lastRpcEnabled = rpcEnabled;
+    }
+    if (gateReason != lastGateReason) {
+        LogDebug(
+            "GATE_TRANSITION state=" + std::string(rpcEnabled ? "open" : "closed")
+            + " reason=" + gateReason
+        );
+        lastGateReason = gateReason;
+    }
+}
+
+[[noreturn]] static void RunClient(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor, ApRpcHealthStatePublisher& healthStatePublisher, bool meathookPreflightPassed) {
+    bool lastRpcEnabled = false;
+    TransientBaseline transientBaseline;
+    std::string lastGateReason;
+    AmmoHotkeyHandler ammoHotkey(LogDebug);
+    while (true) {
+        PollRuntimeProbe(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor);
+        const auto admission = g_ApRpc ? g_ApRpc->SaveAdmission() : sentinel::Inspection{};
+        const bool roomBound = admission.result == sentinel::ProbeResult::ok && (admission.admission.flags & SC_SAVE_SESSION_ACCEPTING);
+
+        const bool rpcTransportReady =
+            meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
+        transientBaseline.Poll(rpcTransportReady, gameStateProbe, healthStatePublisher);
+        healthStatePublisher.PublishHealth(
+            rpcTransportReady,
+                g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
+                g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
+        );
+        LogGateChanges(rpcTransportReady, gameStateProbe, lastRpcEnabled, lastGateReason);
+        ammoHotkey.Poll(
+            gameStateProbe.GetProcessId(),
+            roomBound,
+            rpcTransportReady,
+            true,
+            gameStateProbe.IsSafeForRpc(),
+            [](const std::string& command) {
+                if (!g_ApRpc) return false;
+                return g_ApRpc->ExecuteConsoleCommand(command);
+            },
+            g_ApRpc ? g_ApRpc->LastTransportStatus() : 0
+        );
+        Sleep(25);
+    }
+
+}
+
+int main(int argc, char** argv) {
+    if (argc > 1 && !SetCurrentDirectoryA(argv[1])) {
+        printf("Failed to set DOOM working directory: %s\n", argv[1]);
+        return 1;
+    }
+    RotateClientLog();
+    LogDebug("NATIVE_START process=ap_client.exe");
+
+    char executablePath[MAX_PATH] = {};
+    if (GetModuleFileNameA(nullptr, executablePath, MAX_PATH) == 0) {
+        printf("Failed to resolve ap_client.exe path.\n");
+        return 1;
+    }
+    const std::string workingDirectory = CurrentWorkingDirectory();
+    const RuntimeEnvSignals envSignals = RuntimeEnvironment();
 
     const RuntimePathInfo runtimePaths = ResolveRuntimePathInfo(
         executablePath,
@@ -1238,20 +1482,7 @@ int main(int argc, char** argv) {
         preflight,
         runtimePaths
     );
-    LogDebug(
-        "NATIVE_PREFLIGHT status="
-        + std::string(preflight.deliveryAllowed ? "passed" : "failed")
-    );
-    LogDebug(
-        "XINPUT_DISK_PREFLIGHT status="
-        + std::string(preflight.corePresent ? "present" : "missing")
-        + " path=" + preflight.corePath
-        + " sha256=" + (preflight.sha256.empty() ? "unavailable" : preflight.sha256)
-        + " launcher_game_link_verification=authoritative"
-    );
-    LogDebug(
-        "Native delivery requires the ledger and safe gameplay."
-    );
+    LogClientPreflight(preflight);
 
     GameStateProbe gameStateProbe(LogDebug);
     DWORD moduleProbePid = 0;
@@ -1263,200 +1494,8 @@ int main(int argc, char** argv) {
             "A valid install is required for native delivery."
         );
     } else {
-        g_ApRpcOwner = std::make_unique<SentinelCommandClient>();
-        g_ApRpc = g_ApRpcOwner.get();
-        g_ApRpc->SetLogCallback(LogDebug);
-        LogDebug("RPC_CLIENT_CREATED binding=Meathook");
-        const DWORD rpcWaitStarted = GetTickCount();
-        DWORD nextRpcWaitSummary = rpcWaitStarted;
-        DWORD lastWaitPid = MAXDWORD;
-        bool lastWaitGameplay = false;
-        bool lastWaitSafe = false;
-        int lastWaitResult = INT_MIN;
-        DWORD lastWaitTransport = MAXDWORD;
-        unsigned long long rpcWaitAttempts = 0;
-        auto logRpcWait = [&](const char* reason) {
-            LogDebug(
-                "RPC_SERVER_WAIT reason=" + std::string(reason)
-                + " elapsed_ms=" + std::to_string(GetTickCount() - rpcWaitStarted)
-                + " attempts=" + std::to_string(rpcWaitAttempts)
-                + " last_rpc_result="
-                + std::string(g_ApRpc ? RpcCallResultName(g_ApRpc->LastResult()) : "UNAVAILABLE")
-                + " last_transport_state="
-                + std::to_string(g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND)
-                + " doom_process_detected="
-                + std::string(gameStateProbe.GetProcessId() != 0 ? "yes" : "no")
-                + " doom_pid=" + std::to_string(gameStateProbe.GetProcessId())
-                + " gameplay_loaded="
-                + std::string(gameStateProbe.IsGameplayLoaded() ? "yes" : "no")
-                + " native_safe=" + std::string(gameStateProbe.IsSafeForRpc() ? "yes" : "no")
-            );
-        };
-        logRpcWait("initial");
-        while (!g_ApRpc || !g_ApRpc->PollHealth()) {
-            ++rpcWaitAttempts;
-            if (g_ApRpc) {
-                healthStatePublisher.PublishHealth(
-                    false, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
-                );
-            } else {
-                healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
-            }
-            gameStateProbe.Poll();
-        if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
-            const DWORD doomPid = gameStateProbe.GetProcessId();
-            if (doomPid != 0 && doomPid != moduleProbePid) {
-                LogCoreRuntimeModule(
-                    doomPid,
-                    runtimePaths.gameRootDir / "sentinel_core.dll"
-                );
-                moduleProbePid = doomPid;
-            }
-            missionTransitionMonitor.Poll(
-                gameStateProbe.IsGameplayLoaded(),
-                gameStateProbe.IsLoading(),
-                gameStateProbe.IsSafeForRpc()
-            );
-            const int waitResult =
-                g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN;
-            const DWORD waitTransport =
-                g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND;
-            const bool transition =
-                doomPid != lastWaitPid
-                || gameStateProbe.IsGameplayLoaded() != lastWaitGameplay
-                || gameStateProbe.IsSafeForRpc() != lastWaitSafe
-                || waitResult != lastWaitResult
-                || waitTransport != lastWaitTransport;
-            const DWORD now = GetTickCount();
-            if (transition || now >= nextRpcWaitSummary) {
-                logRpcWait(transition ? "transition" : "periodic");
-                nextRpcWaitSummary = now + 5000;
-                lastWaitPid = doomPid;
-                lastWaitGameplay = gameStateProbe.IsGameplayLoaded();
-                lastWaitSafe = gameStateProbe.IsSafeForRpc();
-                lastWaitResult = waitResult;
-                lastWaitTransport = waitTransport;
-            }
-            Sleep(100);
-        }
-        if (gameStateProbe.GetProcessId() != 0 && gameStateProbe.GetProcessId() != moduleProbePid) {
-            LogCoreRuntimeModule(
-                gameStateProbe.GetProcessId(),
-                runtimePaths.gameRootDir / "sentinel_core.dll"
-            );
-        } else if (gameStateProbe.GetProcessId() == 0) {
-            LogDebug(
-                "CORE_RUNTIME_MODULE status=unavailable doom_pid=0"
-                " module_path=unavailable expected_game_root_path="
-                + (runtimePaths.gameRootDir / "sentinel_core.dll").string()
-                + " error=0 reason=doom_process_not_detected"
-            );
-        }
-        healthStatePublisher.PublishHealth(
-            true, static_cast<int>(g_ApRpc->LastResult()), g_ApRpc->LastTransportStatus()
-        );
-        LogDebug(
-            "RPC_SERVER_VERIFIED elapsed_ms="
-            + std::to_string(GetTickCount() - rpcWaitStarted)
-            + " attempts=" + std::to_string(rpcWaitAttempts)
-            + " doom_pid=" + std::to_string(gameStateProbe.GetProcessId())
-            + " transport=" + RpcCallResultName(g_ApRpc->LastResult())
-            + "/" + std::to_string(g_ApRpc->LastTransportStatus())
-        );
+        WaitForRpc(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor, healthStatePublisher);
     }
 
-    bool lastRpcEnabled = false;
-    bool transientBaselineReady = false;
-    unsigned long long transientBaselineEpoch = 0;
-    std::string lastGateReason;
-    AmmoHotkeyHandler ammoHotkey(LogDebug);
-    while (true) {
-        gameStateProbe.Poll();
-        if (g_ApRpc) g_ApRpc->SetTargetProcess(gameStateProbe.GetProcessId());
-        const DWORD doomPid = gameStateProbe.GetProcessId();
-        if (doomPid != 0 && doomPid != moduleProbePid) {
-            LogCoreRuntimeModule(
-                doomPid,
-                runtimePaths.gameRootDir / "sentinel_core.dll"
-            );
-            moduleProbePid = doomPid;
-        }
-        missionTransitionMonitor.Poll(
-            gameStateProbe.IsGameplayLoaded(),
-            gameStateProbe.IsLoading(),
-            gameStateProbe.IsSafeForRpc()
-        );
-        const auto admission = g_ApRpc ? g_ApRpc->SaveAdmission() : sentinel::Inspection{};
-        const bool roomBound = admission.result == sentinel::ProbeResult::ok && (admission.admission.flags & SC_SAVE_SESSION_ACCEPTING);
-
-        const DWORD now = GetTickCount();
-        const bool rpcTransportReady =
-            meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
-        if (!rpcTransportReady) {
-            transientBaselineReady = false;
-            healthStatePublisher.PublishEffectBaseline(false, 0);
-        } else if (g_ApRpc->AttachmentEpoch() != transientBaselineEpoch) {
-            transientBaselineEpoch = g_ApRpc->AttachmentEpoch();
-            transientBaselineReady = false;
-            healthStatePublisher.PublishEffectBaseline(false, transientBaselineEpoch);
-        }
-        if (rpcTransportReady && g_ApRpc->Ready() && gameStateProbe.IsSafeForRpc()
-                && !transientBaselineReady) {
-            static const std::array<const char*, 3> baselineCommands = {
-                "g_damageScaleAllToAI 1",
-                "g_damageScaleAllToSlayer 1",
-                "g_infiniteAmmo 0",
-            };
-            transientBaselineReady = true;
-            for (const char* command : baselineCommands) {
-                if (!g_ApRpc->ExecuteConsoleCommand(command)) {
-                    transientBaselineReady = false;
-                    break;
-                }
-            }
-            healthStatePublisher.PublishEffectBaseline(
-                transientBaselineReady, transientBaselineEpoch
-            );
-        }
-        healthStatePublisher.PublishHealth(
-            rpcTransportReady,
-                g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : AP_RPC_UNKNOWN,
-                g_ApRpc ? g_ApRpc->LastTransportStatus() : ERROR_FILE_NOT_FOUND
-        );
-        const bool rpcEnabled =
-            rpcTransportReady && gameStateProbe.IsSafeForRpc();
-        const std::string gateReason = RpcGateReason(
-            rpcTransportReady, gameStateProbe
-        );
-        if (rpcEnabled != lastRpcEnabled) {
-            LogDebug(rpcEnabled
-                ? "RPC memory gate OPEN; command execution ENABLED."
-                : "RPC memory gate CLOSED.");
-            lastRpcEnabled = rpcEnabled;
-        }
-        if (gateReason != lastGateReason) {
-            LogDebug(
-                "GATE_TRANSITION state=" + std::string(rpcEnabled ? "open" : "closed")
-                + " reason=" + gateReason
-            );
-            lastGateReason = gateReason;
-        }
-        ammoHotkey.Poll(
-            gameStateProbe.GetProcessId(),
-            roomBound,
-            rpcTransportReady,
-            true,
-            gameStateProbe.IsSafeForRpc(),
-            [](const std::string& command) {
-                if (!g_ApRpc) return false;
-                return g_ApRpc->ExecuteConsoleCommand(command);
-            },
-            g_ApRpc ? static_cast<int>(g_ApRpc->LastResult()) : 0,
-            g_ApRpc ? g_ApRpc->LastTransportStatus() : 0
-        );
-        Sleep(25);
-    }
-
-    ReleaseMutex(singleInstance);
-    CloseHandle(singleInstance);
+    RunClient(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor, healthStatePublisher, meathookPreflightPassed);
 }

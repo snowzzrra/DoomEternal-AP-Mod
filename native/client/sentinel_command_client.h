@@ -13,7 +13,6 @@ const char* RpcCallResultName(ApRpcResult result);
 class SentinelCommandClient {
 public:
     using LogCallback = std::function<void(const std::string&)>;
-    void SetLogCallback(LogCallback callback) { log_ = std::move(callback); }
     void SetTargetProcess(DWORD pid);
     DWORD TargetProcess() const { return pid_; }
     bool PollHealth();
@@ -24,6 +23,7 @@ public:
     DWORD LastTransportStatus() const { return status_; }
     sentinel::Inspection SaveAdmission();
 private:
+    bool AwaitCommand(const sentinel::generated::Bytes& body, const sentinel::generated::Bytes& reference, const sentinel::generated::command_reference& ref);
     template<class T> bool Read(uint16_t type, const sentinel::generated::Bytes& payload, T& value);
     DWORD pid_ = 0, status_ = ERROR_FILE_NOT_FOUND;
     bool ready_ = false;
@@ -33,5 +33,4 @@ private:
     sentinel::generated::scope scope_{};
     std::array<uint8_t, 16> binding_{};
     ApRpcResult result_ = AP_RPC_NONE;
-    LogCallback log_;
 };
