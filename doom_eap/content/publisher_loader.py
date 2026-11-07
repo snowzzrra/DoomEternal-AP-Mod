@@ -11,7 +11,6 @@ from doom_eap.contracts.publisher_contracts import (
     publisher_contracts_from_document,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT
 CONTRACT_PATH = REPO_ROOT / "data" / "publisher_contracts.json"

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from itertools import groupby
 from types import MappingProxyType
-from typing import Mapping
 
 from .slot_data_contract import LimitSet, Recipes, canonical_bytes, catalog_tables, load_slot_catalog
 
-__all__ = ("Body", "ResolvedRow", "ResolvedMap", "ResolvedRecipes", "encode_recipes", "decode_recipes", "recipe_references")
+__all__ = ("Body", "ResolvedMap", "ResolvedRecipes", "ResolvedRow", "decode_recipes", "encode_recipes", "recipe_references")
 
 
 def recipe_references(catalog=None):
@@ -116,7 +116,7 @@ def encode_recipes(resolved: ResolvedRecipes) -> dict:
 def _decode_row(row, recipes):
     source, role, spawn, pattern, logical, maximum, credit, renewable, numerator, denominator, limits = row
     refs = (ref for ref, count in recipes.patterns[pattern] for _ in range(count))
-    bodies = tuple(Body(*recipes.profiles[ref], recipes.limit_sets[limit]) for ref, limit in zip(refs, limits))
+    bodies = tuple(Body(*recipes.profiles[ref], recipes.limit_sets[limit]) for ref, limit in zip(refs, limits, strict=False))
     return ResolvedRow(source, role, spawn, bodies, logical, maximum, credit, renewable, numerator, denominator)
 
 

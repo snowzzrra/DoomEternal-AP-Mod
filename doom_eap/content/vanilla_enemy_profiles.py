@@ -1,13 +1,12 @@
 """Vanilla spawn templates and script population envelopes."""
 
+import json
+import re
 from collections import Counter
 from functools import cache
 from importlib.resources import files
-import json
-import re
 
 from .enemy_options import SPECIES_GROUPS
-
 
 CANONICAL_ORDER = (
     'e1m1_intro', 'e1m2_war', 'e1m3_cult', 'e1m4_boss', 'e2m1_nest',
@@ -67,12 +66,7 @@ def source_is_master(source):
             (bool(layers) and all('master' in layer.lower() for layer in layers)))
 
 
-def reference_source(source, catalog=None, *, master=False):
-    from .native_enemy_safety import CINEMATIC_BOSS_ACTORS
-
-    if (source.get('protected_reason') or source.get('inactive_reason') or source.get('runtime_only')
-            or source.get('family') == 'summon'):
-        return False
+def _reference_source_status(CINEMATIC_BOSS_ACTORS, catalog, master, source):
     if ((source.get('native_identity') or {}).get('status') == 'unknown_native_choice' or
             (catalog is not None and native_source_identity(source, catalog)['status'] == 'unknown_native_choice')):
         return False
@@ -84,66 +78,86 @@ def reference_source(source, catalog=None, *, master=False):
     return 'telemetry' not in owner.lower() and source_is_master(source) == master
 
 
+def reference_source(source, catalog=None, *, master=False):
+    from .native_enemy_safety import CINEMATIC_BOSS_ACTORS
+
+    if (source.get('protected_reason') or source.get('inactive_reason') or source.get('runtime_only')
+            or source.get('family') == 'summon'):
+        return False
+    return _reference_source_status(CINEMATIC_BOSS_ACTORS, catalog, master, source)
+
+
+def _role_peak(slots, role):
+    return sum(slot['count'] for slot in slots if any(
+        ROLES[s] == role and (role != 'stationary' or s not in SPECIAL_SPECIES) for s in slot['species']))
+
+
 def request_peak(slots):
     total = sum(slot['count'] for slot in slots)
     return dict(maximum=total, pressure=total,
-        heavy=sum(slot['count'] for slot in slots if any(ROLES[s] == 'heavy' for s in slot['species'])),
-        superheavy=sum(slot['count'] for slot in slots if any(ROLES[s] == 'superheavy' for s in slot['species'])),
-        stationary=sum(slot['count'] for slot in slots if any(ROLES[s] == 'stationary' and s not in SPECIAL_SPECIES
-                                                             for s in slot['species'])),
+        heavy=_role_peak(slots, 'heavy'), superheavy=_role_peak(slots, 'superheavy'),
+        stationary=_role_peak(slots, 'stationary'),
         mixed=0, combined_special=sum(slot['count'] for slot in slots
                                      if SPECIAL_SPECIES.intersection(slot['species'])),
         specials={name: sum(slot['count'] for slot in slots if name in slot['species'])
                   for name in sorted(SPECIAL_SPECIES)})
 
 
+def _catalog_profile_species(catalog, excluded, master, source, unknown, waves):
+    if not reference_source(source, catalog, master=master):
+        excluded.append(source['id'])
+        identity = native_source_identity(source, catalog) if source.get('logical_count') else {}
+        if (identity.get('status') == 'unknown_native_choice' and reference_source(
+                {**source, 'native_identity': {**identity, 'status': 'known_category'}}, catalog, master=master)):
+            unknown.append(dict(source_id=source['id'], family=source['family'],
+                logical_count=source['logical_count'], maximum_emissions=source['maximum_emissions'],
+                renewable=not source['maximum_emissions'] or bool(source.get('effective_replenishment')),
+                binding=source.get('binding'), wave=source.get('wave', source.get('phase', source['id'])),
+                identity=identity))
+        return
+    species = source_species(source, catalog)
+    if not species:
+        raise ValueError(f"Vanilla source identity is unresolved: {source['id']}")
+    key = source.get('wave', source.get('phase', source['id']))
+    wave = waves.setdefault(key, dict(id=key, owner=(source.get('binding') or {}).get('owner',
+        (source.get('binding') or {}).get('entity', source['id'])), slots=[]))
+    count = source['logical_count']
+    maximum = source['maximum_emissions']
+    wave['slots'].append(dict(source_id=source['id'], count=count, species=list(species),
+                             family=source['family'], maximum_emissions=maximum,
+                             renewable=maximum == 0 or bool(source.get('effective_replenishment'))))
+
+
+def _catalog_profile_finite(wave):
+    counts, finite, identities = Counter(), Counter(), Counter()
+    ambiguous, renewable = [], 0
+    for slot in wave['slots']:
+        roles = {ROLES[species] for species in slot['species']}
+        if len(roles) == 1:
+            role = next(iter(roles))
+            counts[role] += slot['count']
+            finite[role] += 0 if slot['renewable'] else slot['maximum_emissions']
+        else:
+            ambiguous.append(slot['source_id'])
+        if len(slot['species']) == 1:
+            identities[slot['species'][0]] += slot['count']
+        if slot['renewable']:
+            renewable += slot['count']
+    wave.update(counts=dict(counts), finite_counts=dict(finite), species_counts=dict(identities),
+                total=sum(slot['count'] for slot in wave['slots']),
+                finite_total=sum(slot['maximum_emissions'] for slot in wave['slots'] if not slot['renewable']),
+                renewable_targets=renewable, ambiguous_sources=ambiguous,
+                peak=request_peak(wave['slots']), envelope_solved=True,
+                concurrency_basis='native_source_request_upper_envelope')
+
+
 def catalog_profile(catalog, map_key, *, master=False):
     stage = catalog['maps'][map_key]
     waves, excluded, unknown = {}, [], []
     for source in stage['origins']:
-        if not reference_source(source, catalog, master=master):
-            excluded.append(source['id'])
-            identity = native_source_identity(source, catalog) if source.get('logical_count') else {}
-            if (identity.get('status') == 'unknown_native_choice' and reference_source(
-                    {**source, 'native_identity': {**identity, 'status': 'known_category'}}, catalog, master=master)):
-                unknown.append(dict(source_id=source['id'], family=source['family'],
-                    logical_count=source['logical_count'], maximum_emissions=source['maximum_emissions'],
-                    renewable=not source['maximum_emissions'] or bool(source.get('effective_replenishment')),
-                    binding=source.get('binding'), wave=source.get('wave', source.get('phase', source['id'])),
-                    identity=identity))
-            continue
-        species = source_species(source, catalog)
-        if not species:
-            raise ValueError(f"Vanilla source identity is unresolved: {source['id']}")
-        key = source.get('wave', source.get('phase', source['id']))
-        wave = waves.setdefault(key, dict(id=key, owner=(source.get('binding') or {}).get('owner',
-            (source.get('binding') or {}).get('entity', source['id'])), slots=[]))
-        count = source['logical_count']
-        maximum = source['maximum_emissions']
-        wave['slots'].append(dict(source_id=source['id'], count=count, species=list(species),
-                                 family=source['family'], maximum_emissions=maximum,
-                                 renewable=maximum == 0 or bool(source.get('effective_replenishment'))))
+        _catalog_profile_species(catalog, excluded, master, source, unknown, waves)
     for wave in waves.values():
-        counts, finite, identities = Counter(), Counter(), Counter()
-        ambiguous, renewable = [], 0
-        for slot in wave['slots']:
-            roles = {ROLES[species] for species in slot['species']}
-            if len(roles) == 1:
-                role = next(iter(roles))
-                counts[role] += slot['count']
-                finite[role] += 0 if slot['renewable'] else slot['maximum_emissions']
-            else:
-                ambiguous.append(slot['source_id'])
-            if len(slot['species']) == 1:
-                identities[slot['species'][0]] += slot['count']
-            if slot['renewable']:
-                renewable += slot['count']
-        wave.update(counts=dict(counts), finite_counts=dict(finite), species_counts=dict(identities),
-                    total=sum(slot['count'] for slot in wave['slots']),
-                    finite_total=sum(slot['maximum_emissions'] for slot in wave['slots'] if not slot['renewable']),
-                    renewable_targets=renewable, ambiguous_sources=ambiguous,
-                    peak=request_peak(wave['slots']), envelope_solved=True,
-                    concurrency_basis='native_source_request_upper_envelope')
+        _catalog_profile_finite(wave)
     ordered = sorted(waves.values(), key=lambda wave: (wave['owner'],
                      re.sub(r'\d+', lambda match: match[0].zfill(10), wave['id'])))
     totals = Counter()
@@ -162,30 +176,7 @@ def catalog_profile(catalog, map_key, *, master=False):
     return result
 
 
-def attach_encounters(profile):
-    grouped = {}
-    for wave in profile['waves']:
-        match = re.search(r'/encounterComponent\.entityEvents\.item\[(\d+)\]/\d+$', wave['id'])
-        key = wave['id'].rsplit('/', 1)[0] if match else wave['id']
-        encounter = grouped.setdefault(key, dict(id=key, owner=wave['owner'],
-            script_index=int(match[1]) if match else None,
-            kind='scripted_encounter' if match else wave['slots'][0]['family'], waves=[]))
-        encounter['waves'].append(wave)
-    for encounter in grouped.values():
-        encounter['slots'] = [slot for wave in encounter['waves'] for slot in wave['slots']]
-        for field in ('counts', 'finite_counts', 'species_counts'):
-            totals = Counter()
-            for wave in encounter['waves']:
-                totals.update(wave[field])
-            encounter[field] = dict(totals)
-        for field in ('total', 'finite_total', 'renewable_targets'):
-            encounter[field] = sum(wave[field] for wave in encounter['waves'])
-        peaks = [wave['peak'] for wave in encounter['waves'] if 'peak' in wave]
-        if peaks:
-            encounter['peak'] = {field: max(peak.get(field, 0) for peak in peaks)
-                                 for field in ('maximum', 'heavy', 'superheavy', 'stationary', 'pressure', 'mixed', 'combined_special')}
-            encounter['peak']['specials'] = {species: max(peak['specials'].get(species, 0) for peak in peaks)
-                                              for species in sorted(SPECIAL_SPECIES)}
+def _attach_encounters_encounter(grouped, profile):
     profile['encounters'] = list(grouped.values())
     first = {}
     for encounter in profile['encounters']:
@@ -194,6 +185,43 @@ def attach_encounters(profile):
                                   encounter['script_index'] < (first[owner]['script_index'] or 0)):
             first[owner] = encounter
     profile['primary_encounters'] = [encounter['id'] for encounter in first.values()]
+
+
+def _attach_encounters_peaks(encounter):
+    encounter['slots'] = [slot for wave in encounter['waves'] for slot in wave['slots']]
+    for field in ('counts', 'finite_counts', 'species_counts'):
+        totals = Counter()
+        for wave in encounter['waves']:
+            totals.update(wave[field])
+        encounter[field] = dict(totals)
+    for field in ('total', 'finite_total', 'renewable_targets'):
+        encounter[field] = sum(wave[field] for wave in encounter['waves'])
+    peaks = [wave['peak'] for wave in encounter['waves'] if 'peak' in wave]
+    return peaks
+
+
+def _attach_encounters_grouped(profile):
+    grouped = {}
+    for wave in profile['waves']:
+        match = re.search(r'/encounterComponent\.entityEvents\.item\[(\d+)\]/\d+$', wave['id'])
+        key = wave['id'].rsplit('/', 1)[0] if match else wave['id']
+        encounter = grouped.setdefault(key, dict(id=key, owner=wave['owner'],
+            script_index=int(match[1]) if match else None,
+            kind='scripted_encounter' if match else wave['slots'][0]['family'], waves=[]))
+        encounter['waves'].append(wave)
+    return grouped
+
+
+def attach_encounters(profile):
+    grouped = _attach_encounters_grouped(profile)
+    for encounter in grouped.values():
+        peaks = _attach_encounters_peaks(encounter)
+        if peaks:
+            encounter['peak'] = {field: max(peak.get(field, 0) for peak in peaks)
+                                 for field in ('maximum', 'heavy', 'superheavy', 'stationary', 'pressure', 'mixed', 'combined_special')}
+            encounter['peak']['specials'] = {species: max(peak['specials'].get(species, 0) for peak in peaks)
+                                              for species in sorted(SPECIAL_SPECIES)}
+    _attach_encounters_encounter(grouped, profile)
     profile['primary_basis'] = 'lowest nonempty script index; alternatives retained separately'
 
 

@@ -7,8 +7,9 @@ import os
 import re
 import uuid
 from collections import Counter
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping, cast
+from typing import Any, cast
 
 import yaml
 
@@ -16,14 +17,133 @@ from doom_eap.content.enemy_options import normalize_enemy_options
 from doom_eap.content.enemy_species import speed_capability_notice
 from doom_eap.strings import PlayerError
 
-
 OPTIONS_SCHEMA_VERSION = 3
 SUPPORTED_UI_TYPES = frozenset({"toggle", "choice", "option_set", "option_dict", "range", "named_range"})
 GAME_NAME = "DOOM Eternal"
 START_INVENTORY_KEYS = ("start_inventory", "start_inventory_from_pool")
 
 
-def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
+def _validate_options_schema_choices(key, option):
+    choices = option.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError(f"choice {key} lacks choices")
+    choice_keys = []
+    for choice in choices:
+        if not isinstance(choice, Mapping):
+            raise ValueError(f"choice {key} contains malformed entry")
+        choice_key = choice.get("key")
+        if not isinstance(choice_key, str) or not choice_key:
+            raise ValueError(f"choice {key} contains invalid key")
+        if not isinstance(choice.get("label"), str) or not choice["label"]:
+            raise ValueError(f"choice {key} contains invalid label")
+        choice_keys.append(choice_key)
+    if len(choice_keys) != len(set(choice_keys)):
+        raise ValueError(f"choice {key} contains duplicate keys")
+    return choice_keys
+
+
+def _validate_options_schema_default(choices, key, option):
+    default = option.get("default")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError(f"option set {key} lacks choices")
+    if not isinstance(default, list):
+        raise ValueError(f"option set {key} default must be a list")
+    choice_keys: list[str] = []
+    for choice in choices:
+        if not isinstance(choice, Mapping):
+            raise ValueError(f"option set {key} contains malformed entry")
+        choice_key = choice.get("key")
+        if not isinstance(choice_key, str) or not choice_key:
+            raise ValueError(f"option set {key} contains invalid key")
+        if not isinstance(choice.get("label"), str) or not choice["label"]:
+            raise ValueError(f"option set {key} contains invalid label")
+        choice_keys.append(choice_key)
+    return choice_keys, default
+
+
+def _validate_options_schema_option(keys, raw):
+    if not isinstance(raw, Mapping):
+        raise ValueError("options schema entry must be an object")
+    option = dict(raw)
+    key = option.get("key")
+    if not isinstance(key, str) or re.fullmatch(r"[a-z][a-z0-9_]*", key) is None:
+        raise ValueError(f"invalid option key: {key!r}")
+    if key in keys:
+        raise ValueError(f"duplicate option key: {key}")
+    keys.add(key)
+    if not isinstance(option.get("display_name"), str) or not option["display_name"].strip():
+        raise ValueError(f"option {key} lacks display name")
+    if not isinstance(option.get("description"), str):
+        raise ValueError(f"option {key} lacks description")
+    if not isinstance(option.get("group"), str) or not option["group"].strip():
+        raise ValueError(f"option {key} lacks group")
+    return key, option
+
+
+def _validate_options_schema_special_values(key, option):
+    special_values = option.get("special_values")
+    if not isinstance(special_values, list):
+        raise ValueError(f"named range {key} lacks special values")
+    special_keys: list[str] = []
+    for special in special_values:
+        if not isinstance(special, Mapping):
+            raise ValueError(f"named range {key} contains malformed special value")
+        special_key = special.get("key")
+        if (
+            not isinstance(special_key, str)
+            or re.fullmatch(r"[a-z][a-z0-9_]*", special_key) is None
+            or not isinstance(special.get("label"), str)
+            or not special["label"].strip()
+            or isinstance(special.get("value"), bool)
+            or not isinstance(special.get("value"), int)
+        ):
+            raise ValueError(f"named range {key} contains invalid special value")
+        special_keys.append(special_key)
+    return special_keys
+
+
+def _validate_options_schema_special_keys(default, key, maximum, minimum, option):
+    special_keys = _validate_options_schema_special_values(key, option)
+    if len(special_keys) != len(set(special_keys)):
+        raise ValueError(f"named range {key} contains duplicate special values")
+    maximum_label = option.get("maximum_label")
+    if maximum_label is not None and (
+        not isinstance(maximum_label, str) or not maximum_label.strip()
+    ):
+        raise ValueError(f"named range {key} maximum label is invalid")
+    if default not in special_keys and (
+        isinstance(default, bool)
+        or not isinstance(default, int)
+        or not minimum <= default <= maximum
+    ):
+        raise ValueError(f"named range {key} default is invalid")
+
+
+def _validate_options_schema_minimum(key, option, ui_type):
+    minimum = option.get("minimum")
+    maximum = option.get("maximum")
+    default = option.get("default")
+    if any(
+        isinstance(value, bool) or not isinstance(value, int)
+        for value in (minimum, maximum)
+    ):
+        raise ValueError(f"range {key} bounds must be integers")
+    minimum = cast(int, minimum)
+    maximum = cast(int, maximum)
+    if minimum > maximum:
+        raise ValueError(f"range {key} bounds are invalid")
+    if ui_type == "named_range":
+        _validate_options_schema_special_keys(default, key, maximum, minimum, option)
+    elif (
+        isinstance(default, bool)
+        or not isinstance(default, int)
+        or not minimum <= default <= maximum
+    ):
+        raise ValueError(f"range {key} default is outside bounds")
+    return maximum, minimum
+
+
+def _validate_options_schema_raw_options(document):
     if not isinstance(document, Mapping):
         raise ValueError("options schema must be an object")
     if document.get("schema_version") != OPTIONS_SCHEMA_VERSION:
@@ -33,141 +153,10 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
     raw_options = document.get("options")
     if not isinstance(raw_options, list) or not raw_options:
         raise ValueError("options schema must contain exposed options")
+    return raw_options
 
-    keys: set[str] = set()
-    options: list[dict[str, Any]] = []
-    for raw in raw_options:
-        if not isinstance(raw, Mapping):
-            raise ValueError("options schema entry must be an object")
-        option = dict(raw)
-        key = option.get("key")
-        if not isinstance(key, str) or re.fullmatch(r"[a-z][a-z0-9_]*", key) is None:
-            raise ValueError(f"invalid option key: {key!r}")
-        if key in keys:
-            raise ValueError(f"duplicate option key: {key}")
-        keys.add(key)
-        if not isinstance(option.get("display_name"), str) or not option["display_name"].strip():
-            raise ValueError(f"option {key} lacks display name")
-        if not isinstance(option.get("description"), str):
-            raise ValueError(f"option {key} lacks description")
-        if not isinstance(option.get("group"), str) or not option["group"].strip():
-            raise ValueError(f"option {key} lacks group")
-        ui_type = option.get("ui_type")
-        if ui_type not in SUPPORTED_UI_TYPES:
-            raise ValueError(f"unsupported UI type for {key}: {ui_type!r}")
-        if ui_type == "toggle":
-            if not isinstance(option.get("default"), bool):
-                raise ValueError(f"toggle {key} default must be boolean")
-        elif ui_type == "choice":
-            choices = option.get("choices")
-            if not isinstance(choices, list) or not choices:
-                raise ValueError(f"choice {key} lacks choices")
-            choice_keys = []
-            for choice in choices:
-                if not isinstance(choice, Mapping):
-                    raise ValueError(f"choice {key} contains malformed entry")
-                choice_key = choice.get("key")
-                if not isinstance(choice_key, str) or not choice_key:
-                    raise ValueError(f"choice {key} contains invalid key")
-                if not isinstance(choice.get("label"), str) or not choice["label"]:
-                    raise ValueError(f"choice {key} contains invalid label")
-                choice_keys.append(choice_key)
-            if len(choice_keys) != len(set(choice_keys)):
-                raise ValueError(f"choice {key} contains duplicate keys")
-            if option.get("default") not in choice_keys:
-                raise ValueError(f"choice {key} default is not canonical")
-        elif ui_type == "option_set":
-            choices = option.get("choices")
-            default = option.get("default")
-            if not isinstance(choices, list) or not choices:
-                raise ValueError(f"option set {key} lacks choices")
-            if not isinstance(default, list):
-                raise ValueError(f"option set {key} default must be a list")
-            choice_keys: list[str] = []
-            for choice in choices:
-                if not isinstance(choice, Mapping):
-                    raise ValueError(f"option set {key} contains malformed entry")
-                choice_key = choice.get("key")
-                if not isinstance(choice_key, str) or not choice_key:
-                    raise ValueError(f"option set {key} contains invalid key")
-                if not isinstance(choice.get("label"), str) or not choice["label"]:
-                    raise ValueError(f"option set {key} contains invalid label")
-                choice_keys.append(choice_key)
-            if len(choice_keys) != len(set(choice_keys)):
-                raise ValueError(f"option set {key} contains duplicate keys")
-            if any(not isinstance(value, str) or value not in choice_keys for value in default):
-                raise ValueError(f"option set {key} default contains unknown values")
-            if len(default) != len(set(default)):
-                raise ValueError(f"option set {key} default contains duplicate values")
-        elif ui_type == "option_dict":
-            entries = option.get("entries")
-            if not isinstance(entries, list) or not entries:
-                raise ValueError(f"option dictionary {key} lacks entries")
-            seen = set()
-            for entry in entries:
-                if (not isinstance(entry, Mapping) or not isinstance(entry.get("key"), str)
-                        or not entry["key"] or entry["key"] in seen
-                        or not isinstance(entry.get("label"), str) or not entry["label"]
-                        or type(entry.get("minimum")) is not int or type(entry.get("maximum")) is not int
-                        or entry["minimum"] < 0 or entry["maximum"] < entry["minimum"]):
-                    raise ValueError(f"option dictionary {key} contains invalid entry")
-                seen.add(entry["key"])
-            _validate_option_dict(option, option.get("default"))
-        elif ui_type in {"range", "named_range"}:
-            minimum = option.get("minimum")
-            maximum = option.get("maximum")
-            default = option.get("default")
-            if any(
-                isinstance(value, bool) or not isinstance(value, int)
-                for value in (minimum, maximum)
-            ):
-                raise ValueError(f"range {key} bounds must be integers")
-            minimum = cast(int, minimum)
-            maximum = cast(int, maximum)
-            if minimum > maximum:
-                raise ValueError(f"range {key} bounds are invalid")
-            if ui_type == "named_range":
-                special_values = option.get("special_values")
-                if not isinstance(special_values, list):
-                    raise ValueError(f"named range {key} lacks special values")
-                special_keys: list[str] = []
-                for special in special_values:
-                    if not isinstance(special, Mapping):
-                        raise ValueError(f"named range {key} contains malformed special value")
-                    special_key = special.get("key")
-                    if (
-                        not isinstance(special_key, str)
-                        or re.fullmatch(r"[a-z][a-z0-9_]*", special_key) is None
-                        or not isinstance(special.get("label"), str)
-                        or not special["label"].strip()
-                        or isinstance(special.get("value"), bool)
-                        or not isinstance(special.get("value"), int)
-                    ):
-                        raise ValueError(f"named range {key} contains invalid special value")
-                    special_keys.append(special_key)
-                if len(special_keys) != len(set(special_keys)):
-                    raise ValueError(f"named range {key} contains duplicate special values")
-                maximum_label = option.get("maximum_label")
-                if maximum_label is not None and (
-                    not isinstance(maximum_label, str) or not maximum_label.strip()
-                ):
-                    raise ValueError(f"named range {key} maximum label is invalid")
-                if default not in special_keys and (
-                    isinstance(default, bool)
-                    or not isinstance(default, int)
-                    or not minimum <= default <= maximum
-                ):
-                    raise ValueError(f"named range {key} default is invalid")
-            elif (
-                isinstance(default, bool)
-                or not isinstance(default, int)
-                or not minimum <= default <= maximum
-            ):
-                raise ValueError(f"range {key} default is outside bounds")
-            option["minimum"] = minimum
-            option["maximum"] = maximum
-        options.append(option)
 
+def _validate_options_schema_excluded(document, options):
     excluded = document.get("excluded_options", [])
     if not isinstance(excluded, list) or any(
         not isinstance(entry, Mapping)
@@ -179,6 +168,64 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
     normalized = dict(document)
     normalized["options"] = options
     normalized["excluded_options"] = [dict(entry) for entry in excluded]
+    return normalized
+
+
+def _validate_options_schema_choice_keys(choices, key, option):
+    choice_keys, default = _validate_options_schema_default(choices, key, option)
+    if len(choice_keys) != len(set(choice_keys)):
+        raise ValueError(f"option set {key} contains duplicate keys")
+    if any(not isinstance(value, str) or value not in choice_keys for value in default):
+        raise ValueError(f"option set {key} default contains unknown values")
+    if len(default) != len(set(default)):
+        raise ValueError(f"option set {key} default contains duplicate values")
+
+
+def _invalid_dictionary_entry_identity(entry, seen):
+    return not isinstance(entry, Mapping) or not isinstance(entry.get('key'), str) or (not entry['key']) or (entry['key'] in seen) or (not isinstance(entry.get('label'), str)) or (not entry['label'])
+
+
+def _validate_dictionary_schema(key, option):
+    entries = option.get("entries")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError(f"option dictionary {key} lacks entries")
+    seen = set()
+    for entry in entries:
+        if (_invalid_dictionary_entry_identity(entry, seen) or type(entry.get('minimum')) is not int or type(entry.get('maximum')) is not int or (entry['minimum'] < 0) or (entry['maximum'] < entry['minimum'])):
+            raise ValueError(f"option dictionary {key} contains invalid entry")
+        seen.add(entry["key"])
+    _validate_option_dict(option, option.get("default"))
+
+
+def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
+    raw_options = _validate_options_schema_raw_options(document)
+
+    keys: set[str] = set()
+    options: list[dict[str, Any]] = []
+    for raw in raw_options:
+        key, option = _validate_options_schema_option(keys, raw)
+        ui_type = option.get("ui_type")
+        if ui_type not in SUPPORTED_UI_TYPES:
+            raise ValueError(f"unsupported UI type for {key}: {ui_type!r}")
+        if ui_type == "toggle":
+            if not isinstance(option.get("default"), bool):
+                raise ValueError(f"toggle {key} default must be boolean")
+        elif ui_type == "choice":
+            choice_keys = _validate_options_schema_choices(key, option)
+            if option.get("default") not in choice_keys:
+                raise ValueError(f"choice {key} default is not canonical")
+        elif ui_type == "option_set":
+            choices = option.get("choices")
+            _validate_options_schema_choice_keys(choices, key, option)
+        elif ui_type == "option_dict":
+            _validate_dictionary_schema(key, option)
+        elif ui_type in {"range", "named_range"}:
+            maximum, minimum = _validate_options_schema_minimum(key, option, ui_type)
+            option["minimum"] = minimum
+            option["maximum"] = maximum
+        options.append(option)
+
+    normalized = _validate_options_schema_excluded(document, options)
     return normalized
 
 
@@ -209,14 +256,7 @@ def default_option_values(schema: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
-    """Load generated DevInv-supported Starting Inventory choices."""
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"could not load item catalog: {error}") from error
-    if not isinstance(document, Mapping) or document.get("schema_version") != 1:
-        raise ValueError("unsupported item catalog schema")
+def _load_start_inventory_catalog_raw_items(document):
     raw_items = document.get("items")
     if not isinstance(raw_items, list):
         raise ValueError("item catalog lacks items")
@@ -234,6 +274,18 @@ def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
             raise ValueError("item catalog contains invalid item label")
         names.add(name)
         catalog.append({"name": name, "label": label})
+    return catalog
+
+
+def load_start_inventory_catalog(path: Path) -> list[dict[str, str]]:
+    """Load generated DevInv-supported Starting Inventory choices."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"could not load item catalog: {error}") from error
+    if not isinstance(document, Mapping) or document.get("schema_version") != 1:
+        raise ValueError("unsupported item catalog schema")
+    catalog = _load_start_inventory_catalog_raw_items(document)
     return sorted(catalog, key=lambda item: item["label"].casefold())
 
 
@@ -276,6 +328,62 @@ def _validate_starting_limits(options, values):
             raise PlayerError("apworld.errors", "starting_pool_copies", item=name, quantity=quantity, available=available)
 
 
+def _validate_option_values_special_keys(key, option, value):
+    special_keys = {special["key"] for special in option["special_values"]}
+    if isinstance(value, str):
+        if value not in special_keys:
+            raise ValueError(f"{key} must be an explicit value or named range")
+    elif (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not option["minimum"] <= value <= option["maximum"]
+    ):
+        raise ValueError(
+            f"{key} must be between {option['minimum']} and {option['maximum']} or a named range"
+        )
+
+
+def _validate_option_values_choices(key, option, value):
+    choices = {choice["key"] for choice in option["choices"]}
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or item not in choices for item in value
+    ):
+        raise ValueError(f"{key} must be a list of allowed values")
+    if len(value) != len(set(value)):
+        raise ValueError(f"{key} must not contain duplicate values")
+
+
+def _validate_option_values_minimum(key, option, value):
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer")
+    if not option["minimum"] <= value <= option["maximum"]:
+        raise ValueError(
+            f"{key} must be between {option['minimum']} and {option['maximum']}"
+        )
+
+
+def _validate_option_values_ui_type(option, values):
+    key = option["key"]
+    value = values[key]
+    if option["ui_type"] == "toggle":
+        if not isinstance(value, bool):
+            raise ValueError(f"{key} must be true or false")
+    elif option["ui_type"] == "choice":
+        choices = {choice["key"] for choice in option["choices"]}
+        if not isinstance(value, str) or value not in choices:
+            raise ValueError(f"{key} must be one of {sorted(choices)}")
+    elif option["ui_type"] == "option_set":
+        _validate_option_values_choices(key, option, value)
+        value = sorted(value)
+    elif option["ui_type"] == "option_dict":
+        value = _validate_option_dict(option, value)
+    elif option["ui_type"] == "range":
+        _validate_option_values_minimum(key, option, value)
+    else:
+        _validate_option_values_special_keys(key, option, value)
+    return key, value
+
+
 def validate_option_values(
     schema: Mapping[str, Any], values: Mapping[str, Any]
 ) -> dict[str, bool | int | str | list[str] | dict[str, int]]:
@@ -289,46 +397,7 @@ def validate_option_values(
         raise ValueError(f"option value keys mismatch; missing={missing} extra={extra}")
     result: dict[str, bool | int | str | list[str] | dict[str, int]] = {}
     for option in validated["options"]:
-        key = option["key"]
-        value = values[key]
-        if option["ui_type"] == "toggle":
-            if not isinstance(value, bool):
-                raise ValueError(f"{key} must be true or false")
-        elif option["ui_type"] == "choice":
-            choices = {choice["key"] for choice in option["choices"]}
-            if not isinstance(value, str) or value not in choices:
-                raise ValueError(f"{key} must be one of {sorted(choices)}")
-        elif option["ui_type"] == "option_set":
-            choices = {choice["key"] for choice in option["choices"]}
-            if not isinstance(value, list) or any(
-                not isinstance(item, str) or item not in choices for item in value
-            ):
-                raise ValueError(f"{key} must be a list of allowed values")
-            if len(value) != len(set(value)):
-                raise ValueError(f"{key} must not contain duplicate values")
-            value = sorted(value)
-        elif option["ui_type"] == "option_dict":
-            value = _validate_option_dict(option, value)
-        elif option["ui_type"] == "range":
-            if isinstance(value, bool) or not isinstance(value, int):
-                raise ValueError(f"{key} must be an integer")
-            if not option["minimum"] <= value <= option["maximum"]:
-                raise ValueError(
-                    f"{key} must be between {option['minimum']} and {option['maximum']}"
-                )
-        else:
-            special_keys = {special["key"] for special in option["special_values"]}
-            if isinstance(value, str):
-                if value not in special_keys:
-                    raise ValueError(f"{key} must be an explicit value or named range")
-            elif (
-                isinstance(value, bool)
-                or not isinstance(value, int)
-                or not option["minimum"] <= value <= option["maximum"]
-            ):
-                raise ValueError(
-                    f"{key} must be between {option['minimum']} and {option['maximum']} or a named range"
-                )
+        key, value = _validate_option_values_ui_type(option, values)
         result[key] = value
     result["start_inventory"] = validate_start_inventory(values["start_inventory"])
     result["start_inventory_from_pool"] = validate_start_inventory(values["start_inventory_from_pool"], "start_inventory_from_pool")
@@ -425,9 +494,51 @@ class _PlayerLoader(yaml.SafeLoader):
     def construct_mapping(self, node, deep=False):
         self.flatten_mapping(node)
         keys = [self.construct_object(key, deep=deep) for key, _ in node.value]
-        if any(not isinstance(key, (str, int)) for key in keys) or len(keys) != len(set(keys)):
+        if any(not isinstance(key, str | int) for key in keys) or len(keys) != len(set(keys)):
             raise ValueError("YAML contains duplicate or unsupported mapping keys")
         return super().construct_mapping(node, deep=deep)
+
+
+def _load_player_yaml_raw_options(document):
+    if not isinstance(document, dict) or document.get("game") != GAME_NAME:
+        raise ValueError("Select a single DOOM Eternal player YAML")
+    name = validate_player_name(document.get("name"))
+    raw_options = document.get(GAME_NAME)
+    if not isinstance(raw_options, dict):
+        raise ValueError("Player YAML lacks DOOM Eternal settings")
+    if "dlc_logic_timing" in raw_options:
+        raise ValueError(
+            "DLC Logic Timing belongs to DoomEAP 0.6. "
+            "Use the DoomEAP 0.7 template to create a new room."
+        )
+    return name, raw_options
+
+
+def _yaml_choice_keys(option, value):
+    return (choice['key'] for choice in option['choices'] if value == choice['value'] or (isinstance(value, str) and value.casefold() in {choice['key'].casefold(), choice['label'].casefold()}))
+
+
+def _yaml_set_values(option, value):
+    return list(dict.fromkeys(next((choice['key'] for choice in option['choices'] if item in choice.get('aliases', ())), item) for item in value))
+
+
+def _yaml_named_range_value(option, value):
+    return next((special['key'] for special in option['special_values'] if value == special['value']), value)
+
+
+def _import_option_value(key, option, value, values):
+    kind = option["ui_type"]
+    if kind == "toggle" and value in (0, 1, "true", "false", "on", "off"):
+        value = value in (1, "true", "on")
+    elif kind == "choice":
+        value = next(_yaml_choice_keys(option, value), value)
+    elif kind == "named_range" and isinstance(value, int):
+        value = _yaml_named_range_value(option, value)
+    elif kind == "option_set" and isinstance(value, list):
+        if any(not isinstance(item, str) for item in value):
+            raise ValueError(f"{key} must contain explicit option names")
+        value = _yaml_set_values(option, value)
+    values[key] = value
 
 
 def load_player_yaml(path: Path, schema: Mapping[str, Any]) -> tuple[str, dict[str, Any], dict[str, Any]]:
@@ -440,38 +551,14 @@ def load_player_yaml(path: Path, schema: Mapping[str, Any]) -> tuple[str, dict[s
         document = yaml.load(raw.decode("utf-8-sig"), Loader=_PlayerLoader)
     except (yaml.YAMLError, UnicodeError, RecursionError) as error:
         raise ValueError(f"Could not read Player YAML: {error}") from error
-    if not isinstance(document, dict) or document.get("game") != GAME_NAME:
-        raise ValueError("Select a single DOOM Eternal player YAML")
-    name = validate_player_name(document.get("name"))
-    raw_options = document.get(GAME_NAME)
-    if not isinstance(raw_options, dict):
-        raise ValueError("Player YAML lacks DOOM Eternal settings")
-    if "dlc_logic_timing" in raw_options:
-        raise ValueError(
-            "DLC Logic Timing belongs to DoomEAP 0.6. "
-            "Use the DoomEAP 0.7 template to create a new room."
-        )
+    name, raw_options = _load_player_yaml_raw_options(document)
     values = default_option_values(schema)
     for option in schema["options"]:
         key = option["key"]
         if key not in raw_options:
             continue
         value = raw_options[key]
-        kind = option["ui_type"]
-        if kind == "toggle" and value in (0, 1, "true", "false", "on", "off"):
-            value = value in (1, "true", "on")
-        elif kind == "choice":
-            value = next((choice["key"] for choice in option["choices"]
-                          if value == choice["value"] or isinstance(value, str)
-                          and value.casefold() in {choice["key"].casefold(), choice["label"].casefold()}), value)
-        elif kind == "named_range" and isinstance(value, int):
-            value = next((special["key"] for special in option["special_values"] if value == special["value"]), value)
-        elif kind == "option_set" and isinstance(value, list):
-            if any(not isinstance(item, str) for item in value):
-                raise ValueError(f"{key} must contain explicit option names")
-            value = list(dict.fromkeys(next((choice["key"] for choice in option["choices"]
-                                            if item in choice.get("aliases", ())), item) for item in value))
-        values[key] = value
+        _import_option_value(key, option, value, values)
     values["start_inventory"] = raw_options.get("start_inventory", {})
     values["start_inventory_from_pool"] = raw_options.get("start_inventory_from_pool", {})
     try:

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ROOT = REPO_ROOT
 CONTRACT_PATH = REPO_ROOT / "data" / "ap_visual_bundle.json"

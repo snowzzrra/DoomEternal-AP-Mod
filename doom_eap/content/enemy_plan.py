@@ -2,8 +2,8 @@
 
 import hashlib
 import json
-import random
 import math
+import random
 from fractions import Fraction
 
 from . import enemy_species
@@ -32,10 +32,7 @@ BASE_COMBAT_COST = {
 }
 
 
-def enemy_combat_cost(species, attributes, *, buff_totems=False, screechers=False):
-    if set(attributes) != {f"{name}_percent" for name in ("health", "damage", "speed", "size")} or any(
-            type(value) is not int or not 1 <= value <= 10000 for value in attributes.values()):
-        raise ValueError("Enemy combat attributes require integer percentages in 1..10000")
+def _enemy_combat_cost_damage(attributes, buff_totems, screechers, species):
     health, damage, speed, size = (attributes[f"{name}_percent"] for name in ("health", "damage", "speed", "size"))
     cost = BASE_COMBAT_COST[species]
     if buff_totems and species == 'buff_pod':
@@ -46,6 +43,13 @@ def enemy_combat_cost(species, attributes, *, buff_totems=False, screechers=Fals
     # One kill still takes a targeting action when health is below a normal shot.
     return Fraction(cost.numerator * max(health, 25) * (100 + damage) * (300 + speed) * size_numerator,
                     cost.denominator * 100 * 200 * 400 * size_denominator)
+
+
+def enemy_combat_cost(species, attributes, *, buff_totems=False, screechers=False):
+    if set(attributes) != {f"{name}_percent" for name in ("health", "damage", "speed", "size")} or any(
+            type(value) is not int or not 1 <= value <= 10000 for value in attributes.values()):
+        raise ValueError("Enemy combat attributes require integer percentages in 1..10000")
+    return _enemy_combat_cost_damage(attributes, buff_totems, screechers, species)
 
 
 def _density_weights(enemies, candidates, *, seed, phase, stage_index, stage_count):
@@ -71,32 +75,35 @@ LIMITED_SPECIES = ('marauder', 'archvile', 'spirit', 'buff_pod', 'zombie_t1_scre
                    'blood_angel', 'cursed_prowler', 'stone_imp', 'armored_baron')
 
 
-def _limit_suffix(enemies, species):
-    limits = enemies["special_limits"]
-    values = "".join(f"{limits[name]:08x}" for name in ("marauder", "archvile", "spirit", "combined_special"))
-    kinds = {"marauder": "m", "archvile": "a", "spirit": "s"}
-    if enemies.get('revision', 2) >= 3:
-        kinds['buff_pod'] = 'b'
-    if enemies.get('revision', 2) >= 4:
-        kinds['zombie_t1_screecher'] = 'c'
+def _limit_suffix_caps(population):
+    caps = population['species']
+    if not population.get('strict') or set(caps) != set(LIMITED_SPECIES) or any(
+            type(caps[name]) is not int or not 0 <= caps[name] <= 0x7fffffff for name in LIMITED_SPECIES):
+        raise ValueError('Invalid strict species limits')
+    prefix = '_v' + ''.join(f'{caps[name]:08x}' for name in LIMITED_SPECIES)
+    return prefix
+
+
+def _limit_suffix_flags(population, prefix):
+    flags = int(population.get('strict', False)) << 1
+    if population.get('counter'):
+        if not population.get('strict') or population['counter'] != 'spirit':
+            raise ValueError('Invalid strict population counter')
+        flags |= 4
+    if 'species' in population:
+        prefix = _limit_suffix_caps(population)
+    prefix += f"_a{population['scope']:016x}_p" + ''.join(
+        f"{(population[name] | flags | (population.get('heavy', 0) << 8) if name == 'mixed' else population[name]):08x}"
+        for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
+    return prefix
+
+
+def _limit_suffix_kind(enemies, kinds, species):
     kind = kinds.get(species, "n")
     population = enemies.get('population_limits')
     prefix = ''
     if population:
-        flags = int(population.get('strict', False)) << 1
-        if population.get('counter'):
-            if not population.get('strict') or population['counter'] != 'spirit':
-                raise ValueError('Invalid strict population counter')
-            flags |= 4
-        if 'species' in population:
-            caps = population['species']
-            if not population.get('strict') or set(caps) != set(LIMITED_SPECIES) or any(
-                    type(caps[name]) is not int or not 0 <= caps[name] <= 0x7fffffff for name in LIMITED_SPECIES):
-                raise ValueError('Invalid strict species limits')
-            prefix = '_v' + ''.join(f'{caps[name]:08x}' for name in LIMITED_SPECIES)
-        prefix += f"_a{population['scope']:016x}_p" + ''.join(
-            f"{(population[name] | flags | (population.get('heavy', 0) << 8) if name == 'mixed' else population[name]):08x}"
-            for name in ('maximum', 'superheavy', 'pressure', 'mixed'))
+        prefix = _limit_suffix_flags(population, prefix)
         if species in {'baron', 'armored_baron', 'doom_hunter', 'tyrant'}:
             kind = 'h'
         elif species in {'zombie_tier_1', 'zombie_tier_3', 'imp', 'gargoyle', 'hell_soldier'}:
@@ -105,6 +112,18 @@ def _limit_suffix(enemies, species):
             kind = 'o'
         elif (population.get('heavy') or population.get('strict')) and species in SPECIES_GROUPS['fodder'] and species != 'zombie_t1_screecher':
             kind = 'o'
+    return kind, prefix
+
+
+def _limit_suffix(enemies, species):
+    limits = enemies["special_limits"]
+    values = "".join(f"{limits[name]:08x}" for name in ("marauder", "archvile", "spirit", "combined_special"))
+    kinds = {"marauder": "m", "archvile": "a", "spirit": "s"}
+    if enemies.get('revision', 2) >= 3:
+        kinds['buff_pod'] = 'b'
+    if enemies.get('revision', 2) >= 4:
+        kinds['zombie_t1_screecher'] = 'c'
+    kind, prefix = _limit_suffix_kind(enemies, kinds, species)
     return f"{prefix}_l{values}_k{kind}"
 
 
@@ -139,18 +158,7 @@ def sample_species(enemies, eligible_species, *, seed, instance_key):
         draw -= weight
 
 
-def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_index, stage_count, random_draws=None):
-    if type(stage_count) is not int or type(stage_index) is not int or not 0 <= stage_index < stage_count:
-        raise ValueError("Enemy progression requires an included stage index")
-    denominator = max(1, stage_count - 1)
-    def draw(field, lower, upper):
-        key = (field, lower, upper)
-        if random_draws is None:
-            return _random_for(seed, instance_key, field).randint(lower, upper)
-        if key not in random_draws:
-            random_draws[key] = _random_for(seed, instance_key, field).randint(lower, upper)
-        return random_draws[key]
-    attributes = {}
+def _sample_instance_attributes_attribute(attributes, denominator, draw, enemies, species, stage_index):
     for attribute in ("health", "damage", "speed", "size"):
         ranges = enemies["attributes"][attribute]
         bounds = ranges["species"].get(species, ranges["global"])
@@ -168,6 +176,21 @@ def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_in
         chance = enemies["size_variation_chance"]
         variation = draw("size_variation", 0, 199) if chance else 0
         attributes["size_percent"] = 50 if variation < chance else 200 if variation < 2 * chance else 100
+
+
+def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_index, stage_count, random_draws=None):
+    if type(stage_count) is not int or type(stage_index) is not int or not 0 <= stage_index < stage_count:
+        raise ValueError("Enemy progression requires an included stage index")
+    denominator = max(1, stage_count - 1)
+    def draw(field, lower, upper):
+        key = (field, lower, upper)
+        if random_draws is None:
+            return _random_for(seed, instance_key, field).randint(lower, upper)
+        if key not in random_draws:
+            random_draws[key] = _random_for(seed, instance_key, field).randint(lower, upper)
+        return random_draws[key]
+    attributes = {}
+    _sample_instance_attributes_attribute(attributes, denominator, draw, enemies, species, stage_index)
     return attributes
 
 
@@ -177,7 +200,14 @@ def build_resolved_enemy_blocks(enemies, campaign, *, seed, catalog=None, resolv
     """Produce inactive resolved blocks; readiness receives the final safe plan."""
     from .killsanity_plan import build_campaign_kill_budget, build_resolved_killsanity
     from .native_enemy_plan import build_native_recipes, encode_native_recipes
-    from .slot_data_contract import MAX_PAYLOAD_BYTES, PayloadSizeError, StructureError, canonical_bytes, catalog_tables, load_slot_catalog
+    from .slot_data_contract import (
+        MAX_PAYLOAD_BYTES,
+        PayloadSizeError,
+        StructureError,
+        canonical_bytes,
+        catalog_tables,
+        load_slot_catalog,
+    )
 
     catalog = load_slot_catalog() if catalog is None else catalog
     try:

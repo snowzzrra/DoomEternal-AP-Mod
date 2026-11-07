@@ -212,9 +212,7 @@ def build_authorial_registry(root: Path) -> dict[str, Any]:
 def render_authorial_registry(document):
     entries = []
     for entry in document["entries"]:
-        indent = None if entry["classification"] == "event_only" else 2
-        payload = json.dumps(entry, indent=indent, sort_keys=True)
-        entries.append("\n".join("    " + line for line in payload.splitlines()))
+        entries.append("    " + json.dumps(entry, sort_keys=True, separators=(",", ":")))
     rendered = json.dumps({**document, "entries": []}, indent=2, sort_keys=True)
     return rendered.replace('"entries": []', '"entries": [\n' + ',\n'.join(entries) + '\n  ]', 1) + "\n"
 
@@ -228,6 +226,55 @@ def _require_hash(value: Any, label: str) -> None:
     _require(isinstance(value, str) and bool(re.fullmatch(r"[0-9a-f]{64}", value)), f"invalid {label}")
 
 
+def _validate_common_required(entry, seen):
+    _require(isinstance(entry, dict), "checked-location visual entry must be object")
+    required = {"map_key", "runtime_map", "location_id", "ap_check", "classification", "source_identity"}
+    _require(set(entry) >= required, "checked-location visual entry fields missing")
+    identity = (entry["map_key"], entry["location_id"])
+    _require(identity not in seen, f"duplicate checked-location visual entry: {identity}")
+    seen.add(identity)
+    _require(isinstance(entry["location_id"], int) and not isinstance(entry["location_id"], bool), "invalid location ID")
+    _require(isinstance(entry["ap_check"], str) and entry["ap_check"].startswith("AP_CHECK_"), "invalid AP check")
+    _require(isinstance(entry["source_identity"], dict), "invalid source identity")
+    source_identity = entry["source_identity"]
+    for field in (
+        "source_sha256", "descriptor_sha256", "resource_sha256",
+        "policy_sha256", "location_descriptor_sha256",
+    ):
+        _require_hash(source_identity.get(field), f"source identity {field}")
+    _require(isinstance(source_identity.get("source_file"), str), "invalid source identity source_file")
+    _require(isinstance(source_identity.get("source_entity"), str), "invalid source identity source_entity")
+    _require(isinstance(source_identity.get("resource"), dict), "invalid source identity resource")
+    _require(source_identity["resource_sha256"] == _canonical_hash(source_identity["resource"]), "source resource hash drift")
+    _require(entry["classification"] in {"visible_cleanup", "no_visual", "event_only"}, "invalid visual classification")
+    _validate_arena_suppression(entry)
+    if entry["classification"] == "visible_cleanup":
+        for field in (
+            "presentation_entity", "cleanup_entity", "reconciliation_entity",
+            "direct_target",
+        ):
+            _require(bool(isinstance(entry.get(field), str) and ENTITY_NAME_RE.fullmatch(entry[field])), f"invalid visual target name: {field}")
+        _require(entry["direct_target"] == entry["presentation_entity"], "visual direct target mismatch")
+        expected_endpoints = {
+            "presentation_entity": f"ap_location_visual_{entry['location_id']}",
+            "cleanup_entity": f"ap_remove_location_visual_{entry['location_id']}",
+            "reconciliation_entity": f"ap_hide_location_visual_{entry['location_id']}",
+        }
+        for field, expected in expected_endpoints.items():
+            _require(entry[field] == expected, f"visual endpoint name drift: {field}")
+    else:
+        _require(
+            not any(
+                field in entry
+                for field in (
+                    "presentation_entity", "cleanup_entity",
+                    "reconciliation_entity", "direct_target",
+                )
+            ),
+            "special visual entry has cleanup fields",
+        )
+
+
 def _validate_common(document: Any) -> dict[str, Any]:
     _require(isinstance(document, dict), "checked-location visuals must be object")
     _require(document.get("schema_version") == SCHEMA_VERSION, "checked-location visuals schema mismatch")
@@ -237,52 +284,7 @@ def _validate_common(document: Any) -> dict[str, Any]:
     _require(isinstance(document.get("maps"), dict), "checked-location visuals maps missing")
     seen = set()
     for entry in entries:
-        _require(isinstance(entry, dict), "checked-location visual entry must be object")
-        required = {"map_key", "runtime_map", "location_id", "ap_check", "classification", "source_identity"}
-        _require(set(entry) >= required, "checked-location visual entry fields missing")
-        identity = (entry["map_key"], entry["location_id"])
-        _require(identity not in seen, f"duplicate checked-location visual entry: {identity}")
-        seen.add(identity)
-        _require(isinstance(entry["location_id"], int) and not isinstance(entry["location_id"], bool), "invalid location ID")
-        _require(isinstance(entry["ap_check"], str) and entry["ap_check"].startswith("AP_CHECK_"), "invalid AP check")
-        _require(isinstance(entry["source_identity"], dict), "invalid source identity")
-        source_identity = entry["source_identity"]
-        for field in (
-            "source_sha256", "descriptor_sha256", "resource_sha256",
-            "policy_sha256", "location_descriptor_sha256",
-        ):
-            _require_hash(source_identity.get(field), f"source identity {field}")
-        _require(isinstance(source_identity.get("source_file"), str), "invalid source identity source_file")
-        _require(isinstance(source_identity.get("source_entity"), str), "invalid source identity source_entity")
-        _require(isinstance(source_identity.get("resource"), dict), "invalid source identity resource")
-        _require(source_identity["resource_sha256"] == _canonical_hash(source_identity["resource"]), "source resource hash drift")
-        _require(entry["classification"] in {"visible_cleanup", "no_visual", "event_only"}, "invalid visual classification")
-        _validate_arena_suppression(entry)
-        if entry["classification"] == "visible_cleanup":
-            for field in (
-                "presentation_entity", "cleanup_entity", "reconciliation_entity",
-                "direct_target",
-            ):
-                _require(bool(isinstance(entry.get(field), str) and ENTITY_NAME_RE.fullmatch(entry[field])), f"invalid visual target name: {field}")
-            _require(entry["direct_target"] == entry["presentation_entity"], "visual direct target mismatch")
-            expected_endpoints = {
-                "presentation_entity": f"ap_location_visual_{entry['location_id']}",
-                "cleanup_entity": f"ap_remove_location_visual_{entry['location_id']}",
-                "reconciliation_entity": f"ap_hide_location_visual_{entry['location_id']}",
-            }
-            for field, expected in expected_endpoints.items():
-                _require(entry[field] == expected, f"visual endpoint name drift: {field}")
-        else:
-            _require(
-                not any(
-                    field in entry
-                    for field in (
-                        "presentation_entity", "cleanup_entity",
-                        "reconciliation_entity", "direct_target",
-                    )
-                ),
-                "special visual entry has cleanup fields",
-            )
+        _validate_common_required(entry, seen)
     counts = document.get("counts")
     _require(isinstance(counts, dict), "checked-location visuals counts missing")
     actual = {kind: sum(entry["classification"] == kind for entry in entries) for kind in ("visible_cleanup", "no_visual", "event_only")}
@@ -351,20 +353,7 @@ def index_automap_visual_registry(document: dict[str, Any]) -> dict[str, dict[in
     return result
 
 
-def validate_generated_visuals(document: dict[str, Any], map_key: str, content: str) -> None:
-    from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
-
-    entries = [entry for entry in document["entries"] if entry["map_key"] == map_key]
-    expected_visuals = {
-        entry["presentation_entity"]
-        for entry in entries
-        if entry["classification"] == "visible_cleanup"
-    }
-    expected_cleanups = {
-        entry["cleanup_entity"]
-        for entry in entries
-        if entry["classification"] == "visible_cleanup"
-    }
+def _validate_generated_visuals_expected_reconciliations(content, entries, expected_cleanups, expected_visuals, extract_target_names, find_entity_block_bounds, map_key):
     expected_reconciliations = {
         entry["reconciliation_entity"]
         for entry in entries
@@ -424,3 +413,20 @@ def validate_generated_visuals(document: dict[str, Any], map_key: str, content: 
         _require(not any(term in visual.casefold() for term in FORBIDDEN_VISUAL_TERMS), f"functional AP presentation entity: {entry['location_id']}")
         _require(not forbidden_endpoint_pattern.search(cleanup.casefold()), f"forbidden cleanup graph: {entry['location_id']}")
         _require(not forbidden_endpoint_pattern.search(reconciliation.casefold()), f"forbidden reconciliation graph: {entry['location_id']}")
+
+
+def validate_generated_visuals(document: dict[str, Any], map_key: str, content: str) -> None:
+    from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
+
+    entries = [entry for entry in document["entries"] if entry["map_key"] == map_key]
+    expected_visuals = {
+        entry["presentation_entity"]
+        for entry in entries
+        if entry["classification"] == "visible_cleanup"
+    }
+    expected_cleanups = {
+        entry["cleanup_entity"]
+        for entry in entries
+        if entry["classification"] == "visible_cleanup"
+    }
+    _validate_generated_visuals_expected_reconciliations(content, entries, expected_cleanups, expected_visuals, extract_target_names, find_entity_block_bounds, map_key)

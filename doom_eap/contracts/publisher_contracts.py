@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Iterable, Mapping
-
+from typing import Any
 
 TRIGGER_STRATEGIES = frozenset({"native_transition", "map_event_file", "terminal_owner"})
 EFFECT_STRATEGIES = frozenset({
@@ -72,12 +72,50 @@ def publishers_by_trigger(
     })
 
 
-def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
-    if document.get("schema_version") != 1:
-        raise ValueError("publisher contract schema_version must be 1")
-    publishers = document.get("publishers")
-    if not isinstance(publishers, list) or not publishers:
-        raise ValueError("publisher contracts require a non-empty publishers list")
+def _validate_publisher_contracts_effects(effects, key):
+    for effect in effects:
+        strategy = effect.get("strategy")
+        if strategy not in EFFECT_STRATEGIES:
+            raise ValueError(f"{key}: unsupported effect strategy {strategy!r}")
+        if strategy == "location_check":
+            location_id = effect.get("location_id")
+            if not isinstance(location_id, int) or isinstance(location_id, bool):
+                raise ValueError(f"{key}: location_check requires integer location_id")
+        elif strategy == "preserved_native_target" and not effect.get("target"):
+            raise ValueError(f"{key}: preserved_native_target requires target")
+
+
+def _validate_publisher_contracts_filename(filename_markers, key, marker_filenames, trigger):
+    filename = trigger.get("filename")
+    marker = trigger.get("marker")
+    if not isinstance(filename, str) or not filename.endswith(".txt"):
+        raise ValueError(f"{key}: map_event_file requires a .txt filename")
+    if not isinstance(marker, str) or not marker:
+        raise ValueError(f"{key}: map_event_file requires a marker")
+    if filename in filename_markers and filename_markers[filename] != marker:
+        raise ValueError(f"{key}: shared filename has a different marker")
+    if marker in marker_filenames and marker_filenames[marker] != filename:
+        raise ValueError(f"{key}: shared marker has a different filename")
+    return filename, marker
+
+
+def _validate_publisher_contracts_triggers(filename_markers, key, marker_filenames, triggers):
+    for trigger in triggers:
+        strategy = trigger.get("strategy")
+        if strategy not in TRIGGER_STRATEGIES:
+            raise ValueError(f"{key}: unsupported trigger strategy {strategy!r}")
+        if strategy == "native_transition":
+            if not canonical_map_name(trigger.get("from_map")) or not canonical_map_name(trigger.get("to_map")):
+                raise ValueError(f"{key}: native_transition requires from_map/to_map")
+        elif strategy == "map_event_file":
+            filename, marker = _validate_publisher_contracts_filename(filename_markers, key, marker_filenames, trigger)
+            filename_markers[filename] = marker
+            marker_filenames[marker] = filename
+        elif strategy == "terminal_owner" and not trigger.get("owner"):
+            raise ValueError(f"{key}: terminal_owner requires owner")
+
+
+def _validate_publisher_contracts_filename_markers(publishers):
     keys: set[str] = set()
     filename_markers: dict[str, str] = {}
     marker_filenames: dict[str, str] = {}
@@ -94,38 +132,17 @@ def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
             raise ValueError(f"{key}: triggers must be non-empty")
         if not isinstance(effects, list) or not effects:
             raise ValueError(f"{key}: effects must be non-empty")
-        for trigger in triggers:
-            strategy = trigger.get("strategy")
-            if strategy not in TRIGGER_STRATEGIES:
-                raise ValueError(f"{key}: unsupported trigger strategy {strategy!r}")
-            if strategy == "native_transition":
-                if not canonical_map_name(trigger.get("from_map")) or not canonical_map_name(trigger.get("to_map")):
-                    raise ValueError(f"{key}: native_transition requires from_map/to_map")
-            elif strategy == "map_event_file":
-                filename = trigger.get("filename")
-                marker = trigger.get("marker")
-                if not isinstance(filename, str) or not filename.endswith(".txt"):
-                    raise ValueError(f"{key}: map_event_file requires a .txt filename")
-                if not isinstance(marker, str) or not marker:
-                    raise ValueError(f"{key}: map_event_file requires a marker")
-                if filename in filename_markers and filename_markers[filename] != marker:
-                    raise ValueError(f"{key}: shared filename has a different marker")
-                if marker in marker_filenames and marker_filenames[marker] != filename:
-                    raise ValueError(f"{key}: shared marker has a different filename")
-                filename_markers[filename] = marker
-                marker_filenames[marker] = filename
-            elif strategy == "terminal_owner" and not trigger.get("owner"):
-                raise ValueError(f"{key}: terminal_owner requires owner")
-        for effect in effects:
-            strategy = effect.get("strategy")
-            if strategy not in EFFECT_STRATEGIES:
-                raise ValueError(f"{key}: unsupported effect strategy {strategy!r}")
-            if strategy == "location_check":
-                location_id = effect.get("location_id")
-                if not isinstance(location_id, int) or isinstance(location_id, bool):
-                    raise ValueError(f"{key}: location_check requires integer location_id")
-            elif strategy == "preserved_native_target" and not effect.get("target"):
-                raise ValueError(f"{key}: preserved_native_target requires target")
+        _validate_publisher_contracts_triggers(filename_markers, key, marker_filenames, triggers)
+        _validate_publisher_contracts_effects(effects, key)
+
+
+def validate_publisher_contracts(document: Mapping[str, Any]) -> None:
+    if document.get("schema_version") != 1:
+        raise ValueError("publisher contract schema_version must be 1")
+    publishers = document.get("publishers")
+    if not isinstance(publishers, list) or not publishers:
+        raise ValueError("publisher contracts require a non-empty publishers list")
+    _validate_publisher_contracts_filename_markers(publishers)
 
 
 def publisher_contracts_from_document(
@@ -166,11 +183,11 @@ def publisher_contracts_document(publishers) -> dict[str, Any]:
                 "key": publisher.key,
                 "map_key": publisher.map_key,
                 "triggers": [
-                    {key: _thaw(item) for key, item in trigger.items()}
+                    {key: thaw_content(item) for key, item in trigger.items()}
                     for trigger in publisher.triggers
                 ],
                 "effects": [
-                    {key: _thaw(item) for key, item in effect.items()}
+                    {key: thaw_content(item) for key, item in effect.items()}
                     for effect in publisher.effects
                 ],
                 "dedupe_scope": publisher.dedupe_scope,
@@ -181,11 +198,11 @@ def publisher_contracts_document(publishers) -> dict[str, Any]:
     }
 
 
-def _thaw(value: Any) -> Any:
+def thaw_content(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return {key: _thaw(item) for key, item in value.items()}
+        return {key: thaw_content(item) for key, item in value.items()}
     if isinstance(value, tuple):
-        return [_thaw(item) for item in value]
+        return [thaw_content(item) for item in value]
     return value
 
 

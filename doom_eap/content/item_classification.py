@@ -30,11 +30,7 @@ def notification_style_for_item(item_id: int, classification: int) -> str:
         raise ValueError(
             f"item {item_id} has unknown classification bits: {classification}"
         )
-    if classification & ITEM_CLASSIFICATION_TRAP:
-        return "major"
-    if classification & ITEM_CLASSIFICATION_PROGRESSION:
-        return "major"
-    if classification & ITEM_CLASSIFICATION_USEFUL:
+    if classification & (ITEM_CLASSIFICATION_TRAP | ITEM_CLASSIFICATION_PROGRESSION | ITEM_CLASSIFICATION_USEFUL):
         return "major"
     if classification == ITEM_CLASSIFICATION_FILLER:
         return "filler"
@@ -74,17 +70,7 @@ def _reject_duplicate_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def load_item_classification_identity(path: Path) -> dict[int, dict[str, Any]]:
-    """Load and strictly validate the deterministic packaged identity."""
-    data = json.loads(
-        path.read_text(encoding="utf-8"),
-        object_pairs_hook=_reject_duplicate_pairs,
-    )
-    if data.get("schema_version") != ITEM_CLASSIFICATION_SCHEMA_VERSION:
-        raise ValueError("unsupported item classification schema")
-    revision = data.get("item_mapping_revision")
-    if not isinstance(revision, int) or isinstance(revision, bool):
-        raise ValueError("item classification identity lacks mapping revision")
+def _load_item_classification_identity_raw_items(data):
     raw_items = data.get("items")
     if not isinstance(raw_items, dict):
         raise ValueError("item classification identity lacks items")
@@ -103,6 +89,21 @@ def load_item_classification_identity(path: Path) -> dict[int, dict[str, Any]]:
             raise ValueError(f"item {item_id} has no canonical name")
         notification_style_for_item(item_id, entry["classification"])
         result[item_id] = entry
+    return result
+
+
+def load_item_classification_identity(path: Path) -> dict[int, dict[str, Any]]:
+    """Load and strictly validate the deterministic packaged identity."""
+    data = json.loads(
+        path.read_text(encoding="utf-8"),
+        object_pairs_hook=_reject_duplicate_pairs,
+    )
+    if data.get("schema_version") != ITEM_CLASSIFICATION_SCHEMA_VERSION:
+        raise ValueError("unsupported item classification schema")
+    revision = data.get("item_mapping_revision")
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        raise ValueError("item classification identity lacks mapping revision")
+    result = _load_item_classification_identity_raw_items(data)
     return result
 
 

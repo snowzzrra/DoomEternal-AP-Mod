@@ -1,8 +1,9 @@
 """Runtime lifecycle values and map normalization, without registry discovery."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Literal, Mapping
+from typing import Any, Literal
 
 
 def canonical_map_name(name: str | None) -> str | None:

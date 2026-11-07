@@ -1,4 +1,4 @@
-"""Single source of truth for the release campaign-goal map event."""
+"""Campaign goal map event shared by generation and runtime."""
 
 from __future__ import annotations
 

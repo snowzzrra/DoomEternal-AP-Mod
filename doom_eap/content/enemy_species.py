@@ -30,6 +30,25 @@ def load_species_registry(path):
     return registry
 
 
+def _project_species_profiles_inherits(entry, species):
+    if entry.get("status") != "qualified":
+        raise ValueError(f"Unsupported enemy identity status: {species}")
+    masks, inherits, templates = entry.get("source_spawn_types"), entry.get("inherits"), entry.get("templates")
+    if not masks or entry.get("spawn_type") not in masks or not inherits or not templates:
+        raise ValueError(f"Incomplete enemy identity: {species}")
+    if sum(template.get("role") == "preferred" for template in templates) != 1:
+        raise ValueError(f"Enemy identity needs one preferred template: {species}")
+    preferred = next(template for template in templates if template.get("role") == "preferred")
+    return inherits, masks, preferred, templates
+
+
+def _project_species_profiles_spawn_type(entry, inherits, masks, preferred, species, templates):
+    if (set(inherits) != {template.get("inherit") for template in templates}
+            or set(masks) != {template.get("proof", {}).get("spawn_type") for template in templates}
+            or preferred.get("proof", {}).get("spawn_type") != entry["spawn_type"]):
+        raise ValueError(f"Enemy template differs from its identity: {species}")
+
+
 def project_species_profiles(registry):
     if registry.get("schema_version") != 1 or registry.get("qualification") != "authoral_identity_only":
         raise ValueError("Unsupported enemy identity registry")
@@ -42,18 +61,8 @@ def project_species_profiles(registry):
             if not entry.get("gaps") or entry.get("spawn_type") is not None or entry.get("templates"):
                 raise ValueError(f"Ambiguous enemy identity gap: {species}")
             continue
-        if entry.get("status") != "qualified":
-            raise ValueError(f"Unsupported enemy identity status: {species}")
-        masks, inherits, templates = entry.get("source_spawn_types"), entry.get("inherits"), entry.get("templates")
-        if not masks or entry.get("spawn_type") not in masks or not inherits or not templates:
-            raise ValueError(f"Incomplete enemy identity: {species}")
-        if sum(template.get("role") == "preferred" for template in templates) != 1:
-            raise ValueError(f"Enemy identity needs one preferred template: {species}")
-        preferred = next(template for template in templates if template.get("role") == "preferred")
-        if (set(inherits) != {template.get("inherit") for template in templates}
-                or set(masks) != {template.get("proof", {}).get("spawn_type") for template in templates}
-                or preferred.get("proof", {}).get("spawn_type") != entry["spawn_type"]):
-            raise ValueError(f"Enemy template differs from its identity: {species}")
+        inherits, masks, preferred, templates = _project_species_profiles_inherits(entry, species)
+        _project_species_profiles_spawn_type(entry, inherits, masks, preferred, species, templates)
         result[species] = {"spawn_type": entry["spawn_type"], "spawn_types": tuple(masks), "inherits": tuple(inherits)}
     return result
 

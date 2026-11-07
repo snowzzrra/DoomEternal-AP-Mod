@@ -31,10 +31,7 @@ class GoalPolicy:
         return names
 
 
-    def objective_ids(self, slot_data, server_locations):
-        slot_data = self._goal_options(slot_data)
-        if not isinstance(slot_data, dict):
-            return frozenset()
+    def _objective_ids_goal(self, server_locations, slot_data):
         goal = slot_data.get("goal")
         endpoint_event = slot_data.get("goal_endpoint_event")
         required_capabilities = slot_data.get("required_capabilities")
@@ -51,7 +48,7 @@ class GoalPolicy:
         ):
             return frozenset()
         requirements = slot_data.get("additional_victory_requirements", ())
-        if not isinstance(requirements, (list, tuple, set, frozenset)):
+        if not isinstance(requirements, list | tuple | set | frozenset):
             return frozenset()
         requirements = set(requirements)
         if not requirements <= self._requirement_names:
@@ -59,6 +56,13 @@ class GoalPolicy:
 
         active_names = self._active_goal_location_names(slot_data, server_locations)
         return self._objectives(slot_data, goal, requirements, active_names)
+
+
+    def objective_ids(self, slot_data, server_locations):
+        slot_data = self._goal_options(slot_data)
+        if not isinstance(slot_data, dict):
+            return frozenset()
+        return self._objective_ids_goal(server_locations, slot_data)
 
     def _objectives(self, slot_data, goal, requirements, active_names):
         masters = set(slot_data.get("master_level_completion_ids", ()))

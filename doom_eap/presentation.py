@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-
 ARCHIPELAGO_PRESENTATION_COLORS = {
     "text": "#f1f3ef",
     "location": "#43bfc7",

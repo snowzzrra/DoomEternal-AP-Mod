@@ -35,6 +35,29 @@ def _load_stage_ids(catalog):
     return rows
 
 
+def _campaign_stages_regions(catalog, completion, matches, spec, special, stage_ids, stages):
+    if len(matches) != 1:
+        raise ValueError(f"Stage {spec.key} requires its existing completion location: {completion}")
+    regions = sorted(
+        ((name, meta) for name, meta in catalog.region_metadata.items()
+         if meta.get("mission_key") == spec.key),
+        key=lambda pair: pair[1]["order"],
+    )
+    if not regions:
+        raise ValueError(f"Stage {spec.key} has no authored entry region")
+    stages.append({
+        "id": spec.key, "name": spec.display_name,
+        "source": "tag2" if spec.runtime_map.startswith("game/dlc2/") else
+                  "tag1" if spec.runtime_map.startswith("game/dlc/") else "base",
+        "map": spec.runtime_map, "kind": "boss" if special else "mission",
+        "completion": completion, "completion_id": matches[0].location_id,
+        "entry_region": regions[0][0], "regions": [name for name, _ in regions],
+        "access_id": stage_ids[spec.key]["access_id"],
+        "native_index": stage_ids[spec.key]["native_index"],
+        "variant": "mission", "map_key": spec.key,
+    })
+
+
 def campaign_stages(catalog, *, include_master_levels=True):
     stage_ids = _load_stage_ids(catalog)
     stages = []
@@ -44,26 +67,7 @@ def campaign_stages(catalog, *, include_master_levels=True):
         special = spec.key == "e5m4_boss"
         completion = spec.display_name + (" - Defeated" if special else " - Mission Complete")
         matches = [location for location in catalog.runtime_locations if location.name == completion]
-        if len(matches) != 1:
-            raise ValueError(f"Stage {spec.key} requires its existing completion location: {completion}")
-        regions = sorted(
-            ((name, meta) for name, meta in catalog.region_metadata.items()
-             if meta.get("mission_key") == spec.key),
-            key=lambda pair: pair[1]["order"],
-        )
-        if not regions:
-            raise ValueError(f"Stage {spec.key} has no authored entry region")
-        stages.append({
-            "id": spec.key, "name": spec.display_name,
-            "source": "tag2" if spec.runtime_map.startswith("game/dlc2/") else
-                      "tag1" if spec.runtime_map.startswith("game/dlc/") else "base",
-            "map": spec.runtime_map, "kind": "boss" if special else "mission",
-            "completion": completion, "completion_id": matches[0].location_id,
-            "entry_region": regions[0][0], "regions": [name for name, _ in regions],
-            "access_id": stage_ids[spec.key]["access_id"],
-            "native_index": stage_ids[spec.key]["native_index"],
-            "variant": "mission", "map_key": spec.key,
-        })
+        _campaign_stages_regions(catalog, completion, matches, spec, special, stage_ids, stages)
     stages.extend(_master_stages(catalog, stage_ids, include_master_levels))
     return stages
 

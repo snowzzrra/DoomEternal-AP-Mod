@@ -61,37 +61,58 @@ def read_manifest(path, *, require_compatible=True):
     validate_manifest(value, require_compatible=require_compatible)
     return value
 
-def validate_manifest(value, *, require_compatible=True):
-    if type(value["schema"]) is not int or value["schema"] != 1 or value["product"] != "sentinel-core":
-        raise ValueError("Unsupported distribution")
-    key = version_key(value["version"])
-    base = ".".join(map(str, key[:3]))
-    channel = "stable" if key[3] else "rc"
+def _validate_manifest_role(name, names):
+    names.add(name.casefold())
+    role = "runtime_zip" if name == "sentinel-runtime.zip" else "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name == "sentinel_probe.exe" else "helper" if name in HELPERS else "core"
+    return role
+
+
+def _validate_manifest_base_version(base, channel, key, require_compatible, value):
     if value["base_version"] != base or value["channel"] != channel or type(value["rc_number"]) is not int or value["rc_number"] != key[4]:
         raise ValueError("Inconsistent version fields")
     if value["architecture"] != "x64" or value["platform"] != "windows":
         raise ValueError("Incompatible runtime")
     if require_compatible and (key[:2] != (2, 0) or not mod_compatible(value)):
         raise ValueError("Incompatible runtime")
+
+
+def _validate_manifest_abi(base, channel, key, require_compatible, value):
+    _validate_manifest_base_version(base, channel, key, require_compatible, value)
     if not isinstance(value["abi"], dict) or not isinstance(value["required_capabilities"], list):
         raise ValueError("Incompatible ABI or capability")
     if require_compatible and (any(type(value["abi"].get(name)) is not int or value["abi"][name] not in
            ((7, 8) if name == "inventory" else (number,)) for name, number in ABI.items() if name in REQUIRED_ABIS) or not set(value["required_capabilities"]) <= SUPPORTED_CAPABILITIES):
         raise ValueError("Incompatible ABI or capability")
+
+
+def _validate_manifest_schema(require_compatible, value):
+    if type(value["schema"]) is not int or value["schema"] != 1 or value["product"] != "sentinel-core":
+        raise ValueError("Unsupported distribution")
+    key = version_key(value["version"])
+    base = ".".join(map(str, key[:3]))
+    channel = "stable" if key[3] else "rc"
+    _validate_manifest_abi(base, channel, key, require_compatible, value)
     if not re.fullmatch("[a-f0-9]{40}", value["source_commit"]) or not re.fullmatch("[a-f0-9]{64}", value["build_id"]):
         raise ValueError("Invalid source/build identity")
     if value["pair_id"] != value["build_id"]:
         raise ValueError("Inconsistent Core/bootstrap pair")
+
+
+def _validate_manifest_parts(item, names):
+    name = item["path"]
+    parts = PurePosixPath(name)
+    if not name or parts.is_absolute() or "\\" in name or ":" in name or ".." in parts.parts or str(parts) != name or name.casefold() in names:
+        raise ValueError("Unsafe or duplicate artifact name")
+    role = _validate_manifest_role(name, names)
+    if item.get("role") != role:
+        raise ValueError("Inconsistent artifact role")
+
+
+def validate_manifest(value, *, require_compatible=True):
+    _validate_manifest_schema(require_compatible, value)
     names = set()
     for item in value["artifacts"]:
-        name = item["path"]
-        parts = PurePosixPath(name)
-        if not name or parts.is_absolute() or "\\" in name or ":" in name or ".." in parts.parts or str(parts) != name or name.casefold() in names:
-            raise ValueError("Unsafe or duplicate artifact name")
-        names.add(name.casefold())
-        role = "runtime_zip" if name == "sentinel-runtime.zip" else "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name == "sentinel_probe.exe" else "helper" if name in HELPERS else "core"
-        if item.get("role") != role:
-            raise ValueError("Inconsistent artifact role")
+        _validate_manifest_parts(item, names)
         if type(item["size"]) is not int or not 0 < item["size"] <= 50 * 1024 * 1024 or not re.fullmatch("[a-f0-9]{64}", item["sha256"]):
             raise ValueError("Invalid artifact identity")
     required = {name.casefold() for name in REQUIRED} | {"sentinel-runtime.zip"}
@@ -114,6 +135,24 @@ def verify_build_identity(name, data, build_id):
         raise ValueError(f"Runtime binary build identity differs: {name}")
 
 
+def _verify_runtime_file_size(archive, bootstrap_from_archive, items, names, path, value):
+    if sum(item.file_size for item in archive.infolist()) > 50 * 1024 * 1024:
+        raise ValueError("Runtime ZIP exceeds size limit")
+    contents = {}
+    for name in names:
+        data = archive.read(name)
+        verify_bytes(name, data, items[name])
+        if name in {"sentinel_core.dll", "msimg32.dll"}:
+            verify_build_identity(name, data, value["build_id"])
+        contents[name] = data
+    for name, data in contents.items():
+        if bootstrap_from_archive and name == "msimg32.dll":
+            continue
+        if (path.parent / name).read_bytes() != data:
+            raise ValueError(f"Direct runtime artifact differs from ZIP: {name}")
+    return contents
+
+
 def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
     path = Path(manifest_path)
     value = read_manifest(path)
@@ -124,20 +163,7 @@ def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
         names = archive.namelist()
         if len(names) != len(set(name.casefold() for name in names)) or set(names) != set(items) - {"sentinel-runtime.zip"}:
             raise ValueError("Unexpected runtime ZIP contents")
-        if sum(item.file_size for item in archive.infolist()) > 50 * 1024 * 1024:
-            raise ValueError("Runtime ZIP exceeds size limit")
-        contents = {}
-        for name in names:
-            data = archive.read(name)
-            verify_bytes(name, data, items[name])
-            if name in {"sentinel_core.dll", "msimg32.dll"}:
-                verify_build_identity(name, data, value["build_id"])
-            contents[name] = data
-        for name, data in contents.items():
-            if bootstrap_from_archive and name == "msimg32.dll":
-                continue
-            if (path.parent / name).read_bytes() != data:
-                raise ValueError(f"Direct runtime artifact differs from ZIP: {name}")
+        contents = _verify_runtime_file_size(archive, bootstrap_from_archive, items, names, path, value)
     return value, contents
 
 def select_compatible(manifests, *, allow_rc=False):

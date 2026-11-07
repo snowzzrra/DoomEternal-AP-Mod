@@ -16,16 +16,63 @@ from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hin
 from .fortress_economy import battery_surplus_limit
 
 __all__ = (
+    "CATALOG_DEPENDENCIES",
+    "MAX_COLLECTION",
+    "MAX_EXPANDED_BODIES",
+    "MAX_JSON_DEPTH",
+    "MAX_JSON_NODES",
+    "MAX_KILL_REWARDS",
+    "MAX_LIMIT_SETS",
+    "MAX_PATTERNS",
+    "MAX_PAYLOAD_BYTES",
+    "MAX_PROFILES",
+    "MAX_REFERENCE_ENTRIES",
     "ULTRA_NIGHTMARE_CAPABILITY",
-    "MAX_PAYLOAD_BYTES", "MAX_JSON_NODES", "MAX_JSON_DEPTH", "MAX_COLLECTION", "MAX_REFERENCE_ENTRIES",
-    "MAX_LIMIT_SETS", "MAX_PROFILES", "MAX_PATTERNS", "MAX_EXPANDED_BODIES", "MAX_KILL_REWARDS",
-    "ContractError", "StructureError", "ReferenceError", "DigestError", "ExpansionError", "PayloadSizeError",
-    "Identity", "Compatibility", "Goal", "BatteryEconomy", "Fortress", "Campaign", "Starting", "Difficulty",
-    "DeathLink", "Checks", "Runtime", "Population", "LimitSet", "RecipeMap", "Recipes", "StageProfile",
-    "Killsanity", "SlotData", "Profile", "Run", "RecipeRow", "Pair", "TrackerValue", "canonical_bytes", "catalog_digest",
-    "recipe_digest", "placement_digest", "generation_fingerprint", "load_slot_catalog", "validate_slot_data",
-    "CATALOG_DEPENDENCIES", "SlotCatalog", "catalog_tables", "source_reference", "source_index",
-    "native_source_rows", "catalog_target_rows", "dependency_digest", "catalog_dependency_path", "installed_catalog_tables",
+    "BatteryEconomy",
+    "Campaign",
+    "Checks",
+    "Compatibility",
+    "ContractError",
+    "DeathLink",
+    "Difficulty",
+    "DigestError",
+    "ExpansionError",
+    "Fortress",
+    "Goal",
+    "Identity",
+    "Killsanity",
+    "LimitSet",
+    "Pair",
+    "PayloadSizeError",
+    "Population",
+    "Profile",
+    "RecipeMap",
+    "RecipeRow",
+    "Recipes",
+    "ReferenceError",
+    "Run",
+    "Runtime",
+    "SlotCatalog",
+    "SlotData",
+    "StageProfile",
+    "Starting",
+    "StructureError",
+    "TrackerValue",
+    "canonical_bytes",
+    "catalog_dependency_path",
+    "catalog_digest",
+    "catalog_tables",
+    "catalog_target_rows",
+    "dependency_digest",
+    "generation_fingerprint",
+    "installed_catalog_tables",
+    "load_slot_catalog",
+    "native_source_rows",
+    "placement_digest",
+    "recipe_digest",
+    "source_index",
+    "source_reference",
+    "validate_slot_data",
 )
 
 ULTRA_NIGHTMARE_CAPABILITY = "ultra_nightmare_restart_stage"
@@ -452,7 +499,7 @@ def _read_tuple(arguments, value, path):
     if arguments[-1] is Ellipsis:
         return tuple(_read(arguments[0], child, path) for child in value)
     _require(len(value) == len(arguments), f"{path} has the wrong number of fields")
-    return tuple(_read(kind, child, path) for kind, child in zip(arguments, value))
+    return tuple(_read(kind, child, path) for kind, child in zip(arguments, value, strict=False))
 
 
 def _read(kind, value, path):
@@ -555,7 +602,7 @@ def _catalog_maps(catalog, stages):
         _require("stage_id" in row, "Catalog map must declare its stage ownership")
         stage = _read(str | None, row.get("stage_id"), "catalog.maps.stage_id")
         _require(stage is None or stage in stages, "Catalog map has an unknown stage", ReferenceError)
-        _require(stage == name or stage is None and name not in stages, "Catalog map has inconsistent stage ownership", ReferenceError)
+        _require(stage == name or (stage is None and name not in stages), "Catalog map has inconsistent stage ownership", ReferenceError)
     return maps
 
 
@@ -743,7 +790,7 @@ def _killsanity(kills, active, catalog):
     _require(sum(pair[1] for pair in kills.sources) == kills.finite_kills, "Finite kill total disagrees with sources")
     _require(kills.estimated_kills >= kills.finite_kills, "Estimated kills must cover finite kills")
     _require(kills.finite_supported_count * kills.interval <= kills.finite_kills, "Finite rewards exceed supported kills")
-    for ref, count in kills.sources:
+    for ref, _count in kills.sources:
         source = catalog["finite_sources"][ref]
         _require(type(source) is dict and source.get("stage_id") in active, "Finite source belongs to an inactive stage", ReferenceError)
     if kills.count:

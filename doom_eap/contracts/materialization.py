@@ -1,6 +1,6 @@
 """Pure capability selection and immutable room/lease scope for persistent replay."""
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from doom_eap.contracts.runtime_context import RuntimeContext
 
@@ -35,18 +35,23 @@ GATE_KEY_TO_MAP = {
 }
 
 
+def _context_supports_item(context, item_id):
+    if item_id in SUPPORT_RUNE_IDS:
+        return context.supports(SUPPORT_RUNE_CAPABILITY)
+    if item_id in TAG_SPECIAL_IDS:
+        return context.supports(TAG_SPECIAL_CAPABILITY)
+    if item_id == 7770901:
+        return context.supports("special_weapon_v1")
+    if item_id == CRUCIBLE_ID:
+        return context.supports("crucible_v1")
+    return True
+
 
 def context_item_ids(context: RuntimeContext, received_item_ids: Iterable[int]) -> tuple[int, ...]:
     """Select only materializable owned IDs for active context."""
     selected = []
     for item_id in received_item_ids:
-        if item_id in SUPPORT_RUNE_IDS and not context.supports(SUPPORT_RUNE_CAPABILITY):
-            continue
-        if item_id in TAG_SPECIAL_IDS and not context.supports(TAG_SPECIAL_CAPABILITY):
-            continue
-        if item_id == 7770901 and not context.supports("special_weapon_v1"):
-            continue
-        if item_id == CRUCIBLE_ID and not context.supports("crucible_v1"):
+        if not _context_supports_item(context, item_id):
             continue
         if item_id in GATE_KEY_TO_MAP:
             target_map = GATE_KEY_TO_MAP[item_id]

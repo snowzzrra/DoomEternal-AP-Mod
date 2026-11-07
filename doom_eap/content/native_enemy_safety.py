@@ -1,7 +1,7 @@
 """Spatial and scripted actor restrictions for native encounter replacements."""
+import json
 from copy import deepcopy
 from importlib.resources import files
-import json
 
 SCRIPTED_BOSS_ACTORS = {'e1m4_boss': frozenset({'boss_intro_ai_superheavy_doomhunter_stage1_1'})}
 CINEMATIC_BOSS_ACTORS = {'e2m2_base': frozenset({'confront_samuel_ai'})}
@@ -19,21 +19,7 @@ GROUND_ENCOUNTERS = {
 }
 
 
-def preserve_challenge_sources(origins, map_key, catalog):
-    from .vanilla_enemy_profiles import load_vanilla_profiles
-
-    targets = json.loads(files(__package__).joinpath('challenge_enemy_targets.json').read_bytes())
-    targets = [target for target in targets if target['map_key'] == map_key]
-    if not targets:
-        return origins
-    profile = load_vanilla_profiles()['maps'].get(map_key)
-    # challenge requirements describe the qualified retail map.
-    if not profile or profile['source_sha256'] != catalog['maps'][map_key]['source_sha256']:
-        return origins
-    slots = {slot['source_id']: slot for encounter in profile.get('encounters', [])
-             if encounter.get('combat_kind') not in {'secret_encounter', 'slayer_gate_encounter'}
-             and encounter['id'] in profile['primary_encounters']
-             for slot in encounter['slots'] if not slot['renewable']}
+def _preserve_challenge_sources_preserved(origins, slots, targets):
     preserved = set()
     for target in targets:
         minimum = target['minimum']
@@ -47,8 +33,31 @@ def preserve_challenge_sources(origins, map_key, catalog):
             minimum -= min(source['logical_count'], slots[source['id']]['count'])
         if minimum > 0:
             raise ValueError(f"Challenge has no reachable native enemy supply: {target['name']}")
+    return preserved
+
+
+def _preserve_challenge_sources_profile(catalog, load_vanilla_profiles, map_key, origins, targets):
+    profile = load_vanilla_profiles()['maps'].get(map_key)
+    # challenge requirements describe the qualified retail map.
+    if not profile or profile['source_sha256'] != catalog['maps'][map_key]['source_sha256']:
+        return origins
+    slots = {slot['source_id']: slot for encounter in profile.get('encounters', [])
+             if encounter.get('combat_kind') not in {'secret_encounter', 'slayer_gate_encounter'}
+             and encounter['id'] in profile['primary_encounters']
+             for slot in encounter['slots'] if not slot['renewable']}
+    preserved = _preserve_challenge_sources_preserved(origins, slots, targets)
     return [{**source, 'protected_reason': 'challenge enemy supply'} if source['id'] in preserved else source
             for source in origins]
+
+
+def preserve_challenge_sources(origins, map_key, catalog):
+    from .vanilla_enemy_profiles import load_vanilla_profiles
+
+    targets = json.loads(files(__package__).joinpath('challenge_enemy_targets.json').read_bytes())
+    targets = [target for target in targets if target['map_key'] == map_key]
+    if not targets:
+        return origins
+    return _preserve_challenge_sources_profile(catalog, load_vanilla_profiles, map_key, origins, targets)
 
 
 def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_capabilities):
@@ -74,8 +83,8 @@ def _replace_species(body, species, recipe, ordinal, enemies, catalog, speed_cap
 
 def _requires_flying(recipe, map_key):
     return (recipe['binding'].get('reference') in FLYING_SPAWN_POINTS.get(map_key, ()) or
-            recipe['binding']['mode'] == 'summon' and
-            recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ()))
+            (recipe['binding']['mode'] == 'summon' and
+            recipe['selected_spawn_type'] in FLYING_SUMMONS.get(map_key, ())))
 
 
 def _flying_recipe(recipe, map_key, enemies, seed, settings, catalog, capabilities, changes):
@@ -219,10 +228,11 @@ OPENING_OWNERS = {
 
 def opening_source(stage, source, *, verified=False):
     binding = source.get('binding') or {}
-    if verified and stage == 'e1m1_intro' and binding.get('owner') == 'mech_street_encounter_manager_amb_caco':
-        return False
-    if verified and stage in OPENING_OWNERS:
-        return any(binding.get(field) in OPENING_OWNERS[stage] for field in ('owner', 'entity'))
+    if verified:
+        if stage == 'e1m1_intro' and binding.get('owner') == 'mech_street_encounter_manager_amb_caco':
+            return False
+        if stage in OPENING_OWNERS:
+            return any(binding.get(field) in OPENING_OWNERS[stage] for field in ('owner', 'entity'))
     if stage in OPENING_REGIONS and stage not in OPENING_PREFIXES:
         return True
     return any(binding.get(field, '').startswith(OPENING_PREFIXES.get(stage, ()))

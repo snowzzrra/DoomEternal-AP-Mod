@@ -9,9 +9,8 @@ from doom_eap.contracts.source_bytes import SOURCE_BYTE_CONTRACT, first_party_te
 
 SOURCE_ROOTS = ("doom_eap/content", "doom_eap/contracts", "tools/decls", "tools/maps")
 SOURCE_FILES = ("doom_eap/strings.py", "tools/release/build_string_table.py",
-                "doom_eap/launcher/launcher_core.py", "doom_eap/runtime/save_records.py",
-                "doom_eap/runtime/lifecycle.py",
-                "doom_eap/runtime/context_registry.py", "tools/release/room_payloads.py",
+                "doom_eap/launcher/launcher_core.py", "doom_eap/runtime/bridge_saves.py",
+                "doom_eap/runtime/observers.py", "tools/release/room_payloads.py",
                 "tools/release/build_room_resources.py", "tools/release/stage_room_resources.py",
                 "tools/release/source_bytes.py")
 BUNDLED_IDENTITY_PATH = "data/compiler_source_identity.json"

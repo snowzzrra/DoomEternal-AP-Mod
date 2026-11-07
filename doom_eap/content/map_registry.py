@@ -1,4 +1,4 @@
-"""Single source of truth for map generation, validation and packaging plans."""
+"""Map settings shared by generation, validation and packaging."""
 
 from __future__ import annotations
 
@@ -110,15 +110,28 @@ def load_map_registry(
     return load_runtime_map_registry(root / "data")
 
 
-def validate_map_registry(registry: dict[str, Any]) -> None:
-    unknown_root = set(registry) - ROOT_KEYS
-    if unknown_root:
-        raise ValueError(f"Unknown map registry key(s): {sorted(unknown_root)}")
-    if registry.get("schema_version") != 1:
-        raise ValueError("map registry schema_version must be 1")
-    maps = registry.get("maps")
-    if not isinstance(maps, dict) or not maps:
-        raise ValueError("map registry maps must be a non-empty object")
+def _validate_map_registry_unknown(map_key, source):
+    unknown = set(source) - MAP_KEYS
+    missing = MAP_KEYS - set(source)
+    if unknown or missing:
+        raise ValueError(
+            f"Map {map_key} registry fields: missing={sorted(missing)}, "
+            f"unknown={sorted(unknown)}"
+        )
+    if source["onboarding_status"] not in {
+        "frozen_baseline", "onboarding", "implementation_candidate",
+    }:
+        raise ValueError(f"Map {map_key} has invalid onboarding_status")
+    if source["test_only"] and source["onboarding_status"] != "onboarding":
+        raise ValueError(f"Test-only map {map_key} must use onboarding status")
+    for key in MAP_KEYS - {"test_only", "enabled", "onboarding_audit"}:
+        if source[key] in (None, ""):
+            raise ValueError(f"Map {map_key} is missing {key}")
+    if not isinstance(source["resource_priority"], int) or source["resource_priority"] < 0:
+        raise ValueError(f"Map {map_key} resource_priority must be a known nonnegative index")
+
+
+def _validate_map_registry_baseline(maps, registry):
     baseline = registry.get("baseline_map_keys")
     if not isinstance(baseline, list) or len(baseline) != len(set(baseline)):
         raise ValueError("baseline_map_keys must be a unique list")
@@ -130,24 +143,7 @@ def validate_map_registry(registry: dict[str, Any]) -> None:
     for map_key, source in maps.items():
         if not isinstance(source, dict):
             raise ValueError(f"Map {map_key} must be an object")
-        unknown = set(source) - MAP_KEYS
-        missing = MAP_KEYS - set(source)
-        if unknown or missing:
-            raise ValueError(
-                f"Map {map_key} registry fields: missing={sorted(missing)}, "
-                f"unknown={sorted(unknown)}"
-            )
-        if source["onboarding_status"] not in {
-            "frozen_baseline", "onboarding", "implementation_candidate",
-        }:
-            raise ValueError(f"Map {map_key} has invalid onboarding_status")
-        if source["test_only"] and source["onboarding_status"] != "onboarding":
-            raise ValueError(f"Test-only map {map_key} must use onboarding status")
-        for key in MAP_KEYS - {"test_only", "enabled", "onboarding_audit"}:
-            if source[key] in (None, ""):
-                raise ValueError(f"Map {map_key} is missing {key}")
-        if not isinstance(source["resource_priority"], int) or source["resource_priority"] < 0:
-            raise ValueError(f"Map {map_key} resource_priority must be a known nonnegative index")
+        _validate_map_registry_unknown(map_key, source)
         if source["generated_output"] in seen_outputs:
             raise ValueError(f"Duplicate generated output: {source['generated_output']}")
         if source["runtime_map"] in seen_runtime_maps:
@@ -159,6 +155,18 @@ def validate_map_registry(registry: dict[str, Any]) -> None:
             and not source["onboarding_audit"]
         ):
             raise ValueError(f"Onboarding map {map_key} lacks onboarding_audit")
+
+
+def validate_map_registry(registry: dict[str, Any]) -> None:
+    unknown_root = set(registry) - ROOT_KEYS
+    if unknown_root:
+        raise ValueError(f"Unknown map registry key(s): {sorted(unknown_root)}")
+    if registry.get("schema_version") != 1:
+        raise ValueError("map registry schema_version must be 1")
+    maps = registry.get("maps")
+    if not isinstance(maps, dict) or not maps:
+        raise ValueError("map registry maps must be a non-empty object")
+    _validate_map_registry_baseline(maps, registry)
 def _plans(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
     return tuple(
         MapPlan(

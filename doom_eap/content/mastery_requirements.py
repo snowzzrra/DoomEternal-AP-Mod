@@ -2,7 +2,6 @@
 
 import re
 
-
 MASTERY_REQUIREMENT_DIVISORS = {"Original": 1, "Half": 2, "Quarter": 4}
 
 

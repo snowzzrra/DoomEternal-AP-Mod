@@ -26,7 +26,7 @@ DLC_SPECIES = frozenset({"armored_baron", "blood_angel", "chaingun_soldier", "cu
 def uses_protected_opening(enemies):
     return bool(enemies.get('enabled') and enemies.get('progressive') and (
         enemies.get('count_mode') == 'auto' or
-        enemies.get('count_mode') == 'multiplier' and enemies.get('count_multiplier') == 100))
+        (enemies.get('count_mode') == 'multiplier' and enemies.get('count_multiplier') == 100)))
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def _curve(values):
     return {"early": list(values[:2]), "late": list(values[2:])}
 
 
-def _attribute(raw, name, automatic, progressive):
+def _attribute_bounds(name, raw):
     values = raw.get(f"enemy_{name}", {})
     if not isinstance(values, dict):
         raise ValueError(player_text("apworld.errors", "enemy_attribute_object", attribute=str(name)))
@@ -117,6 +117,11 @@ def _attribute(raw, name, automatic, progressive):
         if bound not in bounds or (species != "global" and species not in SPECIES_IDS):
             raise ValueError(player_text("apworld.errors", "enemy_unknown_range", attribute=str(name), range=repr(key)))
         groups.setdefault(species, {})[bound] = _integer(value, f"enemy_{name}.{key}", 1)
+    return bounds, groups
+
+
+def _attribute(raw, name, automatic, progressive):
+    bounds, groups = _attribute_bounds(name, raw)
     result = {"global": _curve(automatic), "species": {}}
     for species, entries in groups.items():
         if set(entries) == {"minimum", "maximum"}:
@@ -141,87 +146,7 @@ def _attribute(raw, name, automatic, progressive):
     return result, set(groups)
 
 
-def normalize_enemy_options(raw):
-    revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
-    if revision not in (2, 3, 4, 5, 6, 7, 8, ENEMY_OPTIONS_REVISION):
-        raise ValueError(player_text("apworld.errors", "enemy_options_revision"))
-    preset = raw.get("enemy_preset", "slayers_path")
-    if preset == "custom":
-        preset = "slayers_path"
-    if not isinstance(preset, str) or preset not in ENEMY_RECIPES:
-        raise ValueError(player_text("apworld.errors", "unknown_enemy_preset", preset=repr(preset)))
-    recipe = ENEMY_RECIPES[preset]
-    balance = BALANCE_PRESETS.get(preset) if revision >= 6 else None
-    enabled = _toggle(raw, "enemy_randomizer", True)
-    progressive = _toggle(raw, "progressive_difficulty", True)
-    dlc = _toggle(raw, "use_dlc_content", True)
-    count_mode = raw.get("enemy_count_mode", "preset")
-    if count_mode == "preset":
-        count_mode = "multiplier" if preset == "oops_all_imps" else "auto"
-    if count_mode not in ("auto", "multiplier"):
-        raise ValueError(player_text("apworld.errors", "enemy_count_mode"))
-    intensity = [_recipe_number(raw, f"enemy_intensity_{end}", recipe.intensity[index], 1)
-                 for index, end in enumerate(("early", "late"))]
-    if not progressive:
-        intensity[1] = intensity[0]
-    density = _recipe_number(raw, "enemy_density", 100 if balance else recipe.density, 1)
-    length = _recipe_number(raw, "enemy_length", 100 if balance and revision >= 7 else
-                            balance['length'] if balance else max(100, density), 100)
-    variety = _recipe_number(raw, "enemy_variety", recipe.variety, 0, 100)
-    multiplier = _recipe_number(raw, "enemy_count_multiplier", 500 if preset == "oops_all_imps" else 100, 1)
-    eligible = [species for species in SPECIES_IDS if dlc or species not in DLC_SPECIES]
-    weights = {species: (recipe.group_weights[index] if index < 4 else 0)
-               for index, members in enumerate(SPECIES_GROUPS.values()) for species in members}
-    if revision >= 3:
-        weights['buff_pod'] = min(recipe.group_weights[2:])
-    if revision >= 4:
-        weights['zombie_t1_screecher'] = min(recipe.group_weights[2:])
-    if revision >= 8:
-        weights.update(tentacle=0, super_tentacle=0, turret=recipe.group_weights[1] // 2)
-    if revision >= 9:
-        weights['blood_angel'] = (weights['blood_angel'] * 5 + 3) // 4
-    if preset == "oops_all_imps":
-        weights.update(imp=900, stone_imp=100)
-    elif preset == "pinata_party":
-        others = [species for species in SPECIES_IDS if species not in ("maykr_angel", "zombie_maykr", "blood_angel")
-                  and weights[species] > 0]
-        weights = {species: 5 if species in others else 0 for species in SPECIES_IDS}
-        weights.update(zombie_maykr=80 * len(others), blood_angel=15 * len(others))
-    weights['chaingun_soldier'] //= 5
-    overrides = raw.get("enemy_weights", {})
-    if not isinstance(overrides, dict):
-        raise ValueError(player_text("apworld.errors", "enemy_weights_object"))
-    for species, weight in overrides.items():
-        if species not in SPECIES_IDS:
-            raise ValueError(player_text("apworld.errors", "unknown_enemy_weight", species=repr(species)))
-        weights[species] = _integer(weight, player_text("apworld.errors", "enemy_weight_label", species=str(species)))
-    weights = {species: weights[species] for species in eligible}
-    if enabled and not any(weights.values()):
-        raise ValueError(player_text("apworld.errors", "enemy_weights_empty"))
-    divisor = gcd(*weights.values()) or 1
-    weights = {species: weight // divisor for species, weight in weights.items()}
-    attributes = {}
-    size_groups = set()
-    for name in ("health", "damage", "speed", "size"):
-        automatic = (100, 100, 100, 100) if name == "size" else getattr(recipe, name)
-        if balance and name != "size":
-            ceiling = 100 if revision >= 7 and preset == 'slayers_path' else balance['attributes'][
-                ("health", "damage", "speed").index(name)]
-            automatic = (100, 100 if progressive else ceiling, 100, ceiling)
-        elif revision >= 5 and progressive and name != "size":
-            ceiling = 120 if name == "health" else 100
-            automatic = (min(automatic[0], ceiling), min(automatic[1], ceiling), *automatic[2:])
-            if name == 'damage':
-                automatic = (*automatic[:2], min(automatic[2], 125), min(automatic[3], 125))
-        attributes[name], groups = _attribute(raw, name, automatic, progressive)
-        if name == "size":
-            size_groups = groups
-    chance = _recipe_number(raw, "enemy_size_variation_chance", 3, 0, 100)
-    size_exclusions = eligible if "global" in size_groups else sorted(size_groups)
-    limits = {"marauder": 1, "archvile": 1, "spirit": 1, "combined_special": recipe.combined_special}
-    overrides = raw.get("enemy_special_limits", {})
-    if not isinstance(overrides, dict):
-        raise ValueError(player_text("apworld.errors", "enemy_limits_object"))
+def _normalize_enemy_options_late_limits(balance, limits, overrides, progressive, recipe):
     for key, value in overrides.items():
         if key not in limits:
             raise ValueError(player_text("apworld.errors", "unknown_enemy_limit", limit=repr(key)))
@@ -245,8 +170,133 @@ def normalize_enemy_options(raw):
         for name in ("marauder", "archvile", "spirit"):
             if name not in overrides:
                 endpoint[name] = min(endpoint[name], endpoint["combined_special"])
+    return late_limits, limits
+
+
+def _normalize_enemy_options_count_mode(balance, preset, progressive, raw, recipe, revision):
+    count_mode = raw.get("enemy_count_mode", "preset")
+    if count_mode == "preset":
+        count_mode = "multiplier" if preset == "oops_all_imps" else "auto"
+    if count_mode not in ("auto", "multiplier"):
+        raise ValueError(player_text("apworld.errors", "enemy_count_mode"))
+    intensity = [_recipe_number(raw, f"enemy_intensity_{end}", recipe.intensity[index], 1)
+                 for index, end in enumerate(("early", "late"))]
+    if not progressive:
+        intensity[1] = intensity[0]
+    density = _recipe_number(raw, "enemy_density", 100 if balance else recipe.density, 1)
+    length = _recipe_number(raw, "enemy_length", 100 if balance and revision >= 7 else
+                            balance['length'] if balance else max(100, density), 100)
+    return count_mode, density, intensity, length
+
+
+def _normalize_enemy_options_overrides(preset, raw, recipe, revision, weights):
+    if revision >= 8:
+        weights.update(tentacle=0, super_tentacle=0, turret=recipe.group_weights[1] // 2)
+    if revision >= 9:
+        weights['blood_angel'] = (weights['blood_angel'] * 5 + 3) // 4
+    if preset == "oops_all_imps":
+        weights.update(imp=900, stone_imp=100)
+    elif preset == "pinata_party":
+        others = [species for species in SPECIES_IDS if species not in ("maykr_angel", "zombie_maykr", "blood_angel")
+                  and weights[species] > 0]
+        weights = {species: 5 if species in others else 0 for species in SPECIES_IDS}
+        weights.update(zombie_maykr=80 * len(others), blood_angel=15 * len(others))
+    weights['chaingun_soldier'] //= 5
+    overrides = raw.get("enemy_weights", {})
+    return overrides, weights
+
+
+def _normalize_enemy_options_weights(eligible, preset, raw, recipe, revision):
+    weights = {species: (recipe.group_weights[index] if index < 4 else 0)
+               for index, members in enumerate(SPECIES_GROUPS.values()) for species in members}
+    if revision >= 3:
+        weights['buff_pod'] = min(recipe.group_weights[2:])
+    if revision >= 4:
+        weights['zombie_t1_screecher'] = min(recipe.group_weights[2:])
+    overrides, weights = _normalize_enemy_options_overrides(preset, raw, recipe, revision, weights)
+    if not isinstance(overrides, dict):
+        raise ValueError(player_text("apworld.errors", "enemy_weights_object"))
+    for species, weight in overrides.items():
+        if species not in SPECIES_IDS:
+            raise ValueError(player_text("apworld.errors", "unknown_enemy_weight", species=repr(species)))
+        weights[species] = _integer(weight, player_text("apworld.errors", "enemy_weight_label", species=str(species)))
+    weights = {species: weights[species] for species in eligible}
+    return weights
+
+
+def _normalize_enemy_options_variety(dlc, enabled, preset, raw, recipe, revision):
+    variety = _recipe_number(raw, "enemy_variety", recipe.variety, 0, 100)
+    multiplier = _recipe_number(raw, "enemy_count_multiplier", 500 if preset == "oops_all_imps" else 100, 1)
+    eligible = [species for species in SPECIES_IDS if dlc or species not in DLC_SPECIES]
+    weights = _normalize_enemy_options_weights(eligible, preset, raw, recipe, revision)
+    if enabled and not any(weights.values()):
+        raise ValueError(player_text("apworld.errors", "enemy_weights_empty"))
+    divisor = gcd(*weights.values()) or 1
+    weights = {species: weight // divisor for species, weight in weights.items()}
+    return eligible, multiplier, variety, weights
+
+
+def _normalize_enemy_options_revision(raw):
+    revision = raw.get("enemies", {}).get("revision", ENEMY_OPTIONS_REVISION)
+    if revision not in (2, 3, 4, 5, 6, 7, 8, ENEMY_OPTIONS_REVISION):
+        raise ValueError(player_text("apworld.errors", "enemy_options_revision"))
+    preset = raw.get("enemy_preset", "slayers_path")
+    if preset == "custom":
+        preset = "slayers_path"
+    if not isinstance(preset, str) or preset not in ENEMY_RECIPES:
+        raise ValueError(player_text("apworld.errors", "unknown_enemy_preset", preset=repr(preset)))
+    recipe = ENEMY_RECIPES[preset]
+    balance = BALANCE_PRESETS.get(preset) if revision >= 6 else None
+    return balance, preset, recipe, revision
+
+
+def _normalize_enemy_options_size_exclusions(balance, eligible, progressive, raw, recipe, size_groups):
+    size_exclusions = eligible if "global" in size_groups else sorted(size_groups)
+    limits = {"marauder": 1, "archvile": 1, "spirit": 1, "combined_special": recipe.combined_special}
+    overrides = raw.get("enemy_special_limits", {})
+    if not isinstance(overrides, dict):
+        raise ValueError(player_text("apworld.errors", "enemy_limits_object"))
+    late_limits, limits = _normalize_enemy_options_late_limits(balance, limits, overrides, progressive, recipe)
     if not progressive:
         late_limits = dict(limits)
+    return late_limits, limits, overrides, size_exclusions
+
+
+def _normalize_enemy_options_ceiling(balance, name, preset, progressive, revision):
+    ceiling = 100 if revision >= 7 and preset == 'slayers_path' else balance['attributes'][
+        ("health", "damage", "speed").index(name)]
+    automatic = (100, 100 if progressive else ceiling, 100, ceiling)
+    return automatic
+
+
+def _normalize_enemy_options_automatic(attributes, balance, name, preset, progressive, raw, recipe, revision, size_groups):
+    automatic = (100, 100, 100, 100) if name == "size" else getattr(recipe, name)
+    if balance and name != "size":
+        automatic = _normalize_enemy_options_ceiling(balance, name, preset, progressive, revision)
+    elif revision >= 5 and progressive and name != "size":
+        ceiling = 120 if name == "health" else 100
+        automatic = (min(automatic[0], ceiling), min(automatic[1], ceiling), *automatic[2:])
+        if name == 'damage':
+            automatic = (*automatic[:2], min(automatic[2], 125), min(automatic[3], 125))
+    attributes[name], groups = _attribute(raw, name, automatic, progressive)
+    if name == "size":
+        size_groups = groups
+    return size_groups
+
+
+def normalize_enemy_options(raw):
+    balance, preset, recipe, revision = _normalize_enemy_options_revision(raw)
+    enabled = _toggle(raw, "enemy_randomizer", True)
+    progressive = _toggle(raw, "progressive_difficulty", True)
+    dlc = _toggle(raw, "use_dlc_content", True)
+    count_mode, density, intensity, length = _normalize_enemy_options_count_mode(balance, preset, progressive, raw, recipe, revision)
+    eligible, multiplier, variety, weights = _normalize_enemy_options_variety(dlc, enabled, preset, raw, recipe, revision)
+    attributes = {}
+    size_groups = set()
+    for name in ("health", "damage", "speed", "size"):
+        size_groups = _normalize_enemy_options_automatic(attributes, balance, name, preset, progressive, raw, recipe, revision, size_groups)
+    chance = _recipe_number(raw, "enemy_size_variation_chance", 3, 0, 100)
+    late_limits, limits, overrides, size_exclusions = _normalize_enemy_options_size_exclusions(balance, eligible, progressive, raw, recipe, size_groups)
     return {"revision": revision, "enabled": enabled, "progressive": progressive,
             **({"balance_preset": preset if balance else None, "length": length} if revision >= 6 else {}),
             **({"special_limit_overrides": dict(overrides)} if revision >= 7 else {}),

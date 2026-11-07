@@ -282,11 +282,15 @@ ALL_PERSISTENT_DOMAIN_IDS = frozenset(
 )
 
 
-def selected_persistent_items(domain="all", item_id=None):
-    """Limit repair intent while leaving entitlement and native ownership authoritative."""
+def _selected_persistent_items_domains(domain):
     domains = {classify_inventory_domain(value) for value in ALL_PERSISTENT_DOMAIN_IDS}
     if domain != "all" and domain not in domains:
         raise ValueError("Unknown persistent inventory domain")
+
+
+def selected_persistent_items(domain="all", item_id=None):
+    """Limit repair intent while leaving entitlement and native ownership authoritative."""
+    _selected_persistent_items_domains(domain)
     if item_id is not None:
         if type(item_id) is not int or item_id not in ALL_PERSISTENT_DOMAIN_IDS:
             raise ValueError("Consumables and currency cannot be replayed by inventory repair")
@@ -400,18 +404,7 @@ class InventoryObservation:
             return self.get_observed_stage(item_id) >= stage
         return True
 
-    def is_stale_for(
-        self,
-        *,
-        room_seed_name: str | None = None,
-        epoch: int | str | None = None,
-        context_identity: str | None = None,
-        campaign: str | None = None,
-        provider_namespace: str | None = None,
-    ) -> bool:
-        """Reject stale observation if scope, epoch, or namespace does not match."""
-        if room_seed_name is not None and self.room_seed_name != room_seed_name:
-            return True
+    def _is_stale_for_epoch(self, campaign, context_identity, epoch, provider_namespace):
         if epoch is not None and str(self.epoch) != str(epoch):
             return True
         if context_identity is not None and self.context_identity != context_identity:
@@ -424,6 +417,21 @@ class InventoryObservation:
         ):
             return True
         return False
+
+
+    def is_stale_for(
+        self,
+        *,
+        room_seed_name: str | None = None,
+        epoch: int | str | None = None,
+        context_identity: str | None = None,
+        campaign: str | None = None,
+        provider_namespace: str | None = None,
+    ) -> bool:
+        """Reject stale observation if scope, epoch, or namespace does not match."""
+        if room_seed_name is not None and self.room_seed_name != room_seed_name:
+            return True
+        return self._is_stale_for_epoch(campaign, context_identity, epoch, provider_namespace)
 
 
 class InventoryObservationPort(Protocol):

@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-
 TAG_PAID_NORMAL_MOD_UPGRADES = frozenset({
     "perk/player/weapons/shotgun/pop_rocket_faster_recharge",
     "perk/player/weapons/shotgun/pop_rocket_larger_explosion",
