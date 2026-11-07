@@ -10,8 +10,6 @@ import json
 from pathlib import Path
 
 CANONICAL_SOURCE_SHA256 = "3f27edeb5bc47aa60d22262458c2eeaac891fb1c6bf9c1f763cb90335ace3edf"
-CANONICAL_SOURCE_SIZE = 64936
-CANONICAL_SOURCE_LINES = 2051
 PATCHED_OUTPUT_SHA256 = "492d473fd89a11e026d5c3c3eb7969bb653691b46bbe6641cd138e7dd6eed716"
 
 RUNE_SLOT_OWNER = {
@@ -1164,99 +1162,15 @@ CANONICAL_PLAYER_DECL_B64 = (
 )
 
 
-def _validate_player_decl_structure_coop_forbidden_fields(data):
-    text = data.decode("utf-8", errors="replace")
-
-    if text.strip().startswith("{") and "edit =" in text and "class =" not in text:
-        raise ValueError("Rejected partial edit-only player.decl")
-    if "edit =" in text and "startingInventory =" not in text:
-        raise ValueError("Rejected partial/edit-only player.decl representation")
-
-    coop_forbidden_fields = [
-        "controlRespawnedFromDeath",
-        "canRespawn",
-        "friendlyRepulsorRadius",
-        "enemyRepulsorRadius",
-        "lockonData",
-    ]
-    for field in coop_forbidden_fields:
-        if field in text:
-            raise ValueError(f"Rejected co-op field in player.decl: {field}")
-
-    required_tokens = [
-        'class = "idPlayer";',
-        'networkReplicated',
-        'editorVars',
-        'renderModelInfo',
-        'handsModelDefault',
-        'startingInventory',
-        'notificationManager',
-        'runeManager',
-        'runeSlotReq',
-    ]
-    for token in required_tokens:
-        if token not in text:
-            raise ValueError(f"Canonical player.decl missing required field/token: {token}")
-    return text
-
-
-def validate_player_decl_structure(data: bytes) -> None:
-    text = _validate_player_decl_structure_coop_forbidden_fields(data)
-
-    if text.count("runeSlotReq") != 1:
-        raise ValueError(f"Expected exactly 1 runeSlotReq block, found {text.count('runeSlotReq')}")
-
-
-def get_canonical_source() -> bytes:
-    raw = base64.b64decode(CANONICAL_PLAYER_DECL_B64)
-    if len(raw) != CANONICAL_SOURCE_SIZE:
-        raise ValueError(f"Canonical source size mismatch: expected {CANONICAL_SOURCE_SIZE}, got {len(raw)}")
-    actual_sha = hashlib.sha256(raw).hexdigest()
-    if actual_sha != CANONICAL_SOURCE_SHA256:
-        raise ValueError(f"Canonical source SHA-256 mismatch: expected {CANONICAL_SOURCE_SHA256}, got {actual_sha}")
-    lines = raw.splitlines(keepends=True)
-    if len(lines) != CANONICAL_SOURCE_LINES:
-        raise ValueError(f"Canonical source line count mismatch: expected {CANONICAL_SOURCE_LINES}, got {len(lines)}")
-    if b"\r\n" not in raw or b"\n" in raw.replace(b"\r\n", b""):
-        raise ValueError("Canonical source must use strict CRLF line endings")
-
-    validate_player_decl_structure(raw)
-    return raw
-
-
-def _patch_player_decl_patched(source_bytes):
-    if source_bytes is None:
-        source_bytes = get_canonical_source()
-    else:
-        validate_player_decl_structure(source_bytes)
-
-    if b"ptr[0] = 1;" not in source_bytes or b"ptr[1] = 2;" not in source_bytes or b"ptr[2] = 3;" not in source_bytes:
-        raise ValueError("Original runeSlotReq values [1, 2, 3] not found in source")
-
-    patched = source_bytes.replace(b"ptr[0] = 1;", b"ptr[0] = 0;", 1)
-    patched = patched.replace(b"ptr[1] = 2;", b"ptr[1] = 0;", 1)
-    patched = patched.replace(b"ptr[2] = 3;", b"ptr[2] = 0;", 1)
-
-    if len(patched) != len(source_bytes):
-        raise ValueError(f"Patched player.decl size changed! Original: {len(source_bytes)}, Patched: {len(patched)}")
-
-    diffs = [(i, source_bytes[i], patched[i]) for i in range(len(source_bytes)) if source_bytes[i] != patched[i]]
-    if len(diffs) != 3:
-        raise ValueError(f"Expected exactly 3 byte diffs, got {len(diffs)}")
-
-    expected_diffs = [(40485, ord('1'), ord('0')), (40504, ord('2'), ord('0')), (40523, ord('3'), ord('0'))]
-    if diffs != expected_diffs:
-        raise ValueError(f"Unexpected byte diffs: {diffs} vs expected {expected_diffs}")
-    return patched
-
-
-def patch_player_decl(source_bytes: bytes | None = None) -> bytes:
-    patched = _patch_player_decl_patched(source_bytes)
-
-    output_sha = hashlib.sha256(patched).hexdigest()
-    if output_sha != PATCHED_OUTPUT_SHA256:
-        raise ValueError(f"Patched output SHA-256 mismatch: expected {PATCHED_OUTPUT_SHA256}, got {output_sha}")
-
+def patch_player_decl() -> bytes:
+    source = base64.b64decode(CANONICAL_PLAYER_DECL_B64)
+    if hashlib.sha256(source).hexdigest() != CANONICAL_SOURCE_SHA256:
+        raise ValueError("Embedded player.decl does not match its SHA-256")
+    patched = source
+    for slot, cost in enumerate((1, 2, 3)):
+        patched = patched.replace(f"ptr[{slot}] = {cost};".encode(), f"ptr[{slot}] = 0;".encode(), 1)
+    if hashlib.sha256(patched).hexdigest() != PATCHED_OUTPUT_SHA256:
+        raise ValueError("Patched player.decl does not match its expected SHA-256")
     return patched
 
 
@@ -1271,7 +1185,7 @@ def build_rune_slot_override(mod_root: Path) -> dict:
     return {
         "owner": RUNE_SLOT_OWNER,
         "source_sha256": CANONICAL_SOURCE_SHA256,
-        "source_size": CANONICAL_SOURCE_SIZE,
+        "source_size": len(patched_bytes),
         "output_sha256": PATCHED_OUTPUT_SHA256,
         "output_size": len(patched_bytes),
         "source_requirements": [1, 2, 3],
