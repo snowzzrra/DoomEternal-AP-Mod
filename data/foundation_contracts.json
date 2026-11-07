@@ -64,7 +64,7 @@
   },
   "map_overrides": {},
   "repeatability": {
-    "7770016": "repeatable_runtime_proven",
-    "7770142": "repeatable_runtime_proven"
+    "7770016": "repeatable_runtime_reported",
+    "7770142": "repeatable_runtime_reported"
   }
 }
