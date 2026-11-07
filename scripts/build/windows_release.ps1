@@ -80,7 +80,7 @@ try {
     if (-not $RebuildRoomResources) {
         Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--check", "--repo-root", $repoRoot)
     }
-    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -Preflight
+    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -Python $pythonExe -Preflight
     if ($LASTEXITCODE -ne 0) { throw "MSVC preflight failed" }
     if ($Preflight) {
         Write-Output "WINDOWS_PREFLIGHT status=PASS"
@@ -89,6 +89,7 @@ try {
 
     if ($RebuildRoomResources) {
         if (-not $StagedMod) { throw "-RebuildRoomResources requires -StagedMod (prepared authorial mod tree)" }
+        Invoke-Python @("-m", "tools.validation.validate_data", "--apworld-root", (Join-Path $archipelago "worlds\doometernal"))
         if (-not $MapSources) { $MapSources = Join-Path $repoRoot "data\map_sources.json" }
         if (-not $Compressor) { $Compressor = Join-Path $workspace "Tools\idFileDeCompressor" }
         $roomOutput = Join-Path $repoRoot "build\room-resources"
@@ -137,7 +138,7 @@ try {
 
     Invoke-Python @("-m", "tools.release.prebuilt_room_resources", "--export-dir", $resources, "--repo-root", $repoRoot)
     Invoke-Python @("-m", "tools.release.apworld_cache", "--output", (Join-Path $handoff "shared\doometernal.apworld"), "--archipelago-source", $archipelago, "--archipelago-python", $pythonExe)
-    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -OutputDir $clientBuild
+    & (Join-Path $PSScriptRoot "client_windows.ps1") -CoreSource $CoreSource -Python $pythonExe -OutputDir $clientBuild
     if ($LASTEXITCODE -ne 0) { throw "Native client build failed" }
     Copy-Item -LiteralPath (Join-Path $clientBuild "ap_client.exe") -Destination $clientHandoff -Force
     Copy-Item -LiteralPath (Join-Path $clientBuild "save_death_probe.exe") -Destination $clientHandoff -Force

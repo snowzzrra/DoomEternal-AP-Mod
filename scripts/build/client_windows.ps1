@@ -2,6 +2,7 @@
 param(
     [string]$OutputDir = "build\\release\\build\\client",
     [string]$CoreSource = "",
+    [string]$Python = "python",
     [switch]$UseCurrentToolchain,
     [switch]$Preflight
 )
@@ -9,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 function Invoke-NativeBuild {
-    param([string]$RepositoryRoot, [string]$BuildDirectory, [string]$CoreRoot, [switch]$PreflightOnly)
+    param([string]$RepositoryRoot, [string]$BuildDirectory, [string]$CoreRoot, [string]$PythonExecutable, [switch]$PreflightOnly)
 
     foreach ($tool in "cl.exe", "link.exe", "dumpbin.exe", "rc.exe") {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
@@ -20,6 +21,9 @@ function Invoke-NativeBuild {
         Write-Output "NATIVE_CLIENT_PREFLIGHT toolchain=msvc-x64 status=PASS"
         return
     }
+
+    $python = & $PythonExecutable -c "import sys; print(sys.executable)"
+    if ($LASTEXITCODE -ne 0 -or -not $python) { throw "Python interpreter is unavailable" }
 
     if (Test-Path -LiteralPath $BuildDirectory) {
         Remove-Item -LiteralPath $BuildDirectory -Recurse -Force
@@ -44,7 +48,7 @@ function Invoke-NativeBuild {
         Join-Path $env:SC_CMAKE "cmake.exe"
     }
     $transportBuild = Join-Path $BuildDirectory "transport"
-    & $cmakePath -S (Join-Path $RepositoryRoot "native\\probes") -B $transportBuild -G Ninja "-DSENTINEL_CORE_SOURCE=$coreRoot" -DCMAKE_BUILD_TYPE=Release
+    & $cmakePath -S (Join-Path $RepositoryRoot "native\\probes") -B $transportBuild -G Ninja "-DSENTINEL_CORE_SOURCE=$coreRoot" "-DPython3_EXECUTABLE=$python" -DCMAKE_BUILD_TYPE=Release
     if ($LASTEXITCODE -ne 0) { throw "CMake failed configuring the native transport" }
     & $cmakePath --build $transportBuild --target save_death_probe
     if ($LASTEXITCODE -ne 0) { throw "CMake failed building save_death_probe.exe" }
@@ -162,10 +166,10 @@ if (-not $UseCurrentToolchain) {
         throw "Visual Studio Build Tools x64 components were not found. Install the Desktop development with C++ workload."
     }
     $preflightArgument = if ($Preflight) { " -Preflight" } else { "" }
-    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -CoreSource "{4}" -UseCurrentToolchain{3}' -f $developerCommand, $PSCommandPath, $buildDirectory, $preflightArgument, $coreDirectory
+    $command = 'call "{0}" -arch=x64 -host_arch=x64 >nul && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "{1}" -OutputDir "{2}" -CoreSource "{4}" -Python "{5}" -UseCurrentToolchain{3}' -f $developerCommand, $PSCommandPath, $buildDirectory, $preflightArgument, $coreDirectory, $Python
     & cmd.exe /d /s /c $command
     if ($LASTEXITCODE -ne 0) { throw "Native Windows build failed with exit code $LASTEXITCODE" }
     exit 0
 }
 
-Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory -CoreRoot $coreDirectory -PreflightOnly:$Preflight
+Invoke-NativeBuild -RepositoryRoot $repositoryRoot -BuildDirectory $buildDirectory -CoreRoot $coreDirectory -PythonExecutable $Python -PreflightOnly:$Preflight

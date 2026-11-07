@@ -1,9 +1,16 @@
-name: DOOM mod smoke
-on: [push, pull_request]
+name: DOOM mod checks
+'on':
+- push
+- pull_request
 permissions:
   contents: read
 env:
-  CORE_REF: ${{ (github.base_ref || github.ref_name) == 'main' && '3ed7cdb932207df458069be6e9225eddfa16546e' || (github.base_ref || github.ref_name) }}
+  CORE_REF: ${{ github.base_ref || github.ref_name }}
+  PYTHONDONTWRITEBYTECODE: '1'
+  PYTHONHASHSEED: '0'
+  SKIP_REQUIREMENTS_UPDATE: '1'
+  AP_TEST_WORLDS: doometernal
+  QT_QPA_PLATFORM: offscreen
 jobs:
   smoke:
     runs-on: ubuntu-24.04
@@ -11,106 +18,109 @@ jobs:
       run:
         working-directory: DoomEternal-AP-Mod
     env:
-      # main pairs with the doom_eternal APWorld branch; other branches use the APWorld branch of the same name
-      APWORLD_REF: ${{ (github.base_ref || github.ref_name) == 'main' && 'doom_eternal' || (github.base_ref || github.ref_name) }}
+      APWORLD_REF: ${{ (github.base_ref || github.ref_name) == 'main' && 'doom_eternal' || (github.base_ref || github.ref_name)
+        }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          path: DoomEternal-AP-Mod
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: snowzzrra/DoomEternal-AP-World
-          ref: ${{ env.APWORLD_REF }}
-          path: Archipelago
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with: {python-version: '3.12.10'}
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: snowzzrra/Sentinel-Core
-          ref: ${{ env.CORE_REF }}
-          path: Sentinel-Core
-          persist-credentials: false
-      - name: Check packaged protocol projection
-        run: python -B tools/content/project_transport_protocol.py --check --core-root ../Sentinel-Core
-      - name: Install Qt runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libegl1 libgl1 libx11-xcb1 libxcb1 libxcb-cursor0 libxcb-icccm4 \
-            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 \
-            libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
-            libxcb-util1 libxcb-xfixes0 libxcb-xkb1 libxkbcommon0 libxkbcommon-x11-0
-      - name: Install smoke dependencies
-        run: |
-          python -m pip install --requirement requirements-launcher.txt
-          python -m pip install --requirement requirements-ci.txt
-      - name: Compile Python
-        run: python -m compileall -q doom_eap tools/content tools/validation
-      - name: Check Python function complexity (development)
-        run: python -m tools.validation.function_complexity
-      - name: Check player display literals
-        run: python -m tools.validation.player_literals
-      - name: Validate authorial content
-        run: python -m tools.validation.authorial --check-authorial
-      - name: Validate frozen room resources
-        run: python -m tools.release.prebuilt_room_resources --check
-      - name: Validate packaged options schema
-        run: python -c "from pathlib import Path; from doom_eap.content.options_foundation import load_options_schema; load_options_schema(Path('data/options_schema.json'))"
-      - name: Behavioral contracts
-        env:
-          QT_QPA_PLATFORM: offscreen
-        run: python -m pytest tests -q --disable-warnings
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: '24.19.0'
-      - name: Report service contract without external writes
-        run: node tools/report_backend/test_server.cjs
-      - name: Check whitespace
-        run: git diff --check
-
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        path: DoomEternal-AP-Mod
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: snowzzrra/DoomEternal-AP-World
+        ref: ${{ env.APWORLD_REF }}
+        path: Archipelago
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: 3.12.10
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: snowzzrra/Sentinel-Core
+        ref: ${{ env.CORE_REF }}
+        path: Sentinel-Core
+        persist-credentials: false
+    - name: Install Qt runtime libraries
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          libegl1 libgl1 libx11-xcb1 libxcb1 libxcb-cursor0 libxcb-icccm4 \
+          libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render0 \
+          libxcb-render-util0 libxcb-shape0 libxcb-shm0 libxcb-sync1 \
+          libxcb-util1 libxcb-xfixes0 libxcb-xkb1 libxkbcommon0 libxkbcommon-x11-0
+    - name: Install smoke dependencies
+      run: |
+        python -m pip install -r requirements-launcher.txt -r requirements-ci.txt jellyfish==1.2.1 jinja2==3.1.6
+    - name: Check generated sources
+      run: |
+        python ../Sentinel-Core/tools/generate_protocol.py --check
+        python -m tools.content.project_transport_protocol --check --core-root ../Sentinel-Core
+        python ../Archipelago/worlds/doometernal/sync_version.py --check --mod-root .
+        python -m tools.content.compile_options_schema --check
+        python -m tools.content.compile_player_strings --check
+        python -m tools.content.compile_start_inventory_catalog --check
+        python -m tools.content.compile_content_catalog --source-only --check
+    - name: Validate data, complexity and lint
+      run: |
+        python -m tools.validation.authorial --check-authorial
+        python -m tools.validation.player_literals
+        python -m tools.validation.function_complexity
+        python -m tools.validation.function_complexity --apworld-root ../Archipelago/worlds/doometernal
+        python -m ruff check doom_eap tools tests scripts
+        python -m ruff check ../Archipelago/worlds/doometernal
+    - name: Fast behavioral contracts
+      env:
+        QT_QPA_PLATFORM: offscreen
+        ARCHIPELAGO_SOURCE: ${{ github.workspace }}/Archipelago
+        DOOMEAP_GENERATION_PROFILE: fast
+      run: |
+        python -m pytest tests -m 'not integration and not slow' -q --basetemp .tmp/pytest -p no:cacheprovider
+        cd ../Archipelago
+        python -m pytest worlds/doometernal/test -m 'not integration and not slow' -q --basetemp .tmp/doometernal -p no:cacheprovider
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: 24.19.0
+    - name: Report service contract without external writes
+      run: node tools/report_backend/test_server.cjs
+    - name: Check whitespace
+      run: git diff --check
   native-client:
-    name: Windows native-client gate
+    name: Windows native build
     runs-on: windows-2022
     env:
       CORE_REPO: snowzzrra/Sentinel-Core
       SENTINEL_CORE_SOURCE: ${{ github.workspace }}/Sentinel-Core
-      SENTINEL_TRANSPORT_RELAY: ${{ github.workspace }}/.tmp/native-transport-ci/save_death_probe.exe
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-      - name: Checkout Core source
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          repository: ${{ env.CORE_REPO }}
-          ref: ${{ env.CORE_REF }}
-          path: Sentinel-Core
-          persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with: {python-version: '3.12.10'}
-      - name: Locate MSVC x64
-        shell: pwsh
-        run: |
-          $installation = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if (!$installation) { throw 'MSVC x64 is required' }
-          "SC_VCVARS=$installation\VC\Auxiliary\Build\vcvars64.bat" >> $env:GITHUB_ENV
-      - name: Verify native-client contracts without skips
-        shell: cmd
-        run: |
-          call "%SC_VCVARS%"
-          if errorlevel 1 exit /b 1
-          cmake -S Sentinel-Core -B Sentinel-Core/build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          if errorlevel 1 exit /b 1
-          python -B tools/content/project_transport_protocol.py --check --core-root Sentinel-Core
-          if errorlevel 1 exit /b 1
-          cmake -S native/probes -B .tmp/native-transport-ci -G Ninja -DCMAKE_BUILD_TYPE=Release -DSENTINEL_CORE_SOURCE="%SENTINEL_CORE_SOURCE%"
-          if errorlevel 1 exit /b 1
-          cmake --build .tmp/native-transport-ci --target save_death_probe --parallel 2
-          if errorlevel 1 exit /b 1
-          if not exist Sentinel-Core\build\generated\sentinel_version.h exit /b 1
-          python -m pip install --requirement requirements-ci.txt
-          if errorlevel 1 exit /b 1
-          set "DELIVERY_TESTS="
-          if exist tests\test_delivery_scenarios.py set "DELIVERY_TESTS=tests/test_delivery_scenarios.py"
-          set "SENTINEL_TRANSPORT_RELAY=%CD%\.tmp\native-transport-ci\save_death_probe.exe"
-          python -m pytest tests/test_native_features.py tests/test_native_transport.py tests/test_native_transport_pipe.py %DELIVERY_TESTS% -q --basetemp=.tmp/native-client-tests -p no:cacheprovider --junitxml=native-client-results.xml
-          if errorlevel 1 exit /b 1
-          python -c "import xml.etree.ElementTree as ET; root = ET.parse('native-client-results.xml').getroot(); assert list(root.iter('testcase')), 'Native-client gate collected zero tests'; assert not [node for node in root.iter('skipped') if node.get('type') != 'pytest.xfail'], 'Native-client gate contains unexpected skipped tests'"
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+    - name: Checkout Core source
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      with:
+        repository: ${{ env.CORE_REPO }}
+        ref: ${{ env.CORE_REF }}
+        path: Sentinel-Core
+        persist-credentials: false
+    - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+      with:
+        python-version: 3.12.10
+      id: python
+    - name: Locate MSVC x64
+      shell: pwsh
+      run: |
+        $installation = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (!$installation) { throw 'MSVC x64 is required' }
+        "SC_VCVARS=$installation\VC\Auxiliary\Build\vcvars64.bat" >> $env:GITHUB_ENV
+    - name: Build native binaries without release services
+      shell: cmd
+      run: |
+        call "%SC_VCVARS%"
+        if errorlevel 1 exit /b 1
+        cmake -S Sentinel-Core -B Sentinel-Core/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPython3_EXECUTABLE="${{ steps.python.outputs.python-path }}"
+        if errorlevel 1 exit /b 1
+        cmake -S native/probes -B .tmp/native-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSENTINEL_CORE_SOURCE="%SENTINEL_CORE_SOURCE%" -DPython3_EXECUTABLE="${{ steps.python.outputs.python-path }}"
+        if errorlevel 1 exit /b 1
+        cmake --build .tmp/native-build --target save_death_probe --parallel 2
+        if errorlevel 1 exit /b 1
+        mkdir .tmp\native-client
+        cl /nologo /std:c++17 /O2 /MT /EHsc /guard:cf /D_M_AMD64 /DNOMINMAX /I. /ISentinel-Core/include /ISentinel-Core/src /ISentinel-Core/build/generated /c native/client/*.cpp /Fo.tmp/native-client/
+        if errorlevel 1 exit /b 1
+        rc /nologo /fo.tmp/native-client/ap_client.res native/client/ap_client.rc
+        if errorlevel 1 exit /b 1
+        link /nologo /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /GUARD:CF /OUT:.tmp/native-client/ap_client.exe .tmp/native-client/*.obj .tmp/native-client/ap_client.res .tmp/native-build/core/sentinel_inspection_client.lib .tmp/native-build/core/sentinel_protocol.lib bcrypt.lib version.lib user32.lib

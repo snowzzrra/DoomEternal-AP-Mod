@@ -12,6 +12,7 @@ This script performs ZERO compilation.
 
 from __future__ import annotations
 
+# ruff: noqa: E402
 import argparse
 import hashlib
 import json
@@ -24,7 +25,7 @@ import time
 import zipfile
 from itertools import product
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[1]
@@ -104,38 +105,7 @@ def source_ancestry(manifest: dict, project: str) -> str:
     return record.get("resolved_sha", "")
 
 
-def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dict[str, Any]:
-    """Validate handoff artifact files and manifest."""
-    manifest_path = handoff_dir / "BUILD-MANIFEST.json"
-    if not manifest_path.is_file():
-        raise ValueError(f"Handoff missing BUILD-MANIFEST.json at {manifest_path}")
-
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise ValueError(f"Failed to parse BUILD-MANIFEST.json: {e}") from e
-
-    if not isinstance(manifest, dict) or not isinstance(manifest.get("version_label"), str) or not manifest["version_label"].strip():
-        raise ValueError("Handoff manifest version_label is missing or invalid")
-
-    sums_path = handoff_dir / "SHA256SUMS.txt"
-    if sums_path.is_file():
-        for line in sums_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            parts = line.split(maxsplit=1)
-            if len(parts) == 2:
-                expected_hash, rel_path = parts[0], parts[1].lstrip("*").strip()
-                target_file = handoff_dir / rel_path
-                if not target_file.is_file():
-                    raise ValueError(f"Handoff file listed in SHA256SUMS.txt is missing: {rel_path}")
-                actual_hash = sha256_file(target_file)
-                if actual_hash.lower() != expected_hash.lower():
-                    raise ValueError(
-                        f"Checksum mismatch in handoff for {rel_path}: expected {expected_hash}, got {actual_hash}"
-                    )
-
+def _validate_handoff_structure_apworld_file(handoff_dir, platform):
     if platform in {"linux", "both"}:
         linux_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
         if not linux_launcher.is_file():
@@ -161,6 +131,46 @@ def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dic
     ap_client_file = handoff_dir / "shared" / "client" / "ap_client.exe"
     if not ap_client_file.is_file():
         raise ValueError(f"Missing native ap_client.exe at {ap_client_file}")
+    return ap_client_file
+
+
+def _validate_handoff_structure_parts(handoff_dir, line):
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return
+    parts = line.split(maxsplit=1)
+    if len(parts) == 2:
+        expected_hash, rel_path = parts[0], parts[1].lstrip("*").strip()
+        target_file = handoff_dir / rel_path
+        if not target_file.is_file():
+            raise ValueError(f"Handoff file listed in SHA256SUMS.txt is missing: {rel_path}")
+        actual_hash = sha256_file(target_file)
+        if actual_hash.lower() != expected_hash.lower():
+            raise ValueError(
+                f"Checksum mismatch in handoff for {rel_path}: expected {expected_hash}, got {actual_hash}"
+            )
+
+
+def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dict[str, Any]:
+    """Validate handoff artifact files and manifest."""
+    manifest_path = handoff_dir / "BUILD-MANIFEST.json"
+    if not manifest_path.is_file():
+        raise ValueError(f"Handoff missing BUILD-MANIFEST.json at {manifest_path}")
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ValueError(f"Failed to parse BUILD-MANIFEST.json: {e}") from e
+
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("version_label"), str) or not manifest["version_label"].strip():
+        raise ValueError("Handoff manifest version_label is missing or invalid")
+
+    sums_path = handoff_dir / "SHA256SUMS.txt"
+    if sums_path.is_file():
+        for line in sums_path.read_text(encoding="utf-8").splitlines():
+            _validate_handoff_structure_parts(handoff_dir, line)
+
+    ap_client_file = _validate_handoff_structure_apworld_file(handoff_dir, platform)
     ap_client_magic = ap_client_file.read_bytes()[:2]
     if ap_client_magic != b"MZ":
         raise ValueError(f"ap_client.exe does not have valid MZ magic (got {ap_client_magic!r})")
@@ -168,9 +178,7 @@ def validate_handoff_structure(handoff_dir: Path, platform: str = "both") -> dic
     return manifest
 
 
-def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) -> dict[str, Any]:
-    """Validate that the canonical room resource set is complete, uncorrupted, and contract-compatible."""
-    base_mod = resources_dir / "base_mod.zip"
+def _validate_room_resources_room_payloads(base_mod, resources_dir):
     room_payloads = resources_dir / "room_payloads.zip"
     room_manifest = resources_dir / "room_payload_manifest.json"
 
@@ -193,39 +201,58 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
 
     for map_key, snapshot in manifest_doc["source_snapshots"].items():
         _decode_source_snapshot(payload_members[snapshot["member"]], snapshot, map_key)
+    return base_members, manifest_doc, payload_members, room_payloads
+
+
+def _validate_room_resources_catalog(manifest_doc, repo_root):
+    catalog = load_content_catalog(repo_root)
+    enabled_map_keys = {spec.key for spec in catalog.compiler_maps()}
+    if set(manifest_doc.get("maps", {})) != enabled_map_keys:
+        raise ValueError(
+            f"Room payload map set disagrees with compiler maps: "
+            f"missing={sorted(enabled_map_keys - set(manifest_doc.get('maps', {})))}, "
+            f"extra={sorted(set(manifest_doc.get('maps', {})) - enabled_map_keys)}"
+        )
+    for map_key, snapshot in manifest_doc["source_snapshots"].items():
+        if snapshot["sha256"] != catalog.maps[map_key].source_sha256:
+            raise ValueError(f"Room source snapshot disagrees with its descriptor: {map_key}")
+
+
+def _validate_room_resources_member(map_key, payload_members, state):
+    member = state.get("member")
+    if member in payload_members:
+        actual_hash = hashlib.sha256(payload_members[member]).hexdigest()
+        if actual_hash != state.get("sha256"):
+            raise ValueError(f"Replacement room member hash mismatch for {map_key}/{member}")
+
+
+def _validate_room_resources_state(base_members, map_key, payload_members, record):
+    for state in record.get("states", []):
+        if state.get("source") == "base":
+            target = record.get("target_member")
+            if target in base_members:
+                actual_hash = hashlib.sha256(base_members[target]).hexdigest()
+                if actual_hash != state.get("sha256"):
+                    raise ValueError(f"Base room member hash mismatch for {map_key}/{target}")
+        elif state.get("source") == "replacement":
+            _validate_room_resources_member(map_key, payload_members, state)
+
+
+def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) -> dict[str, Any]:
+    """Validate that the canonical room resource set is complete, uncorrupted, and contract-compatible."""
+    base_mod = resources_dir / "base_mod.zip"
+    base_members, manifest_doc, payload_members, room_payloads = _validate_room_resources_room_payloads(base_mod, resources_dir)
     for map_key, record in manifest_doc.get("maps", {}).items():
-        for state in record.get("states", []):
-            if state.get("source") == "base":
-                target = record.get("target_member")
-                if target in base_members:
-                    actual_hash = hashlib.sha256(base_members[target]).hexdigest()
-                    if actual_hash != state.get("sha256"):
-                        raise ValueError(f"Base room member hash mismatch for {map_key}/{target}")
-            elif state.get("source") == "replacement":
-                member = state.get("member")
-                if member in payload_members:
-                    actual_hash = hashlib.sha256(payload_members[member]).hexdigest()
-                    if actual_hash != state.get("sha256"):
-                        raise ValueError(f"Replacement room member hash mismatch for {map_key}/{member}")
+        _validate_room_resources_state(base_members, map_key, payload_members, record)
 
     if repo_root is not None:
-        catalog = load_content_catalog(repo_root)
-        enabled_map_keys = {spec.key for spec in catalog.compiler_maps()}
-        if set(manifest_doc.get("maps", {})) != enabled_map_keys:
-            raise ValueError(
-                f"Room payload map set disagrees with compiler maps: "
-                f"missing={sorted(enabled_map_keys - set(manifest_doc.get('maps', {})))}, "
-                f"extra={sorted(set(manifest_doc.get('maps', {})) - enabled_map_keys)}"
-            )
-        for map_key, snapshot in manifest_doc["source_snapshots"].items():
-            if snapshot["sha256"] != catalog.maps[map_key].source_sha256:
-                raise ValueError(f"Room source snapshot disagrees with its descriptor: {map_key}")
+        _validate_room_resources_catalog(manifest_doc, repo_root)
 
     keys = manifest_doc.get("physical_option_keys", [])
     for values, mastery_profile in product(
         product((False, True), repeat=len(keys)), MASTERY_REQUIREMENT_DIVISORS
     ):
-        opts = dict(zip(keys, values), mastery_requirements=mastery_profile)
+        opts = dict(zip(keys, values, strict=False), mastery_requirements=mastery_profile)
         assembled, selected = assemble_room_files(base_mod, room_payloads, manifest_doc, opts)
         if len(selected) != len(manifest_doc.get("maps", {})):
             raise ValueError(f"Room selection non-deterministic for options {opts}")
@@ -233,50 +260,7 @@ def validate_room_resources(resources_dir: Path, repo_root: Path | None = None) 
     return manifest_doc
 
 
-def assemble_platform_release(
-    platform_name: str,
-    handoff_dir: Path,
-    repo_root: Path,
-    room_resources_dir: Path,
-    manifest: dict[str, Any],
-    stage_dir: Path,
-) -> Path:
-    """Populate staging tree for a platform release."""
-    out_root = stage_dir / platform_name
-    if out_root.exists():
-        shutil.rmtree(out_root)
-    out_root.mkdir(parents=True, exist_ok=True)
-
-    # copy platform launcher
-    if platform_name == "linux":
-        src_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
-        dst_launcher = out_root / "DoomEternalArchipelagoLauncher"
-        shutil.copy2(src_launcher, dst_launcher)
-        dst_launcher.chmod(dst_launcher.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-    elif platform_name == "windows":
-        src_launcher = handoff_dir / "windows" / "DoomEternalArchipelagoLauncher.exe"
-        dst_launcher = out_root / "DoomEternalArchipelagoLauncher.exe"
-        shutil.copy2(src_launcher, dst_launcher)
-    else:
-        raise ValueError(f"Unsupported platform: {platform_name}")
-
-    # copy doometernal.apworld
-    src_apworld = handoff_dir / "shared" / "doometernal.apworld"
-    dst_apworld = out_root / "doometernal.apworld"
-    shutil.copy2(src_apworld, dst_apworld)
-
-    for doc in ("README.md", "LICENSE"):
-        source = repo_root / doc if (repo_root / doc).is_file() else repo_root / "docs" / doc
-        if source.is_file():
-            shutil.copy2(source, out_root / doc)
-    docs = out_root / "docs"
-    docs.mkdir(exist_ok=True)
-    for name in ("INSTALL.md", "GAMEPLAY.md", "DEVELOPMENT.md", "RELEASING.md", "LICENSE"):
-        source = repo_root / "docs" / name
-        if source.is_file():
-            shutil.copy2(source, docs / name)
-
-    # copy client runtime, resources & templates
+def _assemble_platform_release_client_dir(handoff_dir, out_root, repo_root, room_resources_dir):
     client_dir = out_root / "client"
     client_dir.mkdir(parents=True, exist_ok=True)
 
@@ -310,20 +294,10 @@ def assemble_platform_release(
         dst_bridge = client_dir / "run_bridge.sh"
         shutil.copy2(run_bridge, dst_bridge)
         dst_bridge.chmod(dst_bridge.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return client_dir
 
-    val_install = repo_root / "scripts" / "validate" / "runtime_install.sh"
-    if val_install.is_file():
-        dst_val = client_dir / "validate_runtime_install.sh"
-        shutil.copy2(val_install, dst_val)
-        dst_val.chmod(dst_val.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    # data directory
-    repo_data = repo_root / "data"
-    if repo_data.is_dir():
-        dst_data = client_dir / "data"
-        shutil.copytree(repo_data, dst_data, dirs_exist_ok=True)
-
-    # manifests directory
+def _assemble_platform_release_repo_manifests(client_dir, repo_root):
     repo_manifests = repo_root / "manifests"
     if repo_manifests.is_dir():
         dst_manifests = client_dir / "manifests"
@@ -376,6 +350,73 @@ def assemble_platform_release(
         if (repo_tools / "__init__.py").is_file():
             shutil.copy2(repo_tools / "__init__.py", dst_tools / "__init__.py")
 
+
+def _assemble_platform_release_out_root(handoff_dir, platform_name, repo_root, room_resources_dir, stage_dir):
+    out_root = stage_dir / platform_name
+    if out_root.exists():
+        shutil.rmtree(out_root)
+    out_root.mkdir(parents=True, exist_ok=True)
+
+    # copy platform launcher
+    if platform_name == "linux":
+        src_launcher = handoff_dir / "linux" / "DoomEternalArchipelagoLauncher"
+        dst_launcher = out_root / "DoomEternalArchipelagoLauncher"
+        shutil.copy2(src_launcher, dst_launcher)
+        dst_launcher.chmod(dst_launcher.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    elif platform_name == "windows":
+        src_launcher = handoff_dir / "windows" / "DoomEternalArchipelagoLauncher.exe"
+        dst_launcher = out_root / "DoomEternalArchipelagoLauncher.exe"
+        shutil.copy2(src_launcher, dst_launcher)
+    else:
+        raise ValueError(f"Unsupported platform: {platform_name}")
+
+    # copy doometernal.apworld
+    src_apworld = handoff_dir / "shared" / "doometernal.apworld"
+    dst_apworld = out_root / "doometernal.apworld"
+    shutil.copy2(src_apworld, dst_apworld)
+
+    for doc in ("README.md", "LICENSE"):
+        source = repo_root / doc if (repo_root / doc).is_file() else repo_root / "docs" / doc
+        if source.is_file():
+            shutil.copy2(source, out_root / doc)
+    docs = out_root / "docs"
+    docs.mkdir(exist_ok=True)
+    for name in ("INSTALL.md", "GAMEPLAY.md", "DEVELOPMENT.md", "RELEASING.md", "LICENSE"):
+        source = repo_root / "docs" / name
+        if source.is_file():
+            shutil.copy2(source, docs / name)
+
+    # copy client runtime, resources & templates
+    client_dir = _assemble_platform_release_client_dir(handoff_dir, out_root, repo_root, room_resources_dir)
+
+    val_install = repo_root / "scripts" / "validate" / "runtime_install.sh"
+    if val_install.is_file():
+        dst_val = client_dir / "validate_runtime_install.sh"
+        shutil.copy2(val_install, dst_val)
+        dst_val.chmod(dst_val.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return client_dir, out_root
+
+
+def assemble_platform_release(
+    platform_name: str,
+    handoff_dir: Path,
+    repo_root: Path,
+    room_resources_dir: Path,
+    manifest: dict[str, Any],
+    stage_dir: Path,
+) -> Path:
+    """Populate staging tree for a platform release."""
+    client_dir, out_root = _assemble_platform_release_out_root(handoff_dir, platform_name, repo_root, room_resources_dir, stage_dir)
+
+    # data directory
+    repo_data = repo_root / "data"
+    if repo_data.is_dir():
+        dst_data = client_dir / "data"
+        shutil.copytree(repo_data, dst_data, dirs_exist_ok=True)
+
+    # manifests directory
+    _assemble_platform_release_repo_manifests(client_dir, repo_root)
+
     # copy top-level doom_logo.png if available
     logo_src = repo_root.parent / "Archipelago" / "worlds" / "doometernal" / "doom_logo.png"
     if logo_src.is_file():
@@ -419,7 +460,7 @@ def assemble_platform_release(
 
     # build the release manifest
     declared_public_files = sorted(
-        list(public_file_members(out_root)) + [MANIFEST_FILENAME]
+        [*list(public_file_members(out_root)), MANIFEST_FILENAME]
     )
     canonical_manifest = build_release_manifest(
         repo_root,
@@ -434,9 +475,7 @@ def assemble_platform_release(
     return out_root
 
 
-def audit_platform_parity(linux_root: Path, windows_root: Path) -> None:
-    """Verify that shared files match byte-for-byte between Linux and Windows packages."""
-    linux_files = {p.relative_to(linux_root).as_posix(): p for p in linux_root.rglob("*") if p.is_file()}
+def _audit_platform_parity_windows_files(linux_files, windows_root):
     windows_files = {p.relative_to(windows_root).as_posix(): p for p in windows_root.rglob("*") if p.is_file()}
 
     # check allowed launcher differences
@@ -473,28 +512,61 @@ def audit_platform_parity(linux_root: Path, windows_root: Path) -> None:
             )
 
 
+def audit_platform_parity(linux_root: Path, windows_root: Path) -> None:
+    """Verify that shared files match byte-for-byte between Linux and Windows packages."""
+    linux_files = {p.relative_to(linux_root).as_posix(): p for p in linux_root.rglob("*") if p.is_file()}
+    _audit_platform_parity_windows_files(linux_files, windows_root)
+
+
+def _audit_final_zip_ROOM_COMPILER_RESOURCE_FILES(expected_platform, names, zip_path):
+    if "DoomEternalArchipelago/client/save_death_probe.exe" not in names:
+        raise ValueError(f"client/save_death_probe.exe missing in {zip_path.name}")
+
+    # mandatory room compiler resources
+    for resource_rel in ROOM_COMPILER_RESOURCE_FILES:
+        expected_zip_path = f"DoomEternalArchipelago/{resource_rel}"
+        if expected_zip_path not in names:
+            raise ValueError(f"Mandatory room compiler resource missing in {zip_path.name}: {resource_rel}")
+
+    if expected_platform == "linux":
+        if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher" not in names:
+            raise ValueError(f"Linux launcher missing in {zip_path.name}")
+        if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher.exe" in names:
+            raise ValueError(f"Windows launcher erroneously found in Linux zip: {zip_path.name}")
+    elif expected_platform == "windows":
+        if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher.exe" not in names:
+            raise ValueError(f"Windows launcher missing in {zip_path.name}")
+        if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher" in names:
+            raise ValueError(f"Linux launcher erroneously found in Windows zip: {zip_path.name}")
+
+
+def _audit_final_zip_infolist(zf, zip_path):
+    infolist = zf.infolist()
+    if not infolist:
+        raise ValueError(f"Release ZIP is empty: {zip_path}")
+
+    names = [zi.filename for zi in infolist]
+    if len(names) != len(set(names)):
+        raise ValueError(f"Release ZIP contains duplicate paths: {zip_path}")
+
+    for name in names:
+        if not name.startswith("DoomEternalArchipelago/"):
+            raise ValueError(f"Entry {name!r} in {zip_path.name} does not start with root 'DoomEternalArchipelago/'")
+        parts = Path(name).parts
+        if any(p in FORBIDDEN_DIR_NAMES for p in parts):
+            raise ValueError(f"Forbidden directory name found in {zip_path.name}: {name}")
+        if ".." in parts or Path(name).is_absolute():
+            raise ValueError(f"Path traversal or absolute path found in {zip_path.name}: {name}")
+    return names
+
+
 def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | None = None) -> None:
     """Audit single output release ZIP against canonical contracts."""
     if not zip_path.is_file():
         raise ValueError(f"Release ZIP does not exist: {zip_path}")
 
     with zipfile.ZipFile(zip_path, "r") as zf:
-        infolist = zf.infolist()
-        if not infolist:
-            raise ValueError(f"Release ZIP is empty: {zip_path}")
-
-        names = [zi.filename for zi in infolist]
-        if len(names) != len(set(names)):
-            raise ValueError(f"Release ZIP contains duplicate paths: {zip_path}")
-
-        for name in names:
-            if not name.startswith("DoomEternalArchipelago/"):
-                raise ValueError(f"Entry {name!r} in {zip_path.name} does not start with root 'DoomEternalArchipelago/'")
-            parts = Path(name).parts
-            if any(p in FORBIDDEN_DIR_NAMES for p in parts):
-                raise ValueError(f"Forbidden directory name found in {zip_path.name}: {name}")
-            if ".." in parts or Path(name).is_absolute():
-                raise ValueError(f"Path traversal or absolute path found in {zip_path.name}: {name}")
+        names = _audit_final_zip_infolist(zf, zip_path)
 
         # check the release manifest
         if f"DoomEternalArchipelago/{MANIFEST_FILENAME}" not in names:
@@ -506,25 +578,7 @@ def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | No
         if "DoomEternalArchipelago/client/ap_client.exe" not in names:
             raise ValueError(f"client/ap_client.exe missing in {zip_path.name}")
 
-        if "DoomEternalArchipelago/client/save_death_probe.exe" not in names:
-            raise ValueError(f"client/save_death_probe.exe missing in {zip_path.name}")
-
-        # mandatory room compiler resources
-        for resource_rel in ROOM_COMPILER_RESOURCE_FILES:
-            expected_zip_path = f"DoomEternalArchipelago/{resource_rel}"
-            if expected_zip_path not in names:
-                raise ValueError(f"Mandatory room compiler resource missing in {zip_path.name}: {resource_rel}")
-
-        if expected_platform == "linux":
-            if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher" not in names:
-                raise ValueError(f"Linux launcher missing in {zip_path.name}")
-            if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher.exe" in names:
-                raise ValueError(f"Windows launcher erroneously found in Linux zip: {zip_path.name}")
-        elif expected_platform == "windows":
-            if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher.exe" not in names:
-                raise ValueError(f"Windows launcher missing in {zip_path.name}")
-            if "DoomEternalArchipelago/DoomEternalArchipelagoLauncher" in names:
-                raise ValueError(f"Linux launcher erroneously found in Windows zip: {zip_path.name}")
+        _audit_final_zip_ROOM_COMPILER_RESOURCE_FILES(expected_platform, names, zip_path)
 
     with tempfile.TemporaryDirectory(prefix="doomeap_audit_zip_") as temp_extract_str:
         temp_extract = Path(temp_extract_str)
@@ -534,6 +588,88 @@ def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | No
         manifest_path = extracted_root / MANIFEST_FILENAME
         manifest_doc = json.loads(manifest_path.read_text(encoding="utf-8"))
         validate_release_manifest(manifest_doc, package_root=extracted_root)
+
+
+def _main_manifest(args, extracted_handoff, repo_root, resources_dir, temp_stage):
+    print("--> Validating handoff artifact...")
+    manifest = validate_handoff_structure(extracted_handoff, args.platform)
+    version_label = manifest["version_label"]
+
+    if args.version and args.version != version_label:
+        raise ValueError(f"Version mismatch: handoff says {version_label}, expected {args.version}")
+
+    mod_sha = source_ancestry(manifest, "mod")
+    if args.expect_mod_sha and not mod_sha.startswith(args.expect_mod_sha):
+        raise ValueError(f"MOD SHA mismatch: handoff says {mod_sha}, expected {args.expect_mod_sha}")
+
+    apworld_sha = source_ancestry(manifest, "apworld")
+    if args.expect_apworld_sha and not apworld_sha.startswith(args.expect_apworld_sha):
+        raise ValueError(f"APWorld SHA mismatch: handoff says {apworld_sha}, expected {args.expect_apworld_sha}")
+
+    stages: dict[str, Path] = {}
+    platforms = ("linux", "windows") if args.platform == "both" else (args.platform,)
+    for platform_name in platforms:
+        print(f"--> Building {platform_name} release staging tree ({version_label})...")
+        stages[platform_name] = assemble_platform_release(
+            platform_name, extracted_handoff, repo_root, resources_dir, manifest, temp_stage
+        )
+    if args.platform == "both":
+        print("--> Running platform parity audit...")
+        audit_platform_parity(stages["linux"], stages["windows"])
+    return platforms, stages, version_label
+
+
+def _assemble_release_archives(args, extracted_handoff, output_dir, repo_root, resources_dir, temp_stage):
+    platforms, stages, version_label = _main_manifest(args, extracted_handoff, repo_root, resources_dir, temp_stage)
+    archives: list[Path] = []
+    for platform_name in platforms:
+        archive = output_dir / f"DoomEternalArchipelago-{version_label}-{platform_name}-x86_64.zip"
+        print(f"--> Creating {archive.name}...")
+        write_deterministic_zip(stages[platform_name], archive)
+        audit_final_zip(archive, platform_name, repo_root=repo_root)
+        archives.append(archive)
+    sums_file = output_dir / "SHA256SUMS.txt"
+    sums_file.write_text(
+        "".join(f"{sha256_file(path)}  {path.name}\n" for path in archives),
+        encoding="utf-8", newline="\n",
+    )
+    print("\n=======================================================")
+    print("PUBLIC RELEASE PACKAGES ASSEMBLED SUCCESSFULLY!")
+    for archive in archives:
+        print(f"Release ZIP:  {archive} ({archive.stat().st_size} bytes)")
+    print(f"Checksums:    {sums_file}")
+    print("=======================================================")
+
+
+def _main_repo_root(args, handoff_path, output_dir):
+    output_dir.mkdir(parents=True, exist_ok=True)
+    repo_root = args.repo_root.resolve()
+    resources_dir = (
+        args.room_resources_dir.resolve()
+        if args.room_resources_dir is not None
+        else (repo_root / "build/release/client/resources").resolve()
+    )
+    if not resources_dir.is_dir():
+        print(f"Error: Room resources directory not found: {resources_dir}", file=sys.stderr)
+        return 1
+    print("--> Validating precompiled room resources...")
+    validate_room_resources(resources_dir, repo_root=repo_root)
+    with tempfile.TemporaryDirectory(prefix="doomeap_release_stage_") as temp_stage_str:
+        temp_stage = Path(temp_stage_str)
+        extracted_handoff = temp_stage / "handoff"
+        if handoff_path.is_file() and (handoff_path.suffix == ".zip" or zipfile.is_zipfile(handoff_path)):
+            with zipfile.ZipFile(handoff_path, "r") as zf:
+                zf.extractall(extracted_handoff)
+            top_level = list(extracted_handoff.iterdir())
+            if len(top_level) == 1 and top_level[0].is_dir() and (top_level[0] / "BUILD-MANIFEST.json").is_file():
+                extracted_handoff = top_level[0]
+        elif handoff_path.is_dir():
+            extracted_handoff = handoff_path
+        else:
+            print(f"Error: Unrecognized handoff format at {handoff_path}", file=sys.stderr)
+            return 1
+        _assemble_release_archives(args, extracted_handoff, output_dir, repo_root, resources_dir, temp_stage)
+    return 0
 
 
 def main() -> int:
@@ -562,85 +698,7 @@ def main() -> int:
         return 1
 
     output_dir = args.output_dir.resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    repo_root = args.repo_root.resolve()
-
-    resources_dir = (
-        args.room_resources_dir.resolve()
-        if args.room_resources_dir is not None
-        else (repo_root / "build/release/client/resources").resolve()
-    )
-    if not resources_dir.is_dir():
-        print(f"Error: Room resources directory not found: {resources_dir}", file=sys.stderr)
-        return 1
-
-    print("--> Validating precompiled room resources...")
-    validate_room_resources(resources_dir, repo_root=repo_root)
-
-    with tempfile.TemporaryDirectory(prefix="doomeap_release_stage_") as temp_stage_str:
-        temp_stage = Path(temp_stage_str)
-        extracted_handoff = temp_stage / "handoff"
-
-        if handoff_path.is_file() and (handoff_path.suffix == ".zip" or zipfile.is_zipfile(handoff_path)):
-            with zipfile.ZipFile(handoff_path, "r") as zf:
-                zf.extractall(extracted_handoff)
-            top_level = list(extracted_handoff.iterdir())
-            if len(top_level) == 1 and top_level[0].is_dir() and (top_level[0] / "BUILD-MANIFEST.json").is_file():
-                extracted_handoff = top_level[0]
-        elif handoff_path.is_dir():
-            extracted_handoff = handoff_path
-        else:
-            print(f"Error: Unrecognized handoff format at {handoff_path}", file=sys.stderr)
-            return 1
-
-        print("--> Validating handoff artifact...")
-        manifest = validate_handoff_structure(extracted_handoff, args.platform)
-        version_label = manifest["version_label"]
-
-        if args.version and args.version != version_label:
-            raise ValueError(f"Version mismatch: handoff says {version_label}, expected {args.version}")
-
-        mod_sha = source_ancestry(manifest, "mod")
-        if args.expect_mod_sha and not mod_sha.startswith(args.expect_mod_sha):
-            raise ValueError(f"MOD SHA mismatch: handoff says {mod_sha}, expected {args.expect_mod_sha}")
-
-        apworld_sha = source_ancestry(manifest, "apworld")
-        if args.expect_apworld_sha and not apworld_sha.startswith(args.expect_apworld_sha):
-            raise ValueError(f"APWorld SHA mismatch: handoff says {apworld_sha}, expected {args.expect_apworld_sha}")
-
-        stages: dict[str, Path] = {}
-        platforms = ("linux", "windows") if args.platform == "both" else (args.platform,)
-        for platform_name in platforms:
-            print(f"--> Building {platform_name} release staging tree ({version_label})...")
-            stages[platform_name] = assemble_platform_release(
-                platform_name, extracted_handoff, repo_root, resources_dir, manifest, temp_stage
-            )
-        if args.platform == "both":
-            print("--> Running platform parity audit...")
-            audit_platform_parity(stages["linux"], stages["windows"])
-
-        archives: list[Path] = []
-        for platform_name in platforms:
-            archive = output_dir / f"DoomEternalArchipelago-{version_label}-{platform_name}-x86_64.zip"
-            print(f"--> Creating {archive.name}...")
-            write_deterministic_zip(stages[platform_name], archive)
-            audit_final_zip(archive, platform_name, repo_root=repo_root)
-            archives.append(archive)
-
-        sums_file = output_dir / "SHA256SUMS.txt"
-        sums_file.write_text(
-            "".join(f"{sha256_file(path)}  {path.name}\n" for path in archives),
-            encoding="utf-8", newline="\n",
-        )
-
-        print("\n=======================================================")
-        print("PUBLIC RELEASE PACKAGES ASSEMBLED SUCCESSFULLY!")
-        for archive in archives:
-            print(f"Release ZIP:  {archive} ({archive.stat().st_size} bytes)")
-        print(f"Checksums:    {sums_file}")
-        print("=======================================================")
-
-    return 0
+    return _main_repo_root(args, handoff_path, output_dir)
 
 
 if __name__ == "__main__":
