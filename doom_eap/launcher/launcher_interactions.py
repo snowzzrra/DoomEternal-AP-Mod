@@ -76,13 +76,13 @@ class LauncherInteractions:
 
     def confirmation(self, job=None):
         return self.request("installation_confirmation_required", {
-            "message": player_text('launcher.interactions', 'did_eternalmodinjector_install_the_mod_without_errors'),
+            "message": player_text('launcher.interactions', 'confirm_installation'),
         }, job)
 
     def uninstall_confirmation(self, job=None):
         return self.request("uninstall_confirmation_required", {
             "operation": "uninstall",
-            "message": player_text('launcher.ui', 'did_eternalmodinjector_remove_this_room_s_mod_without_errors'),
+            "message": player_text('launcher.ui', 'confirm_injector_removal'),
         }, job)
 
 

@@ -71,7 +71,7 @@ class PlayerOptions:
             control = self.view.option_controls.get(key)
             if isinstance(control, QCheckBox):
                 checkbox = cast(QCheckBox, control)
-                message = "before_finding_dash_some_routes_require_bunny_hopping_or_ballist" if key == "randomize_dash" else "hell_on_earth_starts_early_ammo_will_be_scarce_until_you_find_th"
+                message = "dash_warning" if key == "randomize_dash" else "early_ammo_warning"
                 warning = _label(player_text("launcher.ui", message), "warning")
                 self.view.option_rows[key].layout().addWidget(warning, 2, 0, 1, 2)
                 warning.setVisible(checkbox.isChecked())

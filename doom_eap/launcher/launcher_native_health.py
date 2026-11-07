@@ -89,9 +89,49 @@ def _integer(values: Mapping[str, str], key: str, *, minimum: int = 0) -> int:
     return result
 
 
-def read_ap_rpc_health_state(path: Path, *, now_ms: int | None = None) -> NativeHealthSnapshot:
-    """Read one native health snapshot; never creates, logs, or repairs state."""
-    path = Path(path)
+def _health_field_pairs(lines, values, path):
+    for line in lines:
+        if line.count("=") != 1:
+            return _not_ready(path, "malformed")
+        key, value = line.split("=", 1)
+        if not _KEY.fullmatch(key) or not value or len(value) > 64 or not _VALUE.fullmatch(value):
+            return _not_ready(path, "malformed")
+        if key in values:
+            return _not_ready(path, "malformed")
+        values[key] = value
+
+def _health_fields(text, path):
+    values: dict[str, str] = {}
+    lines = text.splitlines()
+    if len(lines) != len(_REQUIRED_KEYS) or text.endswith("\n") is False:
+        return _not_ready(path, "malformed")
+    invalid = _health_field_pairs(lines, values, path)
+    if invalid is not None:
+        return invalid
+    if set(values) != _REQUIRED_KEYS:
+        return _not_ready(path, "unsupported")
+    return values
+
+def _health_presentation(values):
+    native_state = values["state"]
+    if native_state == "ready":
+        normalized = "ready"
+        reason = "ready"
+        degraded = False
+        ready = True
+    elif native_state == "unavailable":
+        normalized = "degraded"
+        reason = "native_unavailable"
+        degraded = True
+        ready = False
+    else:
+        normalized = "not_ready"
+        reason = native_state
+        degraded = False
+        ready = False
+    return native_state, normalized, reason, degraded, ready
+
+def _health_payload(path):
     try:
         payload = path.read_bytes()
     except OSError:
@@ -103,21 +143,24 @@ def read_ap_rpc_health_state(path: Path, *, now_ms: int | None = None) -> Native
     except UnicodeDecodeError:
         return _not_ready(path, "malformed")
 
-    values: dict[str, str] = {}
-    lines = text.splitlines()
-    if len(lines) != len(_REQUIRED_KEYS) or text.endswith("\n") is False:
-        return _not_ready(path, "malformed")
-    for line in lines:
-        if line.count("=") != 1:
-            return _not_ready(path, "malformed")
-        key, value = line.split("=", 1)
-        if not _KEY.fullmatch(key) or not value or len(value) > 64 or not _VALUE.fullmatch(value):
-            return _not_ready(path, "malformed")
-        if key in values:
-            return _not_ready(path, "malformed")
-        values[key] = value
-    if set(values) != _REQUIRED_KEYS:
-        return _not_ready(path, "unsupported")
+    return text
+
+def _health_freshness(now_ms, timestamp_ms, freshness_ms, path):
+    current_ms = int(time.time() * 1000) if now_ms is None else now_ms
+    age_ms = current_ms - timestamp_ms
+    if age_ms < 0 or age_ms > freshness_ms:
+        return _not_ready(path, "stale")
+
+def read_ap_rpc_health_state(path: Path, *, now_ms: int | None = None) -> NativeHealthSnapshot:
+    """Read one native health snapshot; never creates, logs, or repairs state."""
+    path = Path(path)
+    text = _health_payload(path)
+    if isinstance(text, NativeHealthSnapshot):
+        return text
+
+    values = _health_fields(text, path)
+    if isinstance(values, NativeHealthSnapshot):
+        return values
     if values["state"] not in HEALTH_STATES:
         return _not_ready(path, "unsupported")
 
@@ -136,27 +179,11 @@ def read_ap_rpc_health_state(path: Path, *, now_ms: int | None = None) -> Native
     if result_code > 6 or transport_status > 0xFFFFFFFF:
         return _not_ready(path, "unsupported")
 
-    current_ms = int(time.time() * 1000) if now_ms is None else now_ms
-    age_ms = current_ms - timestamp_ms
-    if age_ms < 0 or age_ms > freshness_ms:
-        return _not_ready(path, "stale")
+    stale = _health_freshness(now_ms, timestamp_ms, freshness_ms, path)
+    if stale is not None:
+        return stale
 
-    native_state = values["state"]
-    if native_state == "ready":
-        normalized = "ready"
-        reason = "ready"
-        degraded = False
-        ready = True
-    elif native_state == "unavailable":
-        normalized = "degraded"
-        reason = "native_unavailable"
-        degraded = True
-        ready = False
-    else:
-        normalized = "not_ready"
-        reason = native_state
-        degraded = False
-        ready = False
+    native_state, normalized, reason, degraded, ready = _health_presentation(values)
     return NativeHealthSnapshot(
         state=normalized,
         ready=ready,

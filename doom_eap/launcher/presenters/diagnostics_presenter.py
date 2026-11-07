@@ -86,4 +86,4 @@ class DiagnosticsPresenter:
             return failure_text(operation, failure)
         if room_issue:
             return text("launcher.ui", "open_session_and_select_rebuild_room_package")
-        return (text('launcher.ui', 'you_are_ready_to_play') if ready else text('launcher.ui', 'select_fix_setup_if_it_fails_again_select_help_save_support_repo'))
+        return (text('launcher.ui', 'you_are_ready_to_play') if ready else text('launcher.ui', 'repair_retry_help'))

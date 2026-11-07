@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from .launcher_platform import GameLinkResult, probe_meathook, validate_game_root
+from doom_eap.launcher.launcher_injector import GameLinkResult, probe_meathook
+from doom_eap.launcher.launcher_platform import validate_game_root
 
 
 def install_game_link(config, workflow, emit, force_repair: bool = False) -> GameLinkResult:
@@ -49,6 +50,29 @@ def remove_idfile_decompressor(workflow, emit) -> str:
     return 'Downloaded tool removed.' if removed else 'Downloaded tool is not installed.'
 
 
+def _repair_game_link(config, workflow, emit, action_key):
+    result = install_game_link(config, workflow, emit, force_repair=action_key == "repair_game_link")
+    game_root = config.get("game_root") or config.get("doom_base_dir")
+    root = validate_game_root(Path(str(game_root))) if game_root else None
+    post_probe = probe_meathook(root)
+    if not post_probe.ok:
+        emit(
+            "repair_failed",
+            action=action_key,
+            state=result.state,
+            message='post-repair probe failed: {value_0}'.format(value_0=f'{post_probe.message}'),
+        )
+        raise RuntimeError('Game connection repair could not be checked. Select Help -> SAVE SUPPORT REPORT.')
+    emit(
+        "repair_complete",
+        action=action_key,
+        state="repaired",
+        path=result.path,
+        sha256=result.sha256,
+        probe=post_probe.message,
+    )
+    return 'Game connection repaired.'
+
 def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_setup) -> str:
     """Apply selected Doctor action. Room changes require connected-room setup."""
     actions = {action.key: action for action in doctor.repair_preview()}
@@ -65,27 +89,7 @@ def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_
         emit("repair_started", action=action_key)
         return 'Rebuilding room mod…'
     if action_key in {"install_game_link", "repair_game_link"}:
-        result = install_game_link(config, workflow, emit, force_repair=action_key == "repair_game_link")
-        game_root = config.get("game_root") or config.get("doom_base_dir")
-        root = validate_game_root(Path(str(game_root))) if game_root else None
-        post_probe = probe_meathook(root)
-        if not post_probe.ok:
-            emit(
-                "repair_failed",
-                action=action_key,
-                state=result.state,
-                message='post-repair probe failed: {value_0}'.format(value_0=f'{post_probe.message}'),
-            )
-            raise RuntimeError('Game connection repair could not be checked. Select Help -> SAVE SUPPORT REPORT.')
-        emit(
-            "repair_complete",
-            action=action_key,
-            state="repaired",
-            path=result.path,
-            sha256=result.sha256,
-            probe=post_probe.message,
-        )
-        return 'Game connection repaired.'
+        return _repair_game_link(config, workflow, emit, action_key)
     if action_key == "repair_idfile_decompressor":
         return repair_idfile_decompressor(workflow, emit)
     if action_key == "remove_idfile_decompressor":

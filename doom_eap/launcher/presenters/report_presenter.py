@@ -1,6 +1,7 @@
 """Prepare reviewed support text and fallback links; no Qt or network I/O."""
 
-from ..launcher_doctor import sanitize_support_value
+from doom_eap.launcher.launcher_support import sanitize_support_value
+
 from ..launcher_reporting import github_issue_url, report_text
 
 

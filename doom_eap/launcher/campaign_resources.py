@@ -15,7 +15,7 @@ import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
 
-from .launcher_platform import installation_step
+from doom_eap.launcher.launcher_injector import installation_step
 
 CONTAINER = "gameresources_patch2.resources"
 DECLS = (
@@ -77,6 +77,39 @@ def _u64(data, offset):
     return struct.unpack_from("<Q", data, offset)[0]
 
 
+def _resource_names(name_count, names_at, data):
+    names = []
+    for index in range(name_count):
+        start = names_at + 8 + name_count * 8 + _u64(data, names_at + 8 + index * 8)
+        end = data.find(b"\0", start)
+        if end < start:
+            raise ValueError('Unterminated resource name')
+        names.append(data[start:end].decode("utf-8"))
+    return names
+
+def _read_resource_payload(names, data, local_names, row, decode, name, result, index):
+    kind = names[_u64(data, local_names + _u64(data, row) * 8)]
+    offset, size, decoded = (_u64(data, row + n) for n in (56, 64, 72))
+    if (size != decoded and decode is None) or offset + size > len(data):
+        raise ValueError('Expected decoded post-inject resource: {value_0}'.format(value_0=f'{name}'))
+    payload = data[offset:offset + size]
+    if size != decoded:
+        payload = decode(payload, decoded)
+        if len(payload) != decoded:
+            raise ValueError('Decoded resource length differs: {value_0}'.format(value_0=f'{name}'))
+    result[name] = (index, kind, offset, payload, _u32(data, row + 112))
+
+def _wanted_resource_records(count, info_at, ids, data, names, wanted, result, decode):
+    for index in range(count):
+        row = info_at + index * 144
+        local_names = ids + _u64(data, row + 32) * 8
+        name = names[_u64(data, local_names + _u64(data, row + 8) * 8)]
+        if name not in wanted:
+            continue
+        if name in result:
+            raise ValueError('Duplicate campaign resource: {value_0}'.format(value_0=f'{name}'))
+        _read_resource_payload(names, data, local_names, row, decode, name, result, index)
+
 def _records(path: Path, wanted: set[str], *, decode=None) -> dict:
     result = {}
     with path.open("rb") as source, mmap.mmap(source.fileno(), 0, access=mmap.ACCESS_READ) as data:
@@ -87,43 +120,14 @@ def _records(path: Path, wanted: set[str], *, decode=None) -> dict:
         name_count = _u64(data, names_at)
         if info_at + count * 144 > len(data) or names_at + 8 + name_count * 8 > len(data):
             raise ValueError('Truncated resource index')
-        names = []
-        for index in range(name_count):
-            start = names_at + 8 + name_count * 8 + _u64(data, names_at + 8 + index * 8)
-            end = data.find(b"\0", start)
-            if end < start:
-                raise ValueError('Unterminated resource name')
-            names.append(data[start:end].decode("utf-8"))
-        for index in range(count):
-            row = info_at + index * 144
-            local_names = ids + _u64(data, row + 32) * 8
-            name = names[_u64(data, local_names + _u64(data, row + 8) * 8)]
-            if name not in wanted:
-                continue
-            if name in result:
-                raise ValueError('Duplicate campaign resource: {value_0}'.format(value_0=f'{name}'))
-            kind = names[_u64(data, local_names + _u64(data, row) * 8)]
-            offset, size, decoded = (_u64(data, row + n) for n in (56, 64, 72))
-            if (size != decoded and decode is None) or offset + size > len(data):
-                raise ValueError('Expected decoded post-inject resource: {value_0}'.format(value_0=f'{name}'))
-            payload = data[offset:offset + size]
-            if size != decoded:
-                payload = decode(payload, decoded)
-                if len(payload) != decoded:
-                    raise ValueError('Decoded resource length differs: {value_0}'.format(value_0=f'{name}'))
-            result[name] = (index, kind, offset, payload, _u32(data, row + 112))
+        names = _resource_names(name_count, names_at, data)
+        _wanted_resource_records(count, info_at, ids, data, names, wanted, result, decode)
     if result.keys() != wanted:
         raise ValueError('Missing installed campaign resources: {value_0}'.format(value_0=f'{sorted(wanted - result.keys())}'))
     return result
 
 
-def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tuple[dict, dict]:
-    original = (base / "meta.resources").read_bytes()
-    index, _, payload_at, mask, flags = _records(base / "meta.resources", {"generated/buildgame/container.mask"})[
-        "generated/buildgame/container.mask"]
-    if flags or len(mask) < 8:
-        raise ValueError('Resource activation requires an uncompressed native container mask')
-    original_mapping = (base / "idRehash.map").read_bytes()
+def _activation_mapping(mask, original_mapping, targets):
     mapping, selected = [], {}
     lines = resource_mapping_lines(mask, original_mapping.decode("utf-8-sig"))
     for line in lines:
@@ -138,6 +142,21 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
     by_offset = {selected[name]: name for name in targets}
     if len(by_offset) != len(targets):
         raise ValueError('Ambiguous idRehash container mapping')
+    return mapping, selected, lines, by_offset
+
+def _enable_resource_indices(position, by_offset, targets, words, bits, tables):
+    if position in by_offset:
+        name = by_offset[position]
+        indices = targets[name]
+        added = max(0, (max(indices) + 64) // 64 - words) if indices else 0
+        bits.extend(b"\0" * (8 * added))
+        previous = {value: bool(bits[value // 8] & (1 << (value % 8))) for value in indices}
+        for value in indices:
+            bits[value // 8] |= 1 << (value % 8)
+        tables[name] = {"previously_enabled": previous, "added_mask_words": added,
+                        "changed_bits": sum(not value for value in previous.values())}
+
+def _activation_mask(mask, by_offset, targets):
     updated_mask, offsets, tables = bytearray(mask[:8]), {}, {}
     position = 8
     for _ in range(_u32(mask, 4)):
@@ -149,22 +168,14 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
             raise ValueError('Invalid native container mask boundary')
         offsets[position] = len(updated_mask)
         bits = bytearray(mask[position + 12:end])
-        if position in by_offset:
-            name = by_offset[position]
-            indices = targets[name]
-            added = max(0, (max(indices) + 64) // 64 - words) if indices else 0
-            bits.extend(b"\0" * (8 * added))
-            previous = {value: bool(bits[value // 8] & (1 << (value % 8))) for value in indices}
-            for value in indices:
-                bits[value // 8] |= 1 << (value % 8)
-            tables[name] = {"previously_enabled": previous, "added_mask_words": added,
-                            "changed_bits": sum(not value for value in previous.values())}
+        _enable_resource_indices(position, by_offset, targets, words, bits, tables)
         updated_mask.extend(mask[position:position + 8])
         updated_mask.extend(struct.pack("<I", len(bits) // 8))
         updated_mask.extend(bits)
         position = end
-    if position != len(mask) or set(tables) != set(targets) or any(offset not in offsets for _, offset, _ in mapping):
-        raise ValueError('Invalid native container mask mapping boundary')
+    return updated_mask, offsets, tables, position
+
+def _activation_updates(original, payload_at, updated_mask, mask, index, original_mapping, lines, offsets, mapping, tables):
     updated = bytearray(original)
     incoming_at = payload_at
     if len(updated_mask) != len(mask) and payload_at + len(mask) != len(original):
@@ -182,6 +193,19 @@ def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tup
         "source_rehash_sha256": hashlib.sha256(original_mapping).hexdigest(),
         "updated_meta_sha256": hashlib.sha256(updated).hexdigest(),
     }
+
+def prepare_resource_activation(base: Path, targets: dict[str, set[int]]) -> tuple[dict, dict]:
+    original = (base / "meta.resources").read_bytes()
+    index, _, payload_at, mask, flags = _records(base / "meta.resources", {"generated/buildgame/container.mask"})[
+        "generated/buildgame/container.mask"]
+    if flags or len(mask) < 8:
+        raise ValueError('Resource activation requires an uncompressed native container mask')
+    original_mapping = (base / "idRehash.map").read_bytes()
+    mapping, selected, lines, by_offset = _activation_mapping(mask, original_mapping, targets)
+    updated_mask, offsets, tables, position = _activation_mask(mask, by_offset, targets)
+    if position != len(mask) or set(tables) != set(targets) or any(offset not in offsets for _, offset, _ in mapping):
+        raise ValueError('Invalid native container mask mapping boundary')
+    return _activation_updates(original, payload_at, updated_mask, mask, index, original_mapping, lines, offsets, mapping, tables)
 
 
 def publish_resource_activation(base, updates, report, *, journal=None):
@@ -204,7 +228,7 @@ def _activation_originals(base, updates, report):
 
 
 def _publish_resource_activation(base, updates, report):
-    from .launcher_platform import publish_file
+    from doom_eap.launcher.launcher_platform import publish_file
 
     originals = _activation_originals(base, updates, report)
     incoming, published = {}, []
@@ -221,7 +245,7 @@ def _publish_resource_activation(base, updates, report):
             publish_file(path, base / name, operation="resource_activation")
         if any((base / name).read_bytes() != payload for name, payload in updates.items()):
             raise RuntimeError('Resource activation publication did not match readback')
-    except Exception as error:
+    except (OSError, RuntimeError) as error:
         _restore_resource_activation(base, updates, originals, incoming, published, error)
         raise
     finally:
@@ -230,7 +254,7 @@ def _publish_resource_activation(base, updates, report):
 
 
 def _restore_resource_activation(base, updates, originals, incoming, published, error):
-    from .launcher_platform import publish_file
+    from doom_eap.launcher.launcher_platform import publish_file
 
     for name in reversed(published):
         actual = (base / name).read_bytes()
@@ -251,7 +275,7 @@ def _cleanup_resource_banks(base, obsolete):
 def room_enemy_plan(options):
     if not options:
         return None
-    from doom_eap.runtime.context_registry import admit_slot_data, load_slot_catalog
+    from doom_eap.runtime.observers import admit_slot_data, load_slot_catalog
     from tools.maps.native_recipe_materializer import expand_resolved_native_recipes
 
     plan = expand_resolved_native_recipes(admit_slot_data(options), load_slot_catalog())
@@ -411,7 +435,7 @@ def _verify_bank_registration(base, plan, staging):
 
 
 def enable_campaign_resources(game_root: Path, mod_zip: Path, *, journal=None) -> dict:
-    from .launcher_platform import require_doom_closed
+    from doom_eap.launcher.launcher_platform import require_doom_closed
 
     require_doom_closed('finalizing campaign resources')
     if journal is None:
@@ -447,7 +471,7 @@ def _hud_targets(base, huds, spec, targets, hud_name):
 
 
 def _stage_resource_metadata(staging, updates, report):
-    from .launcher_platform import _atomic_write_bytes
+    from doom_eap.launcher.launcher_platform import _atomic_write_bytes
 
     staged = {}
     staging.mkdir(parents=True, exist_ok=True)

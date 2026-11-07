@@ -315,7 +315,7 @@ class HelpView(QScrollArea):
         details_layout.addLayout(heading)
         details_layout.addWidget(
             self._label(
-                player_text("launcher.ui", "support_reports_include_these_details_with_passwords_removed"),
+                player_text("launcher.ui", "support_privacy_help"),
                 "muted",
             )
         )

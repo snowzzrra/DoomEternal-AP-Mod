@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from doom_eap.runtime.ledger_records import Authority, ItemAction, ItemPage, RoomKey
+from doom_eap.runtime.ledger import Authority, ItemAction, ItemPage, RoomKey
 
 from .events import LauncherEvent
 

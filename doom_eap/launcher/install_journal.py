@@ -13,9 +13,8 @@ import time
 from enum import Enum
 from pathlib import Path
 
+from doom_eap.launcher.launcher_platform import _atomic_write_bytes, publish_file
 from doom_eap.launcher.ui.strings import text as player_text
-
-from .launcher_platform import _atomic_write_bytes, publish_file
 
 
 class InstallPhase(str, Enum):

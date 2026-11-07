@@ -39,7 +39,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ..launcher_controller import normalize_ammo_refill_keybind
+from doom_eap.launcher.launcher_controller import normalize_ammo_refill_keybind
+
 from .doom_style import DoomButton, DoomFrame, animations_enabled
 from .option_grid import ColumnFlow, ListCheckBox, stepper
 from .strings import option_text
@@ -184,7 +185,7 @@ class _AmmoRefillKeyEdit(QPushButton):
         token = _simple_physical_key_token(event)
         if token is None:
             self.rejected.emit(
-                player_text("launcher.player_file", "choose_one_letter_number_function_key_or_navigation_key")
+                player_text("launcher.player_file", "key_choice_help")
             )
             event.accept()
             return
@@ -251,7 +252,7 @@ class AmmoRefillKeyControl(QWidget):
         layout.setSpacing(8)
         self.editor = _AmmoRefillKeyEdit(value)
         self.editor.setToolTip(
-            player_text("launcher.ui", "press_one_key_ctrl_alt_shift_and_numpad_keys_cannot_be_assigned")
+            player_text("launcher.ui", "key_capture_help")
         )
         self.editor.captured.connect(self._emit_value)
         self.editor.rejected.connect(self.rejected)
@@ -505,25 +506,25 @@ class OptionSetControl(QWidget):
 
     TOOLTIPS: ClassVar = {
         "Acquire the Unmaykr": player_text(
-            "launcher.player_file", "collect_six_empyrean_keys_from_the_base_campaign_slayer_gates_th"
+            "launcher.player_file", "goal_unmaykr_help"
         ),
         "Complete All Included Missions": player_text(
-            "launcher.player_file", "finish_every_mission_included_in_this_room_including_the_final_b"
+            "launcher.player_file", "goal_all_missions_help"
         ),
         "Complete All Slayer Gates": player_text(
-            "launcher.player_file", "complete_all_included_slayer_gates_six_in_the_base_campaign_plus"
+            "launcher.player_file", "goal_slayer_gates_help"
         ),
         "Complete All Escalation Encounters": player_text(
-            "launcher.player_file", "complete_both_wave_1_and_wave_2_of_every_escalation_encounter_in"
+            "launcher.player_file", "goal_escalations_help"
         ),
         "Complete All Secret Encounters": player_text(
-            "launcher.player_file", "complete_every_secret_encounter_included_in_this_room_these_are"
+            "launcher.player_file", "goal_encounters_help"
         ),
         "Complete All Mission Challenges": player_text(
-            "launcher.player_file", "complete_the_mission_challenges_in_every_included_mission_that_h"
+            "launcher.player_file", "goal_challenges_help"
         ),
         "Complete All Weapon Mastery Challenges": player_text(
-            "launcher.player_file", "complete_every_included_weapon_mastery_challenge_enable_weapon_m"
+            "launcher.player_file", "goal_masteries_help"
         ),
     }
 

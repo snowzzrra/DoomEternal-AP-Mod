@@ -7,6 +7,9 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from doom_eap.launcher.launcher_injector import AdapterResult, recover_injector_resources
+from doom_eap.launcher.launcher_platform import require_doom_closed
+from doom_eap.launcher.launcher_workers import LauncherWorkCancelled
 from doom_eap.launcher.ui.strings import text as player_text
 
 from .install_journal import InstallationRecoveryRequired, InstallJournal, InstallPhase, file_digest
@@ -17,7 +20,6 @@ from .installation_adapters import (
     require_injector_stopped,
 )
 from .launcher_core_install import game_write_lock, recover_interrupted
-from .launcher_platform import AdapterResult, recover_injector_resources, require_doom_closed
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,7 @@ class InstallationService:
                 return outcome
             try:
                 return self._advance(plan, journal, actions, manual, retry)
-            except Exception as error:
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError, LauncherWorkCancelled) as error:
                 self._record_failure(journal, error)
                 raise
 

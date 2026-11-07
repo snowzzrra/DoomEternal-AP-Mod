@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS, item_classification_color_key
-from doom_eap.runtime.ledger_records import ItemStatus, ResolutionAction
+from doom_eap.runtime.ledger import ItemStatus, ResolutionAction
 
 from ..items import LedgerAvailability
 from .doom_style import DoomButton as QPushButton
@@ -71,7 +71,7 @@ class ItemsView(QWidget):
         local.addWidget(self.local_label)
         self.local_buttons = {}
         for kind in ResolutionAction:
-            button = QPushButton("Try again" if kind.value == "try_again" else text("launcher.items", kind.value))
+            button = QPushButton(text("launcher.items", kind.value))
             button.setObjectName("link")
             button.clicked.connect(lambda checked=False, action=kind: self._choose_local(action))
             self.local_buttons[kind] = button
@@ -219,7 +219,7 @@ class ItemsView(QWidget):
         self.row_actions[row.ap_index] = buttons
 
     def _link(self, key, callback):
-        button = QPushButton("Try again" if key == "try_again" else text("launcher.items", key))
+        button = QPushButton(text("launcher.items", key))
         button.setObjectName("link")
         button.setProperty("compact", True)
         button.setEnabled(not self.presenter.submitted)
@@ -240,7 +240,7 @@ class ItemsView(QWidget):
         if local:
             key = ("confirm_recover_ammo_operation" if pending.action.command_id.startswith("ammo-operation:")
                    else "confirm_" + pending.action.kind.value)
-            self.details.setText("Trying again may duplicate the effect. Confirm only if you want another attempt."
+            self.details.setText(text("launcher.items", "retry_warning")
                                  if key == "confirm_try_again" else text("launcher.items", key))
 
     def _render_local(self):
@@ -250,7 +250,7 @@ class ItemsView(QWidget):
         for kind, button in self.local_buttons.items():
             recovery = any(a.kind is kind and a.command_id.startswith("ammo-operation:") for a in self.presenter.local_actions)
             button.setText(text('launcher.items', 'recover_ammo_operation') if recovery else
-                           "Try again" if kind.value == "try_again" else text("launcher.items", kind.value))
+                           text("launcher.items", kind.value))
             button.setVisible(any(a.kind is kind for a in self.presenter.local_actions) and self.presenter.model.can_resolve)
             button.setEnabled(not self.presenter.submitted)
 

@@ -1,5 +1,3 @@
-"""PySide6 shell for standalone DOOM Eternal Archipelago launcher."""
-
 from __future__ import annotations
 
 import html
@@ -57,8 +55,16 @@ from PySide6.QtWidgets import (
 )
 
 from doom_eap.content.item_classification import load_item_classifications
+from doom_eap.launcher.installation_adapters import LinuxModManagerAdapter
+from doom_eap.launcher.launcher_controller import LauncherController
+from doom_eap.launcher.launcher_platform import (
+    WINDOWS_MANUAL_INSTALL_GUIDE_URL,
+    doom_saved_games_base,
+    is_saved_games_base_shape,
+    redact_secrets,
+)
 from doom_eap.presentation import ARCHIPELAGO_PRESENTATION_COLORS
-from doom_eap.runtime.ledger_records import RoomKey
+from doom_eap.runtime.ledger import RoomKey
 from doom_eap.strings import PlayerError
 
 from ..connection_errors import enrich_connection_failure
@@ -72,15 +78,7 @@ from ..events import (
     adapt_event,
 )
 from ..items import ItemsSnapshot, LedgerAvailability
-from ..launcher_controller import LauncherController
 from ..launcher_integration import RoomSetupCoordinator
-from ..launcher_platform import (
-    WINDOWS_MANUAL_INSTALL_GUIDE_URL,
-    LinuxModManagerAdapter,
-    doom_saved_games_base,
-    is_saved_games_base_shape,
-    redact_secrets,
-)
 from ..presenters.diagnostics_presenter import DiagnosticsPresenter
 from ..presenters.items_presenter import ItemsPresenter
 from ..presenters.play_presenter import PlayPresenter
@@ -113,7 +111,7 @@ class LauncherUI(QMainWindow):
     """Controller-backed, keyboard-first launcher shell."""
 
     COLORS: ClassVar = dict(re.findall(
-        r"@([a-z0-9_]+)@ = (#[0-9a-f]{6})", Path(__file__).with_name("theme.qss").read_text(encoding="utf-8")
+        '@([a-z0-9_]+)@ = (#[0-9a-f]{6})', Path(__file__).with_name('theme.qss').read_text(encoding='utf-8'),
     ))
 
     _label = staticmethod(_label)
@@ -131,13 +129,16 @@ class LauncherUI(QMainWindow):
         self.room_event: dict[str, object] = {}
         self._room_connected = False
         self._reconnecting = False
+        self._close_requested = False
+        self._manual_retry = False
+        self._last_integration_status = None
         self._connection_pending = False
         self._shown_connection_error_attempts: set[int] = set()
         self._event_poll_scheduled = False
         self._setup_state = "disconnected"
         self._previous_setup_state = ""
         self._play_presenter = PlayPresenter(
-            windows=os.name == "nt", installer_wait_seconds=LinuxModManagerAdapter.TIMEOUT_SECONDS
+            windows=os.name == 'nt', installer_wait_seconds=LinuxModManagerAdapter.TIMEOUT_SECONDS,
         )
         self._setup_progress = self._play_presenter.progress
         self._resolved_consent_requests: set[str] = set()
@@ -221,14 +222,8 @@ class LauncherUI(QMainWindow):
         self._capability_request = None
         self._items_generation = self.controller.operation_generation
         self.play_view = PlayView(
-            connection,
-            session,
-            self.session_setup,
-            self.items_view,
-            self._activity_card(),
-            self._hints_card(),
-            self._chat_bar(),
-            self.session_setup_action,
+            connection, session, self.session_setup, self.items_view, self._activity_card(), self._hints_card(),
+            self._chat_bar(), self.session_setup_action,
         )
         self.session_stack = self.play_view.tabs
         self.session_stack.setCornerWidget(self.player_ammo_refills, Qt.Corner.TopRightCorner)
@@ -240,19 +235,14 @@ class LauncherUI(QMainWindow):
         self.help_view = HelpView(
             self.controller,
             {
-                ActionId.DIAGNOSE: self._run_doctor,
-                ActionId.FIX_SETUP: self._preview_repairs,
-                ActionId.SAVE_REPORT: self._save_support_bundle,
-                ActionId.OPEN_ISSUE: self._open_github_issue,
-                ActionId.SELECT_PROTON: self._select_proton,
-                ActionId.UNINSTALL: self._uninstall_room_package,
-                ActionId.LOCAL_BUILD: self._select_local_core,
-                ActionId.AUTOMATIC_CORE: self._clear_local_core,
-                ActionId.REPAIR_CORE: lambda: self._runtime_repair("repair_core"),
-                ActionId.REPAIR_SESSION: lambda: self._runtime_repair("repair_session"),
-                ActionId.ROLLBACK_CORE: lambda: self._runtime_repair("rollback_core"),
-                ActionId.SHOW_PLAY: lambda: self._show_page(0),
-                ActionId.CHOOSE_GAME_FOLDER: self._open_game_paths,
+                ActionId.DIAGNOSE: self._run_doctor, ActionId.FIX_SETUP: self._preview_repairs,
+                ActionId.SAVE_REPORT: self._save_support_bundle, ActionId.OPEN_ISSUE: self._open_github_issue,
+                ActionId.SELECT_PROTON: self._select_proton, ActionId.UNINSTALL: self._uninstall_room_package,
+                ActionId.LOCAL_BUILD: self._select_local_core, ActionId.AUTOMATIC_CORE: self._clear_local_core,
+                ActionId.REPAIR_CORE: lambda: self._runtime_repair('repair_core'),
+                ActionId.REPAIR_SESSION: lambda: self._runtime_repair('repair_session'),
+                ActionId.ROLLBACK_CORE: lambda: self._runtime_repair('rollback_core'),
+                ActionId.SHOW_PLAY: lambda: self._show_page(0), ActionId.CHOOSE_GAME_FOLDER: self._open_game_paths,
                 ActionId.REPAIR_INVENTORY: self._request_inventory_resync,
                 ActionId.REINSTALL: lambda: self._prepare(force=True),
             },
@@ -267,7 +257,7 @@ class LauncherUI(QMainWindow):
         self.help_view.repair_confirmed.connect(self._apply_repair_preview)
         self.help_view.download_answered.connect(self._answer_dependency_consent)
         self.play_view.set_launch_option(
-            self.launch_option_label, self.launch_option, self.copy_launch_option_button, enabled=os.name != "nt"
+            self.launch_option_label, self.launch_option, self.copy_launch_option_button, enabled=os.name != 'nt',
         )
         self.settings_view = SettingsView(
             self.ammo_refill_keybind, self.special_toggle_keybind, self.killsanity_counter_visible, self.grace_control, self.language_button
@@ -464,7 +454,7 @@ class LauncherUI(QMainWindow):
         layout.setSpacing(12)
         layout.addWidget(self._label(player_text('common', 'room_mod'), "section"))
         self.room_summary = self._label(
-            player_text("launcher.ui", "no_room_connected_join_a_room_to_start_playing"), "muted", rich=True
+            player_text('launcher.ui', 'no_room_connected_join_a_room_to_start_playing'), 'muted', rich=True,
         )
         self.room_summary.setWordWrap(True)
         layout.addWidget(self.room_summary)
@@ -549,9 +539,7 @@ class LauncherUI(QMainWindow):
         backup_actions = QHBoxLayout()
         backup_actions.setSpacing(12)
         backup_button = QPushButton(player_text("launcher.ui", "ap_save"))
-        backup_button.setToolTip(
-            player_text("launcher.ui", "back_up_restore_or_start_a_new_game_save_in_the_same_room_restar")
-        )
+        backup_button.setToolTip(player_text('launcher.ui', 'save_actions_help'))
         backup_button.clicked.connect(self._ap_save_actions)
         self.ap_save_button = backup_button
         backup_actions.addWidget(backup_button)
@@ -560,95 +548,6 @@ class LauncherUI(QMainWindow):
         self._build_setup_strip()
         return card
 
-    def _session_log_page(self) -> QFrame:
-        card = self._card()
-        layout = QVBoxLayout(card)
-        layout.setSpacing(12)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.addWidget(self._label(player_text("launcher.ui", "session_log"), "section"))
-        self.session_log = QPlainTextEdit()
-        self.session_log.setReadOnly(True)
-        self.session_log.setFont(QFont("monospace", 10))
-        self.session_log.document().setMaximumBlockCount(self._session_log_limit)
-        layout.addWidget(self.session_log, 1)
-        return card
-
-    def _activity_card(self) -> QFrame:
-        card = self._card("plain")
-        layout = QVBoxLayout(card)
-        layout.setSpacing(12)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.activity_empty = self._label(player_text("launcher.play", "activity_empty"), "empty")
-        self.activity_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.activity_empty, 1)
-        self.activity = QTableWidget(0, 3)
-        self.activity.setHorizontalHeaderLabels(
-            [
-                player_text("launcher.ui", "time"),
-                player_text("launcher.ui", "category"),
-                player_text("launcher.ui", "details"),
-            ]
-        )
-        self.activity.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.activity.setShowGrid(False)
-        self.activity.horizontalHeader().hide()
-        self.activity.hide()
-        self.activity.verticalHeader().hide()
-        self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
-        self.activity.setColumnWidth(0, 86)
-        self.activity.setColumnWidth(1, 132)
-        self.activity.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.activity, 1)
-        return card
-
-    def _hints_card(self) -> QFrame:
-        card = self._card("plain")
-        layout = QVBoxLayout(card)
-        layout.setSpacing(12)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.hints_empty = self._label(player_text("launcher.ui", "connect_to_the_room_to_see_hints"), "muted")
-        self.hints_empty.setObjectName("empty")
-        self.hints_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.hints_empty, 1)
-        self.hints = QTableWidget(0, 5)
-        self.hints.setHorizontalHeaderLabels(
-            [
-                player_text("launcher.items", "status"),
-                player_text("launcher.items", "item"),
-                player_text("launcher.ui", "location"),
-                player_text("launcher.ui", "for"),
-                player_text("launcher.ui", "in_world"),
-            ]
-        )
-        self.hints.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.hints.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self.hints.setShowGrid(False)
-        self.hints.horizontalHeader().hide()
-        self.hints.verticalHeader().hide()
-        self.hints.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        for column in range(1, 5):
-            self.hints.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.hints, 1)
-        return card
-
-    def _chat_bar(self) -> QFrame:
-        card = self._card("plain")
-        layout = QHBoxLayout(card)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        layout.addWidget(self._label(player_text('common', 'chat'), "eyebrow"))
-        self.command_input = QLineEdit()
-        self.command_input.setPlaceholderText(player_text("launcher.ui", "send_a_message_or_server_command"))
-        self.command_input.setEnabled(False)
-        self.command_input.returnPressed.connect(self._send_command)
-        layout.addWidget(self.command_input, 1)
-        self.command_send = QPushButton(player_text("launcher.ui", "send"))
-        self.command_send.setEnabled(False)
-        self.command_send.clicked.connect(self._send_command)
-        layout.addWidget(self.command_send)
-        return card
 
     def _install_shortcuts(self) -> None:
         for key, page in (("Alt+P", 0), ("Alt+J", 1), ("Alt+C", 3), ("Alt+H", 4), ("Alt+S", 5)):
@@ -659,9 +558,7 @@ class LauncherUI(QMainWindow):
 
     def _select_local_core(self):
         path, _ = QFileDialog.getOpenFileName(
-            self,
-            player_text("launcher.ui", "select_local_game_connection_files"),
-            "",
+            self, player_text('launcher.ui', 'select_local_game_connection_files'), '',
             'Game connection settings (distribution.json)',
         )
         if path:
@@ -677,16 +574,13 @@ class LauncherUI(QMainWindow):
 
     def _runtime_repair(self, action):
         if action == "repair_session":
-            self.help_view.doctor_action.setText(player_text("launcher.ui", "close_doom_eternal_before_repairing_save_setup_existing_saves_re"))
+            self.help_view.doctor_action.setText(player_text("launcher.ui", "session_repair_help"))
         if action == "rollback_core":
-            message = player_text("launcher.ui", "restore_the_previous_game_connection_files_and_turn_off_automati")
+            message = player_text("launcher.ui", "rollback_connection_help")
             if (
                 QMessageBox.question(
-                    self,
-                    player_text("launcher.ui", "confirm_recovery"),
-                    message,
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
+                    self, player_text('launcher.ui', 'confirm_recovery'), message,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
                 )
                 != QMessageBox.StandardButton.Yes
             ):
@@ -697,9 +591,7 @@ class LauncherUI(QMainWindow):
         try:
             self.controller.set_death_link_grace(deaths)
         except (OSError, ValueError) as error:
-            self._append_log(
-                'DeathLink Grace setting failed: {value_0}'.format(value_0=f'{error}')
-            )
+            self._append_log('DeathLink Grace setting failed: {value_0}'.format(value_0=f'{error}'))
             self.death_link_grace.blockSignals(True)
             self.death_link_grace.setValue(int(self.controller.config.get("death_link_grace", 0)))
             self.death_link_grace.blockSignals(False)
@@ -738,9 +630,7 @@ class LauncherUI(QMainWindow):
             self.controller.config.get("killsanity_counter_visible", True) is True
         )
             self.killsanity_counter_visible.blockSignals(False)
-            self._append_log(
-                'Killsanity counter preference could not be saved: {value_0}'.format(value_0=f'{error}')
-            )
+            self._append_log('Killsanity counter preference could not be saved: {value_0}'.format(value_0=f'{error}'))
 
     def _set_ammo_refill_indicator(self, value: object) -> None:
         """Render Ammo Refill availability in three fixed indicator slots."""
@@ -753,14 +643,14 @@ class LauncherUI(QMainWindow):
             else player_text("launcher.app_window", "value_0_of_3_available", value_0=f"{available}")
         )
         description = player_text(
-            "launcher.ui", "ammo_refills_value_0_key_value_1", value_0=f"{state}", value_1=f"{keybind}"
+            'launcher.ui', 'ammo_refills_value_0_key_value_1', value_0=f'{state}', value_1=f'{keybind}',
         )
         self.player_ammo_refills.setToolTip(description)
         self.player_ammo_refills.setVisible(self._room_connected and available is not None)
         self.player_ammo_refills.setAccessibleName(player_text("launcher.ui", "ammo_refill_availability"))
         self.player_ammo_refills.setAccessibleDescription(description)
         self.ammo_refill_key.setText(keybind)
-        self.ammo_refill_key.setToolTip('Ammo Refill key: {value_0}'.format(value_0=f'{keybind}'))
+        self.ammo_refill_key.setToolTip(player_text("launcher.ui", "ammo_refill_key", keybind=keybind))
         self.ammo_refill_pips.set_available(available)
         self.ammo_refill_pips.setToolTip(description)
         self._update_ammo_refill_button()
@@ -781,7 +671,7 @@ class LauncherUI(QMainWindow):
         if self.items_presenter.authority is None:
             model = self.items_presenter.model
             return model.room is not None and not model.loading and model.availability is LedgerAvailability.INACTIVE
-        from doom_eap.runtime.ledger_records import Authority
+        from doom_eap.runtime.ledger import Authority
 
         return self.items_presenter.authority is not Authority.LEDGER or self.items_presenter.model.can_spend
 
@@ -874,201 +764,6 @@ class LauncherUI(QMainWindow):
         self._action_id = self._setup_action_id()
         self.session_setup.setVisible(bool(detail))
 
-    def _setup_action_id(self):
-        actions = {
-            "install_needed": ActionId.PREPARE,
-            "update_required": ActionId.PREPARE,
-            "package_failed": ActionId.REINSTALL,
-            "package_incompatible": ActionId.REINSTALL,
-            "failed": ActionId.DIAGNOSE,
-            "campaign_failed": ActionId.SAVE,
-            "proton_needed": ActionId.SELECT_PROTON,
-            "game_link_needed": ActionId.REINSTALL,
-            "manual_install_required": ActionId.MANUAL_INSTALL,
-            "game_link_update_needed": ActionId.REPAIR_CONNECTION,
-        }
-        if self._setup_state in actions:
-            return actions[self._setup_state]
-        if self._room_connected or self._connection_pending:
-            return ActionId.VIEW_SESSION
-        return ActionId.RESUME if self.controller.config.get("server_address") else ActionId.CONNECT
-
-    def _set_setup_state(self, state: str, detail: str = "") -> None:
-        failure = getattr(self.controller, "last_setup_failure", None)
-        if (
-            state == "failed"
-            and isinstance(failure, dict)
-            and failure.get("failure_domain") in {"campaign_session", "proton_runtime"}
-        ):
-            state = "proton_needed" if failure["failure_domain"] == "proton_runtime" else "campaign_failed"
-            detail = str(failure.get("user_message") or "")
-        title, fallback, action, enabled, top_state = self._setup_presentation(state)
-        self._setup_state = state
-        copy = fallback if state in {"package_failed", "package_incompatible"} else detail or fallback
-        self._setup_copy = copy
-        tone = (
-            "ready" if state == "ready" else "working" if state in {"checking", "installing", "updating"} else "warning"
-        )
-        self.session_setup.setProperty("actionTone", tone)
-        self.session_setup.style().unpolish(self.session_setup)
-        self.session_setup.style().polish(self.session_setup)
-        self.session_setup_title.setText(title)
-        self.session_setup_detail.setText(copy)
-        self.session_setup_action.setText(action)
-        self.session_setup_action.setEnabled(enabled)
-        self.session_setup_action.setVisible(state not in {"ready", "disconnected"})
-        strip_visible = state not in {"ready", "disconnected"}
-        self.session_setup.setVisible(strip_visible)
-        if strip_visible and state != self._previous_setup_state:
-            self._fade_in(self.session_setup)
-        self._previous_setup_state = state
-        if state in {"campaign_failed", "proton_needed"}:
-            self.controller.request_doctor()
-        self.session_manual_complete_action.setVisible(state == "manual_install_required")
-        self.session_manual_retry_action.setVisible(state == "manual_install_required")
-        self.reinstall_button.setText(action)
-        self.reinstall_button.setEnabled(enabled)
-        self.reinstall_button.setVisible(state not in {"ready", "disconnected"})
-        self._set_home(title, copy, action, top_state, enabled=enabled)
-        self.hero_action.setVisible(state != "disconnected")
-        self._refresh_help_room_package()
-        self._render_setup_progress()
-
-    def _observe_setup_progress(self, event) -> dict | None:
-        kind = event.get("type")
-        room = self.room_event if self._room_connected else None
-        if kind == "connected":
-            room = event
-        elif kind == "disconnected":
-            room = None
-        key = RoomSetupCoordinator.room_key(room) if room else None
-        generation = self.controller.operation_generation
-        attempt = self.controller.connection_attempt_id
-        self._play_presenter.activate(generation, key, attempt)
-        self._play_presenter.room_details(self.server.text(), self.slot.text())
-        return self._play_presenter.observe(adapt_event(event, generation=generation, room=key, attempt=attempt))
-
-    def _render_room_controls(self):
-        self.room_fields.setVisible(not self._room_connected)
-        self.room_identity.setVisible(self._room_connected)
-        self.connected_server.setText(str(self.room_event.get("endpoint") or self.server.text()))
-        self.connected_player.setText(str(self.room_event.get("slot_name") or self.room_event.get("player_name") or self.slot.text()))
-        self.join_button.setText(player_text("launcher.ui", "disconnect") if self._room_connected else player_text("launcher.ui", "connect"))
-        self.join_button.setObjectName("secondary" if self._room_connected else "primary")
-        self.join_button.setEnabled(not self._connection_pending)
-        self.join_button.setToolTip(player_text("launcher.play", "connecting_guidance", server=self.server.text()) if self._connection_pending else "")
-        self.join_button.style().unpolish(self.join_button)
-        self.join_button.style().polish(self.join_button)
-
-    def _render_setup_progress(self) -> None:
-        self.play_view.render(self._play_presenter.present())
-        self._render_room_controls()
-        if self._installation_request is not None or self._manual_installation_generation is not None:
-            return
-        if getattr(self, "_close_requested", False):
-            message = player_text("launcher.setup", "stop_requested")
-            self.session_setup_detail.setText(message)
-            self.hero_detail.setText(message)
-            return
-        model = self._play_presenter.present()
-        view = model.progress
-        if model.recovery_message:
-            self.session_setup_detail.setText(model.recovery_message)
-            self.hero_detail.setText(model.recovery_message)
-            return
-        active = view is not None and self._setup_state in {"checking", "installing", "updating"}
-        self.setup_elapsed.setVisible(active)
-        if active:
-            minutes, seconds = divmod(view.elapsed_seconds, 60)
-            self.setup_elapsed.setText('{minutes}:{seconds}'.format(minutes=str(minutes), seconds=f'{seconds:02d}'))
-        self.session_setup_help.setVisible(active and view.next_action is SetupAction.DIAGNOSE)
-        if self._setup_state in {"checking", "installing", "updating"}:
-            operation = STEP_TEXT[view.step] if active else self._setup_copy
-            copy = '{operation}…'.format(operation=operation.rstrip("…."))
-            self.session_setup_detail.setText(copy)
-            self.hero_detail.setText(copy)
-
-    def _show_progress_help(self) -> None:
-        self._show_page(4)
-        self._run_doctor()
-
-    def _run_setup_action(self) -> None:
-        action = self._setup_action_id()
-        actions = {
-            ActionId.PREPARE: self._prepare,
-            ActionId.REINSTALL: lambda: self._prepare(force=True),
-            ActionId.DIAGNOSE: lambda: self._show_page(4),
-            ActionId.SAVE: self._ap_save_actions,
-            ActionId.SELECT_PROTON: self._select_proton,
-            ActionId.MANUAL_INSTALL: self._manual_install_action,
-            ActionId.REPAIR_CONNECTION: self._repair_connection,
-        }
-        callback = actions.get(action)
-        if callback:
-            callback()
-
-    def _repair_connection(self):
-        generation = self.controller.operation_generation
-        try:
-            if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
-                self._set_setup_state("installing", player_text("launcher.ui", "repairing_the_game_connection"))
-        except Exception as error:
-            self._append_log(
-                'Game integration repair error: {value_0}'.format(value_0=f'{error}')
-            )
-            self._set_setup_state(
-                "game_link_update_needed",
-                player_text("launcher.ui", "game_connection_repair_failed_select_fix_setup_again_if_it_fails"),
-            )
-
-    def _manual_install_action(self) -> None:
-        if getattr(self, "_manual_retry", False):
-            self._prepare(force=True)
-        else:
-            self._open_manual_install_guide()
-
-    def _open_manual_install_guide(self) -> None:
-        """Open the Windows manual installation section in INSTALL.md."""
-        local_candidates = [
-            self.controller.client_dir.parent / "docs" / "INSTALL.md",
-            self.controller.client_dir / "docs" / "INSTALL.md",
-            self.controller.client_dir / "INSTALL.md",
-            self.controller.application_dir / "docs" / "INSTALL.md",
-            self.controller.application_dir / "INSTALL.md",
-        ]
-        opened = False
-        for candidate in local_candidates:
-            if candidate.is_file():
-                try:
-                    webbrowser.open(candidate.resolve().as_uri())
-                    opened = True
-                    break
-                except Exception:
-                    pass
-        if not opened:
-            try:
-                webbrowser.open(WINDOWS_MANUAL_INSTALL_GUIDE_URL)
-            except Exception as error:
-                self._append_log(
-                    'Could not open browser: {value_0}'.format(value_0=f'{error}')
-                )
-        self._append_log(
-            'Opened manual installation guide (INSTALL.md → Windows manual installation).'
-        )
-
-    def _confirm_manual_installation(self) -> None:
-        if self._installation_request is not None:
-            return
-        self._manual_installation_generation = self.controller.operation_generation
-        self._show_installation_confirmation()
-
-    def _complete_manual_installation(self, generation):
-        try:
-            self.controller.confirm_manual_installation(generation=generation)
-            self._append_log('Manual mod installation confirmed.')
-        except Exception as error:
-            self._append_log('Manual installation confirmation error: {value_0}'.format(value_0=f'{error}'))
-            QMessageBox.warning(self, player_text("launcher.ui", "manual_installation_error"), self._operation_failure('install_mod', error))
 
     def _set_home_secondary_actions(self, resumable: bool) -> None:
         self.join_another_button.setVisible(resumable)
@@ -1100,16 +795,14 @@ class LauncherUI(QMainWindow):
             self._show_page(2)
             return
         endpoint, slot = (
-            str(self.controller.config.get("server_address", "")),
-            str(self.controller.config.get("slot", "")),
+            str(self.controller.config.get('server_address', '')), str(self.controller.config.get('slot', '')),
         )
         if not endpoint or not slot:
             self._focus_join()
             return
         password, accepted = QInputDialog.getText(
-            self,
-            player_text("launcher.ui", "resume_session"),
-            player_text("launcher.ui", "room_password_for_value_0_if_required", value_0=f"{slot}"),
+            self, player_text('launcher.ui', 'resume_session'),
+            player_text('launcher.ui', 'room_password_for_value_0_if_required', value_0=f'{slot}'),
             QLineEdit.EchoMode.Password,
         )
         if not accepted:
@@ -1135,20 +828,17 @@ class LauncherUI(QMainWindow):
             if self.proton_executable is not None:
                 self._persist_proton()
             self.controller.connect(
-                endpoint=self.server.text(),
-                slot=self.slot.text(),
-                password=self.password.text(),
-                game_root=self.game_root.text(),
-                saves_root=self.saves_root.text(),
+                endpoint=self.server.text(), slot=self.slot.text(), password=self.password.text(),
+                game_root=self.game_root.text(), saves_root=self.saves_root.text(),
             )
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             raw = str(error)
             if "server address" in raw.casefold() or "player name" in raw.casefold():
                 event = enrich_connection_failure(
                     {
-                        "type": "error",
-                        "code": "missing_slot" if "player name" in raw.casefold() else "malformed_address",
-                        "technical_message": raw,
+                        'type': 'error',
+                        'code': 'missing_slot' if 'player name' in raw.casefold() else 'malformed_address',
+                        'technical_message': raw,
                     },
                     attempt_id=self.controller.connection_attempt_id,
                 )
@@ -1162,10 +852,8 @@ class LauncherUI(QMainWindow):
                 self.join_error.setText(message)
                 self.join_error.show()
                 self._set_home(
-                    player_text("launcher.ui", "check_game_setup"),
-                    message,
-                    player_text("launcher.ui", "join_room"),
-                    player_text("launcher.ui", "setup_required"),
+                    player_text('launcher.ui', 'check_game_setup'), message, player_text('launcher.ui', 'join_room'),
+                    player_text('launcher.ui', 'setup_required'),
                 )
                 QMessageBox.warning(self, player_text("launcher.ui", "game_setup_failed"), message)
             self._activity_event({"type": "connection_input_error", "message": raw})
@@ -1178,10 +866,9 @@ class LauncherUI(QMainWindow):
         self._set_connection_badge(player_text("launcher.ui", "connecting"), False)
         self._show_page(2)
         self._set_home(
-            player_text("launcher.ui", "connecting_to_room"),
-            player_text("launcher.ui", "waiting_for_the_server_to_send_your_room_settings"),
-            player_text("launcher.ui", "resume_session_a94678"),
-            player_text("launcher.ui", "connecting"),
+            player_text('launcher.ui', 'connecting_to_room'),
+            player_text('launcher.ui', 'waiting_for_the_server_to_send_your_room_settings'),
+            player_text('launcher.ui', 'resume_session_a94678'), player_text('launcher.ui', 'connecting'),
             enabled=False,
         )
 
@@ -1195,7 +882,7 @@ class LauncherUI(QMainWindow):
         try:
             self.controller.disconnect()
             self.stop_button.setEnabled(False)
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self._append_log('Stop error: {value_0}'.format(value_0=f'{error}'))
 
     def _uninstall_room_package(self) -> None:
@@ -1203,11 +890,8 @@ class LauncherUI(QMainWindow):
             return
         generation = self.controller.operation_generation
         confirmation = QMessageBox.question(
-            self,
-            player_text("launcher.ui", "uninstall_room_mod"),
-            player_text("launcher.ui", "remove_this_room_s_mod_from_doom_eternal_other_mods_and_game_con"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+            self, player_text('launcher.ui', 'uninstall_room_mod'), player_text('launcher.ui', 'confirm_uninstall'),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
         if confirmation != QMessageBox.StandardButton.Yes:
             return
@@ -1220,312 +904,12 @@ class LauncherUI(QMainWindow):
         )
         try:
             self.controller.uninstall_setup(generation=generation)
-        except Exception:
+        except (OSError, RuntimeError, ValueError):
             self.help_view.uninstall_button.setEnabled(self._room_connected)
             self.help_view.doctor_room_status.setText(player_text("launcher.ui", "uninstall_failed"))
-            self.help_view.doctor_room_evidence.setText(
-            player_text("launcher.ui", "close_doom_eternal_and_retry_if_it_fails_again_select_help_save")
-        )
+            self.help_view.doctor_room_evidence.setText(player_text('launcher.ui', 'close_game_retry'))
             self._append_log('Room package uninstall failed.')
 
-    def _ap_save_actions(self) -> None:
-        try:
-            self.controller.request_ap_save_inspection()
-        except (OSError, RuntimeError, ValueError) as error:
-            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
-
-    def _ap_save_dialog(self, inspection, guidance):
-        choices = [
-            player_text("launcher.app_window", "details_copy_details"),
-            player_text("launcher.app_window", "back_up_local_files"),
-            player_text("launcher.app_window", "create_backup"),
-            player_text("launcher.app_window", "open_backup_folder"),
-            player_text("launcher.app_window", "restore_compatible_backup"),
-            player_text("launcher.app_window", "new_doom_save_in_this_room"),
-        ]
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle(player_text('common', 'ap_save'))
-        dialog.setLabelText(
-            (
-                player_text(
-                    "launcher.ui",
-                    "room_value_0_player_value_1",
-                    value_0=f"{inspection['seed']}",
-                    value_1=f"{inspection['slot']}",
-                )
-                + ""
-                + "\n"
-                + player_text("launcher.app_window", "save_files")
-                + '{value_0}'.format(value_0=f"{inspection['status'].replace('_', ' ')}")
-                + ""
-                + "\n"
-                + ""
-            )
-            + guidance
-        )
-        dialog.setComboBoxItems(choices)
-        combo = dialog.findChild(QComboBox)
-        if inspection.get("new_save_available"):
-            combo.setCurrentIndex(5)
-        combo.model().item(2).setEnabled(inspection.get("native_backup_available") is True)
-        return dialog
-
-    def _new_save_guidance(self):
-        from doom_eap.runtime.ledger_records import Authority
-
-        if self.items_presenter.authority is Authority.LEDGER:
-            return player_text("launcher.save", "ledger_restart_guidance")
-        return player_text("launcher.ui", "the_launcher_will_back_up_this_room_s_files_and_disconnect_recon")
-
-    def _show_ap_save_actions(self, inspection, guidance=None) -> None:
-        dialog = self._ap_save_dialog(inspection, guidance or player_text("launcher.save", "backup_guidance"))
-        if not dialog.exec():
-            return
-        action = ("details", "copy_files", "backup", "open_backups", "restore", "new_save")[
-            dialog.findChild(QComboBox).currentIndex()
-        ]
-        try:
-            if action == "details":
-                details = json.dumps(inspection, indent=2, ensure_ascii=False)
-                message = QMessageBox(self)
-                message.setWindowTitle(player_text("launcher.ui", "ap_save_details"))
-                message.setText(
-                    player_text("launcher.ui", "this_checks_the_files_it_does_not_test_whether_the_game_can_load")
-                )
-                message.setDetailedText(details)
-                copy = message.addButton(
-                    player_text("launcher.app_window", "copy_details"), QMessageBox.ButtonRole.ActionRole
-                )
-                copy.clicked.connect(lambda: QApplication.clipboard().setText(details))
-                message.addButton(QMessageBox.StandardButton.Close)
-                message.exec()
-            elif action == "copy_files":
-                self.controller.request_ap_save_inspection(copy_files=True)
-            elif action == "open_backups":
-                from PySide6.QtCore import QUrl
-                from PySide6.QtGui import QDesktopServices
-
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.controller.user_paths.data_dir / "campaigns")))
-            elif action == "backup":
-                self.controller.request_ap_backup()
-            elif action == "new_save":
-                if (
-                    QMessageBox.question(
-                        self,
-                        player_text("launcher.ui", "new_doom_eternal_save"),
-                        player_text(
-                            "launcher.ui",
-                            "room_value_0_player_value_1",
-                            value_0=f"{inspection['seed']}",
-                            value_1=f"{inspection['slot']}",
-                        )
-                        + "\n"
-                        + player_text("launcher.ui", "start_a_new_doom_eternal_save_close_the_game_first")
-                        + "\n"
-                        + ""
-                        + "\n"
-                        + self._new_save_guidance(),
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No,
-                    )
-                    == QMessageBox.StandardButton.Yes
-                ):
-                    self.controller.request_new_ap_save()
-            else:
-                self._restore_ap_backup_dialog()
-        except Exception as error:
-            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
-
-    def _restore_ap_backup_dialog(self):
-        backups = self.controller.ap_backups()
-        if not backups:
-            raise PlayerError('launcher.app_window', 'no_backup_matches_this_room_create_a_backup_while_playing_this_r')
-        basename, accepted = QInputDialog.getItem(
-            self,
-            player_text("launcher.ui", "restore_ap_save"),
-            player_text("launcher.ui", "backup"),
-            backups,
-            0,
-            False,
-        )
-        if (
-            accepted
-            and QMessageBox.question(
-                self,
-                player_text("launcher.ui", "restore_ap_save"),
-                player_text("launcher.ui", "close_doom_eternal_then_prepare_this_backup_for_restoration_rece"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            == QMessageBox.StandardButton.Yes
-        ):
-            self.controller.request_ap_backup(restore=basename)
-
-    def _request_inventory_resync(self) -> None:
-        if not self._room_connected:
-            return
-        from doom_eap.contracts.inventory_domain import ALL_PERSISTENT_DOMAIN_IDS, classify_inventory_domain
-
-        choices = (
-            ("all", "everything"),
-            ("weapons", "weapons"),
-            ("equipment", "equipment"),
-            ("capacities", "capacities"),
-            ("persistent_upgrades", "persistent_upgrades"),
-            ("special_weapons", "special_weapons"),
-            ("item", "specific_item"),
-        )
-        dialog = QInputDialog(self)
-        dialog.setWindowTitle(player_text('common', 'repair_inventory'))
-        dialog.setLabelText(player_text("launcher.ui", "repair_scope"))
-        dialog.setComboBoxItems([player_text("launcher.support", key) for _, key in choices])
-        combo = dialog.findChild(QComboBox)
-        for index, (domain, _) in enumerate(choices):
-            combo.setItemData(index, domain)
-        if not dialog.exec():
-            return
-        domain = combo.currentData()
-        item_id = None
-        if domain == "item":
-            catalog = json.loads(
-                (self.controller.client_dir / "data/item_classifications.json").read_text(encoding="utf-8")
-            )
-            items = {
-                str(item["name"]): int(item_id)
-                for item_id, item in catalog["items"].items()
-                if int(item_id) in ALL_PERSISTENT_DOMAIN_IDS
-            }
-            selected, accepted = QInputDialog.getItem(
-                self,
-                player_text('common', 'repair_inventory'),
-                player_text("launcher.ui", "persistent_item"),
-                sorted(items),
-                0,
-                False,
-            )
-            if not accepted:
-                return
-            item_id = items[selected]
-            domain = classify_inventory_domain(item_id)
-        self.resync_inventory_button.setEnabled(False)
-        try:
-            self.controller.request_inventory_resync(domain=domain, item_id=item_id)
-        except Exception as error:
-            self.resync_inventory_button.setEnabled(True)
-            self.player_inventory.setText(
-                player_text("launcher.ui", "inventory_repair_unavailable_select_help_save_support_report")
-            )
-            self._append_log(
-                'Inventory resync request failed: {value_0}'.format(value_0=f'{error}')
-            )
-
-    def _prepare(self, *, force: bool = False) -> None:
-        if not self._room_connected:
-            self._append_log('Connect to a room before preparing its mod.')
-            return
-        if self._setup_state in {"installing", "updating"}:
-            self._append_log('Room mod setup is already active.')
-            return
-        generation = self.controller.operation_generation
-        try:
-            started = (
-                self.controller.reinstall_setup(generation=generation)
-                if force
-                else self.controller.prepare_setup(generation=generation)
-            )
-            if not started:
-                self._append_log('Setup is already active or room is unavailable.')
-                return
-            self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
-        except Exception as error:
-            self._append_log('Setup error: {value_0}'.format(value_0=f'{error}'))
-            self._set_setup_state(self._room_package_issue_state({"code": getattr(error, "code", None)}))
-
-    @staticmethod
-    def _room_package_issue_state(event) -> str:
-        return (
-            "package_incompatible"
-            if event.get("code")
-            in {
-                "unsupported_contract",
-                "unsupported_capabilities",
-                "unsupported_schema",
-                "unsupported_revision",
-                "incompatible_bridge_protocol",
-            }
-            else "package_failed"
-        )
-
-    @staticmethod
-    def _is_room_package_failure(event) -> bool:
-        return event.get("failure_domain") in {"room_package", "installed_room_package"} or event.get(
-            "recovery_action"
-        ) in {"rebuild_room_package", "update_room_package"}
-
-    def _current_room_package_failure(self) -> bool:
-        if self._setup_state in {"package_failed", "package_incompatible"}:
-            return True
-        failure = getattr(self.controller, "last_setup_failure", None)
-        if callable(failure):
-            try:
-                failure = failure()
-            except Exception:
-                return False
-        if isinstance(failure, dict):
-            return self._is_room_package_failure(failure)
-        return False
-
-    def _request_dependency_consent(self, event: dict[str, object]) -> None:
-        request_id = str(event.get("request_id", ""))
-        if not request_id or request_id in self._resolved_consent_requests:
-            self._append_log(
-                'Ignored duplicate or invalid dependency consent request.'
-            )
-            return
-        self._resolved_consent_requests.add(request_id)
-        if self._dependency_request is not None:
-            self.controller.resolve_consent(request_id, False)
-            return
-        name = str(event.get("name") or player_text("launcher.app_window", "required_download"))
-        version = str(event.get("version") or player_text("launcher.app_window", "version_not_provided"))
-        purpose = str(event.get("purpose") or player_text("launcher.app_window", "finish_room_setup"))
-        source = str(
-            event.get("source")
-            or event.get("url")
-            or player_text("launcher.app_window", "download_source_not_provided")
-        )
-        details = [
-            player_text("launcher.app_window", "tool") + f"{name} {version}",
-            player_text("launcher.app_window", "used_for_value_0", value_0=f"{purpose}"),
-            player_text("launcher.app_window", "download_source_value_0", value_0=f"{source}"),
-            player_text("launcher.app_window", "the_launcher_checks_this_download_before_using_it"),
-        ]
-        self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
-        self._dependency_request = (request_id, name)
-        try:
-            title = player_text("launcher.ui", "download_value_0", value_0=f"{name}")
-            self.help_view.download_details.setText("\n\n".join((title, *details)))
-            self.help_view.download_prompt.show()
-            self._show_page(4)
-            self.help_view.ensureWidgetVisible(self.help_view.download_prompt)
-        except Exception as error:
-            self._append_log(
-                'Dependency consent dialog failed: {value_0}'.format(value_0=f'{error}')
-            )
-            self._answer_dependency_consent(False)
-
-    def _answer_dependency_consent(self, accepted):
-        request = self._dependency_request
-        self._dependency_request = None
-        self.help_view.download_prompt.hide()
-        if request is None:
-            return
-        request_id, name = request
-        self.controller.resolve_consent(request_id, accepted)
-        if not accepted:
-            self._set_setup_state(
-                "failed",
-                player_text("launcher.ui", "value_0_download_declined_retry_setup_when_ready", value_0=f"{name}"),
-            )
 
     def _path_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit, callback) -> None:
         layout.addWidget(self._label(label, "eyebrow"), row, 0)
@@ -1544,7 +928,7 @@ class LauncherUI(QMainWindow):
         if value:
             path = Path(value).expanduser().resolve()
             if path.name != "proton" or not path.is_file():
-                raise PlayerError('launcher.app_window', 'select_the_file_named_proton_inside_the_proton_version_used_by_d')
+                raise PlayerError('launcher.app_window', 'proton_file_help')
             value = str(path)
         if self.controller.config.get("proton_executable") != (value or None):
             self.controller.save_config({"proton_executable": value or None})
@@ -1557,10 +941,8 @@ class LauncherUI(QMainWindow):
 
     def _browse_proton(self) -> None:
         value, _ = QFileDialog.getOpenFileName(
-            self,
-            player_text("launcher.ui", "select_doom_eternal_s_proton_program"),
-            self.proton_executable.text(),
-            player_text("launcher.app_window", "proton_program_proton_all_files"),
+            self, player_text('launcher.ui', 'select_doom_eternal_s_proton_program'), self.proton_executable.text(),
+            player_text('launcher.app_window', 'proton_program_proton_all_files'),
         )
         if value:
             self.proton_executable.setText(value)
@@ -1586,7 +968,7 @@ class LauncherUI(QMainWindow):
         except (OSError, TypeError, ValueError, RuntimeError):
             start_dir = ""
         value = QFileDialog.getExistingDirectory(
-            self, player_text("launcher.ui", "select_doom_eternal_save_folder"), start_dir
+            self, player_text('launcher.ui', 'select_doom_eternal_save_folder'), start_dir,
         )
         if value:
             self.saves_root.setText(value)
@@ -1606,20 +988,17 @@ class LauncherUI(QMainWindow):
         seed = text_or(event.get("seed_name"), player_text("launcher.app_window", "room_name_unavailable"))
         team, slot = (event.get("team", "?"), event.get("slot", "?"))
         endpoint = text_or(
-            event.get("endpoint") or self.controller.config.get("server_address"),
-            player_text("launcher.app_window", "server_unavailable"),
+            event.get('endpoint') or self.controller.config.get('server_address'),
+            player_text('launcher.app_window', 'server_unavailable'),
         )
         player = text_or(
-            event.get("slot_name") or event.get("player_name") or self.controller.config.get("slot"),
-            player_text("launcher.app_window", "player_number_value_0", value_0=f"{slot}"),
+            event.get('slot_name') or event.get('player_name') or self.controller.config.get('slot'),
+            player_text('launcher.app_window', 'player_number_value_0', value_0=f'{slot}'),
         )
         self.session_player_name.setText(
             player_text(
-                "launcher.ui",
-                "value_0_team_value_1_player_number_value_2",
-                value_0=f"{player}",
-                value_1=f"{team}",
-                value_2=f"{slot}",
+                'launcher.ui', 'value_0_team_value_1_player_number_value_2', value_0=f'{player}', value_1=f'{team}',
+                value_2=f'{slot}',
             )
         )
         self._set_connection_badge(player_text('common', 'connected'), True)
@@ -1647,12 +1026,9 @@ class LauncherUI(QMainWindow):
             (
                 player_text("launcher.app_window", "player"),
                 player_text(
-                "launcher.ui",
-                "value_0_team_value_1_player_number_value_2",
-                value_0=f"{player}",
-                value_1=f"{team}",
-                value_2=f"{slot}",
-            ),
+                    'launcher.ui', 'value_0_team_value_1_player_number_value_2', value_0=f'{player}', value_1=f'{team}',
+                    value_2=f'{slot}',
+                ),
             ),
             ("Server", endpoint),
             ("Goal", goal),
@@ -1664,18 +1040,28 @@ class LauncherUI(QMainWindow):
         )
         self.help_view.room_card.show()
 
-    def _room_option_value(self, slot_data: dict[object, object], key: str, fallback: str) -> str:
-        if key not in slot_data:
-            return fallback
-        value = slot_data[key]
-        schema = getattr(self.controller, "options_schema", None)
+    def _room_choice_label(self, option, value):
+        for choice in option.get("choices", []) or []:
+            if isinstance(choice, dict) and value in (choice.get("key"), choice.get("value")):
+                return str(choice.get("label", value))
+
+    def _room_option_label(self, key, value):
+        schema = self.controller.options_schema
         if isinstance(schema, dict):
             for option in schema.get("options", []) or []:
                 if not isinstance(option, dict) or option.get("key") != key:
                     continue
-                for choice in option.get("choices", []) or []:
-                    if isinstance(choice, dict) and value in (choice.get("key"), choice.get("value")):
-                        return str(choice.get("label", value))
+                label = self._room_choice_label(option, value)
+                if label is not None:
+                    return label
+
+    def _room_option_value(self, slot_data: dict[object, object], key: str, fallback: str) -> str:
+        if key not in slot_data:
+            return fallback
+        value = slot_data[key]
+        label = self._room_option_label(key, value)
+        if label is not None:
+            return label
         return self.player_view._option_value_text(value)
 
     def _clear_drift(self) -> None:
@@ -1709,125 +1095,6 @@ class LauncherUI(QMainWindow):
         layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
         dialog.exec()
 
-    def _send_command(self) -> None:
-        text = self.command_input.text()
-        if not text.strip() or self._chat_pending_text is not None:
-            return
-        try:
-            self.controller.send_chat(text)
-        except Exception as error:
-            self._append_log('Command error: {value_0}'.format(value_0=f'{error}'))
-            return
-        self._chat_pending_text = text
-        self._set_chat_enabled(False)
-
-    def _set_chat_enabled(self, enabled: bool) -> None:
-        ready = enabled and self._chat_pending_text is None
-        self.command_input.setEnabled(ready)
-        self.command_send.setEnabled(ready)
-        message = player_text("launcher.play", "connect_chat") if not enabled else ""
-        self.command_input.setPlaceholderText(message or player_text("launcher.ui", "send_a_message_or_server_command"))
-        self.command_input.setToolTip(message)
-        self.command_send.setToolTip(message)
-
-    def _render_hints(self, event: dict[str, object]) -> None:
-        records = event.get("hints")
-        if not isinstance(records, list):
-            return
-        deduped: dict[tuple[object, ...], dict[str, object]] = {}
-        for record in records:
-            if not isinstance(record, dict):
-                continue
-            key = tuple(
-                record.get(field)
-                for field in (
-                    "receiving_player",
-                    "finding_player",
-                    "location",
-                    "item",
-                    "entrance",
-                )
-            )
-            deduped[key] = record
-        self.hints.setRowCount(0)
-        for row, record in enumerate(deduped.values()):
-            self.hints.insertRow(row)
-            values = (
-                str(record.get("status_name", "HINT_UNSPECIFIED")).replace("HINT_", "").replace("_", " "),
-                str(record.get("item_name", player_text("launcher.app_window", "item_name_unavailable"))),
-                str(record.get("location_name", player_text("launcher.app_window", "location_name_unavailable"))),
-                str(
-                    record.get(
-                        "receiving_player_name",
-                        record.get("receiving_player", '?'),
-                    )
-                ),
-                str(
-                    record.get(
-                        "finding_player_name",
-                        record.get("finding_player", '?'),
-                    )
-                ),
-            )
-            for column, value in enumerate(values):
-                self.hints.setItem(row, column, QTableWidgetItem(value))
-        self._hints_state = "loaded"
-        self.hints_empty.setText(player_text("launcher.ui", "no_hints_yet") if not deduped else "")
-        self.hints_empty.setVisible(not deduped)
-        self.hints.setVisible(bool(deduped))
-
-    def _set_hints_state(self, state: str) -> None:
-        self._hints_state = state
-        self.hints.setRowCount(0)
-        self.hints.setVisible(False)
-        labels = {
-            "loading": player_text("launcher.app_window", "loading_hints"),
-            "disconnected": player_text("launcher.ui", "connect_to_the_room_to_see_hints"),
-        }
-        self.hints_empty.setText(labels[state])
-        self.hints_empty.setVisible(True)
-
-    def _copy_launch_option(self) -> None:
-        value = self._play_presenter.present().launch_option
-        if value:
-            QApplication.clipboard().setText(value)
-            if QApplication.clipboard().text() != value:
-                self.copy_launch_option_button.setText(player_text("launcher.ui", "copy_failed"))
-                self._append_log(
-                    'Steam launch option could not be verified on clipboard.'
-                )
-                return
-            self._append_log('Steam launch option copied.')
-            self.copy_launch_option_button.setText(player_text("launcher.ui", "copied"))
-            QTimer.singleShot(1800, lambda: self.copy_launch_option_button.setText(player_text("launcher.ui", "copy")))
-
-    def _show_setup_complete(self) -> None:
-        """Confirm a new room package install without offering game launch control."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle(player_text("launcher.ui", "setup_complete"))
-        dialog.setModal(True)
-        dialog.setMinimumWidth(440)
-        layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(12)
-        layout.addWidget(self._label(player_text("launcher.ui", "setup_complete"), "title"))
-        layout.addWidget(
-            self._label(player_text("launcher.ui", "start_doom_eternal_from_steam_using_the_normal_play_option_keep"))
-        )
-        if os.name != "nt" and self._play_presenter.model.launch_option:
-            layout.addWidget(self._label(player_text("launcher.ui", "steam_launch_option"), "eyebrow"))
-            option = QLineEdit(self._play_presenter.model.launch_option)
-            option.setReadOnly(True)
-            layout.addWidget(option)
-            copy = QPushButton(player_text("launcher.ui", "copy_option"))
-            copy.clicked.connect(lambda: QApplication.clipboard().setText(option.text()))
-            layout.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
-        close = QPushButton(player_text("launcher.ui", "close"))
-        close.setObjectName("primary")
-        close.clicked.connect(dialog.accept)
-        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
-        close.setFocus(Qt.FocusReason.OtherFocusReason)
-        dialog.exec()
 
     def _run_doctor(self) -> None:
         self.controller.request_doctor()
@@ -1859,8 +1126,7 @@ class LauncherUI(QMainWindow):
 
     def _save_support_bundle(self) -> None:
         self.controller.request_support_bundle(
-            Path.home() / "DOOM-Eternal-Archipelago-support.zip",
-            logs=self.help_view.log.toPlainText().splitlines(),
+            Path.home() / 'DOOM-Eternal-Archipelago-support.zip', logs=self.help_view.log.toPlainText().splitlines(),
         )
 
     def _preview_repairs(self) -> None:
@@ -1873,26 +1139,14 @@ class LauncherUI(QMainWindow):
         self._repair_preview_request = None
         self.help_view.repair_preview.hide()
         if not actions:
-            self.help_view.doctor_action.setText(
-                player_text("launcher.ui", "no_automatic_repair_is_available_if_the_problem_continues_select")
-            )
+            self.help_view.doctor_action.setText(player_text('launcher.ui', 'manual_repair_help'))
             return
         action = actions[0]
         prompt = "".join(
             (
-                '{value_0}'.format(value_0=f"{action['title']}"),
-                "\n",
-                "",
-                "\n",
-                player_text("launcher.ui", "changes"),
-                "\n",
-                "",
-                "\n".join(f"• {change}" for change in action["changes"]),
-                "",
-                "\n",
-                "",
-                "\n",
-                player_text("launcher.ui", "recovery_options_value_0", value_0=f"{action['rollback']}"),
+                '{value_0}'.format(value_0=f"{action['title']}"), '\n', '', '\n', player_text('launcher.ui', 'changes'),
+                '\n', '', '\n'.join(f'• {change}' for change in action['changes']), '', '\n', '', '\n',
+                player_text('launcher.ui', 'recovery_options_value_0', value_0=f"{action['rollback']}"),
             )
         )
         self._repair_preview_request = (action["action_id"], generation)
@@ -2012,7 +1266,7 @@ class LauncherUI(QMainWindow):
         self.ammo_refill_keybind = AmmoRefillKeyControl(str(self.controller.config.get("ammo_refill_keybind", "F9")))
         self.ammo_refill_keybind.changed.connect(self._save_ammo_refill_keybind)
         self.special_toggle_keybind = AmmoRefillKeyControl(
-            str(self.controller.config.get("special_toggle_keybind", "F10")), default="F10"
+            str(self.controller.config.get('special_toggle_keybind', 'F10')), default='F10',
         )
         self.special_toggle_keybind.changed.connect(self._save_special_toggle_keybind)
         self.killsanity_counter_visible = ToggleSwitch(player_text("launcher.settings", "killsanity"))
@@ -2032,13 +1286,10 @@ class LauncherUI(QMainWindow):
         grace_layout = QHBoxLayout(grace_control)
         grace_layout.setContentsMargins(0, 0, 0, 0)
         grace_layout.setSpacing(0)
-        decrease, increase = (
-            QPushButton("\N{MINUS SIGN}"),
-            QPushButton('+'),
-        )
+        decrease, increase = (QPushButton('\u2212'), QPushButton('+'))
         for button, action, label in (
-            (decrease, self.death_link_grace.stepDown, player_text("launcher.ui", "decrease_deaths_per_deathlink")),
-            (increase, self.death_link_grace.stepUp, player_text("launcher.ui", "increase_deaths_per_deathlink")),
+            (decrease, self.death_link_grace.stepDown, player_text('launcher.ui', 'decrease_deaths_per_deathlink')),
+            (increase, self.death_link_grace.stepUp, player_text('launcher.ui', 'increase_deaths_per_deathlink')),
         ):
             button.setFixedSize(36, 36)
             button.setAccessibleName(label)
@@ -2082,229 +1333,267 @@ class LauncherUI(QMainWindow):
         self._set_ammo_refill_indicator(None)
         return ammo_refill_block
 
-    def _build_setup_strip(self):
-        self.session_setup = self._card("actionStrip")
-        self.session_setup.setProperty("actionTone", "warning")
-        setup_layout = QVBoxLayout(self.session_setup)
-        setup_layout.setContentsMargins(0, 0, 0, 0)
-        setup_layout.setSpacing(12)
-        setup_copy = QHBoxLayout()
-        setup_copy.setSpacing(12)
-        self.session_setup_title = self._label(player_text('common', 'room_mod'), "stateName")
-        self.session_setup_detail = self._label(
-            player_text("launcher.ui", "connect_to_a_room_to_check_its_mod"), "muted"
-        )
-        setup_layout.addWidget(self.session_setup_title)
-        self.session_setup_title.hide()
-        setup_copy.addWidget(self.session_setup_detail, 1)
-        self.setup_elapsed = self._label("", "muted")
-        setup_copy.addWidget(self.setup_elapsed)
-        setup_layout.addLayout(setup_copy)
-        setup_buttons = QHBoxLayout()
-        setup_buttons.setSpacing(12)
-        self.session_manual_complete_action = QPushButton(player_text("launcher.ui", "i_completed_manual_installation"))
-        self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
-        self.session_manual_complete_action.setVisible(False)
-        self.session_manual_retry_action = QPushButton(player_text("launcher.setup", "install_again"))
-        self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
-        self.session_manual_retry_action.setVisible(False)
-        self.session_setup_action = _ScanlineButton(player_text('common', 'install_room_mod'))
-        self.session_setup_action.setObjectName("primary")
-        self.session_setup_action.clicked.connect(self._run_setup_action)
-        self.reinstall_button = self.session_setup_action
-        setup_buttons.addWidget(self.session_manual_complete_action)
-        setup_buttons.addWidget(self.session_manual_retry_action)
-        setup_buttons.addWidget(self.session_setup_action)
-        self.session_setup_help = QPushButton(player_text('common', 'check_setup'))
-        self.session_setup_help.clicked.connect(self._show_progress_help)
-        self.session_setup_help.setVisible(False)
-        setup_buttons.addWidget(self.session_setup_help)
+
+    _EVENT_HANDLERS: ClassVar = {
+        'core_update_status': '_on_core_update_status', 'core_runtime_selected': '_on_core_update_status',
+        'support_bundle_ready': '_on_support_bundle_ready', 'support_bundle_failed': '_on_support_bundle_failed',
+        'problem_report_ready': '_on_problem_report_ready', 'ap_backup_result': '_on_ap_backup_result',
+        'ap_save_inspection': '_on_ap_save_inspection', 'ap_save_error': '_on_ap_save_error',
+        'problem_report_submitted': '_on_problem_report_submitted', 'problem_report_retry': '_on_problem_report_retry',
+        'integration_status': '_on_integration_status', 'doctor_report': '_on_doctor_report',
+        'repair_preview_result': '_on_repair_preview_result', 'doctor_failed': '_on_doctor_failed',
+        'integration_repair_result': '_on_integration_repair_result', 'ui_repair_result': '_on_ui_repair_result',
+        'log': '_on_log', 'native_client_start_failed': '_on_native_client_start_failed',
+        'item_history_status': '_on_item_history_status', 'inventory_resync': '_on_inventory_resync',
+        'ammo_refill': '_on_ammo_refill', 'ammo_refill_keybind_status': '_on_ammo_refill_keybind_status',
+        'uninstall_queued': '_on_uninstall_queued', 'uninstall_started': '_on_uninstall_started',
+        'uninstall_progress': '_on_uninstall_progress',
+        'injector_post_run_confirmation': '_on_injector_post_run_confirmation',
+        'uninstall_complete': '_on_uninstall_complete', 'uninstall_attention': '_on_uninstall_attention',
+        'uninstall_failed': '_on_uninstall_attention', 'connected': '_on_connected',
+        'hints_loading': '_on_hints_loading', 'hints': '_on_hints', 'chat_sent': '_on_chat_sent',
+        'chat_send_failed': '_on_chat_send_failed', 'client_started': '_on_client_started',
+        'connecting': '_on_client_started', 'game_link_installed': '_on_game_link_installed',
+        'room_install_state': '_on_room_install_state', 'setup_started': '_on_setup_started',
+        'mod_building': '_on_setup_started', 'runtime_config_ready': '_on_setup_started',
+        'mod_staged': '_on_setup_started', 'dependency_consent_required': '_on_dependency_consent_required',
+        'setup_ready': '_on_setup_ready', 'manager_started': '_on_manager_started',
+        'injector_started': '_on_manager_started', 'manager_closed': '_on_manager_closed',
+        'injector_closed': '_on_manager_closed',
+        'uninstall_confirmation_required': '_on_uninstall_confirmation_required',
+        'installation_confirmation_required': '_on_installation_confirmation_required',
+        'installation_declined': '_on_installation_declined', 'manual_install_required': '_on_manual_install_required',
+        'injector_finished': '_on_injector_finished', 'disconnected': '_on_disconnected',
+        'connection_lost': '_on_connection_lost', 'setup_failed': '_on_setup_failed', 'error': '_on_setup_failed',
+        'warning': '_on_warning',
+    }
+
+
+    def _show_installation_confirmation(self):
+        self.session_setup_detail.setText(player_text("launcher.setup", "confirm_question"))
+        self.session_setup.show()
+        self.install_yes.show()
+        self.install_no.show()
+
+    def _answer_installation(self, confirmed):
+        request = self._installation_request
+        generation = self._manual_installation_generation
         self._installation_request = None
-        self.install_yes = QPushButton(player_text("launcher.setup", "confirm_yes"))
-        self.install_no = QPushButton(player_text("launcher.setup", "confirm_no"))
-        self.install_yes.clicked.connect(lambda: self._answer_installation(True))
-        self.install_no.clicked.connect(lambda: self._answer_installation(False))
-        for button in (self.install_no, self.install_yes):
-            button.hide()
-            setup_buttons.addWidget(button)
-        setup_buttons.addStretch(1)
-        setup_layout.addLayout(setup_buttons)
+        self._manual_installation_generation = None
+        self.install_yes.hide()
+        self.install_no.hide()
+        if request is not None:
+            self.controller.resolve_installation_confirmation(request, confirmed)
+        elif confirmed and generation is not None and generation == self.controller.operation_generation:
+            self._complete_manual_installation(generation)
 
-    def _setup_presentation(self, state):
-        presentations = {
-            "disconnected": (
-                player_text('common', 'room_mod'),
-                player_text("launcher.ui", "connect_to_a_room_to_check_its_mod"),
-                "",
-                False,
-                player_text("launcher.ui", "ready"),
-            ),
-            "checking": (
-                player_text("launcher.ui", "checking_room_mod"),
-                player_text("launcher.ui", "checking_the_installed_mod"),
-                player_text("launcher.ui", "checking_74fde8"),
-                False,
-                player_text('common', 'connected'),
-            ),
-            "install_needed": (
-                player_text('common', 'install_room_mod'),
-                player_text("launcher.ui", "install_this_room_s_package_before_playing"),
-                player_text('common', 'install_room_mod'),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "update_required": (
-                player_text("launcher.ui", "update_room_package"),
-                player_text("launcher.ui", "this_room_needs_its_matching_package_before_playing"),
-                player_text("launcher.ui", "update_room_package"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "installing": (
-                player_text("launcher.ui", "installing_room_mod"),
-                player_text("launcher.ui", "preparing_this_room_for_play"),
-                player_text("launcher.ui", "installing"),
-                False,
-                player_text("launcher.ui", "working"),
-            ),
-            "updating": (
-                player_text("launcher.ui", "updating_room_mod"),
-                player_text("launcher.ui", "preparing_this_room_for_play"),
-                player_text("launcher.ui", "updating_00b6dd"),
-                False,
-                player_text("launcher.ui", "working"),
-            ),
-            "game_link_needed": (
-                player_text("launcher.ui", "game_integration_setup_needed"),
-                player_text("launcher.ui", "set_up_game_integration_required_by_doom_eternal_archipelago"),
-                player_text("launcher.ui", "prepare"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "game_link_update_needed": (
-                player_text("launcher.ui", "game_integration_needs_repair"),
-                player_text("launcher.ui", "game_integration_needs_repair_before_play"),
-                player_text("launcher.ui", "repair"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "package_failed": (
-                player_text("launcher.ui", "room_mod_could_not_be_built"),
-                player_text("launcher.ui", "open_session_and_select_rebuild_room_package_if_it_fails_again_s"),
-                player_text("launcher.ui", "rebuild_room_package"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "package_incompatible": (
-                player_text("launcher.ui", "room_mod_needs_rebuilding"),
-                player_text("launcher.ui", "this_launcher_does_not_match_the_room_select_help_save_support_r"),
-                player_text("launcher.ui", "rebuild_room_package"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "manual_install_required": (
-                player_text("launcher.ui", "manual_installation_required"),
-                player_text("launcher.ui", "automatic_installation_failed_open_the_windows_installation_guid"),
-                player_text("launcher.ui", "open_installation_guide"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "ready": (
-                player_text("launcher.ui", "setup_ready"),
-                player_text("launcher.ui", "start_doom_eternal_normally_and_keep_this_launcher_open")
-                if os.name == "nt"
-                else player_text("launcher.ui", "copy_the_steam_launch_option_from_session_then_start_doom_eterna"),
-                player_text("launcher.ui", "open_session"),
-                True,
-                player_text("launcher.ui", "ready"),
-            ),
-            "failed": (
-                player_text("launcher.ui", "game_setup_failed"),
-                player_text("launcher.ui", "game_setup_did_not_finish_open_help_and_select_fix_setup_if_it_f"),
-                player_text("launcher.ui", "fix_setup"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "campaign_failed": (
-                player_text("launcher.ui", "save_setup_failed"),
-                player_text("launcher.ui", "close_doom_eternal_open_ap_save_to_inspect_backups_then_select_h"),
-                player_text("launcher.ui", "ap_save_bbd136"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-            "proton_needed": (
-                player_text("launcher.ui", "select_proton"),
-                player_text("launcher.ui", "select_the_proton_version_used_by_doom_eternal_in_steam"),
-                player_text("launcher.ui", "select_proton"),
-                True,
-                player_text("launcher.ui", "action_needed"),
-            ),
-        }
-        return presentations[state]
 
-    def _poll_events(self) -> None:
-        self._event_poll_scheduled = False
-        started = time.perf_counter()
-        processed = 0
-        while processed < 100 and (time.perf_counter() - started) < 0.005:
-            try:
-                event = self.controller.events.get_nowait()
-            except queue.Empty:
-                break
-            if self.controller.process_event(event) is not False:
-                self._present_event(event)
-            processed += 1
-        if not self.controller.events.empty() and not self._event_poll_scheduled:
-            self._event_poll_scheduled = True
-            QTimer.singleShot(0, self._poll_events)
+    def _load_icon(self) -> None:
+        icon = self.controller.bundle_dir / "assets/launcher/EternalAP.ico"
+        if icon.is_file():
+            self.setWindowIcon(QIcon(str(icon)))
 
-    def _poll_slow_state(self) -> None:
-        if self._items_generation != self.controller.operation_generation:
-            self._items_generation = self.controller.operation_generation
-            self._capability_request = None
-            self.items_presenter.cancel_query()
-            self.items_presenter.capabilities(self.items_presenter.model.room, can_resolve=False)
-        key = RoomSetupCoordinator.room_key(self.room_event) if self._room_connected else None
-        self._play_presenter.activate(self.controller.operation_generation, key, self.controller.connection_attempt_id)
-        self._render_setup_progress()
-        self.controller.poll_game_lifecycle()
-        self._refresh_native_health()
-        self.items_view.request()
-        self._request_items_capabilities()
 
-    def _refresh_native_health(self) -> None:
-        self.controller.request_integration_status()
-
-    def _render_native_health(self, event) -> None:
-        proton = event.get("session", {}).get("proton_runtime")
-        if proton and self.proton_executable is not None:
-            self.proton_executable.setPlaceholderText(player_text("launcher.ui", "automatic") + proton["executable"])
-            self.proton_executable.setToolTip(
-                player_text("launcher.ui", "selected_proton_value_0", value_0=f"{proton['tool']}")
-                + "\n"
-                + '{value_1}'.format(value_1=f"{proton['executable']}")
+    def closeEvent(self, event) -> None:
+        if not self.controller.workflow.session_owner.can_close():
+            QMessageBox.information(
+                self, player_text('launcher.ui', 'game_still_running'),
+                player_text('launcher.ui', 'close_doom_eternal_before_closing_this_launcher'),
             )
-        if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
-            if event["meathook_ok"]:
-                self._native_health_presentation = None
-                self._set_setup_state("ready")
-            else:
-                self._native_health_presentation = None
-                target_state = (
-                    "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
-                )
-                if self._setup_state != target_state:
-                    self._append_log(str(event["meathook_message"]))
-                    self._set_setup_state(target_state, failure_text("install_core", event))
-                return
-        elif self._setup_state == "ready" and (not event["meathook_ok"]):
-            self._native_health_presentation = None
-            target_state = (
-                "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
-            )
-            self._append_log(str(event["meathook_message"]))
-            self._set_setup_state(target_state, failure_text("install_core", event))
+            event.ignore()
             return
+        try:
+            if self.controller.close() is False:
+                self._close_requested = True
+                self.centralWidget().setEnabled(False)
+                self._render_setup_progress()
+                QTimer.singleShot(100, self._finish_close)
+                event.ignore()
+                return
+        except RuntimeError as error:
+            QMessageBox.information(self, player_text("launcher.ui", "game_still_running"), str(error))
+            event.ignore()
+            return
+        self.timer.stop()
+        self.lifecycle_timer.stop()
+        event.accept()
+
+    def _finish_close(self) -> None:
+        if self.controller.workers.active:
+            QTimer.singleShot(100, self._finish_close)
+        else:
+            self.close()
+
+    def run(self) -> None:
+        self.show()
+        if os.name == "nt" and getattr(sys, "frozen", False):
+            import ctypes
+
+            kernel = ctypes.windll.kernel32
+            user = ctypes.windll.user32
+            kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
+            kernel.GetModuleHandleW.restype = ctypes.c_void_p
+            user.LoadIconW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            user.LoadIconW.restype = ctypes.c_void_p
+            user.SendMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+            user.SendMessageW.restype = ctypes.c_ssize_t
+            icon = user.LoadIconW(kernel.GetModuleHandleW(None), 1)
+            if icon:
+                for size in (0, 1):
+                    user.SendMessageW(int(self.winId()), 0x80, size, icon)
+        app = QApplication.instance()
+        if app is None:
+            raise RuntimeError('LauncherUI requires QApplication')
+        app.exec()
+
+    def _session_log_page(self) -> QFrame:
+        card = self._card()
+        layout = QVBoxLayout(card)
+        layout.setSpacing(12)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.addWidget(self._label(player_text("launcher.ui", "session_log"), "section"))
+        self.session_log = QPlainTextEdit()
+        self.session_log.setReadOnly(True)
+        self.session_log.setFont(QFont("monospace", 10))
+        self.session_log.document().setMaximumBlockCount(self._session_log_limit)
+        layout.addWidget(self.session_log, 1)
+        return card
+
+    def _activity_card(self) -> QFrame:
+        card = self._card("plain")
+        layout = QVBoxLayout(card)
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.activity_empty = self._label(player_text("launcher.play", "activity_empty"), "empty")
+        self.activity_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.activity_empty, 1)
+        self.activity = QTableWidget(0, 3)
+        self.activity.setHorizontalHeaderLabels(
+            [
+                player_text('launcher.ui', 'time'), player_text('launcher.ui', 'category'),
+                player_text('launcher.ui', 'details'),
+            ]
+        )
+        self.activity.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.activity.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.activity.setShowGrid(False)
+        self.activity.horizontalHeader().hide()
+        self.activity.hide()
+        self.activity.verticalHeader().hide()
+        self.activity.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.activity.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.activity.setColumnWidth(0, 86)
+        self.activity.setColumnWidth(1, 132)
+        self.activity.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.activity, 1)
+        return card
+
+    def _hints_card(self) -> QFrame:
+        card = self._card("plain")
+        layout = QVBoxLayout(card)
+        layout.setSpacing(12)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.hints_empty = self._label(player_text("launcher.ui", "connect_to_the_room_to_see_hints"), "muted")
+        self.hints_empty.setObjectName("empty")
+        self.hints_empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.hints_empty, 1)
+        self.hints = QTableWidget(0, 5)
+        self.hints.setHorizontalHeaderLabels(
+            [
+                player_text('launcher.items', 'status'), player_text('launcher.items', 'item'),
+                player_text('launcher.ui', 'location'), player_text('launcher.ui', 'for'),
+                player_text('launcher.ui', 'in_world'),
+            ]
+        )
+        self.hints.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.hints.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.hints.setShowGrid(False)
+        self.hints.horizontalHeader().hide()
+        self.hints.verticalHeader().hide()
+        self.hints.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        for column in range(1, 5):
+            self.hints.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeMode.Stretch)
+        layout.addWidget(self.hints, 1)
+        return card
+
+    def _chat_bar(self) -> QFrame:
+        card = self._card("plain")
+        layout = QHBoxLayout(card)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self._label(player_text('common', 'chat'), "eyebrow"))
+        self.command_input = QLineEdit()
+        self.command_input.setPlaceholderText(player_text("launcher.ui", "send_a_message_or_server_command"))
+        self.command_input.setEnabled(False)
+        self.command_input.returnPressed.connect(self._send_command)
+        layout.addWidget(self.command_input, 1)
+        self.command_send = QPushButton(player_text("launcher.ui", "send"))
+        self.command_send.setEnabled(False)
+        self.command_send.clicked.connect(self._send_command)
+        layout.addWidget(self.command_send)
+        return card
+
+    def _send_command(self) -> None:
+        text = self.command_input.text()
+        if not text.strip() or self._chat_pending_text is not None:
+            return
+        try:
+            self.controller.send_chat(text)
+        except (OSError, RuntimeError, ValueError) as error:
+            self._append_log('Command error: {value_0}'.format(value_0=f'{error}'))
+            return
+        self._chat_pending_text = text
+        self._set_chat_enabled(False)
+
+    def _set_chat_enabled(self, enabled: bool) -> None:
+        ready = enabled and self._chat_pending_text is None
+        self.command_input.setEnabled(ready)
+        self.command_send.setEnabled(ready)
+        message = player_text("launcher.play", "connect_chat") if not enabled else ""
+        self.command_input.setPlaceholderText(message or player_text("launcher.ui", "send_a_message_or_server_command"))
+        self.command_input.setToolTip(message)
+        self.command_send.setToolTip(message)
+
+    def _render_hints(self, event: dict[str, object]) -> None:
+        records = event.get("hints")
+        if not isinstance(records, list):
+            return
+        deduped: dict[tuple[object, ...], dict[str, object]] = {}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            key = tuple(
+                record.get(field)
+                for field in ('receiving_player', 'finding_player', 'location', 'item', 'entrance')
+            )
+            deduped[key] = record
+        self.hints.setRowCount(0)
+        for row, record in enumerate(deduped.values()):
+            self.hints.insertRow(row)
+            values = (
+                str(record.get('status_name', 'HINT_UNSPECIFIED')).replace('HINT_', '').replace('_', ' '),
+                str(record.get('item_name', player_text('launcher.app_window', 'item_name_unavailable'))),
+                str(record.get('location_name', player_text('launcher.app_window', 'location_name_unavailable'))),
+                str(record.get('receiving_player_name', record.get('receiving_player', '?'))),
+                str(record.get('finding_player_name', record.get('finding_player', '?'))),
+            )
+            for column, value in enumerate(values):
+                self.hints.setItem(row, column, QTableWidgetItem(value))
+        self._hints_state = "loaded"
+        self.hints_empty.setText(player_text("launcher.ui", "no_hints_yet") if not deduped else "")
+        self.hints_empty.setVisible(not deduped)
+        self.hints.setVisible(bool(deduped))
+
+    def _set_hints_state(self, state: str) -> None:
+        self._hints_state = state
+        self.hints.setRowCount(0)
+        self.hints.setVisible(False)
+        labels = {
+            'loading': player_text('launcher.app_window', 'loading_hints'),
+            'disconnected': player_text('launcher.ui', 'connect_to_the_room_to_see_hints'),
+        }
+        self.hints_empty.setText(labels[state])
+        self.hints_empty.setVisible(True)
 
     def _present_event(self, event: dict[str, object]) -> None:
         if self._present_items_event(event):
@@ -2319,13 +1608,13 @@ class LauncherUI(QMainWindow):
             self._handle_event(event)
             self._sync_items_room(event)
             self._render_setup_progress()
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self._append_log(
                 'UI lifecycle presentation failed for {value_0}: {value_1}: {value_2}'.format(value_0=f'{kind}', value_1=f'{type(error).__name__}', value_2=f'{error}')
             )
         try:
             self._activity_event(event)
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self._append_log(
                 'UI activity presentation failed for {value_0}: {value_1}: {value_2}'.format(value_0=f'{kind}', value_1=f'{type(error).__name__}', value_2=f'{error}')
             )
@@ -2378,14 +1667,20 @@ class LauncherUI(QMainWindow):
         else:
             scroll.setValue(scroll_val + 1)
 
-    def _normalize_activity_event(self, event: dict[str, object]) -> tuple[str, str, str] | None:
-        """Project whitelisted player events into Activity; diagnostics stay in Log."""
+    def _room_install_activity(self, event):
         kind = str(event.get("type", ""))
-        if kind == "archipelago":
-            return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], ""
-        if kind == "chat_sent":
-            message = str(event.get("text", "")).strip()
-            return (player_text('common', 'chat'), self.COLORS["ap"], message) if message else None
+        if kind == "room_install_state":
+            if self._is_room_package_failure(event) or str(event.get("readiness")) == "blocked":
+                return (
+                    player_text('launcher.support', 'activity_installation'), self.COLORS['bad'],
+                    player_text('launcher.app_window', 'installation_failed'),
+                )
+            return (
+                player_text('launcher.support', 'activity_installation'), self.COLORS['ap'],
+                player_text('launcher.app_window', 'preparing_this_room_for_play'),
+            )
+
+    def _notification_activity(self, kind, event):
         if kind == "deathlink":
             detail = str(
                 event.get("message") or event.get("cause") or player_text("launcher.app_window", "deathlink_received")
@@ -2396,27 +1691,25 @@ class LauncherUI(QMainWindow):
                 event.get("message") or event.get("plain") or player_text("launcher.app_window", "archipelago_update")
             )
             return player_text('common', 'archipelago'), self.COLORS["ap"], detail[:512]
+
+    def _normalize_activity_event(self, event: dict[str, object]) -> tuple[str, str, str] | None:
+        """Project whitelisted player events into Activity; diagnostics stay in Log."""
+        kind = str(event.get("type", ""))
+        if kind == "archipelago":
+            return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], ""
+        if kind == "chat_sent":
+            message = str(event.get("text", "")).strip()
+            return (player_text('common', 'chat'), self.COLORS["ap"], message) if message else None
+        if kind in {"deathlink", "item", "location"}:
+            return self._notification_activity(kind, event)
         if kind in {"ammo_refill", "stage_restart"}:
             return self._action_activity(event, kind)
         if kind in {"setup_ready", "native_client_stopped_for_install"}:
             return (
-                player_text("launcher.support", "activity_installation"),
-                self.COLORS["accent"],
-                player_text("launcher.app_window", {"setup_ready": "installation_complete"}.get(kind, kind)),
+                player_text('launcher.support', 'activity_installation'), self.COLORS['accent'],
+                player_text('launcher.app_window', {'setup_ready': 'installation_complete'}.get(kind, kind)),
             )
-        if kind == "room_install_state":
-            if self._is_room_package_failure(event) or str(event.get("readiness")) == "blocked":
-                return (
-                    player_text("launcher.support", "activity_installation"),
-                    self.COLORS["bad"],
-                    player_text("launcher.app_window", "installation_failed"),
-                )
-            return (
-                player_text("launcher.support", "activity_installation"),
-                self.COLORS["ap"],
-                player_text("launcher.app_window", "preparing_this_room_for_play"),
-            )
-        return None
+        return self._room_install_activity(event)
 
     def _action_activity(self, event, kind):
         status = str(event.get("status", ""))
@@ -2429,6 +1722,16 @@ class LauncherUI(QMainWindow):
             return None
         detail = self._ammo_refill_message(event, status)
         return player_text('common', 'archipelago'), ARCHIPELAGO_PRESENTATION_COLORS["player_remote"], detail[:512]
+
+    def _activity_segment_color(self, segment, colors):
+        segment_type = str(segment.get("type") or "text")
+        if segment_type == "player":
+            color = colors["player_self"] if bool(segment.get("self")) else colors["player_remote"]
+        elif segment_type == "item":
+            color = colors.get(f"item_{segment.get('classification')}", colors["text"])
+        else:
+            color = colors.get(segment_type, colors["text"])
+        return color
 
     def _archipelago_activity_detail(self, event: dict[str, object]) -> str:
         plain = str(event.get("plain") or "")
@@ -2443,15 +1746,104 @@ class LauncherUI(QMainWindow):
             text = html.escape(str(segment.get("text") or ""))
             if not text:
                 continue
-            segment_type = str(segment.get("type") or "text")
-            if segment_type == "player":
-                color = colors["player_self"] if bool(segment.get("self")) else colors["player_remote"]
-            elif segment_type == "item":
-                color = colors.get(f"item_{segment.get('classification')}", colors["text"])
-            else:
-                color = colors.get(segment_type, colors["text"])
+            color = self._activity_segment_color(segment, colors)
             rendered.append(f'<span style="color:{color};">{text}</span>')
         return "".join(rendered) or html.escape(plain)
+
+    def _append_log(self, text: str) -> None:
+        sanitized = redact_secrets(text).replace("\r", " ").strip()
+        if not sanitized:
+            return
+        if hasattr(self, "help_view"):
+            self.help_view.log.appendPlainText(sanitized)
+        if hasattr(self, "session_log") and self.session_log is not None:
+            self.session_log.appendPlainText(sanitized)
+
+    def _append_session_event(self, event: dict[str, object]) -> None:
+        kind = str(event.get("type", "event"))
+        if "heartbeat" in kind.casefold() or kind == "log":
+            return
+        if kind == "integration_status":
+            semantic = (
+                *(event.get(key) for key in ('meathook_ok', 'meathook_status', 'native_state', 'reason')),
+                event.get('session', {}).get('state'),
+            )
+            if semantic == self._last_integration_status:
+                return
+            self._last_integration_status = semantic
+        details = []
+        for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
+            value = event.get(key)
+            if value not in (None, ""):
+                details.append(f"{key}={value}")
+        self._append_log(f"{datetime.now().strftime("%H:%M:%S")} {kind}: {' | '.join(details) or 'received'}")
+
+    def _poll_events(self) -> None:
+        self._event_poll_scheduled = False
+        started = time.perf_counter()
+        processed = 0
+        while processed < 100 and (time.perf_counter() - started) < 0.005:
+            try:
+                event = self.controller.events.get_nowait()
+            except queue.Empty:
+                break
+            if self.controller.process_event(event) is not False:
+                self._present_event(event)
+            processed += 1
+        if not self.controller.events.empty() and not self._event_poll_scheduled:
+            self._event_poll_scheduled = True
+            QTimer.singleShot(0, self._poll_events)
+
+    def _poll_slow_state(self) -> None:
+        if self._items_generation != self.controller.operation_generation:
+            self._items_generation = self.controller.operation_generation
+            self._capability_request = None
+            self.items_presenter.cancel_query()
+            self.items_presenter.capabilities(self.items_presenter.model.room, can_resolve=False)
+        key = RoomSetupCoordinator.room_key(self.room_event) if self._room_connected else None
+        self._play_presenter.activate(self.controller.operation_generation, key, self.controller.connection_attempt_id)
+        self._render_setup_progress()
+        self.controller.poll_game_lifecycle()
+        self._refresh_native_health()
+        self.items_view.request()
+        self._request_items_capabilities()
+
+    def _refresh_native_health(self) -> None:
+        self.controller.request_integration_status()
+
+    def _render_proton_runtime(self, event):
+        proton = event.get("session", {}).get("proton_runtime")
+        if proton and self.proton_executable is not None:
+            self.proton_executable.setPlaceholderText(player_text("launcher.ui", "automatic") + proton["executable"])
+            self.proton_executable.setToolTip(
+                player_text("launcher.ui", "selected_proton_value_0", value_0=f"{proton['tool']}")
+                + "\n"
+                + '{value_1}'.format(value_1=f"{proton['executable']}")
+            )
+
+    def _render_native_health(self, event) -> None:
+        self._render_proton_runtime(event)
+        if self._setup_state in {"game_link_needed", "game_link_update_needed"}:
+            if event["meathook_ok"]:
+                self._native_health_presentation = None
+                self._set_setup_state("ready")
+            else:
+                self._native_health_presentation = None
+                target_state = (
+                    "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+                )
+                if self._setup_state != target_state:
+                    self._append_log(str(event["meathook_message"]))
+                    self._set_setup_state(target_state, failure_text("install_core", event))
+                return
+        elif self._setup_state == "ready" and (not event["meathook_ok"]):
+            self._native_health_presentation = None
+            target_state = (
+                "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+            )
+            self._append_log(str(event["meathook_message"]))
+            self._set_setup_state(target_state, failure_text("install_core", event))
+            return
 
     def _render_core_update(self, event) -> None:
         state = event.get("state")
@@ -2468,7 +1860,6 @@ class LauncherUI(QMainWindow):
             message = player_text("launcher.ui", "game_connection_files_download_during_setup")
         self.help_view.core_status.setText(message)
         self.help_view.core_status.setVisible(bool(message))
-
 
     def _log_installation_failure(self, event, stdout, stderr):
         self._append_log(
@@ -2488,67 +1879,6 @@ class LauncherUI(QMainWindow):
         if handler:
             getattr(self, handler)(event)
 
-    _EVENT_HANDLERS: ClassVar = {
-        "core_update_status": "_on_core_update_status",
-        "core_runtime_selected": "_on_core_update_status",
-        "support_bundle_ready": "_on_support_bundle_ready",
-        "support_bundle_failed": "_on_support_bundle_failed",
-        "problem_report_ready": "_on_problem_report_ready",
-        "ap_backup_result": "_on_ap_backup_result",
-        "ap_save_inspection": "_on_ap_save_inspection",
-        "ap_save_error": "_on_ap_save_error",
-        "problem_report_submitted": "_on_problem_report_submitted",
-        "problem_report_retry": "_on_problem_report_retry",
-        "integration_status": "_on_integration_status",
-        "doctor_report": "_on_doctor_report",
-        "repair_preview_result": "_on_repair_preview_result",
-        "doctor_failed": "_on_doctor_failed",
-        "integration_repair_result": "_on_integration_repair_result",
-        "ui_repair_result": "_on_ui_repair_result",
-        "log": "_on_log",
-        "native_client_start_failed": "_on_native_client_start_failed",
-        "item_history_status": "_on_item_history_status",
-        "inventory_resync": "_on_inventory_resync",
-        "ammo_refill": "_on_ammo_refill",
-        "ammo_refill_keybind_status": "_on_ammo_refill_keybind_status",
-        "uninstall_queued": "_on_uninstall_queued",
-        "uninstall_started": "_on_uninstall_started",
-        "uninstall_progress": "_on_uninstall_progress",
-        "injector_post_run_confirmation": "_on_injector_post_run_confirmation",
-        "uninstall_complete": "_on_uninstall_complete",
-        "uninstall_attention": "_on_uninstall_attention",
-        "uninstall_failed": "_on_uninstall_attention",
-        "connected": "_on_connected",
-        "hints_loading": "_on_hints_loading",
-        "hints": "_on_hints",
-        "chat_sent": "_on_chat_sent",
-        "chat_send_failed": "_on_chat_send_failed",
-        "client_started": "_on_client_started",
-        "connecting": "_on_client_started",
-        "game_link_installed": "_on_game_link_installed",
-        "room_install_state": "_on_room_install_state",
-        "setup_started": "_on_setup_started",
-        "mod_building": "_on_setup_started",
-        "runtime_config_ready": "_on_setup_started",
-        "mod_staged": "_on_setup_started",
-        "dependency_consent_required": "_on_dependency_consent_required",
-        "setup_ready": "_on_setup_ready",
-        "manager_started": "_on_manager_started",
-        "injector_started": "_on_manager_started",
-        "manager_closed": "_on_manager_closed",
-        "injector_closed": "_on_manager_closed",
-        "uninstall_confirmation_required": "_on_uninstall_confirmation_required",
-        "installation_confirmation_required": "_on_installation_confirmation_required",
-        "installation_declined": "_on_installation_declined",
-        "manual_install_required": "_on_manual_install_required",
-        "injector_finished": "_on_injector_finished",
-        "disconnected": "_on_disconnected",
-        "connection_lost": "_on_connection_lost",
-        "setup_failed": "_on_setup_failed",
-        "error": "_on_setup_failed",
-        "warning": "_on_warning",
-    }
-
     def _on_core_update_status(self, event):
         self._render_core_update(event)
         return
@@ -2562,7 +1892,6 @@ class LauncherUI(QMainWindow):
     def _on_support_bundle_failed(self, event):
         self.help_view.doctor_action.setText(self._operation_failure("report", event))
 
-
     def _on_problem_report_ready(self, event):
         self._present_problem_report(event)
         return
@@ -2574,13 +1903,12 @@ class LauncherUI(QMainWindow):
 
     def _on_ap_save_inspection(self, event):
         self._show_ap_save_actions(
-            event["inspection"], event.get("message", player_text("launcher.save", "backup_guidance"))
+            event['inspection'], event.get('message', player_text('launcher.save', 'backup_guidance')),
         )
         return
 
     def _on_ap_save_error(self, event):
         QMessageBox.warning(self, player_text("common", "ap_save"), self._operation_failure("saves", event))
-
 
     def _on_problem_report_submitted(self, event):
         self._append_log('Problem report submitted: ' + event["url"])
@@ -2589,7 +1917,6 @@ class LauncherUI(QMainWindow):
 
     def _on_problem_report_retry(self, event):
         self.help_view.doctor_action.setText(self._operation_failure("report", event))
-
 
     def _on_integration_status(self, event):
         self._render_native_health(event)
@@ -2608,17 +1935,13 @@ class LauncherUI(QMainWindow):
         self.help_view.doctor_status.setText(player_text("launcher.ui", "setup_check_could_not_run"))
         self.help_view.doctor_evidence.setText(message)
 
-
     def _on_integration_repair_result(self, event):
         if event.get("success", False):
             self._set_setup_state("game_link_update_needed")
             self._prepare(force=True)
         else:
             self._append_log(str(event.get("message", "")))
-            self._set_setup_state(
-                "game_link_update_needed",
-                player_text("launcher.ui", "game_connection_repair_failed_select_fix_setup_again_if_it_fails"),
-            )
+            self._set_setup_state('game_link_update_needed', player_text('launcher.ui', 'connection_repair_failed'))
         return
 
     def _on_ui_repair_result(self, event):
@@ -2628,7 +1951,6 @@ class LauncherUI(QMainWindow):
                    else self._operation_failure("repair", event))
         self.help_view.doctor_action.setText(message)
 
-
     def _on_log(self, event):
         self._append_log(str(event.get("message", "")))
         return
@@ -2636,7 +1958,6 @@ class LauncherUI(QMainWindow):
     def _on_native_client_start_failed(self, event):
         QMessageBox.warning(self, player_text("launcher.controller", "game_connection_could_not_start"),
                             self._operation_failure("install_core", event))
-
 
     def _on_item_history_status(self, event):
         message = str(event.get("message", ""))
@@ -2647,11 +1968,11 @@ class LauncherUI(QMainWindow):
     def _on_inventory_resync(self, event):
         status = str(event.get("status", ""))
         presentation = {
-            "waiting": (player_text("launcher.app_window", "return_to_doom_eternal_and_unpause"), False),
-            "observed": (player_text("launcher.app_window", "inventory_repair_confirmed"), True),
-            "queued": (player_text("launcher.app_window", "inventory_repair_waiting_for_the_game"), True),
-            "noop": (player_text("launcher.app_window", "inventory_is_up_to_date"), True),
-            "error": (player_text("launcher.ui", "inventory_repair_unavailable_select_help_save_support_report"), True),
+            'waiting': (player_text('launcher.app_window', 'return_to_doom_eternal_and_unpause'), False),
+            'observed': (player_text('launcher.app_window', 'inventory_repair_confirmed'), True),
+            'queued': (player_text('launcher.app_window', 'inventory_repair_waiting_for_the_game'), True),
+            'noop': (player_text('launcher.app_window', 'inventory_is_up_to_date'), True),
+            'error': (player_text('launcher.ui', 'inventory_repair_unavailable'), True),
         }.get(status)
         if presentation:
             detail, enabled = presentation
@@ -2712,11 +2033,9 @@ class LauncherUI(QMainWindow):
     def _on_uninstall_complete(self, event):
         self.help_view.uninstall_button.setEnabled(False)
         self.help_view.doctor_room_status.setText(player_text("launcher.ui", "room_mod_removed"))
-        self.help_view.doctor_room_evidence.setText(
-            player_text("launcher.ui", "this_room_s_mod_was_removed_other_mods_and_game_connection_files")
-        )
+        self.help_view.doctor_room_evidence.setText(player_text('launcher.ui', 'removal_details'))
         self._set_setup_state(
-            "install_needed", player_text("launcher.ui", "select_install_room_package_before_playing")
+            'install_needed', player_text('launcher.ui', 'select_install_room_package_before_playing'),
         )
         return
 
@@ -2724,7 +2043,6 @@ class LauncherUI(QMainWindow):
         self.help_view.uninstall_button.setEnabled(self._room_connected)
         self.help_view.doctor_room_status.setText(player_text("launcher.ui", "uninstall_failed"))
         self.help_view.doctor_room_evidence.setText(self._operation_failure("uninstall", event))
-
 
     def _on_connected(self, event):
         self._reconnecting = False
@@ -2751,10 +2069,7 @@ class LauncherUI(QMainWindow):
             self._set_chat_enabled(self._room_connected)
 
     def _on_chat_send_failed(self, event):
-        self._append_log(
-            'Command error: '
-            + str(event.get("message", 'Could not send message.'))
-        )
+        self._append_log('Command error: ' + str(event.get('message', 'Could not send message.')))
         self._chat_pending_text = None
         self._set_chat_enabled(self._room_connected)
 
@@ -2765,9 +2080,7 @@ class LauncherUI(QMainWindow):
 
     def _on_game_link_installed(self, event):
         self._native_health_presentation = None
-        self._append_log(
-            'Game Link runtime verified and installed: {value_0}'.format(value_0=f"{event.get('path')}")
-        )
+        self._append_log('Game Link runtime verified and installed: {value_0}'.format(value_0=f"{event.get('path')}"))
 
     def _on_room_install_state(self, event):
         option = str(event.get("steam_launch_option", ""))
@@ -2780,75 +2093,12 @@ class LauncherUI(QMainWindow):
             self._clear_drift()
             self.help_view.uninstall_button.setEnabled(False)
             self._set_setup_state(
-            "install_needed", player_text("launcher.ui", "select_install_room_package_before_playing")
-        )
+                'install_needed', player_text('launcher.ui', 'select_install_room_package_before_playing'),
+            )
         elif state == "already_installed":
             self._installed_room_state(event)
         else:
             self._room_update_state(event, state, reason, readiness, readiness_reason)
-
-    def _room_update_state(self, event, state, reason, readiness, readiness_reason):
-        drift = state == "update_required"
-        self.drift.setText(
-            player_text("launcher.ui", "room_update")
-            + player_text("launcher.app_window", "this_room_needs_its_matching_mod")
-        )
-        self.drift.setVisible(drift)
-        setup_copy = (
-            player_text("launcher.ui", "another_room_s_mod_is_installed_update_to_this_room_s_mod")
-            if event.get("reason_code") == "room_changed"
-            else player_text("launcher.ui", "this_room_s_installed_mod_needs_an_update")
-        )
-        if readiness == "blocked":
-            self._set_setup_state(self._room_package_issue_state(event))
-        else:
-            self._set_setup_state(
-                "update_required" if state == "update_required" else "install_needed",
-                setup_copy
-                if state == "update_required"
-                else player_text("launcher.ui", "install_this_room_s_package_before_playing"),
-            )
-
-    def _installed_room_state(self, event):
-        readiness = str(event.get("readiness", "ready"))
-        readiness_reason = str(event.get("readiness_reason", ""))
-        self._clear_drift()
-        self.help_view.uninstall_button.setEnabled(self._room_connected)
-        if readiness == "blocked":
-            self._native_health_presentation = None
-            self._show_page(2)
-            if event.get("failure_domain") in {"campaign_session", "proton_runtime"}:
-                self._set_setup_state("failed", str(event.get("user_message") or readiness_reason))
-            else:
-                target_state = (
-                    "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
-                )
-                self._set_setup_state(
-                    target_state,
-                    player_text("launcher.ui", "open_help_and_select_repair_game_connection_before_playing"),
-                )
-        else:
-            self._native_health_presentation = None
-            self._show_page(2)
-            self._set_setup_state("ready")
-
-    def _show_setup_failure(self, event, message):
-        operation = {"campaign_session": "saves", "room_package": "install_mod",
-                     "installed_room_package": "install_mod"}.get(event.get("failure_domain"), "repair")
-        message = self._operation_failure(operation, event)
-        self._reconnecting = False
-        self._connection_pending = False
-        self._set_connection_controls(True)
-        self._set_connection_badge(player_text("launcher.ui", "failed"), False)
-        title = player_text("launcher.ui", "game_setup_failed")
-        self._set_home(title, message, player_text("launcher.ui", "retry_join"), title)
-        self.join_error.setText(message)
-        self.join_error.show()
-        attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
-        if attempt_id not in self._shown_connection_error_attempts:
-            self._shown_connection_error_attempts.add(attempt_id)
-            QMessageBox.warning(self, title, message)
-
 
     def _on_setup_started(self, event):
         self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
@@ -2869,10 +2119,7 @@ class LauncherUI(QMainWindow):
                 target_state = (
                     "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
                 )
-                self._set_setup_state(
-                    target_state,
-                    player_text("launcher.ui", "open_help_and_select_repair_game_connection_before_playing"),
-                )
+                self._set_setup_state(target_state, player_text('launcher.ui', 'repair_connection_help'))
             else:
                 self._native_health_presentation = None
                 self._show_page(2)
@@ -2883,21 +2130,13 @@ class LauncherUI(QMainWindow):
         elif self._is_room_package_failure(event):
             self._set_setup_state("package_failed")
         else:
-            self._append_log(
-                str(
-                    event.get(
-                        "message", 'Setup failed. Open Help and select Fix Setup.'
-                    )
-                )
-            )
+            self._append_log(str(event.get('message', 'Setup failed. Open Help and select Fix Setup.')))
             self._set_setup_state("failed")
         if event.get("new_install") is True:
             self._show_setup_complete()
 
     def _on_manager_started(self, event):
-        message = str(
-            event.get("message", 'Complete installation in EternalModInjector.')
-        )
+        message = str(event.get('message', 'Complete installation in EternalModInjector.'))
         self._set_setup_state("installing", installer_instruction(windows=os.name == "nt"))
         self._append_log(message)
 
@@ -2912,11 +2151,8 @@ class LauncherUI(QMainWindow):
         request_id = str(event.get("request_id", ""))
         self.help_view.uninstall_button.setEnabled(False)
         reply = QMessageBox.question(
-            self,
-            player_text("launcher.ui", "confirm_removal"),
-            player_text("launcher.ui", "did_eternalmodinjector_remove_this_room_s_mod_without_errors"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
+            self, player_text('launcher.ui', 'confirm_removal'), player_text('launcher.ui', 'confirm_injector_removal'),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No,
         )
         confirmed = reply == QMessageBox.StandardButton.Yes
         if confirmed:
@@ -2924,9 +2160,7 @@ class LauncherUI(QMainWindow):
             self.help_view.doctor_room_evidence.setText(player_text("launcher.ui", "checking_that_the_mod_was_removed"))
         else:
             self.help_view.doctor_room_status.setText(player_text("launcher.ui", "uninstall_failed"))
-            self.help_view.doctor_room_evidence.setText(
-                player_text("launcher.ui", "removal_was_not_confirmed_check_eternalmodinjector_then_retry")
-            )
+            self.help_view.doctor_room_evidence.setText(player_text('launcher.ui', 'removal_unconfirmed'))
         self.controller.resolve_uninstall_confirmation(request_id, confirmed)
 
     def _on_installation_confirmation_required(self, event):
@@ -2934,30 +2168,9 @@ class LauncherUI(QMainWindow):
         self._installation_request = event["request_id"]
         self._show_installation_confirmation()
 
-    def _show_installation_confirmation(self):
-        self.session_setup_detail.setText(player_text("launcher.setup", "confirm_question"))
-        self.session_setup.show()
-        self.install_yes.show()
-        self.install_no.show()
-
-    def _answer_installation(self, confirmed):
-        request = self._installation_request
-        generation = self._manual_installation_generation
-        self._installation_request = None
-        self._manual_installation_generation = None
-        self.install_yes.hide()
-        self.install_no.hide()
-        if request is not None:
-            self.controller.resolve_installation_confirmation(request, confirmed)
-        elif confirmed and generation is not None and generation == self.controller.operation_generation:
-            self._complete_manual_installation(generation)
-
     def _on_installation_declined(self, event):
-        self._set_setup_state(
-            "manual_install_required",
-            player_text("launcher.ui", "installation_was_not_confirmed_open_the_windows_installation_gui"),
-        )
-        self._append_log(player_text("launcher.ui", "installation_was_not_confirmed_open_the_windows_installation_gui"))
+        self._set_setup_state('manual_install_required', player_text('launcher.ui', 'install_unconfirmed_help'))
+        self._append_log(player_text("launcher.ui", "install_unconfirmed_help"))
 
     def _on_manual_install_required(self, event):
         self._show_manual_installation(event)
@@ -2993,10 +2206,8 @@ class LauncherUI(QMainWindow):
         self.help_view.room_card.hide()
         self._set_setup_state("disconnected")
         self._set_home(
-            player_text("launcher.ui", "session_ended"),
-            player_text("launcher.ui", "update_room_details_or_reconnect"),
-            player_text("launcher.ui", "join_a_room"),
-            player_text("launcher.ui", "offline"),
+            player_text('launcher.ui', 'session_ended'), player_text('launcher.ui', 'update_room_details_or_reconnect'),
+            player_text('launcher.ui', 'join_a_room'), player_text('launcher.ui', 'offline'),
         )
 
     def _on_connection_lost(self, event):
@@ -3005,19 +2216,12 @@ class LauncherUI(QMainWindow):
         self._reconnecting = True
         self._set_connection_badge(player_text("launcher.ui", "reconnecting"), False)
         self._set_home(
-            player_text("launcher.ui", "room_connection_interrupted"),
-            player_text("launcher.ui", "doomeap_is_reconnecting_in_the_background_gameplay_state_is_pres"),
-            player_text("launcher.ui", "view_session"),
-            player_text("launcher.ui", "reconnecting"),
-            enabled=True,
+            player_text('launcher.ui', 'room_connection_interrupted'), player_text('launcher.ui', 'reconnecting_help'),
+            player_text('launcher.ui', 'view_session'), player_text('launcher.ui', 'reconnecting'), enabled=True,
         )
         self._append_log(
             'Archipelago connection interrupted; automatic reconnect remains active: '
-            + str(
-                event.get("technical_message")
-                or event.get("message")
-                or 'connection closed'
-            )
+            + str(event.get('technical_message') or event.get('message') or 'connection closed')
         )
 
     def _on_setup_failed(self, event):
@@ -3035,6 +2239,677 @@ class LauncherUI(QMainWindow):
 
     def _on_warning(self, event):
         self._append_log("Warning: " + str(event.get("message", "")))
+
+    def _ap_save_actions(self) -> None:
+        try:
+            self.controller.request_ap_save_inspection()
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
+
+    def _ap_save_dialog(self, inspection, guidance):
+        choices = [
+            player_text('launcher.app_window', 'details_copy_details'),
+            player_text('launcher.app_window', 'back_up_local_files'),
+            player_text('launcher.app_window', 'create_backup'),
+            player_text('launcher.app_window', 'open_backup_folder'),
+            player_text('launcher.app_window', 'restore_compatible_backup'),
+            player_text('launcher.app_window', 'new_doom_save_in_this_room'),
+        ]
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle(player_text('common', 'ap_save'))
+        dialog.setLabelText(
+            (
+                player_text(
+                    'launcher.ui', 'room_value_0_player_value_1', value_0=f"{inspection['seed']}",
+                    value_1=f"{inspection['slot']}",
+                )
+                + ""
+                + "\n"
+                + player_text("launcher.app_window", "save_files")
+                + '{value_0}'.format(value_0=f"{inspection['status'].replace('_', ' ')}")
+                + ""
+                + "\n"
+                + ""
+            )
+            + guidance
+        )
+        dialog.setComboBoxItems(choices)
+        combo = dialog.findChild(QComboBox)
+        if inspection.get("new_save_available"):
+            combo.setCurrentIndex(5)
+        combo.model().item(2).setEnabled(inspection.get("native_backup_available") is True)
+        return dialog
+
+    def _new_save_guidance(self):
+        from doom_eap.runtime.ledger import Authority
+
+        if self.items_presenter.authority is Authority.LEDGER:
+            return player_text("launcher.save", "ledger_restart_guidance")
+        return player_text("launcher.ui", "new_save_help")
+
+    def _show_ap_save_actions(self, inspection, guidance=None) -> None:
+        dialog = self._ap_save_dialog(inspection, guidance or player_text("launcher.save", "backup_guidance"))
+        if not dialog.exec():
+            return
+        action = ("details", "copy_files", "backup", "open_backups", "restore", "new_save")[
+            dialog.findChild(QComboBox).currentIndex()
+        ]
+        try:
+            if action == "details":
+                details = json.dumps(inspection, indent=2, ensure_ascii=False)
+                message = QMessageBox(self)
+                message.setWindowTitle(player_text("launcher.ui", "ap_save_details"))
+                message.setText(player_text('launcher.ui', 'save_inspection_help'))
+                message.setDetailedText(details)
+                copy = message.addButton(
+                    player_text('launcher.app_window', 'copy_details'), QMessageBox.ButtonRole.ActionRole,
+                )
+                copy.clicked.connect(lambda: QApplication.clipboard().setText(details))
+                message.addButton(QMessageBox.StandardButton.Close)
+                message.exec()
+            elif action == "copy_files":
+                self.controller.request_ap_save_inspection(copy_files=True)
+            elif action == "open_backups":
+                from PySide6.QtCore import QUrl
+                from PySide6.QtGui import QDesktopServices
+
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.controller.user_paths.data_dir / "campaigns")))
+            elif action == "backup":
+                self.controller.request_ap_backup()
+            elif action == "new_save":
+                if (
+                    QMessageBox.question(
+                        self,
+                        player_text("launcher.ui", "new_doom_eternal_save"),
+                        player_text(
+                            'launcher.ui', 'room_value_0_player_value_1', value_0=f"{inspection['seed']}",
+                            value_1=f"{inspection['slot']}",
+                        )
+                        + "\n"
+                        + player_text("launcher.ui", "confirm_new_save")
+                        + "\n"
+                        + ""
+                        + "\n"
+                        + self._new_save_guidance(),
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No,
+                    )
+                    == QMessageBox.StandardButton.Yes
+                ):
+                    self.controller.request_new_ap_save()
+            else:
+                self._restore_ap_backup_dialog()
+        except (OSError, RuntimeError, ValueError) as error:
+            QMessageBox.warning(self, player_text('common', 'ap_save'), self._operation_failure('saves', error))
+
+    def _restore_ap_backup_dialog(self):
+        backups = self.controller.ap_backups()
+        if not backups:
+            raise PlayerError('launcher.app_window', 'backup_missing')
+        basename, accepted = QInputDialog.getItem(
+            self, player_text('launcher.ui', 'restore_ap_save'), player_text('launcher.ui', 'backup'), backups, 0,
+            False,
+        )
+        if (
+            accepted
+            and QMessageBox.question(
+                self, player_text('launcher.ui', 'restore_ap_save'), player_text('launcher.ui', 'confirm_restore'),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        ):
+            self.controller.request_ap_backup(restore=basename)
+
+    def _request_inventory_resync(self) -> None:
+        if not self._room_connected:
+            return
+        from doom_eap.contracts.inventory_domain import ALL_PERSISTENT_DOMAIN_IDS, classify_inventory_domain
+
+        choices = (
+            ('all', 'everything'), ('weapons', 'weapons'), ('equipment', 'equipment'), ('capacities', 'capacities'),
+            ('persistent_upgrades', 'persistent_upgrades'), ('special_weapons', 'special_weapons'),
+            ('item', 'specific_item'),
+        )
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle(player_text('common', 'repair_inventory'))
+        dialog.setLabelText(player_text("launcher.ui", "repair_scope"))
+        dialog.setComboBoxItems([player_text("launcher.support", key) for _, key in choices])
+        combo = dialog.findChild(QComboBox)
+        for index, (domain, _) in enumerate(choices):
+            combo.setItemData(index, domain)
+        if not dialog.exec():
+            return
+        domain = combo.currentData()
+        item_id = None
+        if domain == "item":
+            catalog = json.loads(
+                (self.controller.client_dir / "data/item_classifications.json").read_text(encoding="utf-8")
+            )
+            items = {
+                str(item["name"]): int(item_id)
+                for item_id, item in catalog["items"].items()
+                if int(item_id) in ALL_PERSISTENT_DOMAIN_IDS
+            }
+            selected, accepted = QInputDialog.getItem(
+                self, player_text('common', 'repair_inventory'), player_text('launcher.ui', 'persistent_item'),
+                sorted(items), 0, False,
+            )
+            if not accepted:
+                return
+            item_id = items[selected]
+            domain = classify_inventory_domain(item_id)
+        self.resync_inventory_button.setEnabled(False)
+        try:
+            self.controller.request_inventory_resync(domain=domain, item_id=item_id)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.resync_inventory_button.setEnabled(True)
+            self.player_inventory.setText(player_text('launcher.ui', 'inventory_repair_unavailable'))
+            self._append_log('Inventory resync request failed: {value_0}'.format(value_0=f'{error}'))
+
+    def _setup_action_id(self):
+        actions = {
+            'install_needed': ActionId.PREPARE, 'update_required': ActionId.PREPARE,
+            'package_failed': ActionId.REINSTALL, 'package_incompatible': ActionId.REINSTALL,
+            'failed': ActionId.DIAGNOSE, 'campaign_failed': ActionId.SAVE, 'proton_needed': ActionId.SELECT_PROTON,
+            'game_link_needed': ActionId.REINSTALL, 'manual_install_required': ActionId.MANUAL_INSTALL,
+            'game_link_update_needed': ActionId.REPAIR_CONNECTION,
+        }
+        if self._setup_state in actions:
+            return actions[self._setup_state]
+        if self._room_connected or self._connection_pending:
+            return ActionId.VIEW_SESSION
+        return ActionId.RESUME if self.controller.config.get("server_address") else ActionId.CONNECT
+
+    def _setup_failure_presentation(self, state, detail):
+        failure = self.controller.last_setup_failure
+        if (
+            state == "failed"
+            and isinstance(failure, dict)
+            and failure.get("failure_domain") in {"campaign_session", "proton_runtime"}
+        ):
+            state = "proton_needed" if failure["failure_domain"] == "proton_runtime" else "campaign_failed"
+            detail = str(failure.get("user_message") or "")
+        return state, detail
+
+    def _set_setup_state(self, state: str, detail: str = "") -> None:
+        state, detail = self._setup_failure_presentation(state, detail)
+        title, fallback, action, enabled, top_state = self._setup_presentation(state)
+        self._setup_state = state
+        copy = fallback if state in {"package_failed", "package_incompatible"} else detail or fallback
+        self._setup_copy = copy
+        tone = (
+            "ready" if state == "ready" else "working" if state in {"checking", "installing", "updating"} else "warning"
+        )
+        self.session_setup.setProperty("actionTone", tone)
+        self.session_setup.style().unpolish(self.session_setup)
+        self.session_setup.style().polish(self.session_setup)
+        self.session_setup_title.setText(title)
+        self.session_setup_detail.setText(copy)
+        self.session_setup_action.setText(action)
+        self.session_setup_action.setEnabled(enabled)
+        self.session_setup_action.setVisible(state not in {"ready", "disconnected"})
+        strip_visible = state not in {"ready", "disconnected"}
+        self.session_setup.setVisible(strip_visible)
+        if strip_visible and state != self._previous_setup_state:
+            self._fade_in(self.session_setup)
+        self._previous_setup_state = state
+        if state in {"campaign_failed", "proton_needed"}:
+            self.controller.request_doctor()
+        self.session_manual_complete_action.setVisible(state == "manual_install_required")
+        self.session_manual_retry_action.setVisible(state == "manual_install_required")
+        self.reinstall_button.setText(action)
+        self.reinstall_button.setEnabled(enabled)
+        self.reinstall_button.setVisible(state not in {"ready", "disconnected"})
+        self._set_home(title, copy, action, top_state, enabled=enabled)
+        self.hero_action.setVisible(state != "disconnected")
+        self._refresh_help_room_package()
+        self._render_setup_progress()
+
+    def _observe_setup_progress(self, event) -> dict | None:
+        kind = event.get("type")
+        room = self.room_event if self._room_connected else None
+        if kind == "connected":
+            room = event
+        elif kind == "disconnected":
+            room = None
+        key = RoomSetupCoordinator.room_key(room) if room else None
+        generation = self.controller.operation_generation
+        attempt = self.controller.connection_attempt_id
+        self._play_presenter.activate(generation, key, attempt)
+        self._play_presenter.room_details(self.server.text(), self.slot.text())
+        return self._play_presenter.observe(adapt_event(event, generation=generation, room=key, attempt=attempt))
+
+    def _render_room_controls(self):
+        self.room_fields.setVisible(not self._room_connected)
+        self.room_identity.setVisible(self._room_connected)
+        self.connected_server.setText(str(self.room_event.get("endpoint") or self.server.text()))
+        self.connected_player.setText(str(self.room_event.get("slot_name") or self.room_event.get("player_name") or self.slot.text()))
+        self.join_button.setText(player_text("launcher.ui", "disconnect") if self._room_connected else player_text("launcher.ui", "connect"))
+        self.join_button.setObjectName("secondary" if self._room_connected else "primary")
+        self.join_button.setEnabled(not self._connection_pending)
+        self.join_button.setToolTip(player_text("launcher.play", "connecting_guidance", server=self.server.text()) if self._connection_pending else "")
+        self.join_button.style().unpolish(self.join_button)
+        self.join_button.style().polish(self.join_button)
+
+    def _render_setup_progress(self) -> None:
+        self.play_view.render(self._play_presenter.present())
+        self._render_room_controls()
+        if self._installation_request is not None or self._manual_installation_generation is not None:
+            return
+        if self._close_requested:
+            message = player_text("launcher.setup", "stop_requested")
+            self.session_setup_detail.setText(message)
+            self.hero_detail.setText(message)
+            return
+        model = self._play_presenter.present()
+        view = model.progress
+        if model.recovery_message:
+            self.session_setup_detail.setText(model.recovery_message)
+            self.hero_detail.setText(model.recovery_message)
+            return
+        active = view is not None and self._setup_state in {"checking", "installing", "updating"}
+        self.setup_elapsed.setVisible(active)
+        if active:
+            minutes, seconds = divmod(view.elapsed_seconds, 60)
+            self.setup_elapsed.setText('{minutes}:{seconds}'.format(minutes=str(minutes), seconds=f'{seconds:02d}'))
+        self.session_setup_help.setVisible(active and view.next_action is SetupAction.DIAGNOSE)
+        if self._setup_state in {"checking", "installing", "updating"}:
+            operation = STEP_TEXT[view.step] if active else self._setup_copy
+            copy = '{operation}…'.format(operation=operation.rstrip("…."))
+            self.session_setup_detail.setText(copy)
+            self.hero_detail.setText(copy)
+
+    def _show_progress_help(self) -> None:
+        self._show_page(4)
+        self._run_doctor()
+
+    def _run_setup_action(self) -> None:
+        action = self._setup_action_id()
+        actions = {
+            ActionId.PREPARE: self._prepare, ActionId.REINSTALL: lambda: self._prepare(force=True),
+            ActionId.DIAGNOSE: lambda: self._show_page(4), ActionId.SAVE: self._ap_save_actions,
+            ActionId.SELECT_PROTON: self._select_proton, ActionId.MANUAL_INSTALL: self._manual_install_action,
+            ActionId.REPAIR_CONNECTION: self._repair_connection,
+        }
+        callback = actions.get(action)
+        if callback:
+            callback()
+
+    def _repair_connection(self):
+        generation = self.controller.operation_generation
+        try:
+            if self.controller.request_repair("repair_game_link", integration_only=True, generation=generation):
+                self._set_setup_state("installing", player_text("launcher.ui", "repairing_the_game_connection"))
+        except (OSError, RuntimeError, ValueError) as error:
+            self._append_log('Game integration repair error: {value_0}'.format(value_0=f'{error}'))
+            self._set_setup_state('game_link_update_needed', player_text('launcher.ui', 'connection_repair_failed'))
+
+    def _manual_install_action(self) -> None:
+        if self._manual_retry:
+            self._prepare(force=True)
+        else:
+            self._open_manual_install_guide()
+
+    def _open_manual_install_guide(self) -> None:
+        """Open the Windows manual installation section in INSTALL.md."""
+        local_candidates = [
+            self.controller.client_dir.parent / 'docs' / 'INSTALL.md',
+            self.controller.client_dir / 'docs' / 'INSTALL.md', self.controller.client_dir / 'INSTALL.md',
+            self.controller.application_dir / 'docs' / 'INSTALL.md', self.controller.application_dir / 'INSTALL.md',
+        ]
+        opened = False
+        for candidate in local_candidates:
+            if candidate.is_file():
+                try:
+                    webbrowser.open(candidate.resolve().as_uri())
+                    opened = True
+                    break
+                except (OSError, RuntimeError, ValueError):
+                    pass
+        if not opened:
+            try:
+                webbrowser.open(WINDOWS_MANUAL_INSTALL_GUIDE_URL)
+            except (OSError, RuntimeError, ValueError) as error:
+                self._append_log('Could not open browser: {value_0}'.format(value_0=f'{error}'))
+        self._append_log('Opened manual installation guide (INSTALL.md → Windows manual installation).')
+
+    def _confirm_manual_installation(self) -> None:
+        if self._installation_request is not None:
+            return
+        self._manual_installation_generation = self.controller.operation_generation
+        self._show_installation_confirmation()
+
+    def _complete_manual_installation(self, generation):
+        try:
+            self.controller.confirm_manual_installation(generation=generation)
+            self._append_log('Manual mod installation confirmed.')
+        except (OSError, RuntimeError, ValueError) as error:
+            self._append_log('Manual installation confirmation error: {value_0}'.format(value_0=f'{error}'))
+            QMessageBox.warning(self, player_text("launcher.ui", "manual_installation_error"), self._operation_failure('install_mod', error))
+
+    def _prepare(self, *, force: bool = False) -> None:
+        if not self._room_connected:
+            self._append_log('Connect to a room before preparing its mod.')
+            return
+        if self._setup_state in {"installing", "updating"}:
+            self._append_log('Room mod setup is already active.')
+            return
+        generation = self.controller.operation_generation
+        try:
+            started = (
+                self.controller.reinstall_setup(generation=generation)
+                if force
+                else self.controller.prepare_setup(generation=generation)
+            )
+            if not started:
+                self._append_log('Setup is already active or room is unavailable.')
+                return
+            self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
+        except (OSError, RuntimeError, ValueError) as error:
+            self._append_log('Setup error: {value_0}'.format(value_0=f'{error}'))
+            self._set_setup_state(self._room_package_issue_state({"code": getattr(error, "code", None)}))
+
+    @staticmethod
+    def _room_package_issue_state(event) -> str:
+        return (
+            "package_incompatible"
+            if event.get("code")
+            in {
+                'unsupported_contract', 'unsupported_capabilities', 'unsupported_schema', 'unsupported_revision',
+                'incompatible_bridge_protocol',
+            }
+            else "package_failed"
+        )
+
+    @staticmethod
+    def _is_room_package_failure(event) -> bool:
+        return event.get("failure_domain") in {"room_package", "installed_room_package"} or event.get('recovery_action') in {"rebuild_room_package", "update_room_package"}
+
+    def _current_room_package_failure(self) -> bool:
+        if self._setup_state in {"package_failed", "package_incompatible"}:
+            return True
+        failure = self.controller.last_setup_failure
+        if isinstance(failure, dict):
+            return self._is_room_package_failure(failure)
+        return False
+
+    def _dependency_consent_details(self, event):
+        name = str(event.get("name") or player_text("launcher.app_window", "required_download"))
+        version = str(event.get("version") or player_text("launcher.app_window", "version_not_provided"))
+        purpose = str(event.get("purpose") or player_text("launcher.app_window", "finish_room_setup"))
+        source = str(
+            event.get("source")
+            or event.get("url")
+            or player_text("launcher.app_window", "download_source_not_provided")
+        )
+        details = [
+            player_text('launcher.app_window', 'tool') + f'{name} {version}',
+            player_text('launcher.app_window', 'used_for_value_0', value_0=f'{purpose}'),
+            player_text('launcher.app_window', 'download_source_value_0', value_0=f'{source}'),
+            player_text('launcher.app_window', 'the_launcher_checks_this_download_before_using_it'),
+        ]
+        return name, details
+
+    def _request_dependency_consent(self, event: dict[str, object]) -> None:
+        request_id = str(event.get("request_id", ""))
+        if not request_id or request_id in self._resolved_consent_requests:
+            self._append_log('Ignored duplicate or invalid dependency consent request.')
+            return
+        self._resolved_consent_requests.add(request_id)
+        if self._dependency_request is not None:
+            self.controller.resolve_consent(request_id, False)
+            return
+        name, details = self._dependency_consent_details(event)
+        self._set_setup_state("updating" if self._setup_state == "update_required" else "installing")
+        self._dependency_request = (request_id, name)
+        try:
+            title = player_text("launcher.ui", "download_value_0", value_0=f"{name}")
+            self.help_view.download_details.setText("\n\n".join((title, *details)))
+            self.help_view.download_prompt.show()
+            self._show_page(4)
+            self.help_view.ensureWidgetVisible(self.help_view.download_prompt)
+        except (OSError, RuntimeError, ValueError) as error:
+            self._append_log('Dependency consent dialog failed: {value_0}'.format(value_0=f'{error}'))
+            self._answer_dependency_consent(False)
+
+    def _answer_dependency_consent(self, accepted):
+        request = self._dependency_request
+        self._dependency_request = None
+        self.help_view.download_prompt.hide()
+        if request is None:
+            return
+        request_id, name = request
+        self.controller.resolve_consent(request_id, accepted)
+        if not accepted:
+            self._set_setup_state(
+                'failed',
+                player_text('launcher.ui', 'value_0_download_declined_retry_setup_when_ready', value_0=f'{name}'),
+            )
+
+    def _copy_launch_option(self) -> None:
+        value = self._play_presenter.present().launch_option
+        if value:
+            QApplication.clipboard().setText(value)
+            if QApplication.clipboard().text() != value:
+                self.copy_launch_option_button.setText(player_text("launcher.ui", "copy_failed"))
+                self._append_log('Steam launch option could not be verified on clipboard.')
+                return
+            self._append_log('Steam launch option copied.')
+            self.copy_launch_option_button.setText(player_text("launcher.ui", "copied"))
+            QTimer.singleShot(1800, lambda: self.copy_launch_option_button.setText(player_text("launcher.ui", "copy")))
+
+    def _show_setup_complete(self) -> None:
+        """Confirm a new room package install without offering game launch control."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(player_text("launcher.ui", "setup_complete"))
+        dialog.setModal(True)
+        dialog.setMinimumWidth(440)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
+        layout.addWidget(self._label(player_text("launcher.ui", "setup_complete"), "title"))
+        layout.addWidget(self._label(player_text('launcher.ui', 'play_steam_help')))
+        if os.name != "nt" and self._play_presenter.model.launch_option:
+            layout.addWidget(self._label(player_text("launcher.ui", "steam_launch_option"), "eyebrow"))
+            option = QLineEdit(self._play_presenter.model.launch_option)
+            option.setReadOnly(True)
+            layout.addWidget(option)
+            copy = QPushButton(player_text("launcher.ui", "copy_option"))
+            copy.clicked.connect(lambda: QApplication.clipboard().setText(option.text()))
+            layout.addWidget(copy, alignment=Qt.AlignmentFlag.AlignLeft)
+        close = QPushButton(player_text("launcher.ui", "close"))
+        close.setObjectName("primary")
+        close.clicked.connect(dialog.accept)
+        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
+        close.setFocus(Qt.FocusReason.OtherFocusReason)
+        dialog.exec()
+
+    def _build_setup_strip(self):
+        self.session_setup = self._card("actionStrip")
+        self.session_setup.setProperty("actionTone", "warning")
+        setup_layout = QVBoxLayout(self.session_setup)
+        setup_layout.setContentsMargins(0, 0, 0, 0)
+        setup_layout.setSpacing(12)
+        setup_copy = QHBoxLayout()
+        setup_copy.setSpacing(12)
+        self.session_setup_title = self._label(player_text('common', 'room_mod'), "stateName")
+        self.session_setup_detail = self._label(
+            player_text('launcher.ui', 'connect_to_a_room_to_check_its_mod'), 'muted',
+        )
+        setup_layout.addWidget(self.session_setup_title)
+        self.session_setup_title.hide()
+        setup_copy.addWidget(self.session_setup_detail, 1)
+        self.setup_elapsed = self._label("", "muted")
+        setup_copy.addWidget(self.setup_elapsed)
+        setup_layout.addLayout(setup_copy)
+        setup_buttons = QHBoxLayout()
+        setup_buttons.setSpacing(12)
+        self.session_manual_complete_action = QPushButton(player_text("launcher.ui", "i_completed_manual_installation"))
+        self.session_manual_complete_action.clicked.connect(self._confirm_manual_installation)
+        self.session_manual_complete_action.setVisible(False)
+        self.session_manual_retry_action = QPushButton(player_text("launcher.setup", "install_again"))
+        self.session_manual_retry_action.clicked.connect(lambda: self._prepare(force=True))
+        self.session_manual_retry_action.setVisible(False)
+        self.session_setup_action = _ScanlineButton(player_text('common', 'install_room_mod'))
+        self.session_setup_action.setObjectName("primary")
+        self.session_setup_action.clicked.connect(self._run_setup_action)
+        self.reinstall_button = self.session_setup_action
+        setup_buttons.addWidget(self.session_manual_complete_action)
+        setup_buttons.addWidget(self.session_manual_retry_action)
+        setup_buttons.addWidget(self.session_setup_action)
+        self.session_setup_help = QPushButton(player_text('common', 'check_setup'))
+        self.session_setup_help.clicked.connect(self._show_progress_help)
+        self.session_setup_help.setVisible(False)
+        setup_buttons.addWidget(self.session_setup_help)
+        self._installation_request = None
+        self.install_yes = QPushButton(player_text("launcher.setup", "confirm_yes"))
+        self.install_no = QPushButton(player_text("launcher.setup", "confirm_no"))
+        self.install_yes.clicked.connect(lambda: self._answer_installation(True))
+        self.install_no.clicked.connect(lambda: self._answer_installation(False))
+        for button in (self.install_no, self.install_yes):
+            button.hide()
+            setup_buttons.addWidget(button)
+        setup_buttons.addStretch(1)
+        setup_layout.addLayout(setup_buttons)
+
+    def _setup_presentation(self, state):
+        presentations = {
+            "disconnected": (
+                player_text('common', 'room_mod'), player_text('launcher.ui', 'connect_to_a_room_to_check_its_mod'), '',
+                False, player_text('launcher.ui', 'ready'),
+            ),
+            "checking": (
+                player_text('launcher.ui', 'checking_room_mod'),
+                player_text('launcher.ui', 'checking_the_installed_mod'), player_text('launcher.ui', 'checking_74fde8'),
+                False, player_text('common', 'connected'),
+            ),
+            "install_needed": (
+                player_text('common', 'install_room_mod'),
+                player_text('launcher.ui', 'install_this_room_s_package_before_playing'),
+                player_text('common', 'install_room_mod'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "update_required": (
+                player_text('launcher.ui', 'update_room_package'), player_text('launcher.ui', 'room_package_required'),
+                player_text('launcher.ui', 'update_room_package'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "installing": (
+                player_text('launcher.ui', 'installing_room_mod'),
+                player_text('launcher.ui', 'preparing_this_room_for_play'), player_text('launcher.ui', 'installing'),
+                False, player_text('launcher.ui', 'working'),
+            ),
+            "updating": (
+                player_text('launcher.ui', 'updating_room_mod'),
+                player_text('launcher.ui', 'preparing_this_room_for_play'),
+                player_text('launcher.ui', 'updating_00b6dd'), False, player_text('launcher.ui', 'working'),
+            ),
+            "game_link_needed": (
+                player_text('launcher.ui', 'game_integration_setup_needed'),
+                player_text('launcher.ui', 'connection_setup_help'), player_text('launcher.ui', 'prepare'), True,
+                player_text('launcher.ui', 'action_needed'),
+            ),
+            "game_link_update_needed": (
+                player_text('launcher.ui', 'game_integration_needs_repair'),
+                player_text('launcher.ui', 'game_integration_needs_repair_before_play'),
+                player_text('launcher.ui', 'repair'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "package_failed": (
+                player_text('launcher.ui', 'room_mod_could_not_be_built'),
+                player_text('launcher.ui', 'rebuild_room_help'), player_text('launcher.ui', 'rebuild_room_package'),
+                True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "package_incompatible": (
+                player_text('launcher.ui', 'room_mod_needs_rebuilding'),
+                player_text('launcher.ui', 'launcher_mismatch_help'),
+                player_text('launcher.ui', 'rebuild_room_package'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "manual_install_required": (
+                player_text('launcher.ui', 'manual_installation_required'),
+                player_text('launcher.ui', 'manual_install_needed'),
+                player_text('launcher.ui', 'open_installation_guide'), True,
+                player_text('launcher.ui', 'action_needed'),
+            ),
+            "ready": (
+                player_text("launcher.ui", "setup_ready"),
+                player_text("launcher.ui", "play_help")
+                if os.name == "nt"
+                else player_text("launcher.ui", "steam_launch_help"),
+                player_text("launcher.ui", "open_session"),
+                True,
+                player_text("launcher.ui", "ready"),
+            ),
+            "failed": (
+                player_text('launcher.ui', 'game_setup_failed'), player_text('launcher.ui', 'setup_incomplete_help'),
+                player_text('launcher.ui', 'fix_setup'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "campaign_failed": (
+                player_text('launcher.ui', 'save_setup_failed'), player_text('launcher.ui', 'inspect_backups_help'),
+                player_text('launcher.ui', 'ap_save_bbd136'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+            "proton_needed": (
+                player_text('launcher.ui', 'select_proton'), player_text('launcher.ui', 'proton_selection_help'),
+                player_text('launcher.ui', 'select_proton'), True, player_text('launcher.ui', 'action_needed'),
+            ),
+        }
+        return presentations[state]
+
+    def _room_update_state(self, event, state, reason, readiness, readiness_reason):
+        drift = state == "update_required"
+        self.drift.setText(
+            player_text("launcher.ui", "room_update")
+            + player_text("launcher.app_window", "this_room_needs_its_matching_mod")
+        )
+        self.drift.setVisible(drift)
+        setup_copy = (
+            player_text("launcher.ui", "room_update_required")
+            if event.get("reason_code") == "room_changed"
+            else player_text("launcher.ui", "this_room_s_installed_mod_needs_an_update")
+        )
+        if readiness == "blocked":
+            self._set_setup_state(self._room_package_issue_state(event))
+        else:
+            self._set_setup_state(
+                "update_required" if state == "update_required" else "install_needed",
+                setup_copy
+                if state == "update_required"
+                else player_text("launcher.ui", "install_this_room_s_package_before_playing"),
+            )
+
+    def _installed_room_state(self, event):
+        readiness = str(event.get("readiness", "ready"))
+        readiness_reason = str(event.get("readiness_reason", ""))
+        self._clear_drift()
+        self.help_view.uninstall_button.setEnabled(self._room_connected)
+        if readiness == "blocked":
+            self._native_health_presentation = None
+            self._show_page(2)
+            if event.get("failure_domain") in {"campaign_session", "proton_runtime"}:
+                self._set_setup_state("failed", str(event.get("user_message") or readiness_reason))
+            else:
+                target_state = (
+                    "game_link_update_needed" if event["meathook_status"] == "incompatible" else "game_link_needed"
+                )
+                self._set_setup_state(target_state, player_text('launcher.ui', 'repair_connection_help'))
+        else:
+            self._native_health_presentation = None
+            self._show_page(2)
+            self._set_setup_state("ready")
+
+    def _show_setup_failure(self, event, message):
+        operation = {"campaign_session": "saves", "room_package": "install_mod",
+                     "installed_room_package": "install_mod"}.get(event.get("failure_domain"), "repair")
+        message = self._operation_failure(operation, event)
+        self._reconnecting = False
+        self._connection_pending = False
+        self._set_connection_controls(True)
+        self._set_connection_badge(player_text("launcher.ui", "failed"), False)
+        title = player_text("launcher.ui", "game_setup_failed")
+        self._set_home(title, message, player_text("launcher.ui", "retry_join"), title)
+        self.join_error.setText(message)
+        self.join_error.show()
+        attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
+        if attempt_id not in self._shown_connection_error_attempts:
+            self._shown_connection_error_attempts.add(attempt_id)
+            QMessageBox.warning(self, title, message)
 
     def _show_connection_failure(self, event: dict[str, object]) -> None:
         attempt_id = int(event.get("attempt_id") or self.controller.connection_attempt_id)
@@ -3057,10 +2932,8 @@ class LauncherUI(QMainWindow):
         )
         self.join_error.show()
         self._set_home(
-            title.upper(),
-            '{value_0} {value_1}'.format(value_0=f'{message}', value_1=f'{action}'),
-            player_text("launcher.ui", "retry_join"),
-            player_text("launcher.ui", "connection_failed"),
+            title.upper(), '{value_0} {value_1}'.format(value_0=f'{message}', value_1=f'{action}'),
+            player_text('launcher.ui', 'retry_join'), player_text('launcher.ui', 'connection_failed'),
         )
         self._show_page(1)
         if attempt_id not in self._shown_connection_error_attempts:
@@ -3072,39 +2945,6 @@ class LauncherUI(QMainWindow):
         self._append_log(f"{operation}: {technical}")
         return failure_text(operation, error)
 
-    def _append_log(self, text: str) -> None:
-        sanitized = redact_secrets(text).replace("\r", " ").strip()
-        if not sanitized:
-            return
-        if hasattr(self, "help_view"):
-            self.help_view.log.appendPlainText(sanitized)
-        if hasattr(self, "session_log") and self.session_log is not None:
-            self.session_log.appendPlainText(sanitized)
-
-    def _append_session_event(self, event: dict[str, object]) -> None:
-        kind = str(event.get("type", "event"))
-        if "heartbeat" in kind.casefold() or kind == "log":
-            return
-        if kind == "integration_status":
-            semantic = (
-                *(event.get(key) for key in ("meathook_ok", "meathook_status", "native_state", "reason")),
-                event.get("session", {}).get("state"),
-            )
-            if semantic == getattr(self, "_last_integration_status", None):
-                return
-            self._last_integration_status = semantic
-        details = []
-        for key in ("endpoint", "slot", "seed_name", "state", "code", "reason", "message"):
-            value = event.get(key)
-            if value not in (None, ""):
-                details.append(f"{key}={value}")
-        self._append_log(f"{datetime.now().strftime("%H:%M:%S")} {kind}: {' | '.join(details) or 'received'}")
-
-    def _load_icon(self) -> None:
-        icon = self.controller.bundle_dir / "assets/launcher/EternalAP.ico"
-        if icon.is_file():
-            self.setWindowIcon(QIcon(str(icon)))
-
     def _show_manual_installation(self, event) -> None:
         message = str(event.get("message", player_text("launcher.setup", "action_confirm_install")))
         self._set_setup_state("manual_install_required", message)
@@ -3115,56 +2955,3 @@ class LauncherUI(QMainWindow):
             for button in (self.hero_action, self.session_setup_action, self.reinstall_button):
                 button.setText(action)
         self._append_log(message)
-
-    def closeEvent(self, event) -> None:
-        if not self.controller.workflow.session_owner.can_close():
-            QMessageBox.information(
-                self,
-                player_text("launcher.ui", "game_still_running"),
-                player_text("launcher.ui", "close_doom_eternal_before_closing_this_launcher"),
-            )
-            event.ignore()
-            return
-        try:
-            if self.controller.close() is False:
-                self._close_requested = True
-                self.centralWidget().setEnabled(False)
-                self._render_setup_progress()
-                QTimer.singleShot(100, self._finish_close)
-                event.ignore()
-                return
-        except RuntimeError as error:
-            QMessageBox.information(self, player_text("launcher.ui", "game_still_running"), str(error))
-            event.ignore()
-            return
-        self.timer.stop()
-        self.lifecycle_timer.stop()
-        event.accept()
-
-    def _finish_close(self) -> None:
-        if self.controller.workers.active:
-            QTimer.singleShot(100, self._finish_close)
-        else:
-            self.close()
-
-    def run(self) -> None:
-        self.show()
-        if os.name == "nt" and getattr(sys, "frozen", False):
-            import ctypes
-
-            kernel = ctypes.windll.kernel32
-            user = ctypes.windll.user32
-            kernel.GetModuleHandleW.argtypes = [ctypes.c_wchar_p]
-            kernel.GetModuleHandleW.restype = ctypes.c_void_p
-            user.LoadIconW.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-            user.LoadIconW.restype = ctypes.c_void_p
-            user.SendMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
-            user.SendMessageW.restype = ctypes.c_ssize_t
-            icon = user.LoadIconW(kernel.GetModuleHandleW(None), 1)
-            if icon:
-                for size in (0, 1):
-                    user.SendMessageW(int(self.winId()), 0x80, size, icon)
-        app = QApplication.instance()
-        if app is None:
-            raise RuntimeError('LauncherUI requires QApplication')
-        app.exec()

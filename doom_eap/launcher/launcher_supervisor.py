@@ -14,11 +14,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, ClassVar
 
+from doom_eap.launcher.launcher_platform import redact_secrets
 from doom_eap.launcher.ui.strings import text as player_text
 
 from .events import EventOrigin, LauncherEvent, adapt_event
 from .items_reader import LedgerReadAdapter as LedgerReadAdapter
-from .launcher_platform import redact_secrets
 
 EVENT_PREFIX = "AP_EVENT "
 
@@ -127,7 +127,7 @@ class BridgeSupervisor:
                 env=environment,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
             )
-        except Exception:
+        except (OSError, ValueError, RuntimeError):
             with self._profiles_lock:
                 self._profiles.discard(self.profile_id)
             self.state = BridgeState.FAILED
@@ -160,7 +160,7 @@ class BridgeSupervisor:
                     if not isinstance(event, dict) or not isinstance(event.get("type"), str):
                         raise ValueError('Room connection stopped. Retry, then select Help -> SAVE SUPPORT REPORT.')
                     self._accept_event(event)
-                except Exception as error:
+                except (OSError, ValueError, RuntimeError) as error:
                     self.last_error = {
                         "code": "invalid_bridge_event",
                         "message": self._redact(str(error)),

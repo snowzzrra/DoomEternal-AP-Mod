@@ -6,14 +6,17 @@ import csv
 import os
 import shutil
 import signal
+import subprocess
+import zipfile
 from collections.abc import Callable, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from doom_eap.launcher import launcher_injector
+from doom_eap.launcher import launcher_platform as platform
 from doom_eap.launcher.ui.strings import text as player_text
 
-from . import launcher_platform as platform
 from .ui.strings import text
 
 
@@ -28,7 +31,7 @@ def injector_state(evidence):
     try:
         if injector_processes(evidence):
             return InjectorState.RUNNING
-    except (OSError, platform.subprocess.SubprocessError, KeyError, ValueError):
+    except (OSError, subprocess.SubprocessError, KeyError, ValueError):
         return InjectorState.UNKNOWN
     result = evidence.get("injector_outcome", {}).get("adapter", {})
     if result.get("returncode") is None or result.get("details", {}).get("recovery_required"):
@@ -58,7 +61,7 @@ def injector_processes(evidence, *, process_list=None):
     if process_list is None:
         process_list = _read_processes()
     tool = Path(evidence.get("tool", {}).get("path", "")).name.casefold()
-    names = {Path(name).name.casefold() for name in platform.WINDOWS_INJECTOR_REQUIRED_MEMBERS}
+    names = {Path(name).name.casefold() for name in launcher_injector.WINDOWS_INJECTOR_REQUIRED_MEMBERS}
     names.update({tool, "injectorshell", "eternalmodinjector", "eternalmodinjector.exe"})
     names.update(Path(name).stem for name in tuple(names))
     parents = {str(evidence.get("injector_pid", ""))}
@@ -90,13 +93,13 @@ def _read_processes():
         )
     else:
         command = ("ps", "-eo", "pid=,ppid=,pgid=,comm=")
-    completed = platform.subprocess.run(
+    completed = subprocess.run(
         command,
         capture_output=True,
         text=True,
         timeout=10,
         check=True,
-        creationflags=getattr(platform.subprocess, 'CREATE_NO_WINDOW', 0),
+        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
     )
     if not completed.stdout.strip():
         raise ValueError('empty injector process inspection')
@@ -115,10 +118,10 @@ def _process_row(line):
 
 def recover_external_execution(journal):
     require_injector_stopped(journal)
-    if (journal.root / platform.INJECTOR_HOLD).exists():
-        record = platform._read_injector_hold(journal.root)
-        platform.InjectorResourceHold(journal.root, record).finish_injector()
-        platform.recover_injector_resources(journal.root)
+    if (journal.root / launcher_injector.INJECTOR_HOLD).exists():
+        record = launcher_injector._read_injector_hold(journal.root)
+        launcher_injector.InjectorResourceHold(journal.root, record).finish_injector()
+        launcher_injector.recover_injector_resources(journal.root)
     record_injector_settings(journal)
 
 
@@ -131,7 +134,7 @@ def check_injector_processes(evidence):
 
     try:
         running = injector_processes(evidence)
-    except (OSError, platform.subprocess.SubprocessError, KeyError, ValueError) as error:
+    except (OSError, subprocess.SubprocessError, KeyError, ValueError) as error:
         raise InstallationRecoveryRequired('injector process inspection failed: {value_0}'.format(value_0=f'{error}')) from error
     if running:
         raise InstallationRecoveryRequired('injector or a child process is still running')
@@ -142,7 +145,7 @@ class WindowsModInjectorAdapter:
 
     def __init__(
         self,
-        dependency: platform.InstalledDependency,
+        dependency: launcher_injector.InstalledDependency,
         *,
         state_dir: Path | None = None,
         opener: Callable[[Sequence[str], Path], Any] | None = None,
@@ -156,13 +159,13 @@ class WindowsModInjectorAdapter:
         self.event_sink = event_sink
 
     @staticmethod
-    def _default_opener(command: Sequence[str], cwd: Path) -> platform.subprocess.Popen:
-        flags = getattr(platform.subprocess, 'CREATE_NEW_CONSOLE', 0)
-        return platform.subprocess.Popen(command, cwd=cwd, creationflags=flags)
+    def _default_opener(command: Sequence[str], cwd: Path) -> subprocess.Popen:
+        flags = getattr(subprocess, 'CREATE_NEW_CONSOLE', 0)
+        return subprocess.Popen(command, cwd=cwd, creationflags=flags)
 
     def _run_process(
-        self, game_root: Path, command: tuple[str, ...], staged_mod: str, hold: platform.InjectorResourceHold
-    ) -> platform.AdapterResult:
+        self, game_root: Path, command: tuple[str, ...], staged_mod: str, hold: launcher_injector.InjectorResourceHold
+    ) -> launcher_injector.AdapterResult:
         if self.event_sink is not None:
             self.event_sink(
                 "injector_started",
@@ -178,9 +181,9 @@ class WindowsModInjectorAdapter:
             if self.journal is not None:
                 self.journal.document["evidence"]["injector_pid"] = getattr(process, "pid", None)
                 self.journal.save()
-        except Exception as error:
-            return platform._installation_failure(
-                platform.AdapterResult(state="failed", message="", command=command), error, "injector", self.event_sink
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+            return launcher_injector._installation_failure(
+                launcher_injector.AdapterResult(state="failed", message="", command=command), error, "injector", self.event_sink
             )
 
         try:
@@ -189,15 +192,15 @@ class WindowsModInjectorAdapter:
             returncode = getattr(process, "returncode", 0)
             check_injector_processes(evidence)
             hold.finish_injector()
-        except Exception as error:
-            return platform._installation_failure(
-                platform.AdapterResult(state="failed", message="", command=command), error, "injector", self.event_sink
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+            return launcher_injector._installation_failure(
+                launcher_injector.AdapterResult(state="failed", message="", command=command), error, "injector", self.event_sink
             )
 
         if self.event_sink is not None:
             self.event_sink("injector_closed", command=list(command), returncode=returncode)
 
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             state="applied" if returncode == 0 else "failed",
             message=(
                 'Installation finished.'
@@ -209,24 +212,24 @@ class WindowsModInjectorAdapter:
         )
 
     def _run_prepared_process(self, game_root, command, staged_mod):
-        result = platform.AdapterResult(state="failed", message="", command=command)
+        result = launcher_injector.AdapterResult(state="failed", message="", command=command)
         try:
-            with platform.prepare_injector_resources(game_root, self.event_sink) as hold:
+            with launcher_injector.prepare_injector_resources(game_root, self.event_sink) as hold:
                 result = self._run_process(game_root, command, staged_mod, hold)
             return result
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
             error.details = {
                 **result.details,
                 **getattr(error, "details", {}),
                 "original_verification_error": result.details.get("verification_error"),
             }
-            return platform._installation_failure(result, error, 'prepare banks', self.event_sink)
+            return launcher_injector._installation_failure(result, error, 'prepare banks', self.event_sink)
 
     def prepare(self, game_root: Path, *, journal=None) -> Path:
         platform.require_doom_closed(player_text('launcher.installation_adapters', 'preparing_eternalmodinjector'))
-        platform.recover_injector_resources(game_root)
-        platform.recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
-        return platform.stage_windows_injector_toolchain(
+        launcher_injector.recover_injector_resources(game_root)
+        launcher_injector.recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
+        return launcher_injector.stage_windows_injector_toolchain(
             self.dependency, game_root, state_dir=self.state_dir, journal=journal
         )
 
@@ -239,8 +242,8 @@ class WindowsModInjectorAdapter:
         uninstall_confirmation: Callable[[], bool] | None = None,
         prepared: Path | None = None,
         journal=None,
-    ) -> platform.AdapterResult:
-        with platform.installation_write(game_root, journal):
+    ) -> launcher_injector.AdapterResult:
+        with launcher_injector.installation_write(game_root, journal):
             return self._run(
                 game_root,
                 staged_mod=staged_mod,
@@ -259,14 +262,14 @@ class WindowsModInjectorAdapter:
         uninstall_confirmation: Callable[[], bool] | None = None,
         prepared: Path | None = None,
         journal=None,
-    ) -> platform.AdapterResult:
+    ) -> launcher_injector.AdapterResult:
         self.journal = journal
         platform.require_doom_closed(player_text('launcher.installation_adapters', 'running_eternalmodinjector'))
         try:
             batch_executable = prepared or self.prepare(game_root, journal=journal)
-        except Exception as error:
-            return platform._installation_failure(
-                platform.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+            return launcher_injector._installation_failure(
+                launcher_injector.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
             )
 
         comspec = os.environ.get("COMSPEC", "cmd.exe")
@@ -286,7 +289,7 @@ class WindowsModInjectorAdapter:
         confirmation_error = ""
         try:
             confirmed = uninstall_confirmation is not None and bool(uninstall_confirmation())
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
             confirmation_error = str(error)
         if self.event_sink is not None:
             self.event_sink(
@@ -303,7 +306,7 @@ class WindowsModInjectorAdapter:
         if confirmation_error:
             details["post_run_error"] = confirmation_error
         if not confirmed:
-            return platform.AdapterResult(
+            return launcher_injector.AdapterResult(
                 state="failed",
                 message=(
                     'Removal could not be confirmed. Select Help -> SAVE SUPPORT REPORT.'
@@ -315,7 +318,7 @@ class WindowsModInjectorAdapter:
                 returncode=result.returncode,
                 details=details,
             )
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             state=result.state,
             message='Removal finished.',
             command=result.command,
@@ -325,17 +328,17 @@ class WindowsModInjectorAdapter:
             details=details,
         )
 
-    def activate(self, game_root: Path, mod_zip: Path) -> platform.AdapterResult:
-        with platform.installation_write(game_root):
+    def activate(self, game_root: Path, mod_zip: Path) -> launcher_injector.AdapterResult:
+        with launcher_injector.installation_write(game_root):
             return self._activate(game_root, mod_zip)
 
-    def _activate(self, game_root: Path, mod_zip: Path) -> platform.AdapterResult:
-        staged = platform._stage_mod(mod_zip, game_root)
+    def _activate(self, game_root: Path, mod_zip: Path) -> launcher_injector.AdapterResult:
+        staged = launcher_injector._stage_mod(mod_zip, game_root)
         result = self.run(game_root, staged_mod=staged.name)
         if result.state != "applied":
-            return platform.AdapterResult(
+            return launcher_injector.AdapterResult(
                 state="manual_install_required",
-                message=player_text('launcher.installation_adapters', 'value_0_follow_manual_installation_steps_in_install_md', value_0=f'{result.message}'),
+                message=player_text('launcher.installation_adapters', 'manual_install_help', value_0=f'{result.message}'),
                 command=result.command,
                 returncode=result.returncode,
                 details={
@@ -348,14 +351,14 @@ class WindowsModInjectorAdapter:
         confirmed = self.confirmer()
         if confirmed:
             result.details["installation_mode"] = "windows_injector_assisted"
-            return platform.finalize_mod_installation(game_root, staged, result, event_sink=self.event_sink)
+            return launcher_injector.finalize_mod_installation(game_root, staged, result, event_sink=self.event_sink)
 
         if self.event_sink is not None:
             self.event_sink("installation_declined", command=list(result.command))
 
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             state="manual_install_required",
-            message=player_text('launcher.installation_adapters', 'installation_was_not_confirmed_follow_windows_manual_installatio'),
+            message=player_text('launcher.installation_adapters', 'installation_unconfirmed'),
             command=result.command,
             returncode=1,
             details={
@@ -395,7 +398,7 @@ class LinuxModManagerAdapter:
 
     def __init__(
         self,
-        dependency: platform.InstalledDependency,
+        dependency: launcher_injector.InstalledDependency,
         *,
         state_dir: Path | None = None,
         event_sink: Callable[..., None] | None = None,
@@ -409,8 +412,8 @@ class LinuxModManagerAdapter:
         executable = Path(self.dependency.executable)
         relative_executable = executable.relative_to(source_root)
         members = tuple(source.relative_to(source_root) for source in sorted(source_root.rglob("*"))
-                        if source.is_file() and source.name != platform.DependencyManager.RECEIPT)
-        platform.check_existing_injector_tools(source_root, game_root, members)
+                        if source.is_file() and source.name != launcher_injector.DependencyManager.RECEIPT)
+        launcher_injector.check_existing_injector_tools(source_root, game_root, members)
         for relative in members:
             source = source_root / relative
             destination = game_root / relative
@@ -430,7 +433,7 @@ class LinuxModManagerAdapter:
         """Configure InjectorShell for explicit launcher-controlled startup."""
         config = game_root / 'EternalModInjector Settings.txt'
         if not config.is_file():
-            platform._write_installer_settings(
+            launcher_injector._write_installer_settings(
                 config,
                 "\n".join(
                     (
@@ -472,27 +475,27 @@ class LinuxModManagerAdapter:
         if not has_auto_launch:
             new_lines.append(':AUTO_LAUNCH_GAME=0')
 
-        platform._write_installer_settings(config, "\n".join(new_lines) + "\n", journal=journal)
+        launcher_injector._write_installer_settings(config, "\n".join(new_lines) + "\n", journal=journal)
 
     def prepare(self, game_root: Path, *, journal=None) -> Path:
         platform.require_doom_closed(player_text('launcher.installation_adapters', 'preparing_injectorshell'))
-        platform.recover_injector_resources(game_root)
-        platform.recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
+        launcher_injector.recover_injector_resources(game_root)
+        launcher_injector.recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         executable = self._prepare_tools(game_root, journal=journal)
         self._configure_first_run(game_root, journal=journal)
         return executable
 
-    def run(self, game_root: Path, *, prepared: Path | None = None, journal=None) -> platform.AdapterResult:
-        with platform.installation_write(game_root, journal):
+    def run(self, game_root: Path, *, prepared: Path | None = None, journal=None) -> launcher_injector.AdapterResult:
+        with launcher_injector.installation_write(game_root, journal):
             return self._run(game_root, prepared=prepared, journal=journal)
 
-    def _run(self, game_root: Path, *, prepared: Path | None = None, journal=None) -> platform.AdapterResult:
+    def _run(self, game_root: Path, *, prepared: Path | None = None, journal=None) -> launcher_injector.AdapterResult:
         platform.require_doom_closed(player_text('launcher.installation_adapters', 'running_injectorshell'))
         try:
             executable = prepared or self.prepare(game_root, journal=journal)
-        except Exception as error:
-            return platform._installation_failure(
-                platform.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+            return launcher_injector._installation_failure(
+                launcher_injector.AdapterResult(state="failed", message=""), error, 'prepare banks', self.event_sink
             )
         environment = os.environ.copy()
         stripped_loader_environment = [
@@ -505,15 +508,15 @@ class LinuxModManagerAdapter:
 
     def _run_command(self, game_root, command, environment, stripped_loader_environment, journal):
         try:
-            with platform.prepare_injector_resources(game_root, self.event_sink) as hold:
+            with launcher_injector.prepare_injector_resources(game_root, self.event_sink) as hold:
                 hold.start_injector()
                 completed = self._execute_process(game_root, command, environment, journal)
                 hold.finish_injector()
-        except platform.subprocess.TimeoutExpired as error:
+        except subprocess.TimeoutExpired as error:
             return self._timeout_result(game_root, command, error, stripped_loader_environment)
-        except Exception as error:
-            return platform._installation_failure(
-                platform.AdapterResult(state="failed", message="", command=command),
+        except (OSError, RuntimeError, ValueError, subprocess.SubprocessError, zipfile.BadZipFile) as error:
+            return launcher_injector._installation_failure(
+                launcher_injector.AdapterResult(state="failed", message="", command=command),
                 error,
                 'prepare banks',
                 self.event_sink,
@@ -521,16 +524,16 @@ class LinuxModManagerAdapter:
         return self._completed_result(game_root, command, completed, stripped_loader_environment)
 
     def _execute_process(self, game_root, command, environment, journal):
-        process = platform.subprocess.Popen(
+        process = subprocess.Popen(
             command,
             cwd=game_root,
             env=environment,
             text=True,
-            stdin=platform.subprocess.DEVNULL,
-            stdout=platform.subprocess.PIPE,
-            stderr=platform.subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             start_new_session=True,
-            creationflags=getattr(platform.subprocess, 'CREATE_NO_WINDOW', 0),
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
         )
         evidence = {"tool": {"path": command[0]}, "injector_pid": process.pid, "injector_group": process.pid}
         if journal is not None:
@@ -538,18 +541,18 @@ class LinuxModManagerAdapter:
             journal.save()
         try:
             stdout, stderr = process.communicate(timeout=self.TIMEOUT_SECONDS)
-        except platform.subprocess.TimeoutExpired as error:
+        except subprocess.TimeoutExpired as error:
             error.details = {"recovery_required": True, "injector_state": "unknown"}
             try:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.wait(timeout=5)
-            except (OSError, platform.subprocess.SubprocessError) as termination_error:
+            except (OSError, subprocess.SubprocessError) as termination_error:
                 error.details["termination_error"] = str(termination_error)
             raise
         finally:
             self._close_output(process)
         check_injector_processes(evidence)
-        return platform.subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
     @staticmethod
     def _close_output(process):
@@ -558,7 +561,7 @@ class LinuxModManagerAdapter:
                 stream.close()
 
     def _timeout_result(self, game_root, command, error, stripped_loader_environment):
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             state="timed_out",
             message=text("launcher.setup", "injector_timeout"),
             command=command,
@@ -580,12 +583,12 @@ class LinuxModManagerAdapter:
         if state == "applied":
             message = 'Mod installed. Start through Steam and keep the launcher open.'
         elif loader_symbol_failure:
-            message = player_text('launcher.installation_adapters', 'installation_failed_at_injector_loader_symbol_lookup_failed_sele')
+            message = player_text('launcher.installation_adapters', 'injector_loader_failure')
         elif prompt:
             message = text("launcher.setup", "injector_prompt_" + prompt)
         else:
             message = text("launcher.setup", "injector_failed_linux", code=completed.returncode)
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             state=state,
             message=message,
             command=command,
@@ -602,18 +605,18 @@ class LinuxModManagerAdapter:
             },
         )
 
-    def activate(self, game_root: Path, mod_zip: Path) -> platform.AdapterResult:
-        with platform.installation_write(game_root):
+    def activate(self, game_root: Path, mod_zip: Path) -> launcher_injector.AdapterResult:
+        with launcher_injector.installation_write(game_root):
             return self._activate(game_root, mod_zip)
 
-    def _activate(self, game_root: Path, mod_zip: Path) -> platform.AdapterResult:
-        staged = platform._stage_mod(mod_zip, game_root)
+    def _activate(self, game_root: Path, mod_zip: Path) -> launcher_injector.AdapterResult:
+        staged = launcher_injector._stage_mod(mod_zip, game_root)
         result = self.run(game_root)
         if result.state != "applied":
             return result
-        result = platform.finalize_mod_installation(game_root, staged, result, event_sink=self.event_sink)
+        result = launcher_injector.finalize_mod_installation(game_root, staged, result, event_sink=self.event_sink)
         if result.state != "applied":
             return result
-        return platform.verify_mod_installation(
+        return launcher_injector.verify_mod_installation(
             game_root, staged, result, platform_name="linux", event_sink=self.event_sink
         )

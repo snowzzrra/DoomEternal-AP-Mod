@@ -104,7 +104,7 @@ class PlayerFileView(QWidget):
         text.setSpacing(12)
         text.addWidget(self._label(player_text('common', 'create_player'), "title"))
         description = self._label(
-            player_text("launcher.ui", "choose_your_settings_and_starting_items_then_save_your_player_fi"), "muted"
+            player_text("launcher.ui", "player_file_help"), "muted"
         )
         description.setWordWrap(True)
         text.addWidget(description)
@@ -397,7 +397,7 @@ class PlayerFileView(QWidget):
         return {
             "goal": player_text("launcher.player_file", "choose_your_victory_goal"),
             "special_weapon": player_text(
-                "launcher.player_file", "choose_how_the_crucible_and_sentinel_hammer_are_randomized"
+                "launcher.player_file", "special_weapon_help"
             ),
         }.get(key, str(fallback).split("\n\n", 1)[0])
 
@@ -408,7 +408,7 @@ class PlayerFileView(QWidget):
                 "launcher.player_file", "claim_the_unmaykr_in_the_fortress_of_doom"
             ),
             ("goal", "kill_the_icon_of_sin"): player_text(
-                "launcher.player_file", "defeat_the_icon_of_sin_at_the_end_of_the_base_campaign"
+                "launcher.player_file", "goal_icon_help"
             ),
             ("goal", "kill_the_dark_lord"): player_text(
                 "launcher.player_file", "defeat_the_dark_lord_in_the_ancient_gods_part_two"
@@ -416,16 +416,16 @@ class PlayerFileView(QWidget):
             (
                 "goal",
                 "complete_the_full_saga",
-            ): player_text("launcher.player_file", "finish_every_enabled_full_saga_mission_claim_the_unmaykr_defeat"),
+            ): player_text("launcher.player_file", "goal_full_saga_help"),
             (
                 "special_weapon",
                 "progressive_special_weapon",
-            ): player_text("launcher.player_file", "crucible_sentinel_hammer_fully_upgraded_sentinel_hammer"),
+            ): player_text("launcher.player_file", "special_weapon_sequence"),
             ("special_weapon", "progressive_sentinel_hammer"): player_text(
                 "launcher.player_file", "sentinel_hammer_fully_upgraded_sentinel_hammer"
             ),
             ("special_weapon", "the_crucible"): player_text(
-                "launcher.player_file", "only_the_crucible_is_included_in_the_special_weapon_item_sequenc"
+                "launcher.player_file", "crucible_only_help"
             ),
         }
         return descriptions.get(
@@ -508,7 +508,7 @@ class PlayerFileView(QWidget):
         layout.addLayout(heading)
         layout.addWidget(
             self._label(
-                player_text("launcher.ui", "choose_the_items_and_quantities_saved_in_your_player_file"), "muted"
+                player_text("launcher.ui", "starting_inventory_help"), "muted"
             )
         )
         try:
@@ -712,7 +712,7 @@ class PlayerFileView(QWidget):
             known_items = {item["name"] for item in self.start_inventory_catalog}
             unknown = (set(values["start_inventory"]) | set(values["start_inventory_from_pool"])) - known_items
             if unknown:
-                raise PlayerError('launcher.player_file', 'these_starting_items_are_unavailable_remove_them_and_try_again_v', value_0=f"{', '.join(sorted(unknown))}")
+                raise PlayerError('launcher.player_file', 'invalid_starting_items', value_0=f"{', '.join(sorted(unknown))}")
         except (OSError, ValueError) as error:
             QMessageBox.critical(self, player_text("launcher.ui", "could_not_import_player_file"), self._file_failure(error))
             return
@@ -741,12 +741,12 @@ class PlayerFileView(QWidget):
                 str(self.inventory_picker.itemData(index)) for index in range(self.inventory_picker.count())
             }
             if unavailable:
-                raise PlayerError("launcher.player_file", "remove_these_unavailable_starting_items_before_saving",
+                raise PlayerError("launcher.player_file", "starting_items_unavailable",
                                   items=", ".join(sorted(unavailable)))
             saved = self.controller.save_player_options(
                 Path(filename), self.player_name.text(), self._option_values(), imported=self._imported_player
             )
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self._append_log('Player YAML save error: {value_0}'.format(value_0=f'{error}'))
             QMessageBox.critical(self, player_text("launcher.ui", "could_not_save_player_file"), self._file_failure(error))
             return

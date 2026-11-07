@@ -1,5 +1,3 @@
-"""Application state and orchestration for standalone launcher."""
-
 from __future__ import annotations
 
 import asyncio
@@ -18,40 +16,23 @@ from collections import deque
 from copy import deepcopy
 from dataclasses import asdict
 from enum import Enum
+from functools import partial
 from pathlib import Path
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
-from doom_eap.runtime.delivery_control import control_room
-from doom_eap.strings import PlayerError, load_catalog
-
-from .connection_errors import enrich_connection_failure, validate_server_address
-from .events import EventOrigin, LauncherEvent, adapt_event
-from .install_journal import InstallationRecoveryRequired
-from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
-from .launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor, write_support_bundle
-from .launcher_integration import (
-    IntegratedLaunchWorkflow,
-    IntegratedSetupRecord,
-    RoomSetupCoordinator,
-    installed_package_issue_payload,
-    setup_failure_payload,
-)
-from .launcher_interactions import LauncherInteractions
-from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
-from .launcher_platform import (
+from doom_eap.launcher.launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor
+from doom_eap.launcher.launcher_injector import client_config_write, probe_meathook, probe_runtime_prerequisites
+from doom_eap.launcher.launcher_platform import (
     ProcessInspectionError,
     SavedGamesSelection,
     SteamInstallationLocator,
     cleanup_legacy_doomeap_cfg,
     cleanup_stale_doom_config_bind,
-    client_config_write,
     detect_doom_processes,
     doom_saved_games_base,
     launch_doom_via_steam,
     launcher_user_paths,
     migrate_legacy_launcher_data,
-    probe_meathook,
-    probe_runtime_prerequisites,
     publish_file,
     read_ap_hotkey_state,
     read_handshake_probe,
@@ -61,6 +42,23 @@ from .launcher_platform import (
     validate_save_directory,
     write_ap_hotkey_states,
 )
+from doom_eap.launcher.launcher_support import write_support_bundle
+from doom_eap.runtime.delivery import control_room
+from doom_eap.strings import PlayerError, load_catalog
+
+from .connection_errors import enrich_connection_failure, validate_server_address
+from .events import EventOrigin, LauncherEvent, adapt_event
+from .install_journal import InstallationRecoveryRequired
+from .launcher_core import ROOM_SLOT_DEFAULTS, LaunchWorkflow, RoomSnapshot, release_identity
+from .launcher_integration import (
+    IntegratedLaunchWorkflow,
+    IntegratedSetupRecord,
+    RoomSetupCoordinator,
+    installed_package_issue_payload,
+    setup_failure_payload,
+)
+from .launcher_interactions import LauncherInteractions
+from .launcher_native_health import NativeHealthReader, doom_base_dir_from_config
 from .launcher_repairs import apply_repair, install_game_link
 from .launcher_reporting import (
     ScopedSupportReport,
@@ -75,28 +73,24 @@ from .launcher_workers import LauncherWorkCancelled, LauncherWorkers
 from .setup_progress import SetupStep
 from .ui.strings import text as player_text
 
-logger = logging.getLogger(__name__)
 
+class LauncherState(str, Enum):
+    IDLE = 'IDLE'
+    CONNECTING = player_text('launcher.ui', 'connecting')
+    CONNECTED = player_text('common', 'connected')
+    FAILED = player_text('launcher.ui', 'failed')
+    DISCONNECTING = 'DISCONNECTING'
+
+
+logger = logging.getLogger(__name__)
 AMMO_REFILL_KEYBIND_CONFIG = "ammo_refill_keybind"
 DEFAULT_AMMO_REFILL_KEYBIND = "F9"
+
 AMMO_REFILL_SUPPORTED_KEY_TOKENS = frozenset(
     {
-        *(f"F{number}" for number in range(1, 13)),
-        *(chr(code) for code in range(ord("A"), ord("Z") + 1)),
-        *(str(number) for number in range(10)),
-        "Space",
-        "Tab",
-        "Backspace",
-        "Insert",
-        "Delete",
-        "Home",
-        "End",
-        "PageUp",
-        "PageDown",
-        "Up",
-        "Down",
-        "Left",
-        "Right",
+        *(f'F{number}' for number in range(1, 13)), *(chr(code) for code in range(ord('A'), ord('Z') + 1)),
+        *(str(number) for number in range(10)), 'Space', 'Tab', 'Backspace', 'Insert', 'Delete', 'Home', 'End',
+        'PageUp', 'PageDown', 'Up', 'Down', 'Left', 'Right',
     }
 )
 
@@ -131,12 +125,13 @@ def bundle_directory() -> Path:
     return application_directory()
 
 
-class LauncherState(str, Enum):
-    IDLE = 'IDLE'
-    CONNECTING = player_text('launcher.ui', 'connecting')
-    CONNECTED = player_text('common', 'connected')
-    FAILED = player_text('launcher.ui', 'failed')
-    DISCONNECTING = 'DISCONNECTING'
+def client_directory(application_dir: Path) -> Path:
+    client = application_dir / "client"
+    if client.is_dir():
+        return client
+    if not getattr(sys, "frozen", False) and (application_dir / "data/options_schema.json").is_file():
+        return application_dir
+    raise PlayerError("launcher.controller", "client_folder_missing")
 
 
 class LauncherController:
@@ -145,8 +140,7 @@ class LauncherController:
     def __init__(self, application_dir: Path | None = None):
         self.application_dir = (application_dir or application_directory()).resolve()
         self.bundle_dir = bundle_directory()
-        packaged_client = self.application_dir / "client"
-        self.client_dir = packaged_client if packaged_client.is_dir() else self.application_dir
+        self.client_dir = client_directory(self.application_dir)
         self.user_paths = launcher_user_paths()
         migrate_legacy_launcher_data(self.application_dir / "launcher-data", self.user_paths)
         self.state_dir = self.user_paths.state_dir
@@ -170,9 +164,7 @@ class LauncherController:
                 configured = read_ap_hotkey_state(doom_base_dir_from_config(self.config), special=special)
             self.config[key] = normalize_ammo_refill_keybind(default if configured is None else configured)
         self._persist_config()
-        self.options_schema = load_options_schema(
-            self.client_dir / "data" / "options_schema.json"
-        )
+        self.options_schema = load_options_schema(self.client_dir / 'data' / 'options_schema.json')
         self.state = LauncherState.IDLE
         self.connected_room = False
         self.item_history_status: dict[str, object] | None = None
@@ -182,6 +174,9 @@ class LauncherController:
         self._condump_pending = None
         self._pending_connect: dict[str, str] | None = None
         self.last_setup: IntegratedSetupRecord | None = None
+        self._last_integration_diagnostic = None
+        self._last_ap_session_status = None
+        self.last_operation_failure = None
         self.last_setup_failure: dict[str, object] | None = None
         self.last_connection_error: dict[str, object] | None = None
         self.connection_attempt_id = 0
@@ -191,32 +186,21 @@ class LauncherController:
         self.workers = LauncherWorkers(self._job_failed)
         self.interactions = LauncherInteractions(lambda kind, payload: self.emit(kind, **payload))
         self.workflow = IntegratedLaunchWorkflow(
-            self.client_dir,
-            self.state_dir,
-            self.config_path,
-            data_dir=self.user_paths.data_dir,
-            event_sink=self._setup_event,
-            consent=self._request_consent,
+            self.client_dir, self.state_dir, self.config_path, data_dir=self.user_paths.data_dir,
+            event_sink=self._setup_event, consent=self._request_consent,
             confirmation=self._request_installation_confirmation,
             uninstall_confirmation=self._request_uninstall_confirmation,
             stop_native_client=self._stop_native_client_for_installation,
         )
         self.setup = RoomSetupCoordinator(
-            self.workflow,
-            self._setup_event,
-            self._setup_result,
-            self.workers,
-            self.interactions,
+            self.workflow, self._setup_event, self._setup_result, self.workers, self.interactions,
         )
         self._native_health_reader: NativeHealthReader | None = None
         self._last_native_health: dict[str, object] | None = None
         self._native_client_process: subprocess.Popen | None = None
         self._native_helper_startup: dict[str, object] = {
-            "process_start_status": "not_attempted",
-            "winerror": None,
-            "normalized_category": None,
-            "disappeared_after_validation": False,
-            "latest_startup_error": None,
+            'process_start_status': 'not_attempted', 'winerror': None, 'normalized_category': None,
+            'disappeared_after_validation': False, 'latest_startup_error': None,
         }
         self._last_game_running: bool = False
         self._game_lifecycle_sample: bool | None = None
@@ -247,214 +231,6 @@ class LauncherController:
         self.config.update(last_delivery_room=asdict(self.items_room), recent_rooms=recent[:8])
         self._persist_config()
 
-    def _native_start_failure(
-        self,
-        *,
-        reason: str,
-        technical_message: str,
-        executable_path: Path,
-        exit_code: int | None = None,
-    ) -> None:
-        if reason == "native_helper_missing":
-            message = (
-                'A required DoomEAP file is missing. Check Windows Security -> Protection history, then reinstall DoomEAP from its official download. If it happens again, select Help -> SAVE SUPPORT REPORT.'
-            )
-        elif reason == "native_helper_application_control_blocked":
-            message = (
-                'Windows blocked DoomEAP from starting its game connection. Select Help -> SAVE SUPPORT REPORT and ask your device administrator or DoomEAP support for help.'
-            )
-        elif reason == "native_helper_removed_after_validation":
-            message = (
-                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
-            )
-        elif reason == "native_helper_access_denied":
-            message = (
-                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
-            )
-        elif reason == "immediate_exit":
-            message = (
-                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
-            )
-        else:
-            message = (
-                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
-            )
-        detail = (
-            'Game integration helper startup failed: reason={value_0} path={value_1} detail={value_2}'.format(value_0=f'{reason}', value_1=f'{executable_path}', value_2=f'{technical_message}')
-        )
-        if exit_code is not None:
-            detail += f" exit_code={exit_code}"
-        self._record_diagnostic(detail)
-        self.emit(
-            "native_client_start_failed",
-            title=player_text('launcher.controller', 'game_connection_could_not_start'),
-            message=message,
-            reason=reason,
-            executable_path=str(executable_path),
-            technical_message=technical_message,
-            exit_code=exit_code,
-        )
-
-    @staticmethod
-    def _classify_native_start_error(error: Exception, *, helper_exists: bool) -> tuple[str, bool]:
-        winerror = getattr(error, "winerror", None)
-        disappeared = (isinstance(error, FileNotFoundError) or winerror in {2, 3}) and not helper_exists
-        if winerror == 4556:
-            return "native_helper_application_control_blocked", False
-        if disappeared:
-            return "native_helper_removed_after_validation", True
-        if isinstance(error, PermissionError) or winerror == 5:
-            return "native_helper_access_denied", False
-        return "native_helper_process_creation_failed", False
-
-    def _native_client_running(self) -> bool:
-        with self._lifecycle_lock:
-            if self._native_client_process is None:
-                return False
-            poll = self._native_client_process.poll()
-            if poll is not None:
-                exit_code = poll
-                self._native_client_process = None
-                self.emit("native_client_exited", returncode=exit_code)
-                return False
-            return True
-
-    def _ensure_native_client(self, *, platform: str | None = None, generation: int | None = None) -> bool:
-        target_platform = platform if platform is not None else os.name
-        if target_platform != "nt":
-            return False
-        with self._lifecycle_lock:
-            if generation is not None and not self.workers.accepts(generation):
-                return False
-            if not self.connected_room:
-                return False
-            if self._native_client_process is not None:
-                if self._native_client_process.poll() is None:
-                    return True
-                exit_code = self._native_client_process.poll()
-                self._native_client_process = None
-                self.emit("native_client_exited", returncode=exit_code)
-
-            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
-            if not game_root:
-                return False
-            try:
-                root = validate_game_root(Path(str(game_root)))
-            except Exception:
-                return False
-
-            client_exe = self.client_dir / "ap_client.exe"
-            if not client_exe.is_file():
-                self._native_helper_startup.update({
-                    "expected_path": str(client_exe), "present": False, "sha256": None,
-                    "process_start_status": "failed", "winerror": None,
-                    "normalized_category": "native_helper_missing",
-                    "disappeared_after_validation": False,
-                    "latest_startup_error": 'expected helper is missing; it may have been quarantined',
-                })
-                self._native_start_failure(
-                    reason="native_helper_missing",
-                    technical_message='file not found: {value_0}; it may have been quarantined'.format(value_0=f'{client_exe}'),
-                    executable_path=client_exe,
-                )
-                return False
-
-            try:
-                helper_sha256 = hashlib.sha256(client_exe.read_bytes()).hexdigest()
-            except OSError:
-                helper_sha256 = None
-            self._native_helper_startup.update({
-                "expected_path": str(client_exe), "present": True, "sha256": helper_sha256,
-                "process_start_status": "validated", "winerror": None,
-                "normalized_category": None, "disappeared_after_validation": False,
-                "latest_startup_error": None,
-            })
-
-            meathook = probe_meathook(root)
-            if not meathook.ok:
-                return False
-
-            LaunchWorkflow.write_client_config(
-            self.client_dir,
-            runtime_config=self.config,
-        )
-            command = [str(client_exe), str(root)]
-            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
-            try:
-                self._native_client_process = subprocess.Popen(
-                    command,
-                    cwd=str(root),
-                    creationflags=creationflags,
-                )
-                time.sleep(0.15)
-                exit_code = self._native_client_process.poll()
-                if exit_code is not None:
-                    health = self.read_native_health(force=True)
-                    self._native_client_process = None
-                    if health.get("native_state") in {"starting", "ready", "unavailable"}:
-                        self.emit(
-                            "native_client_already_running",
-                            pid=health.get("pid"),
-                            native_state=health.get("native_state"),
-                        )
-                        return True
-                    self._native_helper_startup.update({
-                        "process_start_status": "failed", "normalized_category": "immediate_exit",
-                        "latest_startup_error": 'process exited before publishing current native health',
-                    })
-                    self._native_start_failure(
-                        reason="immediate_exit",
-                        technical_message='process exited before publishing current native health',
-                        executable_path=client_exe,
-                        exit_code=exit_code,
-                    )
-                    return False
-                self.emit("native_client_started", path=str(client_exe), game_root=str(root))
-                self._native_helper_startup["process_start_status"] = "started"
-                return True
-            except Exception as error:
-                self._native_client_process = None
-                winerror = getattr(error, "winerror", None)
-                category, disappeared = self._classify_native_start_error(
-                    error, helper_exists=client_exe.is_file()
-                )
-                technical_message = (
-                    f"{type(error).__name__}: {error}"
-                    + (f" (winerror={winerror})" if winerror is not None else "")
-                ).replace("\r", " ").replace("\n", " ")[:512]
-                self._native_helper_startup.update({
-                    "present": client_exe.is_file(), "process_start_status": "failed",
-                    "winerror": winerror, "normalized_category": category,
-                    "disappeared_after_validation": disappeared,
-                    "latest_startup_error": technical_message,
-                })
-                self._native_start_failure(
-                    reason=category,
-                    technical_message=technical_message,
-                    executable_path=client_exe,
-                )
-                return False
-
-    def _stop_native_client_for_installation(self) -> None:
-        if self.game_running_or_unknown():
-            return
-        stopped = self._stop_native_client()
-        if os.name != "nt":
-            stopped = self.workflow.session_owner.retire() or stopped
-        if stopped:
-            self.emit("native_client_stopped_for_install")
-
-    def _stop_native_client(self) -> bool:
-        from .launcher_session import stop_native_client
-
-        if hasattr(self, "workflow") and not self.workflow.session_owner.can_close():
-            return False
-        with self._lifecycle_lock:
-            stopped = stop_native_client(self._native_client_process)
-            self._native_client_process = None
-        if stopped:
-            self.emit("native_client_stopped")
-        return stopped
 
     def _load_config(self) -> dict[str, object]:
         if self.config_path.is_file():
@@ -470,10 +246,7 @@ class LauncherController:
     def _persist_config(self) -> None:
         self.config.pop("password", None)
         temporary = self.config_path.with_suffix(".tmp")
-        temporary.write_text(
-            json.dumps(self.config, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        temporary.write_text(json.dumps(self.config, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         publish_file(temporary, self.config_path, operation="launcher_config_publish")
 
     def ensure_ammo_refill_keybind(self, *, force_check: bool = False) -> Path | None:
@@ -502,20 +275,16 @@ class LauncherController:
             raise ValueError('Choose different keys for Ammo Refill and Special Weapon.')
         state_file = write_ap_hotkey_states(base_dir, normalized_keybind, special)
         logger.info(
-            "AMMO_HOTKEY_CONFIG path=%s token=%s state=%s",
-            state_file,
-            normalized_keybind or 'UNBOUND',
-            "loaded" if normalized_keybind else "disabled",
+            'AMMO_HOTKEY_CONFIG path=%s token=%s state=%s', state_file, normalized_keybind or 'UNBOUND',
+            'loaded' if normalized_keybind else 'disabled',
         )
         self._record_diagnostic(
             'AMMO_HOTKEY_CONFIG path={value_0} token={value_1} state={value_2}'.format(value_0=f'{state_file}', value_1=f"{normalized_keybind or 'UNBOUND'}", value_2=f"{('loaded' if normalized_keybind else 'disabled')}")
         )
 
         self.emit(
-            "ammo_refill_keybind_status",
-            state="configured" if normalized_keybind else "unbound",
-            configured_key=normalized_keybind,
-            path=str(state_file) if state_file else None,
+            'ammo_refill_keybind_status', state='configured' if normalized_keybind else 'unbound',
+            configured_key=normalized_keybind, path=str(state_file) if state_file else None,
         )
         return state_file
 
@@ -532,17 +301,7 @@ class LauncherController:
         """Ensure launcher-managed Ammo Refill configuration."""
         return self.ensure_ammo_refill_keybind()
 
-    def save_config(self, updates: dict[str, object]) -> None:
-        proton_changed = any(key in updates and updates[key] != self.config.get(key)
-            for key in ("proton_executable", "proton_compat_data_dir"))
-        if proton_changed and self.is_game_running():
-            raise RuntimeError('Close DOOM Eternal before changing Proton.')
-        self.config.update(updates)
-        self._persist_config()
-        LaunchWorkflow.write_client_config(
-            self.client_dir,
-            runtime_config=self.config,
-        )
+    def _proton_config_changed(self, proton_changed):
         if proton_changed and self.supervisor is not None and self.supervisor.running:
             try:
                 self.supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
@@ -550,6 +309,16 @@ class LauncherController:
                 self.emit("core_runtime_rebind_pending", message=str(error))
         if proton_changed and self.connected_room and self.setup.current_event:
             self._queue_room_readiness(self.setup.current_event)
+
+    def save_config(self, updates: dict[str, object]) -> None:
+        proton_changed = any(key in updates and updates[key] != self.config.get(key)
+            for key in ("proton_executable", "proton_compat_data_dir"))
+        if proton_changed and self.is_game_running():
+            raise RuntimeError('Close DOOM Eternal before changing Proton.')
+        self.config.update(updates)
+        self._persist_config()
+        LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+        self._proton_config_changed(proton_changed)
         self.emit("configuration_saved", keys=tuple(updates))
 
     def set_launcher_language(self, code: str) -> None:
@@ -563,6 +332,24 @@ class LauncherController:
             self.config.clear()
             self.config.update(previous)
             raise
+
+    def _save_game_root(self, game_root):
+        root_value = game_root
+        if root_value is None:
+            for key in ("game_root", "doom_base_dir"):
+                candidate = self.config.get(key)
+                if candidate and str(candidate):
+                    root_value = candidate
+                    break
+        root_path: Path | None = None
+        if root_value is not None:
+            try:
+                root_path = Path(str(root_value)).expanduser()
+                if root_path.name.casefold() == "base":
+                    root_path = root_path.parent
+            except (OSError, TypeError, ValueError, RuntimeError):
+                root_path = None
+        return root_path
 
     def resolve_saved_games_dir(
         self,
@@ -580,21 +367,7 @@ class LauncherController:
         candidate, otherwise selection fails closed.
         """
         value = configured if configured is not None else self.config.get("save_games_dir")
-        root_value = game_root
-        if root_value is None:
-            for key in ("game_root", "doom_base_dir"):
-                candidate = self.config.get(key)
-                if candidate and str(candidate):
-                    root_value = candidate
-                    break
-        root_path: Path | None = None
-        if root_value is not None:
-            try:
-                root_path = Path(str(root_value)).expanduser()
-                if root_path.name.casefold() == "base":
-                    root_path = root_path.parent
-            except (OSError, TypeError, ValueError, RuntimeError):
-                root_path = None
+        root_path = self._save_game_root(game_root)
         known = Path(str(known_base)).expanduser() if known_base is not None else None
         if known is None:
             try:
@@ -603,13 +376,27 @@ class LauncherController:
                 known = None
         client_dir = self.client_dir if self.client_dir != self.application_dir else None
         return select_saved_games_dir(
-            str(value) if value is not None and str(value) else None,
-            known_base=known,
-            app_dir=self.application_dir,
-            client_dir=client_dir,
-            game_root=root_path,
-            game_running=self.game_running_or_unknown(),
+            str(value) if value is not None and str(value) else None, known_base=known, app_dir=self.application_dir,
+            client_dir=client_dir, game_root=root_path, game_running=self.game_running_or_unknown(),
         )
+
+    def _discover_steam_remote(self, found):
+        remote_candidates: list[Path] = []
+        for root in SteamInstallationLocator.default_roots():
+            userdata = root / "userdata"
+            if not userdata.is_dir():
+                continue
+            remote_candidates.extend(
+                candidate
+                for candidate in userdata.glob("*/782330/remote")
+                if candidate.is_dir()
+            )
+        unique_remote = sorted({candidate.resolve() for candidate in remote_candidates})
+        if len(unique_remote) == 1:
+            found["steam_remote_dir"] = str(unique_remote[0])
+            found["steam_id3"] = LaunchWorkflow._steam_id3(found["steam_remote_dir"])
+        elif len(unique_remote) > 1:
+            found["ambiguous_steam_remote_dirs"] = [str(path) for path in unique_remote]
 
     def discover(self) -> dict[str, object]:
         found: dict[str, object] = {"platform": "windows" if os.name == "nt" else "linux"}
@@ -629,41 +416,18 @@ class LauncherController:
             found["save_games_dir"] = str(selection.path)
         if selection.repaired and selection.path is not None:
             found["save_games_repair"] = {
-                "previous_path": selection.previous_path,
-                "selected_path": str(selection.path),
-                "source": selection.source,
-                "reason": selection.reason,
+                'previous_path': selection.previous_path, 'selected_path': str(selection.path),
+                'source': selection.source, 'reason': selection.reason,
             }
             self.emit(
-                'SAVED_GAMES_PATH_REPAIRED',
-                previous_path=selection.previous_path,
-                selected_path=str(selection.path),
-                source=selection.source,
-                reason=selection.reason,
+                'SAVED_GAMES_PATH_REPAIRED', previous_path=selection.previous_path, selected_path=str(selection.path),
+                source=selection.source, reason=selection.reason,
             )
 
-        remote_candidates: list[Path] = []
-        for root in SteamInstallationLocator.default_roots():
-            userdata = root / "userdata"
-            if not userdata.is_dir():
-                continue
-            remote_candidates.extend(
-                candidate
-                for candidate in userdata.glob("*/782330/remote")
-                if candidate.is_dir()
-            )
-        unique_remote = sorted({candidate.resolve() for candidate in remote_candidates})
-        if len(unique_remote) == 1:
-            found["steam_remote_dir"] = str(unique_remote[0])
-            found["steam_id3"] = LaunchWorkflow._steam_id3(found["steam_remote_dir"])
-        elif len(unique_remote) > 1:
-            found["ambiguous_steam_remote_dirs"] = [str(path) for path in unique_remote]
+        self._discover_steam_remote(found)
         self.config = {**self.config, **found}
         self._persist_config()
-        LaunchWorkflow.write_client_config(
-            self.client_dir,
-            runtime_config=self.config,
-        )
+        LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
         self.emit("discovery_changed", attempt_id=None, launcher_job_generation=None, setup_progress_room=None, **found)
         return found
 
@@ -680,6 +444,20 @@ class LauncherController:
     def is_game_running(self) -> bool:
         return any(str(item.get("name", "")).casefold() in {"doometernalx64vk", "doometernalx64vk.exe"} for item in self.game_processes())
 
+    def _prepare_launch_session(self, job, configuration, snapshot):
+        root = validate_game_root(Path(str(configuration.get("game_root") or configuration.get("doom_base_dir"))))
+        prerequisites = probe_runtime_prerequisites(root, self.client_dir, configuration)
+        if not prerequisites.ok:
+            raise RuntimeError('Cannot play: ' + "; ".join(check.message for check in prerequisites.checks if not check.ok))
+        workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
+        installed = workflow.install_state(snapshot)
+        if installed.state != "already_installed":
+            raise RuntimeError('Prepare the room package before playing')
+        workflow.ensure_game_link(root)
+        configuration.update(workflow._config())
+        status = workflow.session_owner.prepare(snapshot, configuration)
+        return status
+
     def launch_game(self, *, platform: str | None = None) -> str:
         """Prepare process-session admission on the shared worker before opening Steam."""
         event = self.setup.current_event
@@ -691,17 +469,7 @@ class LauncherController:
 
         def operation(job):
             job.check()
-            root = validate_game_root(Path(str(configuration.get("game_root") or configuration.get("doom_base_dir"))))
-            prerequisites = probe_runtime_prerequisites(root, self.client_dir, configuration)
-            if not prerequisites.ok:
-                raise RuntimeError('Cannot play: ' + "; ".join(check.message for check in prerequisites.checks if not check.ok))
-            workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
-            installed = workflow.install_state(snapshot)
-            if installed.state != "already_installed":
-                raise RuntimeError('Prepare the room package before playing')
-            workflow.ensure_game_link(root)
-            configuration.update(workflow._config())
-            status = workflow.session_owner.prepare(snapshot, configuration)
+            status = self._prepare_launch_session(job, configuration, snapshot)
             job.check()
             if status["state"] in {"admitted", "awaiting_admission", "recovering", "awaiting_resume"}:
                 self.emit("ap_session_status", **status)
@@ -718,762 +486,6 @@ class LauncherController:
             raise RuntimeError('A game launch is already being prepared')
         return "queued"
 
-
-
-
-    def probe_handshake(self) -> dict[str, object]:
-        base = self.config.get("doom_base_dir")
-        if not base:
-            result = {"status": "unavailable", "reason": 'DOOM Eternal base directory is not configured'}
-        else:
-            result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
-        self.emit("handshake_probe", **result)
-        return dict(result)
-
-    def read_native_health(self, *, force: bool = False) -> dict[str, object]:
-        """Return normalized native AP health without emitting launcher activity."""
-        base = doom_base_dir_from_config(self.config)
-        if base is None:
-            result = {
-                "state": "not_ready",
-                "ready": False,
-                "degraded": False,
-                "reason": "base_directory_unconfigured",
-            }
-            return result
-        path = base / "ap_rpc_health.state"
-        if self._native_health_reader is None or self._native_health_reader.path != path:
-            self._native_health_reader = NativeHealthReader(path)
-        result = self._native_health_reader.read(force=force).document()
-        session = dict(self.workflow.session_owner.status)
-        result["session"] = session
-        if result.get("ready") and not session.get("ready"):
-            result.update(state="not_ready", ready=False, reason=session["state"])
-        if result.get("native_state") is not None:
-            self._last_native_health = dict(result)
-        return result
-
-    def native_health(self, *, force: bool = False) -> dict[str, object]:
-        return self.read_native_health(force=force)
-
-    def _live_support_diagnostics(self) -> dict[str, object]:
-        """Expose live ownership/process facts without bridge credentials."""
-        supervisor = self.supervisor
-        if supervisor is None:
-            supervisor_details: dict[str, object] = {
-                "status": "unavailable",
-                "running": False,
-                "reason": "supervisor_not_created",
-            }
-        else:
-            supervisor_details = {
-                "status": supervisor.state.value.lower(),
-                "running": supervisor.running,
-                "last_error": dict(supervisor.last_error) if supervisor.last_error else None,
-            }
-        direct = self.read_native_health(force=True)
-        expected_native_path = None
-        base = doom_base_dir_from_config(self.config)
-        if base is not None:
-            expected_native_path = str(base / "ap_rpc_health.state")
-        last_known = self._last_native_health
-        if (
-            last_known is not None
-            and (
-                expected_native_path is None
-                or str(last_known.get("path", "")) != expected_native_path
-            )
-        ):
-            last_known = None
-        if direct.get("native_state") is not None:
-            native = {
-                "source": "direct",
-                "evidence": "direct",
-                "health": direct,
-                "direct": direct,
-            }
-        elif last_known is not None:
-            native = {
-                "source": "last_known",
-                "evidence": "last_known",
-                "health": dict(last_known),
-                "direct": direct,
-            }
-        else:
-            native = {
-                "source": "unknown",
-                "evidence": "unavailable",
-                "health": direct,
-                "direct": direct,
-            }
-        return {
-            "supervisor": supervisor_details,
-            "last_operation_failure": getattr(self, "last_operation_failure", None),
-            "delivery_ledger": {"path": str(self.items_reader.path), "exists": self.items_reader.path.is_file(),
-                                "room": asdict(self.items_room) if self.items_room else None, **self.items_diagnostics},
-            "native_rpc": native,
-            "ap_session": dict(self.workflow.session_owner.status),
-            "native_diagnostics": self._native_diagnostics(),
-            "native_helper_startup": dict(self._native_helper_startup),
-            "config_paths": {
-                "application_dir": str(self.application_dir),
-                "client_dir": str(self.client_dir),
-                "config_file": str(self.config_path),
-                "state_dir": str(self.state_dir),
-            },
-        }
-
-    def _native_diagnostics(self) -> dict:
-        from .sentinel_diagnostics import collect
-        session = dict(self.workflow.session_owner.status)
-        if not session.get("pid") and os.name == "nt":
-            from doom_eap.runtime.observer_lifecycle import windows_game_processes
-            processes = windows_game_processes()
-            root = self.config.get("game_root") or self.config.get("doom_base_dir")
-            if root and processes and len(processes) == 1:
-                game = Path(str(root)).resolve()
-                if game.name.casefold() == "base":
-                    game = game.parent
-                if os.path.normcase(processes[0]["path"]) == os.path.normcase(str(game / "DOOMEternalx64vk.exe")):
-                    session.update(pid=processes[0]["pid"], process_created=processes[0]["created"])
-        return collect(self.config, session)
-
-    def run_doctor(self, *, job=None) -> DoctorReport:
-        if job is not None:
-            job.check()
-        report = LauncherDoctor(
-            config={
-                **self.config,
-                "application_dir": str(self.application_dir),
-                "client_dir": str(self.client_dir),
-            },
-            paths=self.user_paths,
-            config_path=self.config_path,
-            last_setup_failure=self.last_setup_failure,
-            last_room_package_issue=self.last_room_package_issue,
-            live_support=self._live_support_diagnostics(),
-        ).run()
-        if job is None:
-            self.emit("doctor_report", report=report.document())
-        else:
-            self._setup_event("doctor_report", job.event({"report": report.document()}))
-        return report
-
-    def request_doctor(self, *, preview: bool = False) -> bool:
-        with self._lifecycle_lock:
-            generation = self.workers.generation
-            config = deepcopy(self.config)
-            failure = deepcopy(self.last_setup_failure)
-            issue = deepcopy(self.last_room_package_issue)
-
-        def operation(job):
-            try:
-                doctor = LauncherDoctor(
-                    config={**config, "application_dir": str(self.application_dir), "client_dir": str(self.client_dir)},
-                    paths=self.user_paths, config_path=self.config_path,
-                    last_setup_failure=failure, last_room_package_issue=issue,
-                    live_support=None if preview else self._live_support_diagnostics(),
-                )
-                if preview:
-                    payload = {"actions": tuple(asdict(action) for action in doctor.repair_preview())}
-                else:
-                    payload = {"report": doctor.run().document()}
-                self._setup_event("repair_preview_result" if preview else "doctor_report", job.event(payload))
-            except LauncherWorkCancelled:
-                raise
-            except Exception as error:
-                self._setup_event("doctor_failed", job.event({"message": str(error), "preview": preview}))
-
-        return self.workers.submit(("doctor", preview), operation, generation=generation)
-
-    def _queue_repair_setup(self, job) -> bool:
-        return self.setup.start(force=True, generation=job.generation)
-
-    @property
-    def operation_generation(self) -> int:
-        return self.workers.generation
-
-    def request_repair(self, action_key: str, *, integration_only: bool = False, generation: int | None = None) -> bool:
-        with self._lifecycle_lock:
-            generation = self.workers.generation if generation is None else generation
-            if not self.workers.accepts(generation):
-                return False
-            last_failure = deepcopy(self.last_setup_failure)
-            last_issue = deepcopy(self.last_room_package_issue)
-            repair_event = self.setup.current_event if self.connected_room else None
-
-        def operation(job):
-            try:
-                if integration_only or action_key in {
-                    "install_game_link", "repair_game_link", "rebuild_room_package",
-                    "update_room_package", "reinstall_room_mod",
-                }:
-                    with self._lifecycle_lock:
-                        job.check()
-                        self.ensure_ammo_refill_config()
-                workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
-                config = workflow._config()
-
-                def emit(kind, **payload):
-                    self._setup_event(kind, job.event(payload))
-
-                if action_key in {"repair_core", "repair_session", "rollback_core"}:
-                    root = workflow._game_root(config)
-                    if workflow.session_owner.game_processes(config) != ():
-                        raise RuntimeError('Close DOOM Eternal before repairing save setup or restoring a previous version.')
-                    if action_key == "rollback_core":
-                        from .launcher_core_install import rollback_core
-                        self.save_config({"core_auto_update": False})
-                        workflow.session_owner.retire()
-                        self._stop_native_client()
-                        rollback_core(root, self.state_dir)
-                        self.save_config({"core_auto_update": False, "core_runtime_manifest": None, "selected_core_runtime_manifest": None})
-                        workflow.core_runtime.checked = False
-                        message = 'Previous game connection version restored. Automatic updates are off. Reconnect to the same room.'
-                    elif action_key == "repair_core":
-                        workflow.session_owner.retire()
-                        self._stop_native_client()
-                        message = workflow.ensure_game_link(root, force_repair=True).message
-                    else:
-                        if not repair_event:
-                            raise RuntimeError('Connect to the same room before repairing its session')
-                        workflow.ensure_game_link(root)
-                        message = 'Save setup repaired. Saves, received items, and spending records were kept.'
-                    if action_key != "rollback_core" and repair_event:
-                        job.check()
-                        config.update(workflow._config())
-                        status = workflow.session_owner.prepare(RoomSnapshot.from_event(repair_event), config, recover_prelaunch=True)
-                        job.check()
-                        with self._lifecycle_lock:
-                            job.check()
-                            self.last_setup_failure = None
-                        emit("ap_session_status", **status)
-                elif integration_only:
-                    result = install_game_link(config, workflow, emit, force_repair=True)
-                    message = result.message
-                else:
-                    doctor = LauncherDoctor(
-                        config=config, paths=self.user_paths, config_path=self.config_path,
-                        last_setup_failure=last_failure, last_room_package_issue=last_issue,
-                    )
-                    message = apply_repair(
-                        action_key, doctor=doctor, config=config, workflow=workflow, emit=emit,
-                        start_room_setup=lambda: self._queue_repair_setup(job),
-                    )
-                emit("integration_repair_result" if integration_only else "ui_repair_result",
-                     message=str(message), success=True)
-            except LauncherWorkCancelled:
-                raise
-            except Exception as error:
-                self._setup_event(
-                    "integration_repair_result" if integration_only else "ui_repair_result",
-                    job.event({"message": 'Repair error: {value_0}'.format(value_0=f'{error}'), "success": False}),
-                )
-
-        return self.workers.submit(("repair", action_key), operation, generation=generation)
-
-    def request_support_bundle(self, destination: Path, *, logs: list[str]) -> bool:
-        generation = self.workers.generation
-        logs = list(logs)
-        requested = time.monotonic()
-
-        def operation(job):
-            try:
-                self._setup_event("support_bundle_started", job.event({"queue_wait_ms": round((time.monotonic() - requested) * 1000)}))
-                self.create_support_bundle(destination, logs=logs, job=job)
-            except LauncherWorkCancelled:
-                raise
-            except Exception as error:
-                self._setup_event("support_bundle_failed", job.event({"message": str(error)}))
-
-        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation, serialized=False)
-
-    def request_problem_report(self, *, logs: list[str]) -> bool:
-        generation = self.workers.generation
-        logs = list(logs)
-
-        def operation(job):
-            result = report_problem(ScopedSupportReport(self.create_support_bundle, job), logs=logs, job=job,
-                                    draft_path=self.user_paths.data_dir / "reports" / "draft.json")
-            self._setup_event("problem_report_ready", job.event({
-                "message": result.message, "path": str(result.path) if result.path else None,
-                "payload": result.payload, "submitted": result.submitted, "url": result.url,
-            }))
-
-        return self.workers.submit("problem_report", operation, generation=generation)
-
-    def save_problem_report(self, payload):
-        save_report_draft(self.user_paths.data_dir / "reports" / "draft.json", payload)
-
-    def start_new_problem_report(self, *, logs):
-        draft = self.user_paths.data_dir / "reports" / "draft.json"
-        saved = json.loads(draft.read_text(encoding="utf-8"))
-        if not saved.get("url"):
-            raise ValueError('Retry the saved report before starting a new one. Its submitted text cannot be changed.')
-        archived = draft.with_name(str(uuid.UUID(saved["payload"]["idempotency_key"])) + ".json")
-        publish_file(draft, archived, operation="report_archive_publish")
-        return self.request_problem_report(logs=logs)
-
-    def request_report_submission(self, payload: dict) -> bool:
-        endpoint = submission_endpoint(self.client_dir)
-        if endpoint is None:
-            raise RuntimeError('Sending reports is unavailable. Open Report a Problem in Help to save a copy.')
-        payload = deepcopy(payload)
-        report_body(payload)
-        def operation(job):
-            job.check()
-            draft = self.user_paths.data_dir / "reports" / "draft.json"
-            save_report_draft(draft, payload, submitted=True)
-            try:
-                url = submit_report(endpoint, payload)
-            except Exception as error:
-                self._setup_event("problem_report_retry", job.event({"message": str(error)}))
-                return
-            save_report_draft(draft, payload, submitted=True, url=url)
-            self._setup_event("problem_report_submitted", job.event({"url": url}))
-        return self.workers.submit(("report_submission", payload["idempotency_key"]), operation)
-
-    def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None, job=None) -> Path:
-        """Collect a support bundle without requiring a healthy game install.
-
-        Condump capture and doctor inspection are both best-effort: either may
-        degrade to an unavailable marker while the bundle still records logs,
-        configuration evidence, and the last setup failure.
-        """
-        started = time.monotonic()
-        timings = {}
-        try:
-            support_condump: dict[str, object] | None = (
-                self._request_support_condump() if job is None else self._request_support_condump(job=job)
-            )
-        except LauncherWorkCancelled:
-            raise
-        except Exception as error:
-            support_condump = {
-                "status": "unavailable",
-                "reason": f"{type(error).__name__}: {error}",
-            }
-        timings["condump_ms"] = round((time.monotonic() - started) * 1000)
-        stage = time.monotonic()
-        try:
-            report = self.run_doctor() if job is None else self.run_doctor(job=job)
-        except LauncherWorkCancelled:
-            raise
-        except Exception as error:
-            report = DoctorReport(
-                LauncherDoctor.VERSION,
-                (Diagnostic(
-                    "support",
-                    "attention",
-                    'doctor inspection is unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
-                ),),
-                "needs_attention",
-                "",
-                "",
-                'Support bundle collected without a doctor report: {value_0}'.format(value_0=f'{error}'),
-                {},
-            )
-        timings["doctor_ms"] = round((time.monotonic() - stage) * 1000)
-        diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
-        with self._lifecycle_lock:
-            room = self.setup.last_event or {}
-            connected = self.connected_room
-        slot_data = room.get("slot_data")
-        slot_data = slot_data if isinstance(slot_data, dict) else {}
-        option_keys = set(ROOM_SLOT_DEFAULTS) | {
-            option["key"] for option in self.options_schema.get("options", [])
-            if isinstance(option, dict) and isinstance(option.get("key"), str)
-        }
-        support_diagnostics = {
-            **report.support_diagnostics,
-            "collection_timings": timings,
-            "session": {
-                "connected": connected,
-                "identity_source": "connected" if connected else "last_known" if room else "unavailable",
-                "seed_name": room.get("seed_name"),
-                "slot": room.get("slot"),
-                "team": room.get("team"),
-                # Keep options and contract identity; omit placements/protocol history.
-                "slot_data": {
-                    key: value for key, value in slot_data.items()
-                    if key in option_keys or key in {
-                        "death_link", "death_link_mode", "slot_data_version",
-                        "slot_data_schema_version", "slot_data_revision", "apworld_revision", "release_version",
-                        "content_revision", "capabilities",
-                    }
-                },
-            },
-        }
-        try:
-            support_diagnostics["campaign_inspection"] = self.workflow.session_owner.inspect_campaign(
-                RoomSnapshot.from_event(room), dict(self.config)) if room else {"status": "room_unavailable"}
-        except (OSError, RuntimeError, ValueError, KeyError) as error:
-            support_diagnostics["campaign_inspection"] = {"status": "unavailable", "reason": str(error)}
-        try:
-            support_diagnostics["release"] = release_identity()
-        except Exception:
-            support_diagnostics["release"] = {"status": "unavailable"}
-        if job is not None:
-            job.check()
-        stage = time.monotonic()
-        bundle = write_support_bundle(
-                destination,
-                report,
-                logs=diagnostic_logs,
-                config=self.config,
-                paths=self.user_paths,
-                application_dir=self.client_dir,
-                session_start=self.session_start_time,
-                last_setup_failure=self.last_setup_failure,
-                last_connection_error=self.last_connection_error,
-                support_condump=support_condump,
-                support_diagnostics=support_diagnostics,
-                archive_directory=self.user_paths.data_dir / "support-bundles",
-                injector_output=getattr(self, "_injector_output", None),
-        )
-        timing = {"archive_ms": round((time.monotonic() - stage) * 1000),
-                  "total_ms": round((time.monotonic() - started) * 1000), **timings}
-        if support_condump and support_condump.get("owned_capture"):
-            capture = Path(str(support_condump["path"]))
-            if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
-                capture.unlink(missing_ok=True)
-        self._setup_event("support_bundle_timing", job.event(timing) if job is not None else timing)
-        if job is None:
-            self.emit("support_bundle_ready", path=str(bundle))
-        else:
-            self._setup_event("support_bundle_ready", job.event({"path": str(bundle)}))
-        return bundle
-
-    def _request_support_condump(self, *, job=None) -> dict[str, object]:
-        """Attempt one diagnostic condump, recording closed-game availability."""
-        if job is None:
-            return self._capture_support_condump()
-        job.check()
-        result = self.workers.try_serialized(lambda: self._capture_support_condump(job=job))
-        return result if result is not None else {
-            'status': 'unavailable', 'reason': 'launcher_busy', 'requested_at': time.time()}
-
-    def _capture_support_condump(self, *, job=None) -> dict[str, object]:
-        if job is not None:
-            job.check()
-        requested_at = time.time()
-        supervisor = self.supervisor
-        supervisor_available = supervisor is not None and supervisor.running
-        native_health = self.read_native_health(force=True)
-        native_stopped = native_health.get("native_state") == "stopped"
-        if native_stopped:
-            return {
-                "status": "unavailable",
-                "reason": "game_closed",
-                "message": 'diagnostic condump unavailable: game not running',
-                "requested_at": requested_at,
-            }
-        # use fresh native readiness on proton; diagnostics don't need to wait for the host process-name check
-        game_running = bool(native_health.get("ready")) if supervisor_available else self.game_running_or_unknown()
-        if not game_running:
-            return {
-                "status": "unavailable",
-                "reason": "game_closed",
-                "message": 'diagnostic condump unavailable: game not running',
-                "requested_at": requested_at,
-            }
-        if not supervisor_available:
-            return {
-                "status": "unavailable",
-                "reason": "bridge_worker_unavailable",
-                "requested_at": requested_at,
-            }
-        assert supervisor is not None
-        save_value = self.config.get("save_games_dir")
-        if not save_value:
-            return {
-                "status": "unavailable",
-                "reason": "saved_games_path_unconfigured",
-                "requested_at": requested_at,
-            }
-        try:
-            save_dir = Path(str(save_value)).expanduser()
-        except (OSError, TypeError, ValueError, RuntimeError) as error:
-            return {
-                "status": "unavailable",
-                "reason": "saved_games_path_invalid",
-                "message": 'Saved Games path unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
-                "requested_at": requested_at,
-            }
-        with self._condump_lock:
-            scope = self.workflow.session_owner.observe()
-            if not scope.get("ready") or not scope.get("pid") or not scope.get("process_created"):
-                return {"status":"unavailable", "reason":"qualified_process_unavailable"}
-            def process_scope(value):
-                admission = value.get("admission", {})
-                return (value.get("pid"), value.get("process_created"),
-                        admission.get("namespace_id"), admission.get("build_id"), admission.get("instance_id"))
-
-            identity = process_scope(scope)
-            def sources():
-                return [path for path in save_dir.glob("AP_SUPPORT_FILE*.txt")
-                        if re.fullmatch(r"AP_SUPPORT_FILE(?:_[0-9]+)*\.txt", path.name)]
-
-            pending = self._condump_pending
-            if pending is None or pending["identity"] != identity:
-                previous = {}
-                for path in sources():
-                    stat = path.stat()
-                    previous[path.name] = (stat.st_size, stat.st_mtime_ns)
-                pending = {"identity": identity, "requested_at": requested_at, "previous": previous}
-                self._condump_pending = pending
-                supervisor.request_support_condump()
-            requested_at = pending["requested_at"]
-            previous = pending["previous"]
-            deadline = time.monotonic() + 4
-            while time.monotonic() < deadline:
-                if job is not None:
-                    job.check()
-                current = self.workflow.session_owner.observe()
-                if not current.get("ready") or process_scope(current) != identity:
-                    return {"status":"unavailable", "reason":"process_scope_changed"}
-                for source in sources():
-                    try:
-                        stat = source.stat()
-                        changed = previous.get(source.name) != (stat.st_size, stat.st_mtime_ns)
-                        if not changed or stat.st_mtime < requested_at - 1:
-                            continue
-                        capture_dir = self.user_paths.data_dir / "support-captures"
-                        capture_dir.mkdir(parents=True,exist_ok=True)
-                        destination = capture_dir / (uuid.uuid4().hex + ".txt")
-                        with source.open("rb") as incoming:
-                            payload = incoming.read(16*1024*1024 + 1)
-                        after = source.stat()
-                        if (after.st_size,after.st_mtime_ns) != (stat.st_size,stat.st_mtime_ns):
-                            continue
-                        if len(payload) > 16*1024*1024:
-                            return {"status":"unavailable", "reason":"condump_too_large"}
-                        current = self.workflow.session_owner.observe()
-                        if not current.get("ready") or process_scope(current) != identity:
-                            return {"status":"unavailable", "reason":"process_scope_changed"}
-                        with destination.open("xb") as outgoing:
-                            outgoing.write(payload)
-                            outgoing.flush()
-                            os.fsync(outgoing.fileno())
-                        self._condump_pending = None
-                        return {"status":"available", "path":str(destination), "owned_capture":True,
-                            "source_filename":source.name, "source_size":len(payload),
-                            "pid":scope["pid"], "process_created":scope["process_created"],
-                            "namespace":scope.get("admission", {}).get("namespace_id"),
-                            "build_id":scope.get("admission", {}).get("build_id"),
-                            "instance_id":scope.get("admission", {}).get("instance_id"),
-                            "requested_at":requested_at, "freshness":"request_copy"}
-                    except FileNotFoundError:
-                        continue
-                time.sleep(.1)
-            return {"status":"pending", "reason":"game_diagnostic_condump_not_observed_within_timeout"}
-
-    def emit(self, kind: str, **payload: object) -> None:
-        event = {"type": kind, **payload}
-        self._queue_event(event)
-
-    def _queue_event(self, event, *, origin=EventOrigin.APPLICATION) -> None:
-        self._record_event(event)
-        room = self.setup.current_event
-        if event["type"] == "connected":
-            room = event
-        elif origin is EventOrigin.BRIDGE:
-            room = None
-        self.events.put(adapt_event(event, origin=origin, attempt=self.connection_attempt_id,
-            generation=self.workers.generation if origin is EventOrigin.APPLICATION else None,
-            room=RoomSetupCoordinator.room_key(room) if room else None))
-
-    def _record_diagnostic(self, text: object) -> None:
-        sanitized = redact_secrets(str(text)).replace("\r", " ").replace("\n", " ").strip()
-        if sanitized:
-            self.diagnostic_history.append(time.strftime("%Y-%m-%dT%H:%M:%SZ ", time.gmtime()) + sanitized[:1000])
-
-    def _record_event(self, event: dict[str, object]) -> None:
-        kind = str(event.get("type", "event"))
-        if "heartbeat" in kind.casefold():
-            return
-        fields = []
-        for key in (
-            "endpoint", "slot", "seed_name", "state", "code", "reason", "message",
-            "raw_message", "technical_message", "failure_domain", "recovery_action",
-            "category", "attempt_id", "reason_codes", "meathook_ok",
-            "meathook_status", "meathook_message", "native_state",
-        ):
-            if key in event and event[key] not in (None, ""):
-                fields.append(f"{key}={event[key]}")
-        message = f"{kind}: {' | '.join(fields) or 'received'}"
-        if kind == "integration_status":
-            if getattr(self, "_last_integration_diagnostic", None) == message:
-                return
-            self._last_integration_diagnostic = message
-        self._record_diagnostic(message)
-
-    def _worker_event(
-        self, supervisor: BridgeSupervisor, event: dict[str, object]
-    ) -> None:
-        kind = str(event.get("type", ""))
-        stop_failed_worker = False
-        pending: dict[str, str] | None = None
-        emit_event = True
-        intentional_disconnect = False
-        stop_native = False
-        with self._lifecycle_lock:
-            if supervisor is not self.supervisor:
-                return
-            if kind == "item_history_status":
-                self.item_history_status = dict(event)
-            if kind == "error" and not event.get("failure_domain"):
-                event = enrich_connection_failure(event, attempt_id=self.connection_attempt_id)
-                self.last_connection_error = dict(event)
-            if kind == "setup_failed" and not event.get("failure_domain"):
-                event = {
-                    **event,
-                    **setup_failure_payload(
-                        RuntimeError(str(event.get("message", 'setup failed'))),
-                        phase="game_setup",
-                    ),
-                }
-            if kind == "setup_failed" and not event.get("attempt_id"):
-                event = {**event, "attempt_id": self.connection_attempt_id}
-            if kind in {"client_started", "connecting"}:
-                if self.state is not LauncherState.DISCONNECTING:
-                    self.state = LauncherState.CONNECTING
-            elif kind == "connected":
-                if self.state is LauncherState.DISCONNECTING:
-                    emit_event = False
-                else:
-                    self.state = LauncherState.CONNECTED
-                    self.last_setup_failure = None
-                    self.last_connection_error = None
-                    self.last_room_package_issue = None
-            elif kind in {"error", "setup_failed"}:
-                if (
-                    self.state is LauncherState.DISCONNECTING
-                    or self._pending_connect is not None
-                ):
-                    emit_event = False
-                else:
-                    self.state = LauncherState.FAILED
-                    self.connected_room = False
-                    stop_failed_worker = supervisor.running
-                stop_native = True
-            elif kind in {"client_stopping", "disconnected"}:
-                if kind == "disconnected":
-                    self.last_setup_failure = None
-                    self.last_room_package_issue = None
-                if (
-                    self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING}
-                    or self._pending_connect is not None
-                ):
-                    emit_event = False
-            elif kind == "worker_stopped":
-                self.supervisor = None
-                emit_event = False
-                stop_native = True
-                if self._pending_connect is not None:
-                    pending = self._pending_connect
-                    self._pending_connect = None
-                    self.state = LauncherState.CONNECTING
-                elif self.state is LauncherState.DISCONNECTING:
-                    self.state = LauncherState.IDLE
-                    intentional_disconnect = True
-                elif self.state is not LauncherState.FAILED:
-                    self.state = LauncherState.FAILED
-        if stop_native:
-            self._stop_native_client()
-        if emit_event:
-            self._queue_event(event, origin=EventOrigin.BRIDGE)
-        if stop_failed_worker:
-            supervisor.stop(emit_disconnected=False)
-        if intentional_disconnect:
-            self.emit("disconnected", intentional=True)
-        if pending is not None:
-            self._start_supervisor(pending)
-
-    def _worker_log(self, supervisor: BridgeSupervisor, text: str) -> None:
-        with self._lifecycle_lock:
-            if supervisor is not self.supervisor or not text:
-                return
-            self._record_diagnostic(f"worker: {text}")
-            self.events.put(adapt_event({"type": "log", "message": text, "attempt_id": self._supervisor_attempt},
-                                        origin=EventOrigin.BRIDGE))
-
-    def _job_failed(self, job, error) -> None:
-        self._setup_event("setup_failed", {
-            **setup_failure_payload(error, phase="game_setup"),
-            "launcher_job_generation": job.generation,
-        })
-
-    def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
-        runtime_changed = False
-        with self._lifecycle_lock:
-            generation = payload.get("launcher_job_generation")
-            if generation is not None and not self.workers.accepts(generation):
-                return
-            payload = self._setup_progress_context(payload)
-            if kind == "injector_started":
-                self._injector_output = None
-            elif kind == "injector_finished":
-                output = (''.join(('stdout:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stdout', '')}"), '', '\n', 'stderr:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stderr', '')}"))))
-                self._injector_output = output
-            if kind == "core_runtime_selected":
-                old = self.config.get("selected_core_runtime_manifest")
-                self.config["selected_core_runtime_manifest"] = payload["path"]
-                self._persist_config()
-                runtime_changed = old != payload["path"]
-            if (kind == "setup_ready" and payload.get("adapter_state") == "applied") or (
-                kind == "room_install_state" and payload.get("state") == "already_installed"
-                and payload.get("readiness") == "blocked"
-            ):
-                game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
-                meathook = probe_meathook(Path(str(game_root)).expanduser().resolve() if game_root else None)
-                payload = {**payload, "meathook_ok": meathook.ok, "meathook_status": meathook.status.value}
-            if kind == "setup_failed" or (kind == "room_install_state" and payload.get("readiness") == "blocked"
-                                          and payload.get("failure_domain") in {"campaign_session", "proton_runtime"}):
-                self.last_setup_failure = dict(payload)
-                if payload.get("failure_domain") in {"room_package", "installed_room_package"}:
-                    self.last_room_package_issue = dict(payload)
-            elif kind == "room_install_state" and (
-                payload.get("state") == "update_required" or payload.get("failure_domain") in {"room_package", "installed_room_package"}
-            ):
-                self.last_room_package_issue = {"type": kind, **payload}
-            elif kind == "setup_ready":
-                self.last_setup_failure = None
-                self.last_room_package_issue = None
-            elif kind in {"ap_session_status", "room_install_state"} and (payload.get("state") in {"prelaunch_ready", "admitted"} or payload.get("readiness") == "ready"):
-                if self.last_setup_failure and self.last_setup_failure.get("failure_domain") in {"campaign_session", "proton_runtime"}:
-                    self.last_setup_failure = None
-            self.emit(kind, **payload)
-        if runtime_changed:
-            LaunchWorkflow.write_client_config(
-            self.client_dir,
-            runtime_config=self.config,
-        )
-            supervisor = self.supervisor
-            if supervisor is not None and supervisor.running:
-                try:
-                    supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
-                except (OSError, RuntimeError) as error:
-                    self.emit("core_runtime_rebind_pending", message=str(error))
-            self._stop_native_client()
-
-    def _setup_progress_context(self, payload):
-        if "launcher_job_generation" not in payload:
-            return payload
-        setup = getattr(self, "setup", None)
-        room = setup.current_event if setup is not None else None
-        return {
-            "setup_progress_room": RoomSetupCoordinator.room_key(room) if room else None,
-            **payload,
-        }
-
-    def _setup_result(self, record: IntegratedSetupRecord, generation: int) -> None:
-        with self._lifecycle_lock:
-            if not self.workers.accepts(generation):
-                return
-            self.last_setup = record
-        if record.adapter_state == "applied":
-            self.ensure_ammo_refill_config()
 
     def _request_consent(self, spec) -> bool:
         return self.interactions.consent(spec)
@@ -1513,13 +525,13 @@ class LauncherController:
                                                           transaction_id=transaction_id)
             self._setup_result(record, job.generation)
             self._setup_event("setup_ready", job.event({
-                "manifest_hash": record.manifest_hash, "randomize_dash": record.randomize_dash,
-                "adapter_state": record.adapter_state, "message": record.adapter_message,
-                "steam_launch_option": record.steam_launch_option, "new_install": record.new_install,
+                'manifest_hash': record.manifest_hash, 'randomize_dash': record.randomize_dash,
+                'adapter_state': record.adapter_state, 'message': record.adapter_message,
+                'steam_launch_option': record.steam_launch_option, 'new_install': record.new_install,
             }))
 
         return self.workers.submit(
-            ("manual_confirmation", self.setup.room_key(last_event)), operation, generation=generation,
+            ('manual_confirmation', self.setup.room_key(last_event)), operation, generation=generation,
         )
 
     def _entrypoint(self) -> Path:
@@ -1535,17 +547,11 @@ class LauncherController:
         return candidate.resolve() if (candidate / "CommonClient.py").is_file() else None
 
     def _start_supervisor(self, connection: dict[str, str]) -> None:
-        profile = hashlib.sha256(
-            f"{connection['endpoint']}\0{connection['slot']}\0{self.state_dir}".encode()
-        ).hexdigest()
+        profile = hashlib.sha256(f"{connection['endpoint']}\x00{connection['slot']}\x00{self.state_dir}".encode()).hexdigest()
         supervisor = BridgeSupervisor(
-            entrypoint=self._entrypoint(),
-            application_dir=self.client_dir,
-            config_path=self.config_path,
-            profile_id=profile,
-            event_sink=lambda event: self._worker_event(supervisor, event),
-            log_sink=lambda text: self._worker_log(supervisor, text),
-            archipelago_source=self._archipelago_source(),
+            entrypoint=self._entrypoint(), application_dir=self.client_dir, config_path=self.config_path,
+            profile_id=profile, event_sink=lambda event: self._worker_event(supervisor, event),
+            log_sink=lambda text: self._worker_log(supervisor, text), archipelago_source=self._archipelago_source(),
         )
         with self._lifecycle_lock:
             self.supervisor = supervisor
@@ -1553,42 +559,18 @@ class LauncherController:
             self.state = LauncherState.CONNECTING
         try:
             supervisor.start(
-                endpoint=connection["endpoint"],
-                player=connection["slot"],
-                password=connection["password"],
+                endpoint=connection['endpoint'], player=connection['slot'], password=connection['password'],
             )
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError, KeyError) as error:
             with self._lifecycle_lock:
                 if self.supervisor is supervisor:
                     self.supervisor = None
                     self.state = LauncherState.FAILED
-            self.emit(
-                "setup_failed",
-                code="bridge_start_failed",
-                **setup_failure_payload(error, phase="game_setup"),
-            )
+            self.emit('setup_failed', code='bridge_start_failed', **setup_failure_payload(error, phase='game_setup'))
             return
         self.emit("connecting", endpoint=connection["endpoint"], slot=connection["slot"])
 
-    def connect(
-        self,
-        *,
-        endpoint: str,
-        slot: str,
-        password: str,
-        game_root: str,
-        saves_root: str,
-    ) -> None:
-        if not endpoint.strip():
-            raise ValueError('server address is required')
-        if not slot.strip():
-            raise ValueError('player name is required')
-        endpoint = validate_server_address(endpoint)
-        try:
-            game = validate_game_root(Path(game_root))
-            saves = validate_save_directory(Path(saves_root))
-        except ValueError as error:
-            raise ValueError(str(error)) from error
+    def _begin_connection(self):
         with self._lifecycle_lock:
             if "new_ap_save" in self.workers.active:
                 raise RuntimeError('Wait for the save operation to finish before reconnecting.')
@@ -1599,22 +581,25 @@ class LauncherController:
             self.connection_attempt_id += 1
             self.item_history_status = None
             self.setup.invalidate()
+
+    def connect(self, *, endpoint: str, slot: str, password: str, game_root: str, saves_root: str) -> None:
+        if not endpoint.strip():
+            raise ValueError('server address is required')
+        if not slot.strip():
+            raise ValueError('player name is required')
+        endpoint = validate_server_address(endpoint)
+        game = validate_game_root(Path(game_root))
+        saves = validate_save_directory(Path(saves_root))
+        self._begin_connection()
         self.interactions.cancel_all()
         self.save_config(
             {
-                "server_address": endpoint,
-                "slot": slot.strip(),
-                "game_root": str(game),
-                "doom_base_dir": str(game / "base"),
-                "save_games_dir": str(saves),
+                'server_address': endpoint, 'slot': slot.strip(), 'game_root': str(game),
+                'doom_base_dir': str(game / 'base'), 'save_games_dir': str(saves),
             }
         )
         self.ensure_ammo_refill_config()
-        connection = {
-            "endpoint": endpoint,
-            "slot": slot.strip(),
-            "password": password,
-        }
+        connection = {'endpoint': endpoint, 'slot': slot.strip(), 'password': password}
         stop_failed_worker: BridgeSupervisor | None = None
         with self._lifecycle_lock:
             if self.state in {LauncherState.CONNECTING, LauncherState.CONNECTED}:
@@ -1641,13 +626,13 @@ class LauncherController:
             try:
                 health = self.native_health()
                 state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
-            except Exception:
+            except (OSError, RuntimeError, ValueError, KeyError):
                 state = "not_ready"
                 health = {"reason": "health_unavailable", "session": dict(self.workflow.session_owner.status)}
             self._setup_event("integration_status", job.event({
-                "meathook_ok": meathook.ok, "meathook_status": meathook.status.value,
-                "meathook_message": meathook.message, "native_state": state,
-                "reason": health.get("reason"), "session": health.get("session", {}),
+                'meathook_ok': meathook.ok, 'meathook_status': meathook.status.value,
+                'meathook_message': meathook.message, 'native_state': state, 'reason': health.get('reason'),
+                'session': health.get('session', {}),
             }))
 
         return self.workers.submit("integration_status", operation, generation=generation)
@@ -1670,15 +655,12 @@ class LauncherController:
                 state = workflow.install_state(snapshot)
             except LauncherWorkCancelled:
                 raise
-            except Exception as error:
+            except (OSError, RuntimeError, ValueError, KeyError) as error:
                 issue = setup_failure_payload(error, phase="room_snapshot")
                 emit(
-                    "room_install_state",
-                    state="install_needed",
+                    'room_install_state', state='install_needed',
                     reason='could not verify installed room mod: {value_0}'.format(value_0=f'{error}'),
-                    readiness="blocked",
-                    readiness_reason=str(error),
-                    **issue,
+                    readiness='blocked', readiness_reason=str(error), **issue,
                 )
                 return
             if state.state == "already_installed" and state.readiness != "blocked":
@@ -1697,15 +679,10 @@ class LauncherController:
                 job.check()
                 emit("ap_session_status", **status)
             emit(
-                "room_install_state",
-                state=state.state,
-                manifest_hash=state.manifest_hash,
-                staged_mod=state.staged_mod,
-                steam_launch_option=state.steam_launch_option,
-                reason=state.reason,
-                readiness=state.readiness,
+                'room_install_state', state=state.state, manifest_hash=state.manifest_hash, staged_mod=state.staged_mod,
+                steam_launch_option=state.steam_launch_option, reason=state.reason, readiness=state.readiness,
                 readiness_reason=state.readiness_reason,
-                **(installed_package_issue_payload(state.reason) if state.state == "update_required" else {}),
+                **installed_package_issue_payload(state.reason) if state.state == 'update_required' else {},
             )
 
         return self.workers.submit(("room_readiness", self.setup.room_key(event)), operation, generation=generation)
@@ -1765,59 +742,6 @@ class LauncherController:
             raise RuntimeError('delivery connection unavailable')
         supervisor.resolve_item(request)
 
-    def poll_game_lifecycle(self) -> None:
-        """Consume cached process state and clean stale bindings on game exit."""
-        if self._game_lifecycle_thread is None:
-            self._game_lifecycle_thread = threading.Thread(
-                target=self._sample_game_lifecycle,
-                name="DoomLifecycleSampler",
-                daemon=True,
-            )
-            self._game_lifecycle_thread.start()
-        with self._game_lifecycle_sample_lock:
-            current_running = self._game_lifecycle_sample
-        if current_running is None:
-            return
-        if self._last_game_running and not current_running:
-            cleanup_stale_doom_config_bind(self.config, is_game_running=False)
-        self._last_game_running = current_running
-
-    def _sample_game_lifecycle(self) -> None:
-        """Run the slow Windows process enumeration away from the Qt thread."""
-        while not self._game_lifecycle_stop.is_set():
-            if os.name == "nt":
-                from doom_eap.runtime.observer_lifecycle import windows_game_processes
-                processes = windows_game_processes()
-                current_running = None if processes is None else bool(processes)
-                status = self.workflow.session_owner.observe(processes)
-            else:
-                try:
-                    current_running = self.is_game_running()
-                except ProcessInspectionError:
-                    current_running = None
-                status = self.workflow.session_owner.observe()
-            self._observe_game_lifecycle(current_running, status)
-            with self._game_lifecycle_sample_lock:
-                self._game_lifecycle_sample = current_running
-            self._game_lifecycle_stop.wait(1.0)
-
-    def _observe_game_lifecycle(self, current_running, status):
-        if current_running:
-            self._ensure_native_client()
-        semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
-                    status.get("process_created"),
-                    status.get("admission", {}).get("instance_id"), status.get("ready"),
-                    status.get("recovery_state"), status.get("resume_verified"), status.get("recovery_reason"))
-        if semantic != getattr(self, "_last_ap_session_status", None):
-            self._last_ap_session_status = semantic
-            self.emit("process_state_changed", running=current_running)
-            self.emit("ap_session_status", **status)
-            if status.get("state") == "game_exited" and current_running is False:
-                self._stop_native_client()
-                with self._lifecycle_lock:
-                    event = self.setup.current_event
-                    if event is not None:
-                        self._queue_room_readiness(event)
 
     def set_ammo_refill_keybind(self, keybind: str) -> None:
         self.set_ap_keybinds(keybind, str(self.config.get("special_toggle_keybind", "F10")))
@@ -1868,16 +792,12 @@ class LauncherController:
             connected = self.connected_room
             supervisor = self.supervisor
         if not connected or supervisor is None or not supervisor.running:
-            self.emit(
-                "ammo_refill",
-                status="blocked",
-                message='Ammo Refill unavailable while disconnected',
-            )
+            self.emit('ammo_refill', status='blocked', message='Ammo Refill unavailable while disconnected')
             return
         control = json.dumps({"type": "ammo_refill"}, separators=(",", ":"))
         try:
             supervisor.send_command(f'AP_CONTROL {control}')
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError, KeyError) as error:
             self.emit("ammo_refill", status="error", message=str(error))
 
     def ap_backups(self) -> list[str]:
@@ -1897,7 +817,7 @@ class LauncherController:
                 if copy_files:
                     archive = job.publish(lambda: self.workflow.session_owner.backup_local_files(snapshot, configuration))
                     self.emit("ap_backup_result", **job.event({"message":
-                        player_text('launcher.controller', 'backup_saved_and_checked_value_0_loading_it_in_the_game_has_not', value_0=f'{archive}')}))
+                        player_text('launcher.controller', 'backup_verified', value_0=f'{archive}')}))
                 else:
                     inspection = self.workflow.session_owner.inspect_campaign(snapshot, configuration)
                     job.check()
@@ -1938,7 +858,7 @@ class LauncherController:
             job.check()
             if restore is not None:
                 self.workflow.session_owner.prepare(snapshot,configuration,recovery_basename=restore)
-                message=player_text('launcher.controller', 'backup_ready_to_restore_start_this_room_to_load_it_received_item')
+                message=player_text('launcher.controller', 'backup_restore_ready')
             else:
                 from .launcher_session import namespace_id
                 expected=namespace_id(snapshot.seed_name,snapshot.team,snapshot.slot,
@@ -1946,7 +866,7 @@ class LauncherController:
                 if self.workflow.session_owner.namespace != expected:
                     raise RuntimeError('The live AP session belongs to a different room')
                 result=self.workflow.session_owner.create_backup()
-                message=player_text('launcher.controller', 'backup_saved_and_checked_value_0_loading_it_in_the_game_has_not', value_0=f"{result['basename']}")
+                message=player_text('launcher.controller', 'backup_verified', value_0=f"{result['basename']}")
             job.check()
             self.emit("ap_backup_result",**job.event({"message":message}))
 
@@ -1962,7 +882,7 @@ class LauncherController:
             raise RuntimeError('bridge worker is not running')
         try:
             supervisor.request_inventory_resync(domain=domain, item_id=item_id)
-        except Exception as error:
+        except (OSError, RuntimeError, ValueError, KeyError) as error:
             message = str(error).replace("\r", " ").replace("\n", " ")[:512]
             self.emit("inventory_resync", status="error", message=message)
             raise
@@ -1999,13 +919,7 @@ class LauncherController:
         *, imported: dict[str, object] | None = None,
     ) -> Path:
         """Save future-room generation input without touching connected room state."""
-        saved = save_player_yaml(
-            destination,
-            self.options_schema,
-            player_name,
-            values,
-            imported=imported,
-        )
+        saved = save_player_yaml(destination, self.options_schema, player_name, values, imported=imported)
         self.emit("player_yaml_saved", path=str(saved))
         return saved
 
@@ -2038,9 +952,8 @@ class LauncherController:
             raise RuntimeError('connect to room before uninstalling its mod')
         if not self.setup.submit_uninstall(last_event, generation=generation):
             payload = {
-                "state": "attention",
-                "message": 'Another room setup or uninstall operation is already active.',
-                "attention": True,
+                'state': 'attention', 'message': 'Another room setup or uninstall operation is already active.',
+                'attention': True,
             }
             self.emit("uninstall_attention", **payload)
             return payload
@@ -2060,3 +973,1014 @@ class LauncherController:
         self._stop_native_client()
         self.disconnect()
         return True
+
+    def emit(self, kind: str, **payload: object) -> None:
+        event = {"type": kind, **payload}
+        self._queue_event(event)
+
+    def _queue_event(self, event, *, origin=EventOrigin.APPLICATION) -> None:
+        self._record_event(event)
+        room = self.setup.current_event
+        if event["type"] == "connected":
+            room = event
+        elif origin is EventOrigin.BRIDGE:
+            room = None
+        self.events.put(adapt_event(event, origin=origin, attempt=self.connection_attempt_id,
+            generation=self.workers.generation if origin is EventOrigin.APPLICATION else None,
+            room=RoomSetupCoordinator.room_key(room) if room else None))
+
+    def _record_diagnostic(self, text: object) -> None:
+        sanitized = redact_secrets(str(text)).replace("\r", " ").replace("\n", " ").strip()
+        if sanitized:
+            self.diagnostic_history.append(time.strftime("%Y-%m-%dT%H:%M:%SZ ", time.gmtime()) + sanitized[:1000])
+
+    def _record_event(self, event: dict[str, object]) -> None:
+        kind = str(event.get("type", "event"))
+        if "heartbeat" in kind.casefold():
+            return
+        fields = []
+        for key in (
+            'endpoint', 'slot', 'seed_name', 'state', 'code', 'reason', 'message', 'raw_message', 'technical_message',
+            'failure_domain', 'recovery_action', 'category', 'attempt_id', 'reason_codes', 'meathook_ok',
+            'meathook_status', 'meathook_message', 'native_state',
+        ):
+            if key in event and event[key] not in (None, ""):
+                fields.append(f"{key}={event[key]}")
+        message = f"{kind}: {' | '.join(fields) or 'received'}"
+        if kind == "integration_status":
+            if self._last_integration_diagnostic == message:
+                return
+            self._last_integration_diagnostic = message
+        self._record_diagnostic(message)
+
+    def _normalize_worker_event(self, kind, event):
+        if kind == "item_history_status":
+            self.item_history_status = dict(event)
+        if kind == "error" and not event.get("failure_domain"):
+            event = enrich_connection_failure(event, attempt_id=self.connection_attempt_id)
+            self.last_connection_error = dict(event)
+        if kind == "setup_failed" and not event.get("failure_domain"):
+            event = {
+                **event,
+                **setup_failure_payload(RuntimeError(str(event.get('message', 'setup failed'))), phase='game_setup'),
+            }
+        if kind == "setup_failed" and not event.get("attempt_id"):
+            event = {**event, "attempt_id": self.connection_attempt_id}
+        return event
+
+    def _worker_connection_state(self, kind, supervisor, emit_event, stop_failed_worker, pending, intentional_disconnect, stop_native):
+        if kind in {"client_started", "connecting"}:
+            if self.state is not LauncherState.DISCONNECTING:
+                self.state = LauncherState.CONNECTING
+        elif kind == "connected":
+            emit_event = self._worker_connected()
+        elif kind in {"error", "setup_failed"}:
+            emit_event, stop_failed_worker = self._worker_failed(supervisor)
+            stop_native = True
+        elif kind in {"client_stopping", "disconnected"}:
+            emit_event = self._worker_disconnecting(kind)
+        elif kind == "worker_stopped":
+            pending, intentional_disconnect = self._worker_stopped()
+            emit_event = False
+            stop_native = True
+        return emit_event, stop_failed_worker, pending, intentional_disconnect, stop_native
+
+    def _worker_connected(self):
+        if self.state is LauncherState.DISCONNECTING:
+            return False
+        self.state = LauncherState.CONNECTED
+        self.last_setup_failure = None
+        self.last_connection_error = None
+        self.last_room_package_issue = None
+        return True
+
+    def _worker_failed(self, supervisor):
+        if self.state is LauncherState.DISCONNECTING or self._pending_connect is not None:
+            return False, False
+        self.state = LauncherState.FAILED
+        self.connected_room = False
+        return True, supervisor.running
+
+    def _worker_disconnecting(self, kind):
+        if kind == "disconnected":
+            self.last_setup_failure = None
+            self.last_room_package_issue = None
+        return not (self.state in {LauncherState.FAILED, LauncherState.DISCONNECTING} or self._pending_connect is not None)
+
+    def _worker_stopped(self):
+        self.supervisor = None
+        pending = None
+        intentional_disconnect = False
+        if self._pending_connect is not None:
+            pending = self._pending_connect
+            self._pending_connect = None
+            self.state = LauncherState.CONNECTING
+        elif self.state is LauncherState.DISCONNECTING:
+            self.state = LauncherState.IDLE
+            intentional_disconnect = True
+        elif self.state is not LauncherState.FAILED:
+            self.state = LauncherState.FAILED
+        return pending, intentional_disconnect
+
+    def _worker_event(self, supervisor: BridgeSupervisor, event: dict[str, object]) -> None:
+        kind = str(event.get("type", ""))
+        stop_failed_worker = False
+        pending: dict[str, str] | None = None
+        emit_event = True
+        intentional_disconnect = False
+        stop_native = False
+        with self._lifecycle_lock:
+            if supervisor is not self.supervisor:
+                return
+            event = self._normalize_worker_event(kind, event)
+            emit_event, stop_failed_worker, pending, intentional_disconnect, stop_native = self._worker_connection_state(kind, supervisor, emit_event, stop_failed_worker, pending, intentional_disconnect, stop_native)
+        if stop_native:
+            self._stop_native_client()
+        if emit_event:
+            self._queue_event(event, origin=EventOrigin.BRIDGE)
+        if stop_failed_worker:
+            supervisor.stop(emit_disconnected=False)
+        if intentional_disconnect:
+            self.emit("disconnected", intentional=True)
+        if pending is not None:
+            self._start_supervisor(pending)
+
+    def _worker_log(self, supervisor: BridgeSupervisor, text: str) -> None:
+        with self._lifecycle_lock:
+            if supervisor is not self.supervisor or not text:
+                return
+            self._record_diagnostic(f"worker: {text}")
+            self.events.put(adapt_event({"type": "log", "message": text, "attempt_id": self._supervisor_attempt},
+                                        origin=EventOrigin.BRIDGE))
+
+    def _job_failed(self, job, error) -> None:
+        self._setup_event(
+            'setup_failed',
+            {**setup_failure_payload(error, phase='game_setup'), 'launcher_job_generation': job.generation},
+        )
+
+    def _setup_runtime_event(self, kind, payload, runtime_changed):
+        if kind == "injector_started":
+            self._injector_output = None
+        elif kind == "injector_finished":
+            output = (''.join(('stdout:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stdout', '')}"), '', '\n', 'stderr:', '\n', '', '{value_0}'.format(value_0=f"{payload.get('stderr', '')}"))))
+            self._injector_output = output
+        if kind == "core_runtime_selected":
+            old = self.config.get("selected_core_runtime_manifest")
+            self.config["selected_core_runtime_manifest"] = payload["path"]
+            self._persist_config()
+            runtime_changed = old != payload["path"]
+        return runtime_changed
+
+    def _setup_meathook_evidence(self, kind, payload):
+        if (kind == "setup_ready" and payload.get("adapter_state") == "applied") or (
+            kind == "room_install_state" and payload.get("state") == "already_installed"
+            and payload.get("readiness") == "blocked"
+        ):
+            game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            meathook = probe_meathook(Path(str(game_root)).expanduser().resolve() if game_root else None)
+            payload = {**payload, "meathook_ok": meathook.ok, "meathook_status": meathook.status.value}
+        return payload
+
+    def _clear_session_failure(self, kind, payload):
+        if kind in {"ap_session_status", "room_install_state"} and (payload.get("state") in {"prelaunch_ready", "admitted"} or payload.get("readiness") == "ready"):
+            if self.last_setup_failure and self.last_setup_failure.get("failure_domain") in {"campaign_session", "proton_runtime"}:
+                self.last_setup_failure = None
+
+    def _setup_failure_state(self, kind, payload):
+        if kind == "setup_failed" or (kind == "room_install_state" and payload.get("readiness") == "blocked"
+                                      and payload.get("failure_domain") in {"campaign_session", "proton_runtime"}):
+            self.last_setup_failure = dict(payload)
+            if payload.get("failure_domain") in {"room_package", "installed_room_package"}:
+                self.last_room_package_issue = dict(payload)
+        elif kind == "room_install_state" and (
+            payload.get("state") == "update_required" or payload.get("failure_domain") in {"room_package", "installed_room_package"}
+        ):
+            self.last_room_package_issue = {"type": kind, **payload}
+        elif kind == "setup_ready":
+            self.last_setup_failure = None
+            self.last_room_package_issue = None
+        else:
+            self._clear_session_failure(kind, payload)
+
+    def _setup_event(self, kind: str, payload: dict[str, object]) -> None:
+        runtime_changed = False
+        with self._lifecycle_lock:
+            generation = payload.get("launcher_job_generation")
+            if generation is not None and not self.workers.accepts(generation):
+                return
+            payload = self._setup_progress_context(payload)
+            runtime_changed = self._setup_runtime_event(kind, payload, runtime_changed)
+            payload = self._setup_meathook_evidence(kind, payload)
+            self._setup_failure_state(kind, payload)
+            self.emit(kind, **payload)
+        if runtime_changed:
+            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            supervisor = self.supervisor
+            if supervisor is not None and supervisor.running:
+                try:
+                    supervisor.send_command('AP_CONTROL {"type":"core_runtime_reload"}')
+                except (OSError, RuntimeError) as error:
+                    self.emit("core_runtime_rebind_pending", message=str(error))
+            self._stop_native_client()
+
+    def _setup_progress_context(self, payload):
+        if "launcher_job_generation" not in payload:
+            return payload
+        room = self.setup.current_event
+        return {'setup_progress_room': RoomSetupCoordinator.room_key(room) if room else None, **payload}
+
+    def _setup_result(self, record: IntegratedSetupRecord, generation: int) -> None:
+        with self._lifecycle_lock:
+            if not self.workers.accepts(generation):
+                return
+            self.last_setup = record
+        if record.adapter_state == "applied":
+            self.ensure_ammo_refill_config()
+
+    def _native_start_failure(
+        self,
+        *,
+        reason: str,
+        technical_message: str,
+        executable_path: Path,
+        exit_code: int | None = None,
+    ) -> None:
+        if reason == "native_helper_missing":
+            message = (
+                'A required DoomEAP file is missing. Check Windows Security -> Protection history, then reinstall DoomEAP from its official download. If it happens again, select Help -> SAVE SUPPORT REPORT.'
+            )
+        elif reason == "native_helper_application_control_blocked":
+            message = (
+                'Windows blocked DoomEAP from starting its game connection. Select Help -> SAVE SUPPORT REPORT and ask your device administrator or DoomEAP support for help.'
+            )
+        elif reason == "native_helper_removed_after_validation":
+            message = (
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
+            )
+        elif reason == "native_helper_access_denied":
+            message = (
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
+            )
+        elif reason == "immediate_exit":
+            message = (
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
+            )
+        else:
+            message = (
+                'DoomEAP could not start its game connection. Check Windows Security -> Protection history, retry once, then select Help -> SAVE SUPPORT REPORT if it continues.'
+            )
+        detail = (
+            'Game integration helper startup failed: reason={value_0} path={value_1} detail={value_2}'.format(value_0=f'{reason}', value_1=f'{executable_path}', value_2=f'{technical_message}')
+        )
+        if exit_code is not None:
+            detail += f" exit_code={exit_code}"
+        self._record_diagnostic(detail)
+        self.emit(
+            'native_client_start_failed', title=player_text('launcher.controller', 'game_connection_could_not_start'),
+            message=message, reason=reason, executable_path=str(executable_path), technical_message=technical_message,
+            exit_code=exit_code,
+        )
+
+    @staticmethod
+    def _classify_native_start_error(error: Exception, *, helper_exists: bool) -> tuple[str, bool]:
+        winerror = getattr(error, "winerror", None)
+        disappeared = (isinstance(error, FileNotFoundError) or winerror in {2, 3}) and not helper_exists
+        if winerror == 4556:
+            return "native_helper_application_control_blocked", False
+        if disappeared:
+            return "native_helper_removed_after_validation", True
+        if isinstance(error, PermissionError) or winerror == 5:
+            return "native_helper_access_denied", False
+        return "native_helper_process_creation_failed", False
+
+    def _native_client_running(self) -> bool:
+        with self._lifecycle_lock:
+            if self._native_client_process is None:
+                return False
+            poll = self._native_client_process.poll()
+            if poll is not None:
+                exit_code = poll
+                self._native_client_process = None
+                self.emit("native_client_exited", returncode=exit_code)
+                return False
+            return True
+
+    def _native_helper_path(self):
+        client_exe = self.client_dir / "ap_client.exe"
+        if not client_exe.is_file():
+            self._native_helper_startup.update({
+                'expected_path': str(client_exe), 'present': False, 'sha256': None, 'process_start_status': 'failed',
+                'winerror': None, 'normalized_category': 'native_helper_missing', 'disappeared_after_validation': False,
+                'latest_startup_error': 'expected helper is missing; it may have been quarantined',
+            })
+            self._native_start_failure(
+                reason="native_helper_missing",
+                technical_message='file not found: {value_0}; it may have been quarantined'.format(value_0=f'{client_exe}'),
+                executable_path=client_exe,
+            )
+            return False
+        return client_exe
+
+    def _launch_native_helper(self, client_exe, root):
+        command = [str(client_exe), str(root)]
+        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0x08000000)
+        try:
+            self._native_client_process = subprocess.Popen(command, cwd=str(root), creationflags=creationflags)
+            time.sleep(0.15)
+            exit_code = self._native_client_process.poll()
+            if exit_code is not None:
+                health = self.read_native_health(force=True)
+                self._native_client_process = None
+                if health.get("native_state") in {"starting", "ready", "unavailable"}:
+                    self.emit(
+                        'native_client_already_running', pid=health.get('pid'), native_state=health.get('native_state'),
+                    )
+                    return True
+                self._native_helper_startup.update({
+                    'process_start_status': 'failed', 'normalized_category': 'immediate_exit',
+                    'latest_startup_error': 'process exited before publishing current native health',
+                })
+                self._native_start_failure(
+                    reason='immediate_exit', technical_message='process exited before publishing current native health',
+                    executable_path=client_exe, exit_code=exit_code,
+                )
+                return False
+            self.emit("native_client_started", path=str(client_exe), game_root=str(root))
+            self._native_helper_startup["process_start_status"] = "started"
+            return True
+        except (OSError, subprocess.SubprocessError) as error:
+            self._native_client_process = None
+            winerror = getattr(error, "winerror", None)
+            category, disappeared = self._classify_native_start_error(error, helper_exists=client_exe.is_file())
+            technical_message = (f'{type(error).__name__}: {error}' + (f' (winerror={winerror})' if winerror is not None else '')).replace('\r', ' ').replace(
+                '\n', ' ',
+            )[:512]
+            self._native_helper_startup.update({
+                'present': client_exe.is_file(), 'process_start_status': 'failed', 'winerror': winerror,
+                'normalized_category': category, 'disappeared_after_validation': disappeared,
+                'latest_startup_error': technical_message,
+            })
+            self._native_start_failure(reason=category, technical_message=technical_message, executable_path=client_exe)
+            return False
+
+    def _reuse_native_client(self):
+        if self._native_client_process is not None:
+            if self._native_client_process.poll() is None:
+                return True
+            exit_code = self._native_client_process.poll()
+            self._native_client_process = None
+            self.emit("native_client_exited", returncode=exit_code)
+
+    def _native_game_root(self):
+        game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
+        if not game_root:
+            return False
+        try:
+            root = validate_game_root(Path(str(game_root)))
+        except (OSError, ValueError) as error:
+            logger.warning("Native client game directory rejected: %s", error)
+            return False
+        return root
+
+    def _native_helper_identity(self, client_exe):
+        try:
+            helper_sha256 = hashlib.sha256(client_exe.read_bytes()).hexdigest()
+        except OSError:
+            helper_sha256 = None
+        self._native_helper_startup.update({
+            'expected_path': str(client_exe), 'present': True, 'sha256': helper_sha256,
+            'process_start_status': 'validated', 'winerror': None, 'normalized_category': None,
+            'disappeared_after_validation': False, 'latest_startup_error': None,
+        })
+
+    def _ensure_native_client(self, *, platform: str | None = None, generation: int | None = None) -> bool:
+        target_platform = platform if platform is not None else os.name
+        if target_platform != "nt":
+            return False
+        with self._lifecycle_lock:
+            if generation is not None and not self.workers.accepts(generation):
+                return False
+            if not self.connected_room:
+                return False
+            if self._reuse_native_client():
+                return True
+
+            root = self._native_game_root()
+            if not root:
+                return False
+            client_exe = self._native_helper_path()
+            if client_exe is None:
+                return False
+
+            self._native_helper_identity(client_exe)
+
+            meathook = probe_meathook(root)
+            if not meathook.ok:
+                return False
+
+            LaunchWorkflow.write_client_config(self.client_dir, runtime_config=self.config)
+            return self._launch_native_helper(client_exe, root)
+
+    def _stop_native_client_for_installation(self) -> None:
+        if self.game_running_or_unknown():
+            return
+        stopped = self._stop_native_client()
+        if os.name != "nt":
+            stopped = self.workflow.session_owner.retire() or stopped
+        if stopped:
+            self.emit("native_client_stopped_for_install")
+
+    def _stop_native_client(self) -> bool:
+        from .launcher_session import stop_native_client
+
+        if not self.workflow.session_owner.can_close():
+            return False
+        with self._lifecycle_lock:
+            stopped = stop_native_client(self._native_client_process)
+            self._native_client_process = None
+        if stopped:
+            self.emit("native_client_stopped")
+        return stopped
+
+    def probe_handshake(self) -> dict[str, object]:
+        base = self.config.get("doom_base_dir")
+        if not base:
+            result = {"status": "unavailable", "reason": 'DOOM Eternal base directory is not configured'}
+        else:
+            result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
+        self.emit("handshake_probe", **result)
+        return dict(result)
+
+    def read_native_health(self, *, force: bool = False) -> dict[str, object]:
+        """Return normalized native AP health without emitting launcher activity."""
+        base = doom_base_dir_from_config(self.config)
+        if base is None:
+            result = {'state': 'not_ready', 'ready': False, 'degraded': False, 'reason': 'base_directory_unconfigured'}
+            return result
+        path = base / "ap_rpc_health.state"
+        if self._native_health_reader is None or self._native_health_reader.path != path:
+            self._native_health_reader = NativeHealthReader(path)
+        result = self._native_health_reader.read(force=force).document()
+        session = dict(self.workflow.session_owner.status)
+        result["session"] = session
+        if result.get("ready") and not session.get("ready"):
+            result.update(state="not_ready", ready=False, reason=session["state"])
+        if result.get("native_state") is not None:
+            self._last_native_health = dict(result)
+        return result
+
+    def native_health(self, *, force: bool = False) -> dict[str, object]:
+        return self.read_native_health(force=force)
+
+    def poll_game_lifecycle(self) -> None:
+        """Consume cached process state and clean stale bindings on game exit."""
+        if self._game_lifecycle_thread is None:
+            self._game_lifecycle_thread = threading.Thread(
+                target=self._sample_game_lifecycle, name='DoomLifecycleSampler', daemon=True,
+            )
+            self._game_lifecycle_thread.start()
+        with self._game_lifecycle_sample_lock:
+            current_running = self._game_lifecycle_sample
+        if current_running is None:
+            return
+        if self._last_game_running and not current_running:
+            cleanup_stale_doom_config_bind(self.config, is_game_running=False)
+        self._last_game_running = current_running
+
+    def _sample_game_lifecycle(self) -> None:
+        """Run the slow Windows process enumeration away from the Qt thread."""
+        while not self._game_lifecycle_stop.is_set():
+            if os.name == "nt":
+                from doom_eap.runtime.observers import windows_game_processes
+                processes = windows_game_processes()
+                current_running = None if processes is None else bool(processes)
+                status = self.workflow.session_owner.observe(processes)
+            else:
+                try:
+                    current_running = self.is_game_running()
+                except ProcessInspectionError:
+                    current_running = None
+                status = self.workflow.session_owner.observe()
+            self._observe_game_lifecycle(current_running, status)
+            with self._game_lifecycle_sample_lock:
+                self._game_lifecycle_sample = current_running
+            self._game_lifecycle_stop.wait(1.0)
+
+    def _observe_game_lifecycle(self, current_running, status):
+        if current_running:
+            self._ensure_native_client()
+        semantic = (current_running, status.get("state"), status.get("pid"), status.get("namespace_id"),
+                    status.get("process_created"),
+                    status.get("admission", {}).get("instance_id"), status.get("ready"),
+                    status.get("recovery_state"), status.get("resume_verified"), status.get("recovery_reason"))
+        if semantic != self._last_ap_session_status:
+            self._last_ap_session_status = semantic
+            self.emit("process_state_changed", running=current_running)
+            self.emit("ap_session_status", **status)
+            if status.get("state") == "game_exited" and current_running is False:
+                self._stop_native_client()
+                with self._lifecycle_lock:
+                    event = self.setup.current_event
+                    if event is not None:
+                        self._queue_room_readiness(event)
+
+    def _live_support_diagnostics(self) -> dict[str, object]:
+        """Expose live ownership/process facts without bridge credentials."""
+        supervisor = self.supervisor
+        if supervisor is None:
+            supervisor_details: dict[str, object] = {
+                'status': 'unavailable', 'running': False, 'reason': 'supervisor_not_created',
+            }
+        else:
+            supervisor_details = {
+                'status': supervisor.state.value.lower(), 'running': supervisor.running,
+                'last_error': dict(supervisor.last_error) if supervisor.last_error else None,
+            }
+        direct = self.read_native_health(force=True)
+        expected_native_path = None
+        base = doom_base_dir_from_config(self.config)
+        if base is not None:
+            expected_native_path = str(base / "ap_rpc_health.state")
+        last_known = self._last_native_health
+        if (
+            last_known is not None
+            and (
+                expected_native_path is None
+                or str(last_known.get("path", "")) != expected_native_path
+            )
+        ):
+            last_known = None
+        if direct.get("native_state") is not None:
+            native = {'source': 'direct', 'evidence': 'direct', 'health': direct, 'direct': direct}
+        elif last_known is not None:
+            native = {'source': 'last_known', 'evidence': 'last_known', 'health': dict(last_known), 'direct': direct}
+        else:
+            native = {'source': 'unknown', 'evidence': 'unavailable', 'health': direct, 'direct': direct}
+        return {
+            "supervisor": supervisor_details,
+            "last_operation_failure": self.last_operation_failure,
+            "delivery_ledger": {"path": str(self.items_reader.path), "exists": self.items_reader.path.is_file(),
+                                "room": asdict(self.items_room) if self.items_room else None, **self.items_diagnostics},
+            "native_rpc": native,
+            "ap_session": dict(self.workflow.session_owner.status),
+            "native_diagnostics": self._native_diagnostics(),
+            "native_helper_startup": dict(self._native_helper_startup),
+            "config_paths": {
+                'application_dir': str(self.application_dir), 'client_dir': str(self.client_dir),
+                'config_file': str(self.config_path), 'state_dir': str(self.state_dir),
+            },
+        }
+
+    def _native_diagnostics(self) -> dict:
+        from .sentinel_diagnostics import collect
+        session = dict(self.workflow.session_owner.status)
+        if not session.get("pid") and os.name == "nt":
+            from doom_eap.runtime.observers import windows_game_processes
+            processes = windows_game_processes()
+            root = self.config.get("game_root") or self.config.get("doom_base_dir")
+            if root and processes and len(processes) == 1:
+                game = Path(str(root)).resolve()
+                if game.name.casefold() == "base":
+                    game = game.parent
+                if os.path.normcase(processes[0]["path"]) == os.path.normcase(str(game / "DOOMEternalx64vk.exe")):
+                    session.update(pid=processes[0]["pid"], process_created=processes[0]["created"])
+        return collect(self.config, session)
+
+    def run_doctor(self, *, job=None) -> DoctorReport:
+        if job is not None:
+            job.check()
+        report = LauncherDoctor(config={**self.config, 'application_dir': str(self.application_dir), 'client_dir': str(self.client_dir)}, paths=self.user_paths, config_path=self.config_path, last_setup_failure=self.last_setup_failure, last_room_package_issue=self.last_room_package_issue, live_support=self._live_support_diagnostics()).run()
+        if job is None:
+            self.emit("doctor_report", report=report.document())
+        else:
+            self._setup_event("doctor_report", job.event({"report": report.document()}))
+        return report
+
+    def request_doctor(self, *, preview: bool = False) -> bool:
+        with self._lifecycle_lock:
+            generation = self.workers.generation
+            config = deepcopy(self.config)
+            failure = deepcopy(self.last_setup_failure)
+            issue = deepcopy(self.last_room_package_issue)
+
+        def operation(job):
+            try:
+                doctor = LauncherDoctor(
+                    config={**config, 'application_dir': str(self.application_dir), 'client_dir': str(self.client_dir)},
+                    paths=self.user_paths, config_path=self.config_path, last_setup_failure=failure,
+                    last_room_package_issue=issue, live_support=None if preview else self._live_support_diagnostics(),
+                )
+                if preview:
+                    payload = {"actions": tuple(asdict(action) for action in doctor.repair_preview())}
+                else:
+                    payload = {"report": doctor.run().document()}
+                self._setup_event("repair_preview_result" if preview else "doctor_report", job.event(payload))
+            except LauncherWorkCancelled:
+                raise
+            except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+                self._setup_event("doctor_failed", job.event({"message": str(error), "preview": preview}))
+
+        return self.workers.submit(("doctor", preview), operation, generation=generation)
+
+    def _queue_repair_setup(self, job) -> bool:
+        return self.setup.start(force=True, generation=job.generation)
+
+    @property
+    def operation_generation(self) -> int:
+        return self.workers.generation
+
+    def _repair_core_files(self, action_key, workflow, root, repair_event):
+        if action_key == "rollback_core":
+            from .launcher_core_install import rollback_core
+            self.save_config({"core_auto_update": False})
+            workflow.session_owner.retire()
+            self._stop_native_client()
+            rollback_core(root, self.state_dir)
+            self.save_config({"core_auto_update": False, "core_runtime_manifest": None, "selected_core_runtime_manifest": None})
+            workflow.core_runtime.checked = False
+            message = 'Previous game connection version restored. Automatic updates are off. Reconnect to the same room.'
+        elif action_key == "repair_core":
+            workflow.session_owner.retire()
+            self._stop_native_client()
+            message = workflow.ensure_game_link(root, force_repair=True).message
+        else:
+            if not repair_event:
+                raise RuntimeError('Connect to the same room before repairing its session')
+            workflow.ensure_game_link(root)
+            message = 'Save setup repaired. Saves, received items, and spending records were kept.'
+        return message
+
+    def _repair_core_session(self, action_key, workflow, config, repair_event, job, emit):
+        root = workflow._game_root(config)
+        if workflow.session_owner.game_processes(config) != ():
+            raise RuntimeError('Close DOOM Eternal before repairing save setup or restoring a previous version.')
+        message = self._repair_core_files(action_key, workflow, root, repair_event)
+        if action_key != "rollback_core" and repair_event:
+            job.check()
+            config.update(workflow._config())
+            status = workflow.session_owner.prepare(RoomSnapshot.from_event(repair_event), config, recover_prelaunch=True)
+            job.check()
+            with self._lifecycle_lock:
+                job.check()
+                self.last_setup_failure = None
+            emit("ap_session_status", **status)
+        return message
+
+    def _repair_operation(self, job, integration_only, action_key, repair_event, last_failure, last_issue):
+        try:
+            if integration_only or action_key in {
+                'install_game_link', 'repair_game_link', 'rebuild_room_package', 'update_room_package',
+                'reinstall_room_mod',
+            }:
+                with self._lifecycle_lock:
+                    job.check()
+                    self.ensure_ammo_refill_config()
+            workflow = self.workflow.for_job(job, self._setup_event, self.interactions.for_job(job))
+            config = workflow._config()
+
+            def emit(kind, **payload):
+                self._setup_event(kind, job.event(payload))
+
+            if action_key in {"repair_core", "repair_session", "rollback_core"}:
+                message = self._repair_core_session(action_key, workflow, config, repair_event, job, emit)
+            elif integration_only:
+                result = install_game_link(config, workflow, emit, force_repair=True)
+                message = result.message
+            else:
+                doctor = LauncherDoctor(
+                    config=config, paths=self.user_paths, config_path=self.config_path, last_setup_failure=last_failure,
+                    last_room_package_issue=last_issue,
+                )
+                message = apply_repair(
+                    action_key, doctor=doctor, config=config, workflow=workflow, emit=emit,
+                    start_room_setup=lambda: self._queue_repair_setup(job),
+                )
+            emit("integration_repair_result" if integration_only else "ui_repair_result",
+                 message=str(message), success=True)
+        except LauncherWorkCancelled:
+            raise
+        except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+            self._setup_event(
+                'integration_repair_result' if integration_only else 'ui_repair_result',
+                job.event({'message': 'Repair error: {value_0}'.format(value_0=f'{error}'), 'success': False}),
+            )
+
+    def request_repair(self, action_key: str, *, integration_only: bool = False, generation: int | None = None) -> bool:
+        with self._lifecycle_lock:
+            generation = self.workers.generation if generation is None else generation
+            if not self.workers.accepts(generation):
+                return False
+            last_failure = deepcopy(self.last_setup_failure)
+            last_issue = deepcopy(self.last_room_package_issue)
+            repair_event = self.setup.current_event if self.connected_room else None
+
+        operation = partial(self._repair_operation, integration_only=integration_only, action_key=action_key, repair_event=repair_event, last_failure=last_failure, last_issue=last_issue)
+
+        return self.workers.submit(("repair", action_key), operation, generation=generation)
+
+    def request_support_bundle(self, destination: Path, *, logs: list[str]) -> bool:
+        generation = self.workers.generation
+        logs = list(logs)
+        requested = time.monotonic()
+
+        def operation(job):
+            try:
+                self._setup_event("support_bundle_started", job.event({"queue_wait_ms": round((time.monotonic() - requested) * 1000)}))
+                self.create_support_bundle(destination, logs=logs, job=job)
+            except LauncherWorkCancelled:
+                raise
+            except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+                self._setup_event("support_bundle_failed", job.event({"message": str(error)}))
+
+        return self.workers.submit(("support_bundle", str(destination)), operation, generation=generation, serialized=False)
+
+    def request_problem_report(self, *, logs: list[str]) -> bool:
+        generation = self.workers.generation
+        logs = list(logs)
+
+        def operation(job):
+            result = report_problem(ScopedSupportReport(self.create_support_bundle, job), logs=logs, job=job,
+                                    draft_path=self.user_paths.data_dir / "reports" / "draft.json")
+            self._setup_event("problem_report_ready", job.event({
+                'message': result.message, 'path': str(result.path) if result.path else None, 'payload': result.payload,
+                'submitted': result.submitted, 'url': result.url,
+            }))
+
+        return self.workers.submit("problem_report", operation, generation=generation)
+
+    def save_problem_report(self, payload):
+        save_report_draft(self.user_paths.data_dir / "reports" / "draft.json", payload)
+
+    def start_new_problem_report(self, *, logs):
+        draft = self.user_paths.data_dir / "reports" / "draft.json"
+        saved = json.loads(draft.read_text(encoding="utf-8"))
+        if not saved.get("url"):
+            raise ValueError('Retry the saved report before starting a new one. Its submitted text cannot be changed.')
+        archived = draft.with_name(str(uuid.UUID(saved["payload"]["idempotency_key"])) + ".json")
+        publish_file(draft, archived, operation="report_archive_publish")
+        return self.request_problem_report(logs=logs)
+
+    def request_report_submission(self, payload: dict) -> bool:
+        endpoint = submission_endpoint(self.client_dir)
+        if endpoint is None:
+            raise RuntimeError('Sending reports is unavailable. Open Report a Problem in Help to save a copy.')
+        payload = deepcopy(payload)
+        report_body(payload)
+        def operation(job):
+            job.check()
+            draft = self.user_paths.data_dir / "reports" / "draft.json"
+            save_report_draft(draft, payload, submitted=True)
+            try:
+                url = submit_report(endpoint, payload)
+            except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+                self._setup_event("problem_report_retry", job.event({"message": str(error)}))
+                return
+            save_report_draft(draft, payload, submitted=True, url=url)
+            self._setup_event("problem_report_submitted", job.event({"url": url}))
+        return self.workers.submit(("report_submission", payload["idempotency_key"]), operation)
+
+    def _support_collection(self, job, timings):
+        started = time.monotonic()
+        try:
+            support_condump: dict[str, object] | None = (
+                self._request_support_condump() if job is None else self._request_support_condump(job=job)
+            )
+        except LauncherWorkCancelled:
+            raise
+        except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+            support_condump = {'status': 'unavailable', 'reason': f'{type(error).__name__}: {error}'}
+        timings["condump_ms"] = round((time.monotonic() - started) * 1000)
+        stage = time.monotonic()
+        try:
+            report = self.run_doctor() if job is None else self.run_doctor(job=job)
+        except LauncherWorkCancelled:
+            raise
+        except (OSError, RuntimeError, ValueError, KeyError, subprocess.SubprocessError) as error:
+            report = DoctorReport(
+                LauncherDoctor.VERSION,
+                (Diagnostic(
+                    "support",
+                    "attention",
+                    'doctor inspection is unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                ),),
+                "needs_attention",
+                "",
+                "",
+                'Support bundle collected without a doctor report: {value_0}'.format(value_0=f'{error}'),
+                {},
+            )
+        timings["doctor_ms"] = round((time.monotonic() - stage) * 1000)
+        return support_condump, report
+
+    def _support_room_details(self, room, connected, report, timings):
+        slot_data = room.get("slot_data")
+        slot_data = slot_data if isinstance(slot_data, dict) else {}
+        option_keys = set(ROOM_SLOT_DEFAULTS) | {
+            option["key"] for option in self.options_schema.get("options", [])
+            if isinstance(option, dict) and isinstance(option.get("key"), str)
+        }
+        support_diagnostics = {
+            **report.support_diagnostics,
+            "collection_timings": timings,
+            "session": {
+                "connected": connected,
+                "identity_source": "connected" if connected else "last_known" if room else "unavailable",
+                "seed_name": room.get("seed_name"),
+                "slot": room.get("slot"),
+                "team": room.get("team"),
+                # Keep options and contract identity; omit placements/protocol history.
+                "slot_data": {
+                    key: value for key, value in slot_data.items()
+                    if key in option_keys or key in {
+                        'death_link', 'death_link_mode', 'slot_data_version', 'slot_data_schema_version',
+                        'slot_data_revision', 'apworld_revision', 'release_version', 'content_revision', 'capabilities',
+                    }
+                },
+            },
+        }
+        return support_diagnostics
+
+    def _support_campaign_details(self, support_diagnostics, room):
+        try:
+            support_diagnostics["campaign_inspection"] = self.workflow.session_owner.inspect_campaign(
+                RoomSnapshot.from_event(room), dict(self.config)) if room else {"status": "room_unavailable"}
+        except (OSError, RuntimeError, ValueError, KeyError) as error:
+            support_diagnostics["campaign_inspection"] = {"status": "unavailable", "reason": str(error)}
+        try:
+            support_diagnostics["release"] = release_identity()
+        except (OSError, ValueError, KeyError) as error:
+            support_diagnostics["release"] = {"status": "unavailable", "reason": str(error)}
+
+    def _cleanup_support_capture(self, support_condump):
+        if support_condump and support_condump.get("owned_capture"):
+            capture = Path(str(support_condump["path"]))
+            if capture.parent.resolve() == (self.user_paths.data_dir / "support-captures").resolve():
+                capture.unlink(missing_ok=True)
+
+    def create_support_bundle(self, destination: Path, *, logs: list[str] | None = None, job=None) -> Path:
+        """Collect a support bundle without requiring a healthy game install.
+
+        Condump capture and doctor inspection are both best-effort: either may
+        degrade to an unavailable marker while the bundle still records logs,
+        configuration evidence, and the last setup failure.
+        """
+        started = time.monotonic()
+        timings = {}
+        support_condump, report = self._support_collection(job, timings)
+        diagnostic_logs = [*self.diagnostic_history, *(logs or [])]
+        with self._lifecycle_lock:
+            room = self.setup.last_event or {}
+            connected = self.connected_room
+        support_diagnostics = self._support_room_details(room, connected, report, timings)
+        self._support_campaign_details(support_diagnostics, room)
+        if job is not None:
+            job.check()
+        stage = time.monotonic()
+        bundle = write_support_bundle(
+            destination, report, logs=diagnostic_logs, config=self.config, paths=self.user_paths,
+            application_dir=self.client_dir, session_start=self.session_start_time,
+            last_setup_failure=self.last_setup_failure, last_connection_error=self.last_connection_error,
+            support_condump=support_condump, support_diagnostics=support_diagnostics,
+            archive_directory=self.user_paths.data_dir / 'support-bundles', injector_output=self._injector_output,
+        )
+        timing = {"archive_ms": round((time.monotonic() - stage) * 1000),
+                  "total_ms": round((time.monotonic() - started) * 1000), **timings}
+        self._cleanup_support_capture(support_condump)
+        self._setup_event("support_bundle_timing", job.event(timing) if job is not None else timing)
+        if job is None:
+            self.emit("support_bundle_ready", path=str(bundle))
+        else:
+            self._setup_event("support_bundle_ready", job.event({"path": str(bundle)}))
+        return bundle
+
+    def _request_support_condump(self, *, job=None) -> dict[str, object]:
+        """Attempt one diagnostic condump, recording closed-game availability."""
+        if job is None:
+            return self._capture_support_condump()
+        job.check()
+        result = self.workers.try_serialized(lambda: self._capture_support_condump(job=job))
+        return result if result is not None else {
+            'status': 'unavailable', 'reason': 'launcher_busy', 'requested_at': time.time()}
+
+    def _read_condump_copy(self, source):
+        capture_dir = self.user_paths.data_dir / "support-captures"
+        capture_dir.mkdir(parents=True,exist_ok=True)
+        destination = capture_dir / (uuid.uuid4().hex + ".txt")
+        with source.open("rb") as incoming:
+            payload = incoming.read(16*1024*1024 + 1)
+        after = source.stat()
+        return destination, payload, after
+
+    def _publish_condump_copy(self, destination, payload, source, scope, requested_at):
+        with destination.open("xb") as outgoing:
+            outgoing.write(payload)
+            outgoing.flush()
+            os.fsync(outgoing.fileno())
+        self._condump_pending = None
+        return {"status":"available", "path":str(destination), "owned_capture":True,
+            "source_filename":source.name, "source_size":len(payload),
+            "pid":scope["pid"], "process_created":scope["process_created"],
+            "namespace":scope.get("admission", {}).get("namespace_id"),
+            "build_id":scope.get("admission", {}).get("build_id"),
+            "instance_id":scope.get("admission", {}).get("instance_id"),
+            "requested_at":requested_at, "freshness":"request_copy"}
+
+    def _copy_condump_sources(self, sources, previous, requested_at, identity, process_scope, scope):
+        for source in sources():
+            try:
+                stat = source.stat()
+                changed = previous.get(source.name) != (stat.st_size, stat.st_mtime_ns)
+                if not changed or stat.st_mtime < requested_at - 1:
+                    continue
+                destination, payload, after = self._read_condump_copy(source)
+                if (after.st_size,after.st_mtime_ns) != (stat.st_size,stat.st_mtime_ns):
+                    continue
+                if len(payload) > 16*1024*1024:
+                    return {"status":"unavailable", "reason":"condump_too_large"}
+                current = self.workflow.session_owner.observe()
+                if not current.get("ready") or process_scope(current) != identity:
+                    return {"status":"unavailable", "reason":"process_scope_changed"}
+                return self._publish_condump_copy(destination, payload, source, scope, requested_at)
+            except FileNotFoundError:
+                continue
+
+    def _collect_current_condump(self, scope, process_scope, save_dir, requested_at, supervisor, job):
+        identity = process_scope(scope)
+        def sources():
+            return [path for path in save_dir.glob("AP_SUPPORT_FILE*.txt")
+                    if re.fullmatch(r"AP_SUPPORT_FILE(?:_[0-9]+)*\.txt", path.name)]
+
+        pending = self._condump_pending
+        if pending is None or pending["identity"] != identity:
+            previous = {}
+            for path in sources():
+                stat = path.stat()
+                previous[path.name] = (stat.st_size, stat.st_mtime_ns)
+            pending = {"identity": identity, "requested_at": requested_at, "previous": previous}
+            self._condump_pending = pending
+            supervisor.request_support_condump()
+        requested_at = pending["requested_at"]
+        previous = pending["previous"]
+        deadline = time.monotonic() + 4
+        while time.monotonic() < deadline:
+            if job is not None:
+                job.check()
+            current = self.workflow.session_owner.observe()
+            if not current.get("ready") or process_scope(current) != identity:
+                return {"status":"unavailable", "reason":"process_scope_changed"}
+            captured = self._copy_condump_sources(sources, previous, requested_at, identity, process_scope, scope)
+            if captured is not None:
+                return captured
+            time.sleep(.1)
+        return {"status":"pending", "reason":"game_diagnostic_condump_not_observed_within_timeout"}
+
+    def _condump_availability(self, supervisor_available, requested_at):
+        native_health = self.read_native_health(force=True)
+        native_stopped = native_health.get("native_state") == "stopped"
+        if native_stopped:
+            return {
+                'status': 'unavailable', 'reason': 'game_closed',
+                'message': 'diagnostic condump unavailable: game not running', 'requested_at': requested_at,
+            }
+        # use fresh native readiness on proton; diagnostics don't need to wait for the host process-name check
+        game_running = bool(native_health.get("ready")) if supervisor_available else self.game_running_or_unknown()
+        if not game_running:
+            return {
+                'status': 'unavailable', 'reason': 'game_closed',
+                'message': 'diagnostic condump unavailable: game not running', 'requested_at': requested_at,
+            }
+        if not supervisor_available:
+            return {'status': 'unavailable', 'reason': 'bridge_worker_unavailable', 'requested_at': requested_at}
+
+    def _capture_support_condump(self, *, job=None) -> dict[str, object]:
+        if job is not None:
+            job.check()
+        requested_at = time.time()
+        supervisor = self.supervisor
+        supervisor_available = supervisor is not None and supervisor.running
+        unavailable = self._condump_availability(supervisor_available, requested_at)
+        if unavailable is not None:
+            return unavailable
+        save_value = self.config.get("save_games_dir")
+        if not save_value:
+            return {'status': 'unavailable', 'reason': 'saved_games_path_unconfigured', 'requested_at': requested_at}
+        try:
+            save_dir = Path(str(save_value)).expanduser()
+        except (OSError, TypeError, ValueError, RuntimeError) as error:
+            return {
+                "status": "unavailable",
+                "reason": "saved_games_path_invalid",
+                "message": 'Saved Games path unavailable: {value_0}: {value_1}'.format(value_0=f'{type(error).__name__}', value_1=f'{error}'),
+                "requested_at": requested_at,
+            }
+        with self._condump_lock:
+            scope = self.workflow.session_owner.observe()
+            if not scope.get("ready") or not scope.get("pid") or not scope.get("process_created"):
+                return {"status":"unavailable", "reason":"qualified_process_unavailable"}
+            def process_scope(value):
+                admission = value.get("admission", {})
+                return (value.get("pid"), value.get("process_created"),
+                        admission.get("namespace_id"), admission.get("build_id"), admission.get("instance_id"))
+
+            return self._collect_current_condump(scope, process_scope, save_dir, requested_at, supervisor, job)

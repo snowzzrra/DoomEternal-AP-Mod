@@ -24,17 +24,14 @@ from doom_eap.content.physical_options import (
     project_room_config,
 )
 from doom_eap.content.slot_data_contract import placement_digest
-from doom_eap.runtime.context_registry import (
-    SlotAdmissionError,
-    admit_slot_data,
-)
+from doom_eap.launcher.launcher_injector import IDFILE_DECOMPRESSOR, client_config_write
+from doom_eap.launcher.launcher_platform import publish_file
+from doom_eap.runtime.observers import SlotAdmissionError, admit_slot_data
 from tools.decls.devinv_builder import (
     build_devinv_loadout,
     build_tag_devinv_overrides,
     output_path_for_map,
 )
-
-from .launcher_platform import IDFILE_DECOMPRESSOR, client_config_write, publish_file
 
 MODULE_DIR = Path(__file__).resolve().parent
 ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
@@ -143,6 +140,18 @@ class PlacementRecord:
     local: bool
 
     @classmethod
+    def _validate_placement_numbers(cls, value):
+        integer_fields = ("location_id", "item_id", "recipient_slot", "classification")
+        for field in integer_fields:
+            field_value = value[field]
+            if not isinstance(field_value, int) or isinstance(field_value, bool):
+                raise ValueError('placement {value_0} must be an integer'.format(value_0=f'{field}'))
+        if value["location_id"] <= 0 or value["recipient_slot"] < 1:
+            raise ValueError('placement location_id and recipient_slot must be positive')
+        if value["classification"] < 0:
+            raise ValueError('placement classification must be non-negative')
+
+    @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> PlacementRecord:
         if not isinstance(value, Mapping):
             raise ValueError('placement must be an object')
@@ -154,15 +163,7 @@ class PlacementRecord:
             raise ValueError(
                 'placement fields must be exactly ' + ", ".join(sorted(required))
             )
-        integer_fields = ("location_id", "item_id", "recipient_slot", "classification")
-        for field in integer_fields:
-            field_value = value[field]
-            if not isinstance(field_value, int) or isinstance(field_value, bool):
-                raise ValueError('placement {value_0} must be an integer'.format(value_0=f'{field}'))
-        if value["location_id"] <= 0 or value["recipient_slot"] < 1:
-            raise ValueError('placement location_id and recipient_slot must be positive')
-        if value["classification"] < 0:
-            raise ValueError('placement classification must be non-negative')
+        cls._validate_placement_numbers(value)
         for field in ("location_name", "item_name", "recipient_name"):
             if not isinstance(value[field], str) or not value[field].strip():
                 raise ValueError('placement {value_0} must be non-empty text'.format(value_0=f'{field}'))
@@ -234,7 +235,7 @@ def _validate_manifest_starting(options):
 def _admit_manifest(manifest):
     if not manifest.static_precompile:
         rows = [[record.location_id, record.item_id, record.recipient_slot] for record in manifest.placements]
-        admit_slot_data(manifest.options, placements=rows)
+        return admit_slot_data(manifest.options, placements=rows)
 
 
 @dataclass(frozen=True)
@@ -363,25 +364,7 @@ class SeedManifest:
         )
 
     @classmethod
-    def create(
-        cls,
-        *,
-        seed_name: str,
-        team: int,
-        slot: int,
-        options: dict[str, Any],
-        active_location_ids: list[int],
-        placements: object = (),
-        static_precompile: bool = False,
-        static_content_digest: str = "",
-    ) -> SeedManifest:
-        if not static_precompile:
-            return cls._create_resolved(
-                seed_name=seed_name, team=team, slot=slot, options=options,
-                active_location_ids=active_location_ids, placements=placements,
-                static_content_digest=static_content_digest,
-            )
-        identity = release_identity()
+    def _static_manifest_options(cls, options):
         normalized_options = {
             key: options[key]
             for key in sorted(options)
@@ -402,6 +385,29 @@ class SeedManifest:
                 raise ValueError('manifest option {value_0} must be boolean'.format(value_0=f'{key}'))
         project_room_config(normalized_options)
         _validate_manifest_starting(normalized_options)
+        return normalized_options
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        seed_name: str,
+        team: int,
+        slot: int,
+        options: dict[str, Any],
+        active_location_ids: list[int],
+        placements: object = (),
+        static_precompile: bool = False,
+        static_content_digest: str = "",
+    ) -> SeedManifest:
+        if not static_precompile:
+            return cls._create_resolved(
+                seed_name=seed_name, team=team, slot=slot, options=options,
+                active_location_ids=active_location_ids, placements=placements,
+                static_content_digest=static_content_digest,
+            )
+        identity = release_identity()
+        normalized_options = cls._static_manifest_options(options)
         active_ids = tuple(sorted(set(active_location_ids)))
         if not isinstance(static_precompile, bool):
             raise ValueError('static_precompile must be boolean')
@@ -457,9 +463,7 @@ class SeedManifest:
     def document(self) -> dict[str, Any]:
         return asdict(self)
 
-    def require_complete_placements(self) -> tuple[PlacementRecord, ...]:
-        """Return placement records required by room compilation."""
-        _admit_manifest(self)
+    def _complete_placements(self):
         if self.static_precompile:
             return ()
         if not self.placements:
@@ -467,6 +471,11 @@ class SeedManifest:
                 'real-room compilation requires complete placement mapping'
             )
         return _room_placements(self.options, self.placements, self.active_location_ids, self.slot)
+
+    def require_complete_placements(self) -> tuple[PlacementRecord, ...]:
+        """Return placement records required by room compilation."""
+        _admit_manifest(self)
+        return self._complete_placements()
 
     @classmethod
     def from_room(
@@ -658,9 +667,23 @@ class RoomCompiler:
         return hashlib.sha256(canonical_json(material)).hexdigest()
 
     @staticmethod
-    def validate_cached_package(package_path: Path, manifest: SeedManifest) -> bool:
-        """Verify that an existing generated room ZIP matches manifest and content identity."""
-        _admit_manifest(manifest)
+    def _cached_manifest_matches(manifest_doc, receipt_doc, manifest):
+        if manifest_doc.get("manifest_hash") != manifest.manifest_hash:
+            return False
+        if manifest.static_content_digest and manifest_doc.get("static_content_digest") != manifest.static_content_digest:
+            return False
+        if manifest_doc.get("seed_name") != manifest.seed_name:
+            return False
+        if manifest_doc.get("slot") != manifest.slot:
+            return False
+        if manifest_doc.get("team") != manifest.team:
+            return False
+        if receipt_doc.get("manifest_hash") != manifest.manifest_hash:
+            return False
+        return True
+
+    @staticmethod
+    def _cached_package_matches(package_path, manifest):
         if not package_path.is_file():
             return False
         try:
@@ -672,21 +695,31 @@ class RoomCompiler:
                 receipt_doc = json.loads(package.read("seed_receipt.json"))
             if not isinstance(manifest_doc, dict) or not isinstance(receipt_doc, dict):
                 return False
-            if manifest_doc.get("manifest_hash") != manifest.manifest_hash:
-                return False
-            if manifest.static_content_digest and manifest_doc.get("static_content_digest") != manifest.static_content_digest:
-                return False
-            if manifest_doc.get("seed_name") != manifest.seed_name:
-                return False
-            if manifest_doc.get("slot") != manifest.slot:
-                return False
-            if manifest_doc.get("team") != manifest.team:
-                return False
-            if receipt_doc.get("manifest_hash") != manifest.manifest_hash:
-                return False
-            return True
+            return RoomCompiler._cached_manifest_matches(manifest_doc, receipt_doc, manifest)
         except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile):
             return False
+
+    @staticmethod
+    def validate_cached_package(package_path: Path, manifest: SeedManifest) -> bool:
+        """Verify that an existing generated room ZIP matches manifest and content identity."""
+        _admit_manifest(manifest)
+        return RoomCompiler._cached_package_matches(package_path, manifest)
+
+    def _placement_receipt_strings(self, per_item, by_name, locale, item_receipt_text):
+        for item_id, records in per_item.items():
+            if len(records) != 1:
+                continue
+            record = records[0]
+            entry = by_name.get(f"#str_ap_notify_item_{item_id}")
+            if entry is None or not isinstance(entry.get("text"), str):
+                continue
+            entry["text"] = item_receipt_text(
+                entry["text"],
+                local=record.local,
+                trap=record.trap,
+                recipient_name=record.recipient_name,
+                locale=locale,
+            )
 
     def _apply_placement_strings(self, assembled: dict[str, bytes], placements: tuple) -> None:
         """Merge placement-aware receipt strings into the packaged locale tables."""
@@ -710,20 +743,7 @@ class RoomCompiler:
                 for entry in entries
                 if isinstance(entry, dict) and isinstance(entry.get("name"), str)
             }
-            for item_id, records in per_item.items():
-                if len(records) != 1:
-                    continue
-                record = records[0]
-                entry = by_name.get(f"#str_ap_notify_item_{item_id}")
-                if entry is None or not isinstance(entry.get("text"), str):
-                    continue
-                entry["text"] = item_receipt_text(
-                    entry["text"],
-                    local=record.local,
-                    trap=record.trap,
-                    recipient_name=record.recipient_name,
-                    locale=locale,
-                )
+            self._placement_receipt_strings(per_item, by_name, locale, item_receipt_text)
             for record in placements:
                 sent_key = f"#str_ap_location_sent_{record.location_id}"
                 by_name[sent_key] = {
@@ -735,9 +755,123 @@ class RoomCompiler:
                 json.dumps(table, indent=4, ensure_ascii=False) + "\n"
             ).encode("utf-8")
 
+    def _decode_placement_entities(self, compressed, content, decompressor, decoded, member):
+        compressed.write_bytes(content)
+        try:
+            subprocess.run(
+            [str(decompressor), "--decompress", str(compressed), str(decoded)],
+            check=True,
+            capture_output=True,
+            text=True,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
+        except subprocess.CalledProcessError as error:
+            detail = (error.stderr or error.stdout or "").strip()[:500]
+            raise ValueError(
+                'could not decompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
+            ) from error
+        if not decoded.is_file():
+            raise ValueError(
+                'idFileDeCompressor produced no decoded entities member: {value_0}'.format(value_0=f'{member}')
+            )
+        try:
+            text = decoded.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(
+                'packaged entities member is not UTF-8 after decompression: {value_0}'.format(value_0=f'{member}')
+        ) from error
+        return text
+
+    def _neutralize_inactive_aliases(self, inactive_aliases, text):
+        if inactive_aliases:
+            from tools.maps.ap_map_generator import (
+                find_entity_block_bounds,
+                neutralize_conditional_pickup_block,
+            )
+            for check, location_id in inactive_aliases.items():
+                bounds = find_entity_block_bounds(text, check)
+                if bounds is not None:
+                    text = text[:bounds[0]] + neutralize_conditional_pickup_block(text[slice(*bounds)]) + text[bounds[1]:]
+                bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                if bounds is not None:
+                    text = text[:bounds[0]] + text[bounds[1]:]
+        return text
+
+    def _remove_inactive_notifications(self, economy_enabled, notification_header, text, placement_by_id):
+        if economy_enabled:
+            from tools.maps.ap_map_generator import find_entity_block_bounds
+            inactive = {int(match.group(2)) for match in notification_header.finditer(text)} - placement_by_id.keys()
+            for location_id in sorted(inactive):
+                bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                if bounds is None:
+                    raise ValueError('notification entity missing: {value_0}'.format(value_0=f'{location_id}'))
+                text = text[:bounds[0]] + text[bounds[1]:]
+        return text
+
+    def _append_fortress_labels(self, member, fortress_member_suffix, fortress_labels_written, economy_enabled, rewritten_text, fortress_labels):
+        if member.endswith(fortress_member_suffix):
+            if fortress_labels_written:
+                raise ValueError('room package contains multiple Fortress hub entity members')
+            if not economy_enabled:
+                rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
+            fortress_labels_written = True
+        return rewritten_text, fortress_labels_written
+
+    def _encode_placement_entities(self, rewritten_text, decoded, decompressor, recompressed, member, assembled):
+        rewritten = rewritten_text.encode("utf-8")
+        decoded.write_bytes(rewritten)
+        try:
+            subprocess.run(
+                [str(decompressor), "--compress", str(decoded), str(recompressed)],
+                check=True,
+                capture_output=True,
+                text=True,
+                creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            )
+        except subprocess.CalledProcessError as error:
+            detail = (error.stderr or error.stdout or "").strip()[:500]
+            raise ValueError(
+                'could not recompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
+            ) from error
+        if not recompressed.is_file():
+            raise ValueError(
+                'idFileDeCompressor produced no encoded entities member: {value_0}'.format(value_0=f'{member}')
+            )
+        assembled[member] = recompressed.read_bytes()
+        return rewritten
+
+    def _placement_header_rewriter(self, placement_by_id, placement_sent_key):
+        def replace_header(match: re.Match[str]) -> str:
+            location_id = int(match.group(2))
+            if location_id not in placement_by_id:
+                raise ValueError(
+                    'packaged location notification lacks placement mapping: {value_0}'.format(value_0=f'{location_id}')
+                )
+            return (
+                match.group(1)
+                + placement_sent_key(location_id)
+                + match.group(3)
+            )
+        return replace_header
+
+    def _placement_entity_policies(self, placements, options, resolved):
+        placement_by_id = {record.location_id: record for record in placements}
+        from doom_eap.content.content_catalog import load_content_catalog
+        inactive_aliases = {spec.ap_check: spec.location_id for spec in load_content_catalog().physical_locations
+                            if spec.policy.get("legacy_alias_of") and spec.location_id not in placement_by_id}
+        timer_transform = self._room_timer_transform(options or {}, resolved)
+        options = self._compile_options(options or {})
+        selected_groups = (options or {}).get("active_fortress_spend_group_ids")
+        economy_enabled = "fortress_economy_v1" in (options or {}).get("required_capabilities", ())
+        fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
+            placement_by_id, selected_groups if economy_enabled else None
+        )
+        fortress_labels_written = False
+        return placement_by_id, inactive_aliases, timer_transform, options, selected_groups, economy_enabled, fortress_member_suffix, fortress_labels, fortress_labels_written
+
     def _apply_placement_entities(
         self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...],
-        options: dict | None = None,
+        options: dict | None = None, *, resolved=None,
     ) -> None:
         """Bind packaged location notifications to their room placements."""
         import re
@@ -746,18 +880,7 @@ class RoomCompiler:
 
         decompressor = self._verified_decompressor()
 
-        placement_by_id = {record.location_id: record for record in placements}
-        from doom_eap.content.content_catalog import load_content_catalog
-        inactive_aliases = {spec.ap_check: spec.location_id for spec in load_content_catalog().physical_locations
-                            if spec.policy.get("legacy_alias_of") and spec.location_id not in placement_by_id}
-        timer_transform = self._room_timer_transform(options or {})
-        options = self._compile_options(options or {})
-        selected_groups = (options or {}).get("active_fortress_spend_group_ids")
-        economy_enabled = "fortress_economy_v1" in (options or {}).get("required_capabilities", ())
-        fortress_member_suffix, fortress_labels = self._fortress_battery_label_entities(
-            placement_by_id, selected_groups if economy_enabled else None
-        )
-        fortress_labels_written = False
+        placement_by_id, inactive_aliases, timer_transform, options, selected_groups, economy_enabled, fortress_member_suffix, fortress_labels, fortress_labels_written = self._placement_entity_policies(placements, options, resolved)
         notification_header = re.compile(
             r'(entityDef\s+ap_notify_location_(\d+)\s*\{.*?'
             r'header\s*=\s*")#str_ap_location_sent(";)',
@@ -772,98 +895,23 @@ class RoomCompiler:
                 compressed = temporary_dir / "input.entities"
                 decoded = temporary_dir / "decoded.entities"
                 recompressed = temporary_dir / "output.entities"
-                compressed.write_bytes(content)
-                try:
-                    subprocess.run(
-                    [str(decompressor), "--decompress", str(compressed), str(decoded)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
-                )
-                except subprocess.CalledProcessError as error:
-                    detail = (error.stderr or error.stdout or "").strip()[:500]
-                    raise ValueError(
-                        'could not decompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
-                    ) from error
-                if not decoded.is_file():
-                    raise ValueError(
-                        'idFileDeCompressor produced no decoded entities member: {value_0}'.format(value_0=f'{member}')
-                    )
-                try:
-                    text = decoded.read_bytes().decode("utf-8")
-                except UnicodeDecodeError as error:
-                    raise ValueError(
-                        'packaged entities member is not UTF-8 after decompression: {value_0}'.format(value_0=f'{member}')
-                    ) from error
+                text = self._decode_placement_entities(compressed, content, decompressor, decoded, member)
 
-                def replace_header(match: re.Match[str]) -> str:
-                    location_id = int(match.group(2))
-                    if location_id not in placement_by_id:
-                        raise ValueError(
-                            'packaged location notification lacks placement mapping: {value_0}'.format(value_0=f'{location_id}')
-                        )
-                    return (
-                        match.group(1)
-                        + placement_sent_key(location_id)
-                        + match.group(3)
-                    )
+                replace_header = self._placement_header_rewriter(placement_by_id, placement_sent_key)
 
                 if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
                     from tools.maps.ap_map_generator import remove_blood_punch_grants
                     text = remove_blood_punch_grants(text)
-                if inactive_aliases:
-                    from tools.maps.ap_map_generator import (
-                        find_entity_block_bounds,
-                        neutralize_conditional_pickup_block,
-                    )
-                    for check, location_id in inactive_aliases.items():
-                        bounds = find_entity_block_bounds(text, check)
-                        if bounds is not None:
-                            text = text[:bounds[0]] + neutralize_conditional_pickup_block(text[slice(*bounds)]) + text[bounds[1]:]
-                        bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
-                        if bounds is not None:
-                            text = text[:bounds[0]] + text[bounds[1]:]
+                text = self._neutralize_inactive_aliases(inactive_aliases, text)
                 text = timer_transform(text, member)
                 if economy_enabled and member.endswith(fortress_member_suffix):
                     from tools.maps.fortress_campaign import project_spend_groups
                     text = text.rstrip() + "\n" + fortress_labels
                     text = project_spend_groups(text, selected_groups)
-                if economy_enabled:
-                    from tools.maps.ap_map_generator import find_entity_block_bounds
-                    inactive = {int(match.group(2)) for match in notification_header.finditer(text)} - placement_by_id.keys()
-                    for location_id in sorted(inactive):
-                        bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
-                        if bounds is None:
-                            raise ValueError('notification entity missing: {value_0}'.format(value_0=f'{location_id}'))
-                        text = text[:bounds[0]] + text[bounds[1]:]
+                text = self._remove_inactive_notifications(economy_enabled, notification_header, text, placement_by_id)
                 rewritten_text = notification_header.sub(replace_header, text)
-                if member.endswith(fortress_member_suffix):
-                    if fortress_labels_written:
-                        raise ValueError('room package contains multiple Fortress hub entity members')
-                    if not economy_enabled:
-                        rewritten_text = rewritten_text.rstrip() + "\n" + fortress_labels
-                    fortress_labels_written = True
-                rewritten = rewritten_text.encode("utf-8")
-                decoded.write_bytes(rewritten)
-                try:
-                    subprocess.run(
-                        [str(decompressor), "--compress", str(decoded), str(recompressed)],
-                        check=True,
-                        capture_output=True,
-                        text=True,
-                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
-                    )
-                except subprocess.CalledProcessError as error:
-                    detail = (error.stderr or error.stdout or "").strip()[:500]
-                    raise ValueError(
-                        'could not recompress packaged entities member {value_0}: {value_1}'.format(value_0=f'{member}', value_1=f'{detail}')
-                    ) from error
-                if not recompressed.is_file():
-                    raise ValueError(
-                        'idFileDeCompressor produced no encoded entities member: {value_0}'.format(value_0=f'{member}')
-                    )
-                assembled[member] = recompressed.read_bytes()
+                rewritten_text, fortress_labels_written = self._append_fortress_labels(member, fortress_member_suffix, fortress_labels_written, economy_enabled, rewritten_text, fortress_labels)
+                rewritten = self._encode_placement_entities(rewritten_text, decoded, decompressor, recompressed, member, assembled)
                 LOGGER.info(
                     "ROOM_PACKAGE_MEMBER member=%s compressed_bytes=%d decoded_bytes=%d encoded_bytes=%d",
                     member[:256],
@@ -883,16 +931,7 @@ class RoomCompiler:
             raise ValueError('Fortress Battery placement text contains empty display name')
         return normalized.replace("\\", "\\\\").replace('"', '\\"')
 
-    def _fortress_battery_label_entities(
-        self, placement_by_id: dict[int, PlacementRecord], active_group_ids: list[str] | None = None
-    ) -> tuple[str, str]:
-        """Compile seed-specific pre-purchase labels for all Battery consumers."""
-        from doom_eap.presentation import (
-            ARCHIPELAGO_PRESENTATION_COLORS,
-            color_rgb_floats,
-            item_classification_color_key,
-        )
-
+    def _fortress_expected_locations(self, active_group_ids):
         expected = self.FORTRESS_BATTERY_LOCATION_IDS
         if active_group_ids is not None:
             from doom_eap.content.content_catalog import load_content_catalog
@@ -901,12 +940,9 @@ class RoomCompiler:
                      for name in group["locations"]}
             expected = {code for code, name in load_content_catalog().location_names.items() if name in names}
             expected.add(7770171)
-        missing = sorted(expected - set(placement_by_id))
-        if missing:
-            raise ValueError(
-                'Fortress Battery placement scout is incomplete; missing location IDs: '
-                + ", ".join(str(value) for value in missing)
-            )
+        return expected
+
+    def _fortress_label_spec(self):
         document = json.loads(self.FORTRESS_BATTERY_LABEL_SPEC_PATH.read_text(encoding="utf-8"))
         if document.get("schema_version") != 1:
             raise ValueError('Fortress Battery label specification schema is unsupported')
@@ -925,6 +961,28 @@ class RoomCompiler:
         }
         if primitive != required_primitive:
             raise ValueError('Fortress Battery label primitive contract is invalid')
+        return member_suffix, rows
+
+    @staticmethod
+    def _valid_label_orientation(orientation):
+        return isinstance(orientation, list) and len(orientation) == 3 and all(
+            isinstance(vec, list) and len(vec) == 3 and all(isinstance(val, int | float) for val in vec)
+            for vec in orientation)
+
+    def _validate_fortress_transform(self, location_id, row, position, orientation, rows_by_id):
+        if (
+            not isinstance(location_id, int)
+            or not isinstance(row["source_entity"], str)
+            or not row["source_entity"]
+            or not isinstance(position, list)
+            or len(position) != 3
+            or any(not isinstance(value, int | float) for value in position)
+            or not self._valid_label_orientation(orientation)
+            or location_id in rows_by_id
+        ):
+            raise ValueError('Fortress Battery label transform row is invalid')
+
+    def _fortress_label_transforms(self, rows):
         rows_by_id: dict[int, tuple[float, float, float]] = {}
         orientations_by_id: dict[int, list[list[float]]] = {}
         for row in rows:
@@ -937,29 +995,34 @@ class RoomCompiler:
                 [0.0, 1.0, 0.0],
                 [0.0, 0.0, 1.0],
             ])
-            if (
-                not isinstance(location_id, int)
-                or not isinstance(row["source_entity"], str)
-                or not row["source_entity"]
-                or not isinstance(position, list)
-                or len(position) != 3
-                or any(not isinstance(value, int | float) for value in position)
-                or not isinstance(orientation, list)
-                or len(orientation) != 3
-                or any(
-                    not isinstance(vec, list) or len(vec) != 3
-                    or any(not isinstance(val, int | float) for val in vec)
-                    for vec in orientation
-                )
-                or location_id in rows_by_id
-            ):
-                raise ValueError('Fortress Battery label transform row is invalid')
+            self._validate_fortress_transform(location_id, row, position, orientation, rows_by_id)
             rows_by_id[location_id] = tuple(float(value) for value in position)  # type: ignore[assignment]
             orientations_by_id[location_id] = [
                 [float(val) for val in vec] for vec in orientation
             ]
         if set(rows_by_id) != self.FORTRESS_BATTERY_LOCATION_IDS:
             raise ValueError('Fortress placement label specification must cover exactly 13 anchors')
+        return rows_by_id, orientations_by_id
+
+    def _fortress_battery_label_entities(
+        self, placement_by_id: dict[int, PlacementRecord], active_group_ids: list[str] | None = None
+    ) -> tuple[str, str]:
+        """Compile seed-specific pre-purchase labels for all Battery consumers."""
+        from doom_eap.presentation import (
+            ARCHIPELAGO_PRESENTATION_COLORS,
+            color_rgb_floats,
+            item_classification_color_key,
+        )
+
+        expected = self._fortress_expected_locations(active_group_ids)
+        missing = sorted(expected - set(placement_by_id))
+        if missing:
+            raise ValueError(
+                'Fortress Battery placement scout is incomplete; missing location IDs: '
+                + ", ".join(str(value) for value in missing)
+            )
+        member_suffix, rows = self._fortress_label_spec()
+        rows_by_id, orientations_by_id = self._fortress_label_transforms(rows)
 
         entities: list[str] = []
         for location_id in sorted(expected - {7770171}):
@@ -1122,29 +1185,29 @@ class RoomCompiler:
             return compressed.read_bytes()
 
     @staticmethod
-    def _resolved_enemy_plan(manifest):
-        from doom_eap.runtime.context_registry import load_slot_catalog
+    def _resolved_enemy_plan(manifest, *, resolved=None):
+        from doom_eap.runtime.observers import load_slot_catalog
         from tools.maps.native_recipe_materializer import expand_resolved_native_recipes
 
-        return expand_resolved_native_recipes(admit_slot_data(manifest.options), load_slot_catalog())
+        return expand_resolved_native_recipes(resolved if resolved is not None else admit_slot_data(manifest.options), load_slot_catalog())
 
-    def _compile_enemy_content(self, assembled, manifest):
+    def _compile_enemy_content(self, assembled, manifest, plan=None):
         from tools.maps.native_recipe_materializer import RecipeMaterializationError
 
         try:
-            return self._apply_enemy_plan(assembled, manifest)
+            return self._apply_enemy_plan(assembled, manifest, plan=plan)
         except (ValueError, KeyError, TypeError, OSError) as error:
             if isinstance(error, RecipeMaterializationError | SlotAdmissionError):
                 raise
             raise RecipeMaterializationError('recipe_materialization', str(error)) from error
 
-    def _room_timer_transform(self, options):
+    def _room_timer_transform(self, options, resolved=None):
         from functools import partial
 
-        from doom_eap.runtime.context_registry import load_slot_catalog
+        from doom_eap.runtime.observers import load_slot_catalog
         from tools.maps.native_recipe_materializer import materialize_resolved_timers
 
-        return partial(materialize_resolved_timers, slot=admit_slot_data(options), catalog=load_slot_catalog())
+        return partial(materialize_resolved_timers, slot=resolved if resolved is not None else admit_slot_data(options), catalog=load_slot_catalog())
 
     def _compile_options(self, options):
         data = options
@@ -1170,7 +1233,7 @@ class RoomCompiler:
             self.base_resource, self.payload_resource, self.payload_manifest, options)
         from doom_eap.content.mastery_requirements import patch_mastery_decl
         from doom_eap.content.slot_data_contract import catalog_tables
-        from doom_eap.runtime.context_registry import load_slot_catalog
+        from doom_eap.runtime.observers import load_slot_catalog
 
         masteries = catalog_tables(load_slot_catalog())['masteries']
         for identity, count in manifest.options['runtime']['mastery_requirement_counts'].items():
@@ -1180,7 +1243,73 @@ class RoomCompiler:
             assembled[member] = patch_mastery_decl(assembled[member].decode('utf-8'), entry).encode('utf-8')
         return assembled, selected
 
-    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest) -> dict[str, list[str]]:
+    def _enemy_required_sources(self, changed_maps):
+        required_sources = set(changed_maps)
+        try:
+            for row in changed_maps.values():
+                required_sources.update(body["ai"]["map_key"] for recipe in
+                    [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
+                    for body in recipe["bodies"])
+        except (KeyError, TypeError) as error:
+            raise ValueError('Enemy generation source references are malformed') from error
+        return required_sources
+
+    def _frozen_body_assets(self, references, precache, sources, find_entity_block_bounds):
+        roots, assets = set(), {}
+        for map_key, entity, sha in sorted(references):
+            profile = precache.get(sha)
+            if profile is None or profile["source"] != {"map_key": map_key, "entity": entity, "sha256": sha}:
+                raise ValueError('Native enemy resource catalog lacks frozen body: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{entity}'))
+            for entry in profile["assets"]:
+                assets.setdefault((entry["mapResourceType"], entry["name"]), None)
+            source = sources[map_key]
+            start, end = find_entity_block_bounds(source, entity)
+            roots.update(json.loads(match[0]) for match in re.finditer(r'"(?:[^"\\]|\\.)*"', source[start:end]))
+        return roots, assets
+
+    def _enemy_resource_assets(self, changed_maps, precache, sources, find_entity_block_bounds):
+        map_assets = {}
+        resource_roots = {}
+        for key, row in changed_maps.items():
+            references = {tuple(body["ai"][field] for field in ("map_key", "entity", "sha256"))
+                          for recipe in [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
+                          for body in recipe["bodies"]}
+            roots, assets = self._frozen_body_assets(references, precache, sources, find_entity_block_bounds)
+            roots.update(name for _, name in assets)
+            map_assets[key] = assets
+            resource_roots[row["runtime_map"]] = sorted(roots - {""})
+        return map_assets, resource_roots
+
+    def _materialize_enemy_maps(self, changed_maps, assembled, sources, plan, spawn_diagnostics, staged, compiler, neutral_manifest, patch_mission_complete_maps, materialize_native_recipe_calls, map_assets):
+        for map_key, row in sorted(changed_maps.items()):
+            if map_key not in self.payload_manifest["maps"]:
+                raise ValueError('Enemy generation map is not packaged: {value_0}'.format(value_0=f'{map_key}'))
+            member = self.payload_manifest["maps"][map_key]["target_member"]
+            if member not in assembled:
+                raise ValueError('Enemy generation map is not active: {value_0}'.format(value_0=f'{map_key}'))
+            materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
+                enemy_revision=9, diagnostics=spawn_diagnostics)
+            source_path = staged / f"{map_key}.source"
+            output_path = staged / f"{map_key}.entities"
+            source_path.write_bytes(materialized.encode("utf-8"))
+            compiler.compile_map(neutral_manifest, source_path, output_path, map_key,
+                                 encounter_source=sources[map_key], write_seed_sidecar=False)
+            audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
+                                                 {map_key: output_path}, staged / "publishers",
+                                                 source_maps=sources, retained_overrides=assembled)
+            if audit["unrelated_generated_entity_diff_count"]:
+                raise ValueError('Enemy map publisher patch changed unrelated entities: {value_0}'.format(value_0=f'{map_key}'))
+            assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
+            assets_path = member.split('/', 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
+            assets = json.loads(assembled.get(assets_path, b"{}"))
+            entries = assets.setdefault("assets", [])
+            existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
+            # binary dependencies need their own native cache entries before model preparation.
+            entries.extend({"name": name, "mapResourceType": kind}
+                           for kind, name in map_assets[map_key] if (kind, name) not in existing)
+            assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
+
+    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest, *, plan=None) -> dict[str, list[str]]:
         from dataclasses import replace
 
         from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
@@ -1191,75 +1320,25 @@ class RoomCompiler:
         )
         from tools.release.room_payloads import read_source_snapshots
 
-        plan = self._resolved_enemy_plan(manifest)
+        if plan is None:
+            plan = self._resolved_enemy_plan(manifest)
         if plan is None:
             return {}
         from tools.maps.arena_checks import room_compile_maps
         changed_maps = room_compile_maps(plan["maps"], manifest.active_location_ids, ROOT)
         if not changed_maps:
             return {}
-        required_sources = set(changed_maps)
-        try:
-            for row in changed_maps.values():
-                required_sources.update(body["ai"]["map_key"] for recipe in
-                    [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
-                    for body in recipe["bodies"])
-        except (KeyError, TypeError) as error:
-            raise ValueError('Enemy generation source references are malformed') from error
+        required_sources = self._enemy_required_sources(changed_maps)
         sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
         from tools.maps.ap_map_generator import find_entity_block_bounds
         precache = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes())["bodies"]
-        map_assets = {}
-        resource_roots = {}
-        for key, row in changed_maps.items():
-            references = {tuple(body["ai"][field] for field in ("map_key", "entity", "sha256"))
-                          for recipe in [*row["recipes"], *row.get('compatibility_recipes', []), *row.get('counter_recipes', [])]
-                          for body in recipe["bodies"]}
-            roots, assets = set(), {}
-            for map_key, entity, sha in sorted(references):
-                profile = precache.get(sha)
-                if profile is None or profile["source"] != {"map_key": map_key, "entity": entity, "sha256": sha}:
-                    raise ValueError('Native enemy resource catalog lacks frozen body: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{entity}'))
-                for entry in profile["assets"]:
-                    assets.setdefault((entry["mapResourceType"], entry["name"]), None)
-                source = sources[map_key]
-                start, end = find_entity_block_bounds(source, entity)
-                roots.update(json.loads(match[0]) for match in re.finditer(r'"(?:[^"\\]|\\.)*"', source[start:end]))
-            roots.update(name for _, name in assets)
-            map_assets[key] = assets
-            resource_roots[row["runtime_map"]] = sorted(roots - {""})
+        map_assets, resource_roots = self._enemy_resource_assets(changed_maps, precache, sources, find_entity_block_bounds)
         compiler = ModCompiler(ROOT)
         neutral_manifest = replace(manifest, options=self._compile_options(manifest.options), static_precompile=True)
         spawn_diagnostics = []
         with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
             staged = Path(temporary)
-            for map_key, row in sorted(changed_maps.items()):
-                if map_key not in self.payload_manifest["maps"]:
-                    raise ValueError('Enemy generation map is not packaged: {value_0}'.format(value_0=f'{map_key}'))
-                member = self.payload_manifest["maps"][map_key]["target_member"]
-                if member not in assembled:
-                    raise ValueError('Enemy generation map is not active: {value_0}'.format(value_0=f'{map_key}'))
-                materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
-                    enemy_revision=9, diagnostics=spawn_diagnostics)
-                source_path = staged / f"{map_key}.source"
-                output_path = staged / f"{map_key}.entities"
-                source_path.write_bytes(materialized.encode("utf-8"))
-                compiler.compile_map(neutral_manifest, source_path, output_path, map_key,
-                                     encounter_source=sources[map_key], write_seed_sidecar=False)
-                audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
-                                                     {map_key: output_path}, staged / "publishers",
-                                                     source_maps=sources, retained_overrides=assembled)
-                if audit["unrelated_generated_entity_diff_count"]:
-                    raise ValueError('Enemy map publisher patch changed unrelated entities: {value_0}'.format(value_0=f'{map_key}'))
-                assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
-                assets_path = member.split('/', 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
-                assets = json.loads(assembled.get(assets_path, b"{}"))
-                entries = assets.setdefault("assets", [])
-                existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
-                # binary dependencies need their own native cache entries before model preparation.
-                entries.extend({"name": name, "mapResourceType": kind}
-                               for kind, name in map_assets[map_key] if (kind, name) not in existing)
-                assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
+            self._materialize_enemy_maps(changed_maps, assembled, sources, plan, spawn_diagnostics, staged, compiler, neutral_manifest, patch_mission_complete_maps, materialize_native_recipe_calls, map_assets)
         assembled['enemy_spawn_diagnostics.json'] = (json.dumps({
             'positions': spawn_diagnostics, 'limit': MAX_POSITION_DIAGNOSTICS,
             'limit_per_map': MAX_POSITION_DIAGNOSTICS_PER_MAP,
@@ -1267,13 +1346,7 @@ class RoomCompiler:
         }, sort_keys=True) + '\n').encode('utf8')
         return resource_roots
 
-    def _apply_boon_resources(self, assembled, manifest, resource_roots):
-        profiles = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes()).get('powerups', {})
-        if set(profiles) != {'berserk', 'onslaught', 'overdrive'}:
-            raise ValueError('Powerup resource catalog is incomplete')
-        entries = dict.fromkeys((entry['mapResourceType'], entry['name'])
-                                for profile in profiles.values() for entry in profile['assets'])
-        roots = {name for _, name in entries} | {f'pickup/powerup/{effect}' for effect in profiles}
+    def _boon_map_resources(self, manifest, assembled, resource_roots, roots, entries):
         for key in manifest.options['recipes']['maps']:
             row = self.payload_manifest['maps'].get(key)
             if row is None or row['target_member'] not in assembled:
@@ -1288,33 +1361,16 @@ class RoomCompiler:
             assets.extend(dict(mapResourceType=kind, name=name) for kind, name in entries if (kind, name) not in existing)
             assembled[asset_path] = (json.dumps(document, sort_keys=True) + '\n').encode('utf-8')
 
-    def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
-        from tools.release.room_payloads import canonical_json, write_deterministic_zip
-        placements = manifest.require_complete_placements()
-        self._resolved_enemy_plan(manifest)
-        options = self._compile_options(manifest.options)
-        if manifest.static_content_digest != self.static_content_digest:
-            raise ValueError('room static content identity drifted')
-        output_root.mkdir(parents=True, exist_ok=True)
-        destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
-        if not force and self.validate_cached_package(destination, manifest):
-            return destination
-        assembled, selected = self._assemble_room_files(manifest, options)
-        resource_roots = self._compile_enemy_content(assembled, manifest)
-        from dataclasses import replace
-        self._apply_boon_resources(assembled, replace(manifest, options=options), resource_roots)
-        seed_document = json.loads(canonical_json(manifest.document()))
-        room_config = project_room_config(options)
-        receipt = {
-            "schema": 1,
-            "manifest_hash": manifest.manifest_hash,
-            "physical_options": {key: options[key] for key in PHYSICAL_OPTION_KEYS},
-            "map_payloads": selected,
-            "starting_inventory": options.get("starting_inventory", {}),
-            "starting_weapon": options.get("starting_weapon"),
-            "room_config": room_config,
-            "native_resource_roots": resource_roots,
-        }
+    def _apply_boon_resources(self, assembled, manifest, resource_roots):
+        profiles = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes()).get('powerups', {})
+        if set(profiles) != {'berserk', 'onslaught', 'overdrive'}:
+            raise ValueError('Powerup resource catalog is incomplete')
+        entries = dict.fromkeys((entry['mapResourceType'], entry['name'])
+                                for profile in profiles.values() for entry in profile['assets'])
+        roots = {name for _, name in entries} | {f'pickup/powerup/{effect}' for effect in profiles}
+        self._boon_map_resources(manifest, assembled, resource_roots, roots, entries)
+
+    def _room_loadout_resources(self, options, manifest, assembled):
         devinv_path = output_path_for_map(
             Path("."), ROOT / "data" / "map_sources.json", self.DEVINV_MAP_KEY
         ).as_posix()
@@ -1343,6 +1399,33 @@ class RoomCompiler:
             skip_dlc1_credits=True,
             skip_dlc2_credits=True,
         ))
+        return devinv_path, devinv_source
+
+    def _room_dlc_publishers(self, dlc_contexts, catalog, assembled, patch_generated_map_text):
+        for context in dlc_contexts():
+            if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
+                raise ValueError('DLC context overlay requires one exact map: {value_0}'.format(value_0=f'{context.identity}'))
+            overlay_member = self.payload_manifest["context_targets"].get(context.identity)
+            if not isinstance(overlay_member, str):
+                raise ValueError('DLC context lacks room payload target: {value_0}'.format(value_0=f'{context.identity}'))
+            map_key = context.map_keys[0]
+            spec = catalog.maps.get(map_key)
+            if spec is None:
+                raise ValueError('DLC context map spec missing: {value_0}'.format(value_0=f'{map_key}'))
+            member = overlay_member
+            compiled_content = assembled.get(member)
+            if compiled_content is None:
+                raise ValueError('DLC map compiled payload is missing: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
+            compiled_text = self._decompress_entities_text(compiled_content, member)
+            if "idWorldspawn" not in compiled_text:
+                raise ValueError('DLC map compiled payload is incomplete: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
+            patched_text, _publisher_audit = patch_generated_map_text(
+                map_key, compiled_text, ROOT
+            )
+            if patched_text != compiled_text:
+                assembled[member] = self._compress_entities_text(patched_text)
+
+    def _room_dlc_resources(self, options, manifest, assembled):
         if options.get("include_dlc_missions", True):
             assembled.update({
                 path: source.encode("utf-8")
@@ -1354,42 +1437,13 @@ class RoomCompiler:
                 ).items()
             })
             from doom_eap.content.content_catalog import load_content_catalog
-            from doom_eap.runtime.context_registry import dlc_contexts
+            from doom_eap.runtime.observers import dlc_contexts
             from tools.maps.mission_complete_map_patcher import patch_generated_map_text
 
             catalog = load_content_catalog()
-            for context in dlc_contexts():
-                if len(context.runtime_maps) != 1 or len(context.map_keys) != 1:
-                    raise ValueError('DLC context overlay requires one exact map: {value_0}'.format(value_0=f'{context.identity}'))
-                overlay_member = self.payload_manifest["context_targets"].get(context.identity)
-                if not isinstance(overlay_member, str):
-                    raise ValueError('DLC context lacks room payload target: {value_0}'.format(value_0=f'{context.identity}'))
-                map_key = context.map_keys[0]
-                spec = catalog.maps.get(map_key)
-                if spec is None:
-                    raise ValueError('DLC context map spec missing: {value_0}'.format(value_0=f'{map_key}'))
-                member = overlay_member
-                compiled_content = assembled.get(member)
-                if compiled_content is None:
-                    raise ValueError('DLC map compiled payload is missing: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
-                compiled_text = self._decompress_entities_text(compiled_content, member)
-                if "idWorldspawn" not in compiled_text:
-                    raise ValueError('DLC map compiled payload is incomplete: {value_0}/{value_1}'.format(value_0=f'{map_key}', value_1=f'{member}'))
-                patched_text, _publisher_audit = patch_generated_map_text(
-                    map_key, compiled_text, ROOT
-                )
-                if patched_text != compiled_text:
-                    assembled[member] = self._compress_entities_text(patched_text)
-        assembled.update({
-            "room_config.json": canonical_json(room_config),
-            "seed_manifest.json": canonical_json(seed_document),
-            "seed_receipt.json": canonical_json(receipt),
-        })
-        if options.get("enhanced_melee_damage", False):
-            assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
-        if not manifest.static_precompile:
-            self._apply_placement_entities(assembled, placements, manifest.options)
-            self._apply_placement_strings(assembled, placements)
+            self._room_dlc_publishers(dlc_contexts, catalog, assembled, patch_generated_map_text)
+
+    def _publish_room_package(self, destination, assembled, write_deterministic_zip):
         incoming = destination.with_name(f".{destination.name}.incoming")
         try:
             write_deterministic_zip(assembled, incoming)
@@ -1399,6 +1453,8 @@ class RoomCompiler:
                 incoming.unlink()
             except OSError:
                 pass
+
+    def _verify_room_package(self, destination, assembled, seed_document, room_config, receipt, devinv_path, devinv_source, options):
         with zipfile.ZipFile(destination) as output:
             expected = set(assembled)
             if set(output.namelist()) != expected:
@@ -1415,12 +1471,66 @@ class RoomCompiler:
                 options.get("enhanced_melee_damage", False)
             ):
                 raise ValueError('assembled Enhanced Melee Damage validation failed')
+
+    def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
+        from tools.release.room_payloads import canonical_json, write_deterministic_zip
+        resolved = _admit_manifest(manifest)
+        placements = manifest._complete_placements()
+        if resolved is None:
+            resolved = admit_slot_data(manifest.options)
+        plan = self._resolved_enemy_plan(manifest, resolved=resolved)
+        options = self._compile_options(manifest.options)
+        if manifest.static_content_digest != self.static_content_digest:
+            raise ValueError('room static content identity drifted')
+        output_root.mkdir(parents=True, exist_ok=True)
+        destination = output_root / f"DoomEternalArchipelago-{manifest.manifest_hash[:16]}.zip"
+        if not force and self._cached_package_matches(destination, manifest):
+            return destination
+        assembled, selected = self._assemble_room_files(manifest, options)
+        resource_roots = self._compile_enemy_content(assembled, manifest, plan)
+        self._apply_boon_resources(assembled, manifest, resource_roots)
+        seed_document = json.loads(canonical_json(manifest.document()))
+        room_config = project_room_config(options)
+        receipt = {
+            "schema": 1,
+            "manifest_hash": manifest.manifest_hash,
+            "physical_options": {key: options[key] for key in PHYSICAL_OPTION_KEYS},
+            "map_payloads": selected,
+            "starting_inventory": options.get("starting_inventory", {}),
+            "starting_weapon": options.get("starting_weapon"),
+            "room_config": room_config,
+            "native_resource_roots": resource_roots,
+        }
+        devinv_path, devinv_source = self._room_loadout_resources(options, manifest, assembled)
+        self._room_dlc_resources(options, manifest, assembled)
+        assembled.update({
+            "room_config.json": canonical_json(room_config),
+            "seed_manifest.json": canonical_json(seed_document),
+            "seed_receipt.json": canonical_json(receipt),
+        })
+        if options.get("enhanced_melee_damage", False):
+            assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
+        if not manifest.static_precompile:
+            self._apply_placement_entities(assembled, placements, manifest.options, resolved=resolved)
+            self._apply_placement_strings(assembled, placements)
+        self._publish_room_package(destination, assembled, write_deterministic_zip)
+        self._verify_room_package(destination, assembled, seed_document, room_config, receipt, devinv_path, devinv_source, options)
         return destination
 
 
 class ModCompiler:
     def __init__(self, root: Path = ROOT):
         self.root = root
+
+    def _enabled_location_ids(self, ids, physical_ids, options, names):
+        active = [
+            location_id for location_id in ids
+            if location_id not in (physical_ids - physical_location_ids(options))
+            and (options.get("include_slayer_gates", True) or not names[str(location_id)].endswith(" - Slayer Gate Complete"))
+            and (options.get("include_secret_encounters", True) or " - Secret Encounter - " not in names[str(location_id)])
+            and (options.get("include_slayer_gates", True) or names[str(location_id)] != "Fortress of Doom - Unmaykr Acquired")
+        ]
+        return active
 
     def active_location_ids(self, options: dict[str, Any]) -> list[int]:
         from doom_eap.content.arena_checks import inactive_arena_ids
@@ -1431,13 +1541,7 @@ class ModCompiler:
             int(spec["location_id"])
             for spec in PHYSICAL_OPTIONS.values()
         }
-        active = [
-            location_id for location_id in ids
-            if location_id not in (physical_ids - physical_location_ids(options))
-            and (options.get("include_slayer_gates", True) or not names[str(location_id)].endswith(" - Slayer Gate Complete"))
-            and (options.get("include_secret_encounters", True) or " - Secret Encounter - " not in names[str(location_id)])
-            and (options.get("include_slayer_gates", True) or names[str(location_id)] != "Fortress of Doom - Unmaykr Acquired")
-        ]
+        active = self._enabled_location_ids(ids, physical_ids, options, names)
         if "killsanity" in options:
             active.extend(milestone_ids(options["killsanity"]))
         return sorted(active)
@@ -1483,7 +1587,7 @@ class ModCompiler:
                     write_seed_sidecar: bool = True) -> Path:
         """Compile one supported campaign map with map-local room transforms."""
         from doom_eap.content.item_classification import load_item_classifications
-        from doom_eap.runtime.item_reconciliation import load_policy_registry
+        from doom_eap.runtime.inventory import load_policy_registry
         from tools.maps.ap_map_generator import generate_map
 
         item_definitions = json.loads(
@@ -1555,6 +1659,20 @@ class LaunchWorkflow:
         return candidate / "ap_config.json"
 
     @staticmethod
+    def _validate_steam_account(configured, inferred):
+        if configured is not None:
+            if isinstance(configured, bool) or not isinstance(configured, int | str):
+                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.')
+            try:
+                configured_id = int(configured)
+            except ValueError as error:
+                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.') from error
+            if configured_id <= 0 or configured_id != inferred:
+                raise ValueError(
+                    'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
+                )
+
+    @staticmethod
     def _steam_id3(steam_remote_dir: object, configured: object = None) -> int:
         remote = Path(str(steam_remote_dir)).expanduser()
         if (
@@ -1571,18 +1689,27 @@ class LaunchWorkflow:
                 'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
             )
         inferred = int(account)
-        if configured is not None:
-            if isinstance(configured, bool) or not isinstance(configured, int | str):
-                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.')
-            try:
-                configured_id = int(configured)
-            except ValueError as error:
-                raise ValueError('The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.') from error
-            if configured_id <= 0 or configured_id != inferred:
-                raise ValueError(
-                    'The Steam save account could not be identified. Select the correct account or select Help -> SAVE SUPPORT REPORT.'
-                )
+        LaunchWorkflow._validate_steam_account(configured, inferred)
         return inferred
+
+    @staticmethod
+    def _update_client_config(config, runtime_config, endpoint, manifest_hash):
+        previous_base = config.get("doom_base_dir")
+        source = dict(runtime_config or {})
+        for key in CLIENT_CONFIG_FIELDS - {"steam_id3", "steam_remote_dir"}:
+            value = source.get(key)
+            if key == "server_address" and endpoint is not None:
+                value = endpoint
+            elif key == "seed_manifest_hash" and manifest_hash is not None:
+                value = manifest_hash
+            if value is not None:
+                config[key] = value
+            elif runtime_config is not None and key in {"core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"}:
+                config.pop(key, None)
+
+        LaunchWorkflow._client_steam_config(config, source)
+        config.pop("password", None)
+        return previous_base
 
     @staticmethod
     def write_client_config(
@@ -1600,21 +1727,7 @@ class LaunchWorkflow:
         if not isinstance(config, dict):
             raise ValueError('The game connection settings could not be read. Select Help -> SAVE SUPPORT REPORT.')
 
-        previous_base = config.get("doom_base_dir")
-        source = dict(runtime_config or {})
-        for key in CLIENT_CONFIG_FIELDS - {"steam_id3", "steam_remote_dir"}:
-            value = source.get(key)
-            if key == "server_address" and endpoint is not None:
-                value = endpoint
-            elif key == "seed_manifest_hash" and manifest_hash is not None:
-                value = manifest_hash
-            if value is not None:
-                config[key] = value
-            elif runtime_config is not None and key in {"core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"}:
-                config.pop(key, None)
-
-        LaunchWorkflow._client_steam_config(config, source)
-        config.pop("password", None)
+        previous_base = LaunchWorkflow._update_client_config(config, runtime_config, endpoint, manifest_hash)
 
         if journal is not None:
             journal.replace(path, (json.dumps(config, indent=2, sort_keys=True) + "\n").encode("utf-8"),

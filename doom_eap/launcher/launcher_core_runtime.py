@@ -13,9 +13,9 @@ import zipfile
 from pathlib import Path
 
 from doom_eap.contracts.core_distribution import validate_manifest, verify_bytes, verify_runtime, version_key
+from doom_eap.launcher.launcher_injector import UrlDownloadTransport, probe_meathook
+from doom_eap.launcher.launcher_platform import ProcessInspectionError, detect_doom_processes
 from doom_eap.launcher.ui.strings import text as player_text
-
-from .launcher_platform import ProcessInspectionError, UrlDownloadTransport, detect_doom_processes, probe_meathook
 
 RELEASES_URL = "https://api.github.com/repos/snowzzrra/Sentinel-Core/releases?per_page=100"
 
@@ -28,9 +28,19 @@ class CoreRuntime:
         self._lock = threading.RLock()
         self.checked = False
 
-    def _metadata(self, url):
-        key = hashlib.sha256(url.encode()).hexdigest()
-        saved = self.root / (key + ".json")
+    def _record_rate_limit(self, error):
+        if error.code in (403, 429, 503):
+            delay = error.headers.get("Retry-After", "60")
+            reset = error.headers.get("X-RateLimit-Reset", "0")
+            from email.utils import parsedate_to_datetime
+            try:
+                retry = time.time() + int(delay) if delay.isdecimal() else parsedate_to_datetime(delay).timestamp()
+            except (ValueError, TypeError, OverflowError):
+                retry = time.time() + 60
+            retry = max(time.time(), retry, int(reset) if reset.isdecimal() else 0)
+            (self.root / "retry.json").write_text(json.dumps({"after": retry}))
+
+    def _metadata_cache(self, saved):
         try:
             cached = json.loads(saved.read_text()) if saved.exists() else {}
             if not isinstance(cached, dict):
@@ -40,6 +50,12 @@ class CoreRuntime:
         headers = {"Accept": "application/vnd.github+json"}
         if cached.get("etag"):
             headers["If-None-Match"] = cached["etag"]
+        return cached, headers
+
+    def _metadata(self, url):
+        key = hashlib.sha256(url.encode()).hexdigest()
+        saved = self.root / (key + ".json")
+        cached, headers = self._metadata_cache(saved)
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             path = Path(directory) / "response"
             try:
@@ -47,16 +63,7 @@ class CoreRuntime:
             except urllib.error.HTTPError as error:
                 if error.code == 304 and cached:
                     return cached["value"], cached.get("next")
-                if error.code in (403, 429, 503):
-                    delay = error.headers.get("Retry-After", "60")
-                    reset = error.headers.get("X-RateLimit-Reset", "0")
-                    from email.utils import parsedate_to_datetime
-                    try:
-                        retry = time.time() + int(delay) if delay.isdecimal() else parsedate_to_datetime(delay).timestamp()
-                    except (ValueError, TypeError, OverflowError):
-                        retry = time.time() + 60
-                    retry = max(time.time(), retry, int(reset) if reset.isdecimal() else 0)
-                    (self.root / "retry.json").write_text(json.dumps({"after": retry}))
+                self._record_rate_limit(error)
                 raise
             value = json.loads(path.read_text(encoding="utf-8"))
             received = {name.lower(): value for name, value in (response.headers or {}).items()}
@@ -80,6 +87,41 @@ class CoreRuntime:
                 continue
         return sorted(result, key=lambda row: version_key(row[0]["version"]), reverse=True)
 
+    def _release_pages(self):
+        releases, url, visited = [], RELEASES_URL, set()
+        while url:
+            if url in visited:
+                raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
+            visited.add(url)
+            page, url = self._metadata(url)
+            if not isinstance(page, list):
+                raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
+            releases.extend(page)
+        return releases
+
+    def _stable_release(self, assets, candidates, release):
+        try:
+            manifest, _ = self._metadata(assets["distribution.json"])
+            validate_manifest(manifest)
+            if manifest["channel"] == "stable":
+                candidates.append((manifest, assets))
+        except (ValueError, KeyError, TypeError) as error:
+            self.emit("core_update_status", state="skipped",
+                      technical_message='Game connection release {value_0} skipped: {value_1}'.format(value_0=f"{release.get('tag_name', 'unknown')}", value_1=f'{error}'))
+
+    def _release_candidates(self, releases):
+        candidates = []
+        for release in releases:
+            if release.get("draft") or release.get("prerelease"):
+                continue
+            assets = {asset["name"]: asset["browser_download_url"] for asset in release.get("assets", [])}
+            if "distribution.json" not in assets or "sentinel-runtime.zip" not in assets:
+                continue
+            if any(not assets[name].startswith("https://github.com/snowzzrra/Sentinel-Core/releases/download/") for name in ("distribution.json", "sentinel-runtime.zip")):
+                raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
+            self._stable_release(assets, candidates, release)
+        return candidates
+
     def check(self, *, preferred_build=None):
         with self._lock:
             self.root.mkdir(parents=True, exist_ok=True)
@@ -94,32 +136,8 @@ class CoreRuntime:
                 return
             self.emit("core_update_status", state="checking", message=player_text("launcher.core_runtime", "checking_for_game_connection_updates"))
             try:
-                releases, url, visited = [], RELEASES_URL, set()
-                while url:
-                    if url in visited:
-                        raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
-                    visited.add(url)
-                    page, url = self._metadata(url)
-                    if not isinstance(page, list):
-                        raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
-                    releases.extend(page)
-                candidates = []
-                for release in releases:
-                    if release.get("draft") or release.get("prerelease"):
-                        continue
-                    assets = {asset["name"]: asset["browser_download_url"] for asset in release.get("assets", [])}
-                    if "distribution.json" not in assets or "sentinel-runtime.zip" not in assets:
-                        continue
-                    if any(not assets[name].startswith("https://github.com/snowzzrra/Sentinel-Core/releases/download/") for name in ("distribution.json", "sentinel-runtime.zip")):
-                        raise ValueError('The game connection download could not be checked. Retry later. If it continues, select Help -> SAVE SUPPORT REPORT.')
-                    try:
-                        manifest, _ = self._metadata(assets["distribution.json"])
-                        validate_manifest(manifest)
-                        if manifest["channel"] == "stable":
-                            candidates.append((manifest, assets))
-                    except (ValueError, KeyError, TypeError) as error:
-                        self.emit("core_update_status", state="skipped",
-                                  technical_message='Game connection release {value_0} skipped: {value_1}'.format(value_0=f"{release.get('tag_name', 'unknown')}", value_1=f'{error}'))
+                releases = self._release_pages()
+                candidates = self._release_candidates(releases)
                 if candidates:
                     manifest, assets = max(candidates, key=lambda row: version_key(row[0]["version"]))
                     self._download(manifest, assets)
@@ -167,16 +185,7 @@ class CoreRuntime:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     os.replace(path, target)
 
-    def resolve(self, config, game_root, *, refresh=False):
-        override = config.get("core_runtime_manifest")
-        if override:
-            path = Path(str(override)).expanduser().resolve()
-            if path.is_dir():
-                path /= "distribution.json"
-            verify_runtime(path, bootstrap_from_archive=True)
-            return path
-        installed = probe_meathook(game_root)
-        selected = config.get("selected_core_runtime_manifest")
+    def _verified_selection(self, selected, installed):
         if selected:
             try:
                 manifest, _ = verify_runtime(Path(str(selected)), bootstrap_from_archive=True)
@@ -184,29 +193,62 @@ class CoreRuntime:
                     selected = None
             except (OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile):
                 selected = None
-        try:
-            running = bool(detect_doom_processes())
-        except ProcessInspectionError:
-            running = True
-        hold = installed.ok and (running or (not config.get("core_auto_update", True) and not refresh))
-        if hold and selected and not refresh:
-            return Path(str(selected))
-        preferred_build = installed.details["build_id"] if installed.ok and not config.get("core_auto_update", True) else None
+        return selected
+
+    def _cached_runtime_available(self, selected, installed, hold):
         available = selected or any(
             not installed.ok or (row[0]["build_id"] == installed.details["build_id"] if hold else
                                 version_key(row[0]["version"]) >= version_key(installed.details["version"]))
             for row in self.cached())
-        if refresh or (not self.checked and not available):
-            self.check(preferred_build=preferred_build)
-        with self._lock if not available else contextlib.nullcontext():
-            candidates = self.cached()
+        return available
+
+    def _matching_runtime_candidates(self, installed, hold, candidates):
         if installed.ok:
             if hold:
                 candidates = [row for row in candidates if row[0]["build_id"] == installed.details["build_id"]]
             else:
                 candidates = [row for row in candidates if version_key(row[0]["version"]) >= version_key(installed.details["version"])]
+        return candidates
+
+    def _override_runtime(self, config):
+        override = config.get("core_runtime_manifest")
+        if override:
+            path = Path(str(override)).expanduser().resolve()
+            if path.is_dir():
+                path /= "distribution.json"
+            verify_runtime(path, bootstrap_from_archive=True)
+            return path
+
+    def _hold_installed_runtime(self, installed, config, refresh):
+        try:
+            running = bool(detect_doom_processes())
+        except ProcessInspectionError:
+            running = True
+        hold = installed.ok and (running or (not config.get("core_auto_update", True) and not refresh))
+        return hold
+
+    def _select_cached_runtime(self, available, installed, hold, selected):
+        with self._lock if not available else contextlib.nullcontext():
+            candidates = self.cached()
+        candidates = self._matching_runtime_candidates(installed, hold, candidates)
         if candidates:
             return candidates[0][1]
         if selected:
             return Path(str(selected))
         raise RuntimeError('Game connection files are unavailable. Open Help and select Repair Game Connection.')
+
+    def resolve(self, config, game_root, *, refresh=False):
+        override = self._override_runtime(config)
+        if override is not None:
+            return override
+        installed = probe_meathook(game_root)
+        selected = config.get("selected_core_runtime_manifest")
+        selected = self._verified_selection(selected, installed)
+        hold = self._hold_installed_runtime(installed, config, refresh)
+        if hold and selected and not refresh:
+            return Path(str(selected))
+        preferred_build = installed.details["build_id"] if installed.ok and not config.get("core_auto_update", True) else None
+        available = self._cached_runtime_available(selected, installed, hold)
+        if refresh or (not self.checked and not available):
+            self.check(preferred_build=preferred_build)
+        return self._select_cached_runtime(available, installed, hold, selected)

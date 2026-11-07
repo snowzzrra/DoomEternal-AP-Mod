@@ -60,7 +60,7 @@ class ReportDialog(QDialog):
         preview = QPlainTextEdit()
         preview.setReadOnly(True)
         preview.setPlainText(payload["diagnostics"])
-        layout.addWidget(QLabel(player_text("launcher.ui", "technical_details_with_private_information_removed")))
+        layout.addWidget(QLabel(player_text("launcher.ui", "sanitized_details")))
         layout.addWidget(preview)
         path = QLabel(
             player_text("launcher.ui", "support_report_file")
@@ -70,7 +70,7 @@ class ReportDialog(QDialog):
         path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         layout.addWidget(path)
         instruction = QLabel(
-            player_text("launcher.ui", "drag_the_support_zip_into_the_github_issue_before_submitting_it")
+            player_text("launcher.ui", "attach_report_help")
         )
         instruction.setWordWrap(True)
         layout.addWidget(instruction)
@@ -87,11 +87,11 @@ class ReportDialog(QDialog):
             if clipboard is not None:
                 QApplication.clipboard().setText(clipboard)
                 message.setText(
-                    player_text("launcher.ui", "report_copied_paste_it_into_the_issue_summary_and_drag_in_the_zi")
+                    player_text("launcher.ui", "report_copied_help")
                 )
             if not webbrowser.open(url):
                 message.setText(
-                    player_text("launcher.ui", "could_not_open_the_browser_copy_the_report_and_open_the_project")
+                    player_text("launcher.ui", "browser_failed")
                 )
 
         open_issue.clicked.connect(open_github)

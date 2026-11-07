@@ -17,6 +17,17 @@ _HUB_TEXT_DONORS = {
 }
 
 
+def _native_donor_maps(stage, catalog, key):
+    donors = set()
+    for recipe in [*stage["recipes"], *stage.get('compatibility_recipes', []), *stage.get('counter_recipes', [])]:
+        for body in recipe["bodies"]:
+            donor = body["ai"]["map_key"]
+            if donor not in catalog:
+                raise ValueError('Unknown native enemy resource donor')
+            if donor != key:
+                donors.add(catalog[donor]["runtime_map"])
+    return donors
+
 def native_resource_maps(plan):
     if not plan or plan.get("kind") != "native_recipes":
         return {}
@@ -25,14 +36,7 @@ def native_resource_maps(plan):
     for key, stage in plan["maps"].items():
         if key not in catalog or stage["runtime_map"] != catalog[key]["runtime_map"]:
             raise ValueError('Native enemy resource destination differs from the catalog')
-        donors = set()
-        for recipe in [*stage["recipes"], *stage.get('compatibility_recipes', []), *stage.get('counter_recipes', [])]:
-            for body in recipe["bodies"]:
-                donor = body["ai"]["map_key"]
-                if donor not in catalog:
-                    raise ValueError('Unknown native enemy resource donor')
-                if donor != key:
-                    donors.add(catalog[donor]["runtime_map"])
+        donors = _native_donor_maps(stage, catalog, key)
         if donors:
             result[stage["runtime_map"]] = donors
     return result

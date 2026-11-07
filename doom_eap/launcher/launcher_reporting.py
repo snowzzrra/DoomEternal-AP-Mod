@@ -16,10 +16,10 @@ from typing import Protocol
 from urllib.parse import urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from doom_eap.launcher.launcher_platform import publish_file
+from doom_eap.launcher.launcher_support import sanitize_support_value
 from doom_eap.launcher.ui.strings import text as player_text
 
-from .launcher_doctor import sanitize_support_value
-from .launcher_platform import publish_file
 from .launcher_workers import LauncherJob, LauncherWorkCancelled
 
 
@@ -77,7 +77,7 @@ def report_problem(controller: SupportReportGenerator, *, logs: list[str], job: 
         saved = json.loads(draft_path.read_text(encoding="utf-8"))
         path = Path(saved["path"]) if saved.get("path") else None
         message = (player_text('launcher.reporting', 'report_sent') + saved["url"] if saved.get("url") else
-                   player_text('launcher.reporting', 'saved_report_reopened_review_the_text_before_opening_a_github_is'))
+                   player_text('launcher.reporting', 'report_reopened'))
         return ProblemReport(path, saved["payload"], message, bool(saved.get("submitted")), saved.get("url"))
     path = None
     diagnostics = ""
@@ -89,11 +89,11 @@ def report_problem(controller: SupportReportGenerator, *, logs: list[str], job: 
         with zipfile.ZipFile(path) as archive:
             report_id = json.loads(archive.read("doctor.json"))["report_id"]
             diagnostics = archive.read("summary.txt").decode("utf-8")
-        message = player_text('launcher.reporting', 'review_the_text_before_opening_a_github_issue_a_support_report_f')
+        message = player_text('launcher.reporting', 'report_review_help')
     except LauncherWorkCancelled:
         raise
     except (OSError, ValueError, zipfile.BadZipFile):
-        message = player_text('launcher.reporting', 'the_support_file_could_not_be_created_describe_the_problem_and_r')
+        message = player_text('launcher.reporting', 'support_file_failed')
     if job is not None:
         job.check()
     payload = {"schema_version":1, "idempotency_key":report_id, "title":'Launcher problem',

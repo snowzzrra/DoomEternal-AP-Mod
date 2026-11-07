@@ -20,6 +20,38 @@ def diagnostics_directory(config):
     return Path(prefix).expanduser() / "pfx/drive_c/users/steamuser/AppData/Local/SentinelCore/diagnostics"
 
 
+def _read_diagnostic_tail(path):
+    with path.open("rb") as stream:
+        size = stream.seek(0, 2)
+        start = max(0, size - 1024 * 1024)
+        stream.seek(start)
+        if start:
+            stream.readline(131073)
+        raw = stream.read(1024 * 1024)
+    return size, start, raw
+
+def _matching_diagnostic_records(raw, pid, created, session):
+    retained = []
+    skipped = 0
+    for line in raw.splitlines():
+        if len(line) > 131072:
+            skipped += 1
+            continue
+        record = json.loads(line)
+        if (not isinstance(record, dict) or record.get("schema") != "sentinel-startup-v1"
+                or record.get("pid") != pid or record.get("process_created") != created):
+            continue
+        native_session = record.get("session")
+        record["correlation"] = {"build_matches": record.get("build_id") == session.get("build_id"),
+                                 "namespace_matches": isinstance(native_session, dict) and native_session.get("namespace_id") == session.get("namespace_id")}
+        retained.append(record)
+    return retained, skipped
+
+def _diagnostic_file_record(files, path, size, start, skipped, retained):
+    files.append({"source_filename": path.name, "source_size": size,
+                  "truncated": bool(start or skipped or len(retained) > 64),
+                  "records": retained[-64:]})
+
 def collect(config, session):
     pid, created = session.get("pid"), str(session.get("process_created", ""))
     if type(pid) is not int or pid <= 0 or not created.isdecimal():
@@ -33,30 +65,9 @@ def collect(config, session):
     for suffix in (".jsonl.previous", ".jsonl", ".latest.json"):
         path = root / f"{pid}-{created}{suffix}"
         try:
-            with path.open("rb") as stream:
-                size = stream.seek(0, 2)
-                start = max(0, size - 1024 * 1024)
-                stream.seek(start)
-                if start:
-                    stream.readline(131073)
-                raw = stream.read(1024 * 1024)
-            retained = []
-            skipped = 0
-            for line in raw.splitlines():
-                if len(line) > 131072:
-                    skipped += 1
-                    continue
-                record = json.loads(line)
-                if (not isinstance(record, dict) or record.get("schema") != "sentinel-startup-v1"
-                        or record.get("pid") != pid or record.get("process_created") != created):
-                    continue
-                native_session = record.get("session")
-                record["correlation"] = {"build_matches": record.get("build_id") == session.get("build_id"),
-                                         "namespace_matches": isinstance(native_session, dict) and native_session.get("namespace_id") == session.get("namespace_id")}
-                retained.append(record)
-            files.append({"source_filename": path.name, "source_size": size,
-                          "truncated": bool(start or skipped or len(retained) > 64),
-                          "records": retained[-64:]})
+            size, start, raw = _read_diagnostic_tail(path)
+            retained, skipped = _matching_diagnostic_records(raw, pid, created, session)
+            _diagnostic_file_record(files, path, size, start, skipped, retained)
             records.extend(retained[-64:])
         except FileNotFoundError:
             continue

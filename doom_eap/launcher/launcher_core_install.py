@@ -31,7 +31,7 @@ def game_write_lock(root, *, blocking=True):
 
 @contextmanager
 def _game_write_lock(root, *, blocking=True):
-    from .launcher_platform import _acquire_windows_mutex, _release_windows_mutex
+    from doom_eap.launcher.launcher_platform import _acquire_windows_mutex, _release_windows_mutex
     key = hashlib.sha256(os.path.normcase(str(Path(root).resolve())).encode()).hexdigest()
     if os.name == "nt":
         name = "Local\\DoomEAP.GameWrite." + key
@@ -60,7 +60,7 @@ def _read(path):
 
 
 def restore(root, backup):
-    from .launcher_platform import _atomic_write_bytes
+    from doom_eap.launcher.launcher_platform import _atomic_write_bytes
     record = json.loads((backup / "record.json").read_text())
     if record["game_root"] != str(root.resolve()):
         raise RuntimeError('These recovery files belong to another game folder. Select Help -> SAVE SUPPORT REPORT.')
@@ -81,6 +81,16 @@ def restore(root, backup):
             _atomic_write_bytes(root / name, original)
 
 
+def _verify_completed_core_update(directory, token, root, marker):
+    record = json.loads((directory / token / "record.json").read_text())
+    if record["game_root"] != str(root.resolve()) or marker.read_bytes() != b"sentinel-update-v1\n":
+        raise RuntimeError('Update details could not be read and were kept. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
+    for name in NAMES:
+        data = _read(root / name)
+        if data is None or hashlib.sha256(data).hexdigest() != record["incoming"][name]:
+            raise RuntimeError('Updated files do not match the saved recovery details. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
+    marker.unlink()
+
 def recover_interrupted(root, state_dir):
     directory = backup_root(root, state_dir)
     active = directory / "active.json"
@@ -97,22 +107,10 @@ def recover_interrupted(root, state_dir):
         token = json.loads((directory / "previous.json").read_text())["backup"]
         if len(token) != 32 or any(char not in "0123456789abcdef" for char in token):
             raise ValueError('Recovery details could not be read. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
-        record = json.loads((directory / token / "record.json").read_text())
-        if record["game_root"] != str(root.resolve()) or marker.read_bytes() != b"sentinel-update-v1\n":
-            raise RuntimeError('Update details could not be read and were kept. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
-        for name in NAMES:
-            data = _read(root / name)
-            if data is None or hashlib.sha256(data).hexdigest() != record["incoming"][name]:
-                raise RuntimeError('Updated files do not match the saved recovery details. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
-        marker.unlink()
+        _verify_completed_core_update(directory, token, root, marker)
 
 
-def replace_pair(root, state_dir, incoming, *, journal=None):
-    from .launcher_platform import _atomic_write_bytes, detect_doom_processes, probe_meathook, require_doom_closed
-    require_doom_closed('replacing Core')
-    directory = backup_root(root, state_dir)
-    backup = directory / secrets.token_hex(16)
-    backup.mkdir(parents=True)
+def _backup_core_pair(root, incoming, backup):
     original = {name: _read(root / name) for name in NAMES}
     record = {"game_root": str(root.resolve()), "original": {}, "incoming": {}}
     for name in NAMES:
@@ -123,6 +121,15 @@ def replace_pair(root, state_dir, incoming, *, journal=None):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(data)
     (backup / "record.json").write_text(json.dumps(record))
+
+def replace_pair(root, state_dir, incoming, *, journal=None):
+    from doom_eap.launcher.launcher_injector import probe_meathook
+    from doom_eap.launcher.launcher_platform import _atomic_write_bytes, detect_doom_processes, require_doom_closed
+    require_doom_closed('replacing Core')
+    directory = backup_root(root, state_dir)
+    backup = directory / secrets.token_hex(16)
+    backup.mkdir(parents=True)
+    _backup_core_pair(root, incoming, backup)
     pointer = _pair_intents(root, directory, backup, journal)
     _atomic_write_bytes(directory / "active.json", pointer)
     _atomic_write_bytes(root / "sentinel-core-update.txt", b"sentinel-update-v1\n")
@@ -133,7 +140,7 @@ def replace_pair(root, state_dir, incoming, *, journal=None):
             _atomic_write_bytes(root / name, incoming[name])
         if not probe_meathook(root).ok:
             raise RuntimeError('Game connection files could not be checked after installation. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         if not detect_doom_processes():
             restore(root, backup)
             (directory / "active.json").unlink()
@@ -159,7 +166,7 @@ def _pair_intents(root, directory, backup, journal):
 
 
 def rollback_core(root, state_dir):
-    from .launcher_platform import detect_doom_processes
+    from doom_eap.launcher.launcher_platform import detect_doom_processes
     with game_write_lock(root):
         if detect_doom_processes():
             raise RuntimeError('Close DOOM Eternal before restoring the previous game connection files.')

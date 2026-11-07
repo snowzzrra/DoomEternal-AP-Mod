@@ -77,6 +77,22 @@ class LauncherWorkers:
             for job in self._jobs.values():
                 job._cancelled.set()
 
+    def _run_job(self, job, key, operation, serialized):
+        try:
+            with self._serial if serialized else nullcontext():
+                job.check()
+                operation(job)
+        except LauncherWorkCancelled:
+            pass
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError) as error:
+            if self.accepts(job.generation):
+                self._error_sink(job, error)
+        finally:
+            with self._lock:
+                if self._jobs.get(key) is job:
+                    self._jobs.pop(key)
+                self._threads.discard(threading.current_thread())
+
     def submit(self, key: Hashable, operation: Callable[[LauncherJob], None], *, generation: int | None = None,
                serialized: bool = True) -> bool:
         with self._lock:
@@ -87,23 +103,8 @@ class LauncherWorkers:
                 return False
             job = LauncherJob(key, self._generation, threading.Event(), self._publication_lock)
 
-            def run() -> None:
-                try:
-                    with self._serial if serialized else nullcontext():
-                        job.check()
-                        operation(job)
-                except LauncherWorkCancelled:
-                    pass
-                except Exception as error:
-                    if self.accepts(job.generation):
-                        self._error_sink(job, error)
-                finally:
-                    with self._lock:
-                        if self._jobs.get(key) is job:
-                            self._jobs.pop(key)
-                        self._threads.discard(threading.current_thread())
 
-            thread = threading.Thread(target=run, name="DoomLauncherWorker", daemon=True)
+            thread = threading.Thread(target=self._run_job, args=(job, key, operation, serialized), name="DoomLauncherWorker", daemon=True)
             self._jobs[key] = job
             self._threads.add(thread)
             thread.start()

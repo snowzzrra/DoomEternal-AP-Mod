@@ -3,7 +3,7 @@
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
-from doom_eap.runtime.ledger_records import (
+from doom_eap.runtime.ledger import (
     Authority,
     ItemAction,
     ItemReason,
