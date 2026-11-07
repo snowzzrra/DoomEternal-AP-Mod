@@ -19,17 +19,7 @@ def load_packagemapspec(packagemapspec_path: Path | str) -> dict[str, Any]:
     return data
 
 
-def resolve_owner(
-    runtime_map: str,
-    packagemapspec_path: Path | str,
-) -> tuple[str, int]:
-    """Return first ordered resource reference and file index for one runtime map."""
-    data = load_packagemapspec(packagemapspec_path)
-    map_indices = [
-        index
-        for index, record in enumerate(data["maps"])
-        if isinstance(record, dict) and record.get("name") == runtime_map
-    ]
+def _resolve_owner_map_index(data, map_indices, runtime_map):
     if len(map_indices) != 1:
         raise ValueError(
             f"runtime map {runtime_map!r} must have exactly one packagemapspec map record"
@@ -48,6 +38,20 @@ def resolve_owner(
         if name.endswith(".resources"):
             return name, file_index
     raise ValueError(f"runtime map {runtime_map!r} has no resource reference")
+
+
+def resolve_owner(
+    runtime_map: str,
+    packagemapspec_path: Path | str,
+) -> tuple[str, int]:
+    """Return first ordered resource reference and file index for one runtime map."""
+    data = load_packagemapspec(packagemapspec_path)
+    map_indices = [
+        index
+        for index, record in enumerate(data["maps"])
+        if isinstance(record, dict) and record.get("name") == runtime_map
+    ]
+    return _resolve_owner_map_index(data, map_indices, runtime_map)
 
 
 def resolve_owner_evidence(

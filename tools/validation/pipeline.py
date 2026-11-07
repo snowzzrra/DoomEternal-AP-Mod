@@ -68,32 +68,36 @@ from tools.validation.audit_resource_packages import (
 )
 
 
+def _validate_generated_visuals_relay(content, entry):
+    relay = entry["reconciliation_entity"]
+    model = relay + "_model"
+    suppress = f"ap_suppress_checked_{entry['location_id']}"
+    bounds = [find_entity_block_bounds(content, name) for name in (relay, model, suppress)]
+    if any(value is None for value in bounds):
+        raise ValueError(f"Fortress reconciliation endpoint missing: {entry['location_id']}")
+    relay_bounds, model_bounds, suppress_bounds = bounds
+    relay_text = content[slice(*relay_bounds)]
+    if re.findall(r'class\s*=\s*"([^"]+)";', relay_text) != ["idTarget_Count"]:
+        raise ValueError(f"Fortress reconciliation relay class drift: {entry['location_id']}")
+    if extract_target_names(relay_text) != [model, suppress]:
+        raise ValueError(f"Fortress reconciliation relay graph drift: {entry['location_id']}")
+    if 'count = 1;' not in relay_text or 'reuseable = true;' not in relay_text:
+        raise ValueError(f"Fortress reconciliation relay count drift: {entry['location_id']}")
+    suppression = content[slice(*suppress_bounds)]
+    if re.findall(r'class\s*=\s*"([^"]+)";', suppression) != ["idTarget_Remove"] or extract_target_names(suppression) != [entry["ap_check"]]:
+        raise ValueError(f"Fortress suppression must remove only its AP check: {entry['location_id']}")
+    return model, model_bounds, relay, relay_bounds
+
+
 def validate_generated_visuals(document, map_key, content):
     if map_key == "hub":
         for entry in document["entries"]:
             if entry["map_key"] != map_key or entry["classification"] != "visible_cleanup":
                 continue
-            relay = entry["reconciliation_entity"]
-            model = relay + "_model"
-            suppress = f"ap_suppress_checked_{entry['location_id']}"
-            bounds = [find_entity_block_bounds(content, name) for name in (relay, model, suppress)]
-            if any(value is None for value in bounds):
-                raise ValueError(f"Fortress reconciliation endpoint missing: {entry['location_id']}")
-            relay_bounds, model_bounds, suppress_bounds = bounds
-            relay_text = content[slice(*relay_bounds)]
-            if re.findall(r'class\s*=\s*"([^"]+)";', relay_text) != ["idTarget_Count"]:
-                raise ValueError(f"Fortress reconciliation relay class drift: {entry['location_id']}")
-            if extract_target_names(relay_text) != [model, suppress]:
-                raise ValueError(f"Fortress reconciliation relay graph drift: {entry['location_id']}")
-            if 'count = 1;' not in relay_text or 'reuseable = true;' not in relay_text:
-                raise ValueError(f"Fortress reconciliation relay count drift: {entry['location_id']}")
-            suppression = content[slice(*suppress_bounds)]
-            if re.findall(r'class\s*=\s*"([^"]+)";', suppression) != ["idTarget_Remove"] or extract_target_names(suppression) != [entry["ap_check"]]:
-                raise ValueError(f"Fortress suppression must remove only its AP check: {entry['location_id']}")
+            model, model_bounds, relay, relay_bounds = _validate_generated_visuals_relay(content, entry)
             model_text = content[slice(*model_bounds)].replace(model, relay, 1)
             content = content[:relay_bounds[0]] + model_text + content[relay_bounds[1]:]
     _validate_generated_visuals(document, map_key, content)
-
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -127,40 +131,23 @@ PREFLIGHT_PYTHON = (
     "doom_eap/content/secret_encounter_timers.py",
     "doom_eap/content/mastery_requirements.py",
     "doom_eap/contracts/save_observation.py",
-    "doom_eap/runtime/save_files.py",
-    "doom_eap/runtime/save_records.py",
-    "doom_eap/runtime/save_observer.py",
+    "doom_eap/runtime/bridge_saves.py",
     "doom_eap/contracts/materialization.py",
-    "doom_eap/runtime/materialization.py",
-    "doom_eap/runtime/fast_travel.py",
-    "doom_eap/runtime/checked_visuals.py",
-    "doom_eap/runtime/bootstrap.py",
-    "doom_eap/runtime/transient_effects.py",
-    "doom_eap/runtime/weapon_points.py",
-    "doom_eap/runtime/transient_files.py",
-    "doom_eap/runtime/ammo_refill.py",
-    "doom_eap/runtime/death_observation.py",
+    "doom_eap/runtime/inventory.py",
+    "doom_eap/runtime/campaign.py",
+    "doom_eap/runtime/bridge_checks.py",
+    "doom_eap/runtime/observers.py",
+    "doom_eap/runtime/bridge_items.py",
+    "doom_eap/runtime/ammo.py",
+    "doom_eap/runtime/deathlink.py",
     "doom_eap/contracts/goal_policy.py",
     "doom_eap/contracts/check_observation.py",
-    "doom_eap/runtime/check_publication.py",
-    "doom_eap/runtime/goal_progress.py",
-    "doom_eap/runtime/publisher_dispatch.py",
-    "doom_eap/runtime/save_checks.py",
     "doom_eap/contracts/receipt_delivery.py",
             "doom_eap/contracts/source_bytes.py",
-    "doom_eap/runtime/receipt_delivery.py",
-    "doom_eap/runtime/save_check_observation.py",
-    "doom_eap/runtime/deathlink_session.py",
-    "doom_eap/runtime/deathlink_publication.py",
-    "doom_eap/runtime/ammo_adapters.py",
-    "doom_eap/runtime/rune_reconciliation.py",
     "doom_eap/contracts/runtime_context.py",
-    "doom_eap/runtime/lifecycle.py",
-    "doom_eap/runtime/context_registry.py",
     "doom_eap/contracts/tag_prerequisites.py",
     "doom_eap/contracts/ownership.py",
     "doom_eap/contracts/command_publication.py",
-    "doom_eap/runtime/client_state_store.py",
     "doom_eap/content/publisher_loader.py",
     "doom_eap/contracts/ap_visual_contract.py",
     "doom_eap/runtime/bridge_client.py",
@@ -179,7 +166,6 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/launcher_platform.py",
     "doom_eap/launcher/launcher_supervisor.py",
     "doom_eap/launcher/launcher_ui.py",
-    "doom_eap/runtime/publisher_runtime.py",
     "doom_eap/presentation.py",
     "doom_eap/__init__.py",
     "doom_eap/launcher/__init__.py",
@@ -293,6 +279,226 @@ def _reject_duplicate_object_keys(pairs: Sequence[tuple[str, object]]) -> dict[s
     return result
 
 
+def _validate_python_sources():
+    for relative in PREFLIGHT_PYTHON:
+        path = ROOT / relative
+        try:
+            compile(path.read_text(encoding="utf-8"), str(path), "exec")
+        except SyntaxError as error:
+            raise ValueError(
+                f"component=syntax file={relative} field=line "
+                f"value={error.lineno}\nReproduce:\n"
+                "  scripts/pipeline.sh fast"
+            ) from error
+
+
+def _validate_json_sources():
+    json_roots = [ROOT / "data", ROOT / "content", ROOT / "manifests"]
+    for directory in json_roots:
+        if not directory.exists():
+            continue
+        for path in sorted(directory.rglob("*.json")):
+            try:
+                json.loads(
+                    path.read_text(encoding="utf-8"),
+                    object_pairs_hook=_reject_duplicate_object_keys,
+                )
+            except (OSError, json.JSONDecodeError, ValueError) as error:
+                raise ValueError(
+                    f"component=json file={path.relative_to(ROOT)} "
+                    f"field=parse value={error}\nReproduce:\n"
+                    "  scripts/pipeline.sh fast"
+                ) from error
+
+
+def _validate_onboarding_guards_forbidden(catalog, forbidden, guards, public_surface, spec):
+    for term in forbidden:
+        if any(term in value.casefold() for value in public_surface):
+            raise ValueError(
+                f"component=onboarding map={spec.key} "
+                f"field=forbidden_ap_terms value={term!r}"
+            )
+    source = (
+        ROOT / "vanillamaps" / spec.source_file
+    ).read_text(encoding="utf-8")
+    edge = guards.get("required_source_edge")
+    if edge:
+        marker = f"entityDef {edge['from']}"
+        start = source.find(marker)
+        end = source.find("\nentity {", start + len(marker))
+        block = source[start:end if end >= 0 else None]
+        if start < 0 or f'"{edge["to"]}"' not in block:
+            raise ValueError(
+                f"component=onboarding map={spec.key} "
+                "field=required_source_edge value=missing"
+            )
+    excluded = set(guards.get("excluded_entities", []))
+    declared_entities = {
+        item.ap_check.removeprefix("AP_CHECK_").casefold()
+        for item in catalog.physical_locations
+        if item.map_key == spec.key
+    }
+    return declared_entities, excluded
+
+
+def _validate_onboarding_guards_onboarding_path(catalog, item_document, spec):
+    if not spec.onboarding_path or not spec.data.get("package_directory"):
+        return
+    onboarding = json.loads(
+        spec.onboarding_path.read_text(encoding="utf-8")
+    )
+    guards = onboarding.get("vanilla_guards", {})
+    forbidden = tuple(
+        str(term).casefold()
+        for term in guards.get("forbidden_ap_terms", [])
+    )
+    public_surface = [
+        item.ap_check
+        for item in catalog.physical_locations
+        if item.map_key == spec.key
+    ] + [
+        item.name
+        for item in catalog.runtime_locations
+        if item.mission_key == spec.key
+    ] + [
+        json.dumps(item_document, sort_keys=True)
+    ]
+    declared_entities, excluded = _validate_onboarding_guards_forbidden(catalog, forbidden, guards, public_surface, spec)
+    if {name.casefold() for name in excluded} & declared_entities:
+        raise ValueError(
+            f"component=onboarding map={spec.key} "
+            "field=excluded_entities value=declared"
+        )
+
+
+def _validate_onboarding_guards(catalog, item_document):
+    for spec in catalog.enabled_maps():
+        _validate_onboarding_guards_onboarding_path(catalog, item_document, spec)
+
+
+def _validate_runtime_publishers(catalog, runtime_by_id):
+    for publisher in catalog.publishers:
+        for effect in publisher.effects:
+            if effect["strategy"] != "location_check":
+                continue
+            location_id = effect["location_id"]
+            if location_id not in runtime_by_id:
+                raise ValueError(
+                    f"component=publisher map={publisher.map_key} "
+                    "file=data/publisher_contracts.json field=effects.location_id "
+                    f"value={location_id} is not a runtime location\n"
+                    "Reproduce:\n  scripts/pipeline.sh fast"
+                )
+
+
+def _validate_goal_publishers_publisher(catalog, goal, goal_files, goal_markers):
+    for publisher in catalog.publishers:
+        if publisher is goal:
+            continue
+        if publisher.dedupe_scope == goal.dedupe_scope:
+            raise ValueError(
+                f"component=publisher map={goal.map_key} "
+                "file=data/publisher_contracts.json field=dedupe_scope "
+                f"value={goal.dedupe_scope!r} shared with campaign goal"
+            )
+        files = {
+            trigger.get("filename") for trigger in publisher.triggers
+            if trigger["strategy"] == "map_event_file"
+        }
+        markers = {
+            trigger.get("marker") for trigger in publisher.triggers
+            if trigger["strategy"] == "map_event_file"
+        }
+        if files & goal_files or markers & goal_markers:
+            raise ValueError(
+                f"component=publisher map={goal.map_key} "
+                "file=data/publisher_contracts.json "
+                "field=filename/marker value=shared campaign goal authority"
+            )
+
+
+def _validate_goal_publishers(catalog):
+    goals = [
+        publisher for publisher in catalog.publishers
+        if any(effect["strategy"] == "campaign_goal" for effect in publisher.effects)
+    ]
+    goal = goals[0]
+    goal_files = {
+        trigger.get("filename") for trigger in goal.triggers
+        if trigger["strategy"] == "map_event_file"
+    }
+    goal_markers = {
+        trigger.get("marker") for trigger in goal.triggers
+        if trigger["strategy"] == "map_event_file"
+    }
+    _validate_goal_publishers_publisher(catalog, goal, goal_files, goal_markers)
+
+
+def _cache_metadata_matches(digest, inputs, map_key, metadata):
+    return metadata.get('schema_version') != 2 or metadata.get('map_key') != map_key or metadata.get('digest') != digest or (metadata.get('inputs') != inputs)
+
+
+def _cache_output_matches(digest, inputs, manifest, map_key, metadata, output):
+    return _cache_metadata_matches(digest, inputs, map_key, metadata) or not output.is_file() or (not manifest.is_file()) or (metadata.get('output_sha256') != _sha256(output)) or (metadata.get('output_size') != output.stat().st_size)
+
+
+def _cache_manifest_matches(digest, inputs, manifest, map_key, metadata, output, raw):
+    return _cache_output_matches(digest, inputs, manifest, map_key, metadata, output) or metadata.get('manifest_sha256') != _sha256(manifest) or metadata.get('manifest_size') != manifest.stat().st_size or (not raw.is_file())
+
+
+def _validate_package_manifest_fields_actual_value(expected, field, generated_root, manifest):
+    actual_value = manifest[field]
+    expected_value = expected[field]
+    if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:
+        actual_value = dict(actual_value)
+        actual_value["generated_map_sha256"] = {}
+    if field == "room_compiler" and generated_root is None:
+        actual_value = dict(actual_value)
+        actual_value["maps"] = {
+            map_key: {
+                key: value
+                for key, value in map_value.items()
+                if key not in ("generated_map_sha256", "generated_map_size")
+            }
+            for map_key, map_value in actual_value["maps"].items()
+        }
+    if actual_value != expected_value:
+        raise ValueError(f"component=package field=manifest_disagreement value={field}")
+
+
+def _validate_package_manifest_fields(expected, generated_root, manifest):
+    for field in ("checked_location_visuals", "physical_pickups", "room_compiler", "base_resources"):
+        if field == "physical_pickups" and field not in manifest:
+            continue
+        _validate_package_manifest_fields_actual_value(expected, field, generated_root, manifest)
+
+
+def _validate_packaged_imports(client_dir):
+    if client_dir.is_dir():
+        presentation_path = client_dir / "doom_eap" / "presentation.py"
+        if not presentation_path.is_file():
+            raise ValueError("component=package field=missing_module value=client/doom_eap/presentation.py")
+        cmd = [
+            sys.executable,
+            "-B",
+            "-c",
+            "import doom_eap.presentation; from doom_eap.launcher.launcher_core import RoomCompiler",
+        ]
+        env = os.environ.copy()
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        env["PYTHONPATH"] = str(client_dir)
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        for pycache in client_dir.rglob("__pycache__"):
+            if pycache.is_dir():
+                shutil.rmtree(pycache, ignore_errors=True)
+        if res.returncode != 0:
+            raise ValueError(f"component=package field=import_closure error={res.stderr.strip()}")
+
+
+def _cache_raw_matches(digest, inputs, manifest, map_key, metadata, output, patch_members, raw):
+    return _cache_manifest_matches(digest, inputs, manifest, map_key, metadata, output, raw) or metadata.get('raw_sha256') != _sha256(raw) or metadata.get('raw_size') != raw.stat().st_size or (metadata.get('patch_mod_members') != patch_members)
+
+
 class Pipeline:
     def __init__(self, *, no_cache: bool = False, baseline_diff: bool = False):
         self.started = time.perf_counter()
@@ -321,89 +527,13 @@ class Pipeline:
 
     def preflight(self) -> ContentCatalog:
         with self.timed("preflight"):
-            for relative in PREFLIGHT_PYTHON:
-                path = ROOT / relative
-                try:
-                    compile(path.read_text(encoding="utf-8"), str(path), "exec")
-                except SyntaxError as error:
-                    raise ValueError(
-                        f"component=syntax file={relative} field=line "
-                        f"value={error.lineno}\nReproduce:\n"
-                        "  scripts/pipeline.sh fast"
-                    ) from error
-            json_roots = [ROOT / "data", ROOT / "content", ROOT / "manifests"]
-            for directory in json_roots:
-                if not directory.exists():
-                    continue
-                for path in sorted(directory.rglob("*.json")):
-                    try:
-                        json.loads(
-                            path.read_text(encoding="utf-8"),
-                            object_pairs_hook=_reject_duplicate_object_keys,
-                        )
-                    except (OSError, json.JSONDecodeError, ValueError) as error:
-                        raise ValueError(
-                            f"component=json file={path.relative_to(ROOT)} "
-                            f"field=parse value={error}\nReproduce:\n"
-                            "  scripts/pipeline.sh fast"
-                        ) from error
+            _validate_python_sources()
+            _validate_json_sources()
             catalog = load_content_catalog()
             item_document = json.loads(
                 (ROOT / "data" / "items.json").read_text(encoding="utf-8")
             )
-            for spec in catalog.enabled_maps():
-                if not spec.onboarding_path or not spec.data.get("package_directory"):
-                    continue
-                onboarding = json.loads(
-                    spec.onboarding_path.read_text(encoding="utf-8")
-                )
-                guards = onboarding.get("vanilla_guards", {})
-                forbidden = tuple(
-                    str(term).casefold()
-                    for term in guards.get("forbidden_ap_terms", [])
-                )
-                public_surface = [
-                    item.ap_check
-                    for item in catalog.physical_locations
-                    if item.map_key == spec.key
-                ] + [
-                    item.name
-                    for item in catalog.runtime_locations
-                    if item.mission_key == spec.key
-                ] + [
-                    json.dumps(item_document, sort_keys=True)
-                ]
-                for term in forbidden:
-                    if any(term in value.casefold() for value in public_surface):
-                        raise ValueError(
-                            f"component=onboarding map={spec.key} "
-                            f"field=forbidden_ap_terms value={term!r}"
-                        )
-                source = (
-                    ROOT / "vanillamaps" / spec.source_file
-                ).read_text(encoding="utf-8")
-                edge = guards.get("required_source_edge")
-                if edge:
-                    marker = f"entityDef {edge['from']}"
-                    start = source.find(marker)
-                    end = source.find("\nentity {", start + len(marker))
-                    block = source[start:end if end >= 0 else None]
-                    if start < 0 or f'"{edge["to"]}"' not in block:
-                        raise ValueError(
-                            f"component=onboarding map={spec.key} "
-                            "field=required_source_edge value=missing"
-                        )
-                excluded = set(guards.get("excluded_entities", []))
-                declared_entities = {
-                    item.ap_check.removeprefix("AP_CHECK_").casefold()
-                    for item in catalog.physical_locations
-                    if item.map_key == spec.key
-                }
-                if {name.casefold() for name in excluded} & declared_entities:
-                    raise ValueError(
-                        f"component=onboarding map={spec.key} "
-                        "field=excluded_entities value=declared"
-                    )
+            _validate_onboarding_guards(catalog, item_document)
             audit_source_asset_dependencies(
                 ROOT / "packaging" / "mod_assets",
                 catalog.assets,
@@ -418,54 +548,8 @@ class Pipeline:
                     "Reproduce:\n  scripts/pipeline.sh fast"
                 )
             runtime_by_id = {item.location_id: item for item in catalog.runtime_locations}
-            for publisher in catalog.publishers:
-                for effect in publisher.effects:
-                    if effect["strategy"] != "location_check":
-                        continue
-                    location_id = effect["location_id"]
-                    if location_id not in runtime_by_id:
-                        raise ValueError(
-                            f"component=publisher map={publisher.map_key} "
-                            "file=data/publisher_contracts.json field=effects.location_id "
-                            f"value={location_id} is not a runtime location\n"
-                            "Reproduce:\n  scripts/pipeline.sh fast"
-                        )
-            goals = [
-                publisher for publisher in catalog.publishers
-                if any(effect["strategy"] == "campaign_goal" for effect in publisher.effects)
-            ]
-            goal = goals[0]
-            goal_files = {
-                trigger.get("filename") for trigger in goal.triggers
-                if trigger["strategy"] == "map_event_file"
-            }
-            goal_markers = {
-                trigger.get("marker") for trigger in goal.triggers
-                if trigger["strategy"] == "map_event_file"
-            }
-            for publisher in catalog.publishers:
-                if publisher is goal:
-                    continue
-                if publisher.dedupe_scope == goal.dedupe_scope:
-                    raise ValueError(
-                        f"component=publisher map={goal.map_key} "
-                        "file=data/publisher_contracts.json field=dedupe_scope "
-                        f"value={goal.dedupe_scope!r} shared with campaign goal"
-                    )
-                files = {
-                    trigger.get("filename") for trigger in publisher.triggers
-                    if trigger["strategy"] == "map_event_file"
-                }
-                markers = {
-                    trigger.get("marker") for trigger in publisher.triggers
-                    if trigger["strategy"] == "map_event_file"
-                }
-                if files & goal_files or markers & goal_markers:
-                    raise ValueError(
-                        f"component=publisher map={goal.map_key} "
-                        "file=data/publisher_contracts.json "
-                        "field=filename/marker value=shared campaign goal authority"
-                    )
+            _validate_runtime_publishers(catalog, runtime_by_id)
+            _validate_goal_publishers(catalog)
             self.catalog = catalog
             validate_source_layout(ROOT, catalog)
             return catalog
@@ -495,7 +579,7 @@ class Pipeline:
             check_start_inventory_catalog(ROOT / "data" / "start_inventory_catalog.json")
         print("CONTENT synchronization=checked")
 
-    def _map_inputs(self, map_key: str) -> dict[str, str]:
+    def _map_inputs_catalog(self, map_key):
         catalog = self.catalog or load_content_catalog()
         spec = catalog.map(map_key)
         paths = [
@@ -518,6 +602,11 @@ class Pipeline:
                     f"  scripts/pipeline.sh map {map_key}"
                 )
             result[str(path.relative_to(ROOT))] = _sha256(path)
+        return catalog, result
+
+
+    def _map_inputs(self, map_key: str) -> dict[str, str]:
+        catalog, result = self._map_inputs_catalog(map_key)
         result["publisher_contract"] = _canonical_hash([
             {
                 "key": publisher.key,
@@ -587,23 +676,10 @@ class Pipeline:
                 return None
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             patch_members = {} if not patch_mod.exists() else _member_hashes(patch_mod)
-            if not isinstance(metadata, dict) or patch_members is None:
+            if not _valid_cache_metadata(metadata, patch_members):
                 return None
             if (
-                metadata.get("schema_version") != 2
-                or metadata.get("map_key") != map_key
-                or metadata.get("digest") != digest
-                or metadata.get("inputs") != inputs
-                or not output.is_file()
-                or not manifest.is_file()
-                or metadata.get("output_sha256") != _sha256(output)
-                or metadata.get("output_size") != output.stat().st_size
-                or metadata.get("manifest_sha256") != _sha256(manifest)
-                or metadata.get("manifest_size") != manifest.stat().st_size
-                or not raw.is_file()
-                or metadata.get("raw_sha256") != _sha256(raw)
-                or metadata.get("raw_size") != raw.stat().st_size
-                or metadata.get("patch_mod_members") != patch_members
+                _cache_raw_matches(digest, inputs, manifest, map_key, metadata, output, patch_members, raw)
             ):
                 return None
             return MapArtifact(
@@ -776,7 +852,7 @@ class Pipeline:
     def map(self, map_key: str) -> MapArtifact:
         return self.validate_map(map_key)
 
-    def selection(self, *, preflight: bool = True) -> tuple[list[str], list[str]]:
+    def _selection_catalog(self, preflight):
         catalog = self.catalog or (
             self.preflight() if preflight else load_content_catalog()
         )
@@ -791,6 +867,11 @@ class Pipeline:
             for entry in output.split("\0"):
                 if entry:
                     paths.append(f"{repository.name}/{entry[3:]}")
+        return catalog, paths
+
+
+    def selection(self, *, preflight: bool = True) -> tuple[list[str], list[str]]:
+        catalog, paths = self._selection_catalog(preflight)
         selected: set[str] = set()
         central = False
         for path in paths:
@@ -912,46 +993,9 @@ class Pipeline:
                 room_resources=root / "client" / "resources",
                 release_version=manifest["version"],
             )
-            for field in ("checked_location_visuals", "physical_pickups", "room_compiler", "base_resources"):
-                if field == "physical_pickups" and field not in manifest:
-                    continue
-                actual_value = manifest[field]
-                expected_value = expected[field]
-                if field == "checked_location_visuals" and not expected_value["generated_map_sha256"]:
-                    actual_value = dict(actual_value)
-                    actual_value["generated_map_sha256"] = {}
-                if field == "room_compiler" and generated_root is None:
-                    actual_value = dict(actual_value)
-                    actual_value["maps"] = {
-                        map_key: {
-                            key: value
-                            for key, value in map_value.items()
-                            if key not in ("generated_map_sha256", "generated_map_size")
-                        }
-                        for map_key, map_value in actual_value["maps"].items()
-                    }
-                if actual_value != expected_value:
-                    raise ValueError(f"component=package field=manifest_disagreement value={field}")
+            _validate_package_manifest_fields(expected, generated_root, manifest)
             client_dir = root / "client"
-            if client_dir.is_dir():
-                presentation_path = client_dir / "doom_eap" / "presentation.py"
-                if not presentation_path.is_file():
-                    raise ValueError("component=package field=missing_module value=client/doom_eap/presentation.py")
-                cmd = [
-                    sys.executable,
-                    "-B",
-                    "-c",
-                    "import doom_eap.presentation; from doom_eap.launcher.launcher_core import RoomCompiler",
-                ]
-                env = os.environ.copy()
-                env["PYTHONDONTWRITEBYTECODE"] = "1"
-                env["PYTHONPATH"] = str(client_dir)
-                res = subprocess.run(cmd, env=env, capture_output=True, text=True)
-                for pycache in client_dir.rglob("__pycache__"):
-                    if pycache.is_dir():
-                        shutil.rmtree(pycache, ignore_errors=True)
-                if res.returncode != 0:
-                    raise ValueError(f"component=package field=import_closure error={res.stderr.strip()}")
+            _validate_packaged_imports(client_dir)
             print(f"PACKAGE_PREFLIGHT package=checked root={root}")
 
     def playtest(self) -> None:
@@ -1028,56 +1072,30 @@ class Pipeline:
             "doom_eap/contracts/tag_prerequisites.py",
             "doom_eap/contracts/runtime_context.py",
             "doom_eap/contracts/save_observation.py",
-            "doom_eap/runtime/save_files.py",
-            "doom_eap/runtime/save_records.py",
-            "doom_eap/runtime/save_observer.py",
+            "doom_eap/runtime/bridge_saves.py",
             "doom_eap/contracts/materialization.py",
-            "doom_eap/runtime/materialization.py",
-            "doom_eap/runtime/fast_travel.py",
-            "doom_eap/runtime/checked_visuals.py",
-            "doom_eap/runtime/bootstrap.py",
-            "doom_eap/runtime/transient_effects.py",
-            "doom_eap/runtime/weapon_points.py",
-            "doom_eap/runtime/transient_files.py",
-            "doom_eap/runtime/ammo_refill.py",
-            "doom_eap/runtime/death_observation.py",
+            "doom_eap/runtime/inventory.py",
+            "doom_eap/runtime/campaign.py",
+            "doom_eap/runtime/bridge_checks.py",
+            "doom_eap/runtime/observers.py",
+            "doom_eap/runtime/bridge_items.py",
+            "doom_eap/runtime/ammo.py",
+            "doom_eap/runtime/deathlink.py",
             "doom_eap/contracts/goal_policy.py",
             "doom_eap/contracts/check_observation.py",
-            "doom_eap/runtime/check_publication.py",
-            "doom_eap/runtime/goal_progress.py",
-            "doom_eap/runtime/publisher_dispatch.py",
-            "doom_eap/runtime/save_checks.py",
             "doom_eap/contracts/receipt_delivery.py",
             "doom_eap/contracts/source_bytes.py",
-            "doom_eap/runtime/receipt_delivery.py",
-        "doom_eap/runtime/protocol_feed.py",
-        "doom_eap/runtime/location_setup.py",
-        "doom_eap/runtime/level_ready.py",
-    "doom_eap/runtime/task_supervision.py",
-        "doom_eap/runtime/physical_checks.py",
-        "doom_eap/runtime/location_names.py",
-        "doom_eap/runtime/protocol_feed_format.py",
-            "doom_eap/runtime/save_check_observation.py",
-            "doom_eap/runtime/deathlink_session.py",
-            "doom_eap/runtime/deathlink_publication.py",
-            "doom_eap/runtime/ammo_adapters.py",
-            "doom_eap/runtime/rune_reconciliation.py",
-            "doom_eap/runtime/lifecycle.py",
-            "doom_eap/runtime/context_registry.py",
+        "doom_eap/runtime/native_transport.py",
+    "doom_eap/runtime/bridge_client.py",
             "doom_eap/contracts/ownership.py",
             "doom_eap/contracts/command_publication.py",
-            "doom_eap/runtime/client_state_store.py",
             "doom_eap/content/publisher_loader.py",
-            "doom_eap/runtime/bridge_client.py",
-            "doom_eap/runtime/bootstrap_actions.py",
             "doom_eap/contracts/campaign_goal_contract.py",
             "doom_eap/contracts/challenge_registry.py",
             "doom_eap/content/content_catalog.py",
             "doom_eap/contracts/foundation.py",
             "doom_eap/content/item_classification.py",
-            "doom_eap/runtime/item_reconciliation.py",
             "doom_eap/content/map_registry.py",
-            "doom_eap/runtime/observer_lifecycle.py",
             "doom_eap/contracts/publisher_contracts.py",
             "doom_eap/launcher/launcher_app.py",
             "doom_eap/launcher/launcher_controller.py",
@@ -1104,13 +1122,11 @@ class Pipeline:
             "doom_eap/launcher/ui/theme.qss",
             "doom_eap/launcher/ui/strings.py",
             "doom_eap/runtime/ledger.py",
-            "doom_eap/runtime/ledger_records.py",
-            "doom_eap/runtime/delivery_control.py",
+            "doom_eap/runtime/delivery.py",
             "doom_eap/strings.py",
             "data/strings/en.json", "data/strings/pt-BR.json", "data/strings/languages.json",
-            "doom_eap/runtime/publisher_runtime.py",
             "doom_eap/__init__.py", "doom_eap/launcher/__init__.py",
-            "doom_eap/runtime/__init__.py", "doom_eap/runtime/save_decrypt.py",
+            "doom_eap/runtime/__init__.py",
         ):
             release_inputs[relative] = _sha256(ROOT / relative)
         return _canonical_hash({
@@ -1191,20 +1207,7 @@ class Pipeline:
             for item in artifacts
         }
 
-    def receipt(self, artifacts: Sequence[MapArtifact], stages: Sequence[str]) -> Path:
-        workspace_digest = self._workspace_digest(artifacts)
-        artifact_root = WORKSPACES_ROOT / workspace_digest
-        receipt_path = RECEIPTS_ROOT / f"{workspace_digest}.json"
-        members = self._workspace_members(artifacts)
-        if members is None:
-            raise ValueError("workspace sources are not a complete regular-file cache")
-        self.workspace_cache_hit = False
-        if not self.no_cache and artifact_root.exists():
-            self.workspace_cache_hit = _member_hashes(artifact_root) == members
-            if not self.workspace_cache_hit:
-                print(f"WORKSPACE cache=invalid digest={workspace_digest[:16]} reason=integrity")
-                if artifact_root.exists() or artifact_root.is_symlink():
-                    _remove_path(artifact_root)
+    def _receipt_workspace_cache_hit(self, artifact_root, artifacts, members, receipt_path, workspace_digest):
         if not self.workspace_cache_hit:
             CACHE_ROOT.mkdir(parents=True, exist_ok=True)
             temporary = Path(tempfile.mkdtemp(
@@ -1245,6 +1248,23 @@ class Pipeline:
                 artifacts=artifacts,
             )
         )
+
+
+    def receipt(self, artifacts: Sequence[MapArtifact], stages: Sequence[str]) -> Path:
+        workspace_digest = self._workspace_digest(artifacts)
+        artifact_root = WORKSPACES_ROOT / workspace_digest
+        receipt_path = RECEIPTS_ROOT / f"{workspace_digest}.json"
+        members = self._workspace_members(artifacts)
+        if members is None:
+            raise ValueError("workspace sources are not a complete regular-file cache")
+        self.workspace_cache_hit = False
+        if not self.no_cache and artifact_root.exists():
+            self.workspace_cache_hit = _member_hashes(artifact_root) == members
+            if not self.workspace_cache_hit:
+                print(f"WORKSPACE cache=invalid digest={workspace_digest[:16]} reason=integrity")
+                if artifact_root.exists() or artifact_root.is_symlink():
+                    _remove_path(artifact_root)
+        self._receipt_workspace_cache_hit(artifact_root, artifacts, members, receipt_path, workspace_digest)
         if self.receipt_cache_hit:
             return receipt_path
         if receipt_path.exists():
@@ -1398,48 +1418,77 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _main_show_selection(args, pipeline):
+    selected, paths = pipeline.selection(preflight=not args.show_selection)
+    if args.show_selection:
+        print("CHANGED FILES")
+        print("\n".join(f"  {path}" for path in paths) or "  (none)")
+        print("SELECTED MAPS")
+        print("\n".join(f"  {key}" for key in selected) or "  (none)")
+    if selected and not args.show_selection:
+        pipeline.integration(selected, tests=args.tests)
+
+
+def _print_map_cache_key(args, pipeline):
+    if not args.map_key:
+        raise ValueError("cache-key phase requires <map_key>")
+    pipeline.preflight()
+    digest, inputs = pipeline.map_digest(args.map_key)
+    print(json.dumps({
+        "map_key": args.map_key,
+        "digest": digest,
+        "inputs": inputs,
+    }, indent=2, sort_keys=True))
+
+
+def _integration_maps(args):
+    return args.maps or ([args.map_key] if args.map_key else None)
+
+
+def _valid_cache_metadata(metadata, patch_members):
+    return isinstance(metadata, dict) and patch_members is not None
+
+
+def _run_map_phase(args, pipeline):
+    if not args.map_key:
+        raise ValueError("map phase requires <map_key>")
+    pipeline.map(args.map_key)
+
+
+def _run_pipeline_phase(args, pipeline):
+    if args.phase == "fast":
+        pipeline.fast()
+    elif args.phase == "map":
+        _run_map_phase(args, pipeline)
+    elif args.phase in {"changed", "affected"}:
+        _main_show_selection(args, pipeline)
+    elif args.phase == "integration":
+        selected = _integration_maps(args)
+        pipeline.integration(selected, tests=args.tests)
+    elif args.phase == "package-preflight":
+        pipeline.package_preflight(args.package_root)
+    elif args.phase in {"package", "playtest"}:
+        pipeline.playtest()
+    else:
+        _run_pipeline_build_phase(args, pipeline)
+
+
+def _run_pipeline_build_phase(args, pipeline):
+    if args.phase in {"audit", "full"}:
+        pipeline.full(args.tests)
+    elif args.phase == "release":
+        pipeline.release(build=args.build, tests=args.tests)
+    elif args.phase == "seed-smoke":
+        pipeline.seed_smoke()
+    elif args.phase == "cache-key":
+        _print_map_cache_key(args, pipeline)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     pipeline = Pipeline(no_cache=args.no_cache, baseline_diff=args.baseline_diff)
     try:
-        if args.phase == "fast":
-            pipeline.fast()
-        elif args.phase == "map":
-            if not args.map_key:
-                raise ValueError("map phase requires <map_key>")
-            pipeline.map(args.map_key)
-        elif args.phase in {"changed", "affected"}:
-            selected, paths = pipeline.selection(preflight=not args.show_selection)
-            if args.show_selection:
-                print("CHANGED FILES")
-                print("\n".join(f"  {path}" for path in paths) or "  (none)")
-                print("SELECTED MAPS")
-                print("\n".join(f"  {key}" for key in selected) or "  (none)")
-            if selected and not args.show_selection:
-                pipeline.integration(selected, tests=args.tests)
-        elif args.phase == "integration":
-            selected = args.maps or ([args.map_key] if args.map_key else None)
-            pipeline.integration(selected, tests=args.tests)
-        elif args.phase == "package-preflight":
-            pipeline.package_preflight(args.package_root)
-        elif args.phase in {"package", "playtest"}:
-            pipeline.playtest()
-        elif args.phase in {"audit", "full"}:
-            pipeline.full(args.tests)
-        elif args.phase == "release":
-            pipeline.release(build=args.build, tests=args.tests)
-        elif args.phase == "seed-smoke":
-            pipeline.seed_smoke()
-        elif args.phase == "cache-key":
-            if not args.map_key:
-                raise ValueError("cache-key phase requires <map_key>")
-            pipeline.preflight()
-            digest, inputs = pipeline.map_digest(args.map_key)
-            print(json.dumps({
-                "map_key": args.map_key,
-                "digest": digest,
-                "inputs": inputs,
-            }, indent=2, sort_keys=True))
+        _run_pipeline_phase(args, pipeline)
     finally:
         pipeline.report()
     return 0

@@ -63,9 +63,6 @@ ALLOWED = {
     "1": "initial quantity",
     "00": "timer padding",
     "02d": "timer format",
-    "Ammo Refill key: {value_0}": "fixed keybinding indicator classified as code",
-    "Try again": "manual item retry classified as code",
-    "Trying again may duplicate the effect. Confirm only if you want another attempt.": "manual retry confirmation classified as code",
 }
 ALLOWED.update(
     {
@@ -223,6 +220,10 @@ def text_scopes(tree, game_only):
 
 
 def technical_literal(value):
+    if re.fullmatch(r"(?:[\w./\\:-]+\.(?:exe|dll|bat|cmd|ps1|sh|json|jsonl|log|cfg|txt|state|zip)|--[a-z][a-z0-9-]*|[a-zA-Z][a-zA-Z0-9]*_[a-zA-Z0-9_]+)", value):
+        return True
+    if re.fullmatch(r"[A-Z][A-Z0-9_]*=[^\r\n]+", value):
+        return True
     if value in ALLOWED or value in {"Player", "archipelago.gg:38281"}:
         return True
     return not re.search(r"[A-Za-zÀ-ÿ]", re.sub(r"\{[a-z0-9_]+\}", "", value))

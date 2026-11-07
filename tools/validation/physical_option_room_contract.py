@@ -11,6 +11,47 @@ from doom_eap.content.physical_options import PHYSICAL_OPTIONS, physical_locatio
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
 
 
+def _audit_physical_option_rooms_manifest(compiler, map_key, option_keys, options, output_root, root, source, values):
+    options.update(dict(zip(option_keys, values, strict=False)))
+    manifest = SeedManifest.create(
+        seed_name=f"physical-contract-{map_key}",
+        team=0,
+        slot=1,
+        options=options,
+        active_location_ids=compiler.active_location_ids(options),
+    )
+    output = output_root / f"{map_key}-{'-'.join(str(int(value)) for value in values)}.entities"
+    compiler.compile_map(
+        manifest,
+        root / "vanillamaps" / source["source_file"],
+        output,
+        map_key,
+    )
+    text = output.read_text(encoding="utf-8")
+    active = set(manifest.active_location_ids)
+    expected_physical = physical_location_ids(options)
+    if not expected_physical <= active:
+        raise ValueError(
+            f"physical option manifest misses active locations: {map_key} {options}"
+        )
+    for key, spec in PHYSICAL_OPTIONS.items():
+        if spec["map_key"] != map_key:
+            continue
+        location_id = int(spec["location_id"])
+        ap_entity = str(spec["entity"])
+        ap_present = (
+            f"entityDef {ap_entity}" in text
+            and f"AP_CHECK_EVENT_{location_id}" in text
+        )
+        enabled = bool(options[key])
+        if enabled != (location_id in active) or enabled != ap_present:
+            raise ValueError(
+                f"physical option map/manifest disagreement: {key}={enabled}"
+            )
+        if not enabled and f"entityDef {spec['vanilla_entity']}" not in text:
+            raise ValueError(f"physical option vanilla carrier missing: {key}")
+
+
 def audit_physical_option_rooms(root: Path) -> None:
     """Compile all physical states and require manifest/map membership agreement."""
     compiler = ModCompiler(root)
@@ -26,41 +67,4 @@ def audit_physical_option_rooms(root: Path) -> None:
             source = sources[map_key]
             for values in product((False, True), repeat=len(option_keys)):
                 options = {key: False for key in PHYSICAL_OPTIONS}
-                options.update(dict(zip(option_keys, values)))
-                manifest = SeedManifest.create(
-                    seed_name=f"physical-contract-{map_key}",
-                    team=0,
-                    slot=1,
-                    options=options,
-                    active_location_ids=compiler.active_location_ids(options),
-                )
-                output = output_root / f"{map_key}-{'-'.join(str(int(value)) for value in values)}.entities"
-                compiler.compile_map(
-                    manifest,
-                    root / "vanillamaps" / source["source_file"],
-                    output,
-                    map_key,
-                )
-                text = output.read_text(encoding="utf-8")
-                active = set(manifest.active_location_ids)
-                expected_physical = physical_location_ids(options)
-                if not expected_physical <= active:
-                    raise ValueError(
-                        f"physical option manifest misses active locations: {map_key} {options}"
-                    )
-                for key, spec in PHYSICAL_OPTIONS.items():
-                    if spec["map_key"] != map_key:
-                        continue
-                    location_id = int(spec["location_id"])
-                    ap_entity = str(spec["entity"])
-                    ap_present = (
-                        f"entityDef {ap_entity}" in text
-                        and f"AP_CHECK_EVENT_{location_id}" in text
-                    )
-                    enabled = bool(options[key])
-                    if enabled != (location_id in active) or enabled != ap_present:
-                        raise ValueError(
-                            f"physical option map/manifest disagreement: {key}={enabled}"
-                        )
-                    if not enabled and f"entityDef {spec['vanilla_entity']}" not in text:
-                        raise ValueError(f"physical option vanilla carrier missing: {key}")
+                _audit_physical_option_rooms_manifest(compiler, map_key, option_keys, options, output_root, root, source, values)

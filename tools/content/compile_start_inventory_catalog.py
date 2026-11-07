@@ -8,22 +8,21 @@ import ast
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 AP_ITEMS = ROOT.parent / "Archipelago" / "worlds" / "doometernal" / "items.py"
 MAPPING = ROOT / "data" / "devinv_start_mapping.json"
 OUTPUT = ROOT / "data" / "start_inventory_catalog.json"
 
 
+def _is_inventory_declaration(node):
+    return isinstance(node, ast.Assign) and any(isinstance(target, ast.Name) and target.id == 'DEVINV_START_INVENTORY_ITEM_NAMES' for target in node.targets) and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Name) and (node.value.func.id == 'frozenset')
+
+
 def _legal_names(path: Path) -> set[str]:
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     for node in tree.body:
         if (
-            isinstance(node, ast.Assign)
-            and any(isinstance(target, ast.Name) and target.id == "DEVINV_START_INVENTORY_ITEM_NAMES" for target in node.targets)
-            and isinstance(node.value, ast.Call)
-            and isinstance(node.value.func, ast.Name)
-            and node.value.func.id == "frozenset"
+            _is_inventory_declaration(node)
         ):
             values = ast.literal_eval(node.value.args[0])
             if not isinstance(values, set) or not all(isinstance(value, str) for value in values):

@@ -8,21 +8,12 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from doom_eap.launcher.resource_bank import ResourceIndex, read_masks, resource_records, select_resources, _u64
+from doom_eap.launcher.resource_bank import ResourceIndex, _u64, read_masks, resource_records, select_resources
 from tools.maps.ap_map_generator import find_entity_block_bounds
 from tools.maps.encounter_catalog import entity_records
 
 
-def capture(game_root, output):
-    root = Path(__file__).resolve().parents[2]
-    base = game_root.resolve() / 'base'
-    catalog = json.loads((root / 'doom_eap/content/native_enemy_catalog.json').read_bytes())
-    spec = json.loads((base / 'packagemapspec.json').read_bytes())
-    by_map = {}
-    for ref in spec['mapFileRefs']:
-        name = spec['files'][ref['file']]['name']
-        if name.endswith('.resources') and not name.startswith('ap_enemy_resources/'):
-            by_map.setdefault(spec['maps'][ref['map']]['name'], set()).add(ref['file'])
+def _capture_bodies(catalog, root):
     bodies = []
     for species, row in catalog['species'].items():
         ref = row['ai']
@@ -47,8 +38,10 @@ def capture(game_root, output):
         tokens = {json.loads(m[0]) for m in re.finditer(r'"(?:[^"\\]|\\.)*"', block)}
         powerups[effect] = ref['sha256']
         bodies.append(('powerup/' + effect, catalog['maps']['e2m2_base']['runtime_map'], set(), tokens, {effect}, ref))
-    needed = set().union(by_map['common'], *(by_map[runtime] for _, runtime, _, _, _, _ in bodies))
-    indices = {n: ResourceIndex(base / spec['files'][n]['name']) for n in sorted(needed)}
+    return bodies, powerups
+
+
+def _capture_raw_masks(base, bodies, by_map, game_root, indices, output, spec):
     raw_masks = read_masks(base)
     masks = {index.path: raw_masks[spec['files'][n]['name']] for n, index in indices.items()}
     common = resource_records(indices, by_map['common'], masks)
@@ -83,6 +76,39 @@ def capture(game_root, output):
         subprocess.run(['powershell', '-NoProfile', '-File', str(Path(__file__).with_name('read_native_asset_tables.ps1')),
                         '-GameBase', str(base), '-InputFile', str(inputs), '-OutputFile', str(exported)], check=True)
         tables = json.loads(exported.read_text(encoding='utf-8-sig'))
+    return common, documents, masks, tables
+
+
+def _capture_kind(key, pairs):
+    kind, name = key[:2]
+    if kind == 'rs_streamfile' and name.startswith('generated/decls/') and name.endswith('.decl'):
+        _, _, kind, name = name.split('/', 3)
+        name = name[:-5]
+    matches = {p for p in pairs if p[0].lower() == kind.lower() and p[1] == name}
+    if not matches:
+        raise ValueError('Missing native cache association: ' + kind + '/' + name)
+    return matches
+
+
+def _capture_wanted(assets, common_pairs, models, pairs, profiles, ref, roots, selected, species):
+    wanted = {p for p in pairs if p[1] in roots}
+    for key in selected:
+        matches = _capture_kind(key, pairs)
+        wanted.update(matches)
+    wanted.update((kind, model) for model in models for kind in ('md6Def', 'binarymd6def'))
+    wanted.difference_update(common_pairs)
+    ordered = dict.fromkeys((r['mapResourceType'], r['name']) for r in assets if (r['mapResourceType'], r['name']) in wanted)
+    if set(ordered) != wanted:
+        raise ValueError('Native cache model association is incomplete: ' + species)
+    profiles[ref['sha256']] = {'source': ref, 'models': sorted(models),
+                              'assets': [{'mapResourceType': kind, 'name': name} for kind, name in ordered]}
+    return ordered
+
+
+def _capture_needed(base, bodies, by_map, game_root, output, powerups, spec):
+    needed = set().union(by_map['common'], *(by_map[runtime] for _, runtime, _, _, _, _ in bodies))
+    indices = {n: ResourceIndex(base / spec['files'][n]['name']) for n in sorted(needed)}
+    common, documents, masks, tables = _capture_raw_masks(base, bodies, by_map, game_root, indices, output, spec)
     profiles = {}
     common_pairs = {(r['mapResourceType'], r['name']) for r in tables['common']}
     for species, runtime, models, tokens, scopes, ref in bodies:
@@ -91,28 +117,27 @@ def capture(game_root, output):
         pairs = {(r['mapResourceType'], r['name']) for r in assets}
         roots = tokens | {r['name'] for r in assets if scopes.intersection(r['name'].split('/'))}
         selected, _ = select_resources(available, common, roots)
-        wanted = {p for p in pairs if p[1] in roots}
-        for key in selected:
-            kind, name = key[:2]
-            if kind == 'rs_streamfile' and name.startswith('generated/decls/') and name.endswith('.decl'):
-                _, _, kind, name = name.split('/', 3)
-                name = name[:-5]
-            matches = {p for p in pairs if p[0].lower() == kind.lower() and p[1] == name}
-            if not matches:
-                raise ValueError('Missing native cache association: ' + kind + '/' + name)
-            wanted.update(matches)
-        wanted.update((kind, model) for model in models for kind in ('md6Def', 'binarymd6def'))
-        wanted.difference_update(common_pairs)
-        ordered = dict.fromkeys((r['mapResourceType'], r['name']) for r in assets if (r['mapResourceType'], r['name']) in wanted)
-        if set(ordered) != wanted:
-            raise ValueError('Native cache model association is incomplete: ' + species)
-        profiles[ref['sha256']] = {'source': ref, 'models': sorted(models),
-                                  'assets': [{'mapResourceType': kind, 'name': name} for kind, name in ordered]}
+        ordered = _capture_wanted(assets, common_pairs, models, pairs, profiles, ref, roots, selected, species)
         print(species, 'cache entries', len(ordered), flush=True)
     document = {'schema_version': 1, 'game_image_sha256': hashlib.sha256((game_root / 'DOOMEternalx64vk.exe').read_bytes()).hexdigest(),
                 'source_tables': {key: {'bank': v['bank'], 'sha256': v['sha256']} for key, v in documents.items()},
                 'powerups': {effect: profiles.pop(sha) for effect, sha in powerups.items()},
                 'bodies': dict(sorted(profiles.items()))}
+    return document, profiles
+
+
+def capture(game_root, output):
+    root = Path(__file__).resolve().parents[2]
+    base = game_root.resolve() / 'base'
+    catalog = json.loads((root / 'doom_eap/content/native_enemy_catalog.json').read_bytes())
+    spec = json.loads((base / 'packagemapspec.json').read_bytes())
+    by_map = {}
+    for ref in spec['mapFileRefs']:
+        name = spec['files'][ref['file']]['name']
+        if name.endswith('.resources') and not name.startswith('ap_enemy_resources/'):
+            by_map.setdefault(spec['maps'][ref['map']]['name'], set()).add(ref['file'])
+    bodies, powerups = _capture_bodies(catalog, root)
+    document, profiles = _capture_needed(base, bodies, by_map, game_root, output, powerups, spec)
     output.write_text(json.dumps(document, sort_keys=True, separators=(',', ':')) + '\n', encoding='utf-8', newline='\n')
     print('Native enemy asset snapshot:', len(profiles), 'bodies;', output.stat().st_size, 'bytes')
 

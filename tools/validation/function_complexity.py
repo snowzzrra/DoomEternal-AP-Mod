@@ -1,4 +1,4 @@
-"""Check Python function complexity against general limits and recorded exceptions."""
+"""Check Python functions against cognitive 15 and cyclomatic 10."""
 
 from __future__ import annotations
 
@@ -7,31 +7,13 @@ import ast
 import sys
 import tokenize
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-EXCEPTIONS = Path(__file__).resolve().parent
-
-
-class Mode(Enum):
-    CHECK = "check"
-    UPDATE = "update"
-    WRITE = "write"
-
-
-class ExceptionsError(ValueError):
-    pass
 
 
 class ScanError(ValueError):
     pass
-
-
-@dataclass(frozen=True)
-class Ceiling:
-    cognitive: int
-    cyclomatic: int
 
 
 @dataclass(frozen=True)
@@ -227,8 +209,6 @@ def scan(root, directories):
         for path in sorted(directory.rglob("*.py")):
             with tokenize.open(path) as source:
                 contents = source.read()
-            if generated_source(contents):
-                continue
             tree = ast.parse(contents, filename=str(path))
             visitor = Functions(path.relative_to(root).as_posix())
             visitor.visit(tree)
@@ -238,68 +218,20 @@ def scan(root, directories):
     return functions
 
 
-def generated_source(contents):
-    for line in contents.splitlines():
-        if not line.strip():
-            continue
-        if not line.startswith("#"):
-            return False
-        if line.startswith("# Generated ") and "DO NOT EDIT" in line:
-            return True
-    return False
-
-
-def parse_exception(line):
-    key, cognitive, cyclomatic = line.split()
-    path, separator, name = key.partition("::")
-    if not path or not separator or not name or "::" in name:
-        raise ExceptionsError("expected path::qualified.name")
-    cognitive, cyclomatic = int(cognitive), int(cyclomatic)
-    if cognitive < 0 or cyclomatic < 1:
-        raise ExceptionsError("cognitive must be >= 0 and cyclomatic >= 1")
-    return key, Ceiling(cognitive, cyclomatic)
-
-
-def read_exceptions(path):
-    result = {}
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        try:
-            key, ceiling = parse_exception(line)
-            if key in result:
-                raise ExceptionsError(f"duplicate function: {key}")
-        except ValueError as error:
-            raise ExceptionsError(f"{path}:{number}: invalid exception line: {error}") from error
-        result[key] = ceiling
-    return result
-
-
-def exceeds_limit(metrics):
-    return metrics.cognitive > 15 or metrics.cyclomatic > 10
-
-
-def failures(functions, exceptions, *, updating=False):
+def failures(functions):
     result = []
     for key, metrics in functions.items():
-        if key in exceptions and not exceeds_limit(metrics):
-            if not updating:
-                result.append(f"{key}: within general limits; remove its exception line or run --update")
-            continue
-        ceiling = exceptions.get(key, Ceiling(15, 10))
-        if metrics.cognitive > ceiling.cognitive:
-            result.append(f"{key}: cognitive {metrics.cognitive} > {ceiling.cognitive}")
-        if metrics.cyclomatic > ceiling.cyclomatic:
-            result.append(f"{key}: cyclomatic {metrics.cyclomatic} > {ceiling.cyclomatic}")
+        if metrics.cognitive > 15:
+            result.append(f"{key}: cognitive {metrics.cognitive} > 15")
+        if metrics.cyclomatic > 10:
+            result.append(f"{key}: cyclomatic {metrics.cyclomatic} > 10")
     return result
 
 
-def warnings(functions, exceptions):
+def warnings(functions):
     result = []
     for key, metrics in functions.items():
         reasons = []
-        if key in exceptions and 16 <= metrics.cognitive <= 25:
-            reasons.append(f"cognitive {metrics.cognitive}")
         if metrics.nesting > 4:
             reasons.append(f"nesting {metrics.nesting}")
         if metrics.lines > 150:
@@ -309,36 +241,18 @@ def warnings(functions, exceptions):
     return result
 
 
-def current_exceptions(functions):
-    return {
-        key: Ceiling(metrics.cognitive, metrics.cyclomatic)
-        for key, metrics in functions.items() if exceeds_limit(metrics)
-    }
-
-
-def write_exceptions(path, exceptions):
-    lines = ["# path::qualified.name cognitive cyclomatic"]
-    lines.extend(f"{key} {value.cognitive} {value.cyclomatic}" for key, value in sorted(exceptions.items()))
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-
-
-def run_gate(root, directories, exceptions_path, mode=Mode.CHECK, *, verbose=False):
+def run_gate(root, directories, *, verbose=False):
     functions = scan(root, directories)
-    exceptions = current_exceptions(functions) if mode is Mode.WRITE else read_exceptions(exceptions_path)
-    errors = failures(functions, exceptions, updating=mode is Mode.UPDATE)
+    errors = failures(functions)
     if verbose:
-        for message in warnings(functions, exceptions):
+        for message in warnings(functions):
             print(f"WARNING {message}")
     for message in errors:
         print(f"ERROR {message}")
     if errors:
-        print(f"FAIL {exceptions_path.name}: {len(errors)} failures, {len(functions)} functions")
+        print(f"FAIL {root.name}: {len(errors)} failures, {len(functions)} functions")
         return 1
-    if mode is Mode.UPDATE:
-        exceptions = current_exceptions({key: functions[key] for key in exceptions if key in functions})
-    if mode is not Mode.CHECK:
-        write_exceptions(exceptions_path, exceptions)
-    print(f"PASS {exceptions_path.name}: {len(functions)} functions, {len(exceptions)} exceptions")
+    print(f"PASS {root.name}: {len(functions)} functions, cognitive <= 15, cyclomatic <= 10")
     return 0
 
 
@@ -355,40 +269,26 @@ def arguments(argv):
             "boolean operators, comprehension generators/filters, assert, match choices "
             "and guards; nested definitions are separate. Nesting measures flow depth; "
             "body length spans the first through last body line, including blanks/comments. "
-            "All .py files in each scope, including APWorld tests, are scanned except files "
-            "with a leading '# Generated ... DO NOT EDIT' generator header. "
+            "All .py files in each scope, including tests and generated files, are scanned. "
             "Keys use relative POSIX paths and dotted class/function names; duplicate "
-            "qualified names are errors. Unlisted functions must have cognitive <= 15 and "
-            "cyclomatic <= 10. Listed functions cannot exceed either recorded score and must "
-            "be removed when within general limits. Scanner changes require --write-exceptions."
+            "qualified names are errors. All functions must have cognitive <= 15 and "
+            "cyclomatic <= 10."
         ),
     )
-    parser.add_argument("--apworld-root", type=Path, help="check only this APWorld directory; default: Mod doom_eap/tools/scripts")
-    modes = parser.add_mutually_exclusive_group()
-    modes.add_argument(
-        "--update", dest="mode", action="store_const", const=Mode.UPDATE,
-        help="lower existing scores and remove unnecessary lines; never raise scores or add functions",
-    )
-    modes.add_argument(
-        "--write-exceptions", dest="mode", action="store_const", const=Mode.WRITE,
-        help="explicitly replace the exception list from current scores after scanner changes",
-    )
+    parser.add_argument("--apworld-root", type=Path, help="check only this APWorld directory; default: Mod doom_eap/tools/scripts/tests")
     parser.add_argument("--verbose", action="store_true", help="print complexity, nesting and body length warnings")
-    parser.set_defaults(mode=Mode.CHECK)
     return parser.parse_args(argv)
 
 
 def main(argv=None):
     args = arguments(argv)
     root = ROOT
-    directories = [root / name for name in ("doom_eap", "tools", "scripts")]
-    exceptions_path = EXCEPTIONS / "complexity_exceptions_mod.txt"
+    directories = [root / name for name in ("doom_eap", "tools", "scripts", "tests")]
     if args.apworld_root is not None:
         root = args.apworld_root.resolve()
         directories = [root]
-        exceptions_path = EXCEPTIONS / "complexity_exceptions_apworld.txt"
     try:
-        return run_gate(root, directories, exceptions_path, args.mode, verbose=args.verbose)
+        return run_gate(root, directories, verbose=args.verbose)
     except (OSError, SyntaxError, UnicodeError, ValueError) as error:
         print(f"ERROR {error}", file=sys.stderr)
         return 2

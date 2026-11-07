@@ -17,42 +17,29 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_handoff_manifest(
-    root: Path, *, version: str, mod_sha: str, apworld_sha: str, platform: str = "both",
-    mod_ref: str | None = None, apworld_ref: str | None = None,
-    source_state: dict | None = None,
-) -> Path:
-    root = root.resolve()
-    required = [
-        root / "shared/doometernal.apworld",
-        root / "shared/client/ap_client.exe",
-        root / "shared/resources/base_mod.zip",
-        root / "shared/resources/room_payloads.zip",
-        root / "shared/resources/room_payload_manifest.json",
-    ]
-    if platform in {"windows", "both"}:
-        required.append(root / "windows/DoomEternalArchipelagoLauncher.exe")
-    if platform in {"linux", "both"}:
-        required.append(root / "linux/DoomEternalArchipelagoLauncher")
-    missing = [str(path) for path in required if not path.is_file()]
+def _write_handoff_manifest_filename(directory, filenames, records, root, sums):
+    for filename in sorted(filenames):
+        if filename in {"BUILD-MANIFEST.json", "SHA256SUMS.txt"}:
+            continue
+        path = Path(directory) / filename
+        relative = path.relative_to(root).as_posix()
+        digest = _sha256(path)
+        role = "launcher" if "Launcher" in filename else (
+            "apworld" if filename.endswith(".apworld") else
+            "room-resource" if "resources/" in relative else "native-client"
+        )
+        records.append({"path": relative, "sha256": digest, "size": path.stat().st_size, "role": role})
+        sums.append(f"{digest}  {relative}")
+
+
+def _write_handoff_manifest_sums(apworld_ref, apworld_sha, missing, mod_ref, mod_sha, platform, root, source_state, version):
     if missing:
         raise ValueError(f"handoff inputs missing: {missing}")
 
     records: list[dict[str, object]] = []
     sums: list[str] = []
     for directory, _, filenames in os.walk(root):
-        for filename in sorted(filenames):
-            if filename in {"BUILD-MANIFEST.json", "SHA256SUMS.txt"}:
-                continue
-            path = Path(directory) / filename
-            relative = path.relative_to(root).as_posix()
-            digest = _sha256(path)
-            role = "launcher" if "Launcher" in filename else (
-                "apworld" if filename.endswith(".apworld") else
-                "room-resource" if "resources/" in relative else "native-client"
-            )
-            records.append({"path": relative, "sha256": digest, "size": path.stat().st_size, "role": role})
-            sums.append(f"{digest}  {relative}")
+        _write_handoff_manifest_filename(directory, filenames, records, root, sums)
     records.sort(key=lambda record: str(record["path"]))
     manifest = {
         "schema_version": 1,
@@ -74,6 +61,28 @@ def write_handoff_manifest(
         candidate = root / str(record["path"])
         if _sha256(candidate) != record["sha256"] or candidate.stat().st_size != record["size"]:
             raise RuntimeError(f"handoff verification failed: {candidate}")
+    return path, records
+
+
+def write_handoff_manifest(
+    root: Path, *, version: str, mod_sha: str, apworld_sha: str, platform: str = "both",
+    mod_ref: str | None = None, apworld_ref: str | None = None,
+    source_state: dict | None = None,
+) -> Path:
+    root = root.resolve()
+    required = [
+        root / "shared/doometernal.apworld",
+        root / "shared/client/ap_client.exe",
+        root / "shared/resources/base_mod.zip",
+        root / "shared/resources/room_payloads.zip",
+        root / "shared/resources/room_payload_manifest.json",
+    ]
+    if platform in {"windows", "both"}:
+        required.append(root / "windows/DoomEternalArchipelagoLauncher.exe")
+    if platform in {"linux", "both"}:
+        required.append(root / "linux/DoomEternalArchipelagoLauncher")
+    missing = [str(path) for path in required if not path.is_file()]
+    path, records = _write_handoff_manifest_sums(apworld_ref, apworld_sha, missing, mod_ref, mod_sha, platform, root, source_state, version)
     print(f"HANDOFF manifest={path} files={len(records)} platform={platform}")
     return path
 

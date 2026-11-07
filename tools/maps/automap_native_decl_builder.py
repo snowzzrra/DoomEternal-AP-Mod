@@ -41,6 +41,25 @@ EDIT_OPEN = "\tedit = {\n"
 XP_OVERRIDE = "\t\txp = 0;\n"
 
 
+def _build_toy_override_required(text):
+    required = (
+        'inherit = "propitem/collectible/toys/default";',
+        'inventoryDecl = "collectible/toys/doom_slayer";',
+        'collectible = "toys/doomguy";',
+    )
+    if text.count(EDIT_OPEN) != 1 or any(text.count(value) != 1 for value in required):
+        raise ValueError("Doom Slayer Toy owner structure drift")
+    if "xp" in text or "inventoryCount" in text:
+        raise ValueError("Doom Slayer Toy leaf unexpectedly owns inherited reward fields")
+    override = text.replace(EDIT_OPEN, EDIT_OPEN + XP_OVERRIDE, 1)
+    if override.replace(XP_OVERRIDE, "", 1) != text or override.count("xp = 0;") != 1:
+        raise ValueError("Doom Slayer Toy override changed more than inherited XP")
+    for value in required[1:]:
+        if override.count(value) != 1:
+            raise ValueError("Doom Slayer Toy cosmetic/Dossier state was not preserved")
+    return override
+
+
 def build_toy_override(mod_root: Path) -> dict:
     owner_root = (
         ROOT / "data" / "automap_native_decl_sources" / OWNER["container"] /
@@ -67,21 +86,7 @@ def build_toy_override(mod_root: Path) -> dict:
     actual_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     if actual_hash != OWNER["normalized_snapshot_sha256"]:
         raise ValueError(f"Doom Slayer Toy owner hash drift: {actual_hash}")
-    required = (
-        'inherit = "propitem/collectible/toys/default";',
-        'inventoryDecl = "collectible/toys/doom_slayer";',
-        'collectible = "toys/doomguy";',
-    )
-    if text.count(EDIT_OPEN) != 1 or any(text.count(value) != 1 for value in required):
-        raise ValueError("Doom Slayer Toy owner structure drift")
-    if "xp" in text or "inventoryCount" in text:
-        raise ValueError("Doom Slayer Toy leaf unexpectedly owns inherited reward fields")
-    override = text.replace(EDIT_OPEN, EDIT_OPEN + XP_OVERRIDE, 1)
-    if override.replace(XP_OVERRIDE, "", 1) != text or override.count("xp = 0;") != 1:
-        raise ValueError("Doom Slayer Toy override changed more than inherited XP")
-    for value in required[1:]:
-        if override.count(value) != 1:
-            raise ValueError("Doom Slayer Toy cosmetic/Dossier state was not preserved")
+    override = _build_toy_override_required(text)
 
     target = (
         mod_root / OWNER["container"] / "generated" / "decls" / OWNER["path"]

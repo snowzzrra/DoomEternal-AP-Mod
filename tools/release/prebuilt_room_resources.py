@@ -10,11 +10,10 @@ import argparse
 import hashlib
 import json
 import shutil
-import tempfile
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
-
 
 from tools.release.source_bytes import SOURCE_BYTE_CONTRACT, compiler_source_bytes
 
@@ -38,9 +37,9 @@ DEPENDENCY_DIRS = (
 
 DEPENDENCY_FILES = (
     "doom_eap/strings.py",
-    "doom_eap/runtime/save_records.py",
+    "doom_eap/runtime/bridge_saves.py",
     "doom_eap/launcher/launcher_core.py",
-    "doom_eap/runtime/context_registry.py",
+    "doom_eap/runtime/observers.py",
     "packaging/shell_menu_assetsinfo.json",
     "packaging/hub_world_text_assetsinfo.json",
     "tools/content/compile_content_catalog.py",
@@ -72,8 +71,7 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tuple[str, dict[str, str]]:
-    """Compute deterministic SHA-256 fingerprint across all content/data inputs affecting room resources."""
+def _compute_room_resource_input_fingerprint_root(repo_root):
     root = (repo_root or REPO_ROOT).resolve()
     files_to_hash: dict[str, str] = {}
 
@@ -87,6 +85,12 @@ def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tu
                 if rel == "doom_eap/contracts/core_distribution.py":
                     continue
                 files_to_hash[rel] = hashlib.sha256(compiler_source_bytes(p)).hexdigest()
+    return files_to_hash, root
+
+
+def compute_room_resource_input_fingerprint(repo_root: Path | None = None) -> tuple[str, dict[str, str]]:
+    """Compute deterministic SHA-256 fingerprint across all content/data inputs affecting room resources."""
+    files_to_hash, root = _compute_room_resource_input_fingerprint_root(repo_root)
 
     for rel_file in DEPENDENCY_FILES:
         p = root / rel_file
@@ -105,12 +109,7 @@ def get_frozen_bundle_dir(repo_root: Path | None = None, version: str = ROOM_RES
     return root / "packaging" / "room_resources" / version_dir
 
 
-def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = ROOM_RESOURCES_VERSION) -> dict[str, Any]:
-    """Verify exact emitted bytes against immutable sums/provenance, without a cache claim."""
-    bundle_path = bundle_dir.resolve()
-    if not bundle_path.is_dir():
-        raise ValueError(f"Prebuilt room resources bundle directory missing: {bundle_path}")
-
+def _validate_room_resource_integrity_filename(bundle_path):
     for filename in (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES):
         target = bundle_path / filename
         if not target.is_file():
@@ -136,10 +135,19 @@ def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = R
                 f"Checksum mismatch for {filename}: expected {recorded_sums[filename]}, got {actual_hash}"
             )
 
+
+def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = ROOM_RESOURCES_VERSION) -> dict[str, Any]:
+    """Verify exact emitted bytes against immutable sums/provenance, without a cache claim."""
+    bundle_path = bundle_dir.resolve()
+    if not bundle_path.is_dir():
+        raise ValueError(f"Prebuilt room resources bundle directory missing: {bundle_path}")
+
+    _validate_room_resource_integrity_filename(bundle_path)
+
     prov_path = bundle_path / "ROOM_RESOURCES_PROVENANCE.json"
     try:
         provenance = json.loads(prov_path.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (OSError, ValueError) as e:
         raise ValueError(f"Corrupt ROOM_RESOURCES_PROVENANCE.json: {e}") from e
 
     norm_expected = expected_version.lstrip("v")
@@ -169,22 +177,14 @@ def validate_room_resource_integrity(bundle_dir: Path, expected_version: str = R
     return provenance
 
 
-def validate_prebuilt_room_resources(
-    bundle_dir: Path,
-    repo_root: Path | None = None,
-    expected_version: str = ROOM_RESOURCES_VERSION,
-) -> dict[str, Any]:
-    """Validate emitted bytes, current compiler fingerprint and resource contracts."""
-    root = (repo_root or REPO_ROOT).resolve()
+def _validate_prebuilt_room_resources_bundle_path(bundle_dir, expected_version, root):
     bundle_path = bundle_dir.resolve()
     provenance = validate_room_resource_integrity(bundle_path, expected_version)
 
-    # 4. Strict NO STALE ARTIFACT: current content input fingerprint must match provenance
     current_fingerprint, current_hashes = compute_room_resource_input_fingerprint(root)
     expected_fingerprint = provenance.get("room_resource_input_fingerprint")
     if (current_fingerprint != expected_fingerprint
             or provenance.get("compiler_input_byte_contract") != SOURCE_BYTE_CONTRACT):
-        # diagnose divergence
         old_hashes = provenance.get("source_hashes", {})
         diffs = []
         for k in set(current_hashes) | set(old_hashes):
@@ -208,8 +208,18 @@ def validate_prebuilt_room_resources(
 
     if provenance.get("source_hashes") != current_hashes or provenance.get("inputs_count") != len(current_hashes):
         raise ValueError("Compiler input provenance does not match the declared fingerprint/source byte contract")
+    return bundle_path, current_fingerprint, provenance
 
-    # check the room resources
+
+def validate_prebuilt_room_resources(
+    bundle_dir: Path,
+    repo_root: Path | None = None,
+    expected_version: str = ROOM_RESOURCES_VERSION,
+) -> dict[str, Any]:
+    """Validate emitted bytes, current compiler fingerprint and resource contracts."""
+    root = (repo_root or REPO_ROOT).resolve()
+    bundle_path, current_fingerprint, provenance = _validate_prebuilt_room_resources_bundle_path(bundle_dir, expected_version, root)
+
     from scripts.release.assemble_ci_artifact import validate_room_resources
 
     manifest_doc = validate_room_resources(bundle_path, repo_root=root)
@@ -251,13 +261,12 @@ def export_prebuilt_room_resources(
     return result
 
 
-
 def publish_prebuilt_room_resources(
     source_dir: Path, bundle_dir: Path, *, repo_root: Path, expected_version: str,
     mod_commit: str, apworld_commit: str,
     source_state: dict | None = None,
 ) -> dict[str, Any]:
-    """Publish compiler outputs as the canonical, fingerprinted authorial boundary."""
+    """Record compiler inputs and checksums beside the built room resources."""
     source = source_dir.resolve()
     bundle = bundle_dir.resolve()
     for filename in CANONICAL_RESOURCE_FILENAMES:
@@ -292,6 +301,8 @@ def publish_prebuilt_room_resources(
             "mod": source_origin(mod_commit, source_state["mod"]),
             "apworld": source_origin(apworld_commit, source_state["apworld"]),
         }
+        for origin in provenance["source_state"].values():
+            origin["source_state"] = {key: value for key, value in origin["source_state"].items() if key != "files"}
     (bundle / "ROOM_RESOURCES_PROVENANCE.json").write_text(
         json.dumps(provenance, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
@@ -346,7 +357,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  room_payloads SHA-256:        {res['provenance']['room_payloads']['sha256']}")
         print(f"  room_payload_manifest SHA-256:{res['provenance']['room_payload_manifest']['sha256']}")
         return 0
-    except Exception as e:
+    except (OSError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 

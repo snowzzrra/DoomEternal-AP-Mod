@@ -6,8 +6,9 @@ import hashlib
 import json
 import re
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog, thaw_content
 from doom_eap.content.map_registry import load_map_registry, release_plan
@@ -32,8 +33,6 @@ def _canonical_hash(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
-
-
 
 
 def _field_count(text: str, field: str) -> int:
@@ -92,22 +91,7 @@ def _asset_package_payload(catalog: ContentCatalog, map_key: str) -> dict:
     }
 
 
-def describe_generated_map(
-    path: Path,
-    manifest_path: Path,
-    config_path: Path,
-    *,
-    map_key: str | None = None,
-    catalog: ContentCatalog | None = None,
-) -> dict:
-    data = path.read_bytes()
-    text = data.decode("utf-8")
-    names = re.findall(r"\bentityDef\s+([^\s{]+)", text)
-    event_ids = sorted({
-        int(value) for value in re.findall(r"AP_CHECK_EVENT_(\d+)", text)
-    })
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+def _describe_generated_map_catalog(catalog, config_path, map_key):
     catalog = catalog or load_content_catalog()
     if map_key is None:
         matches = [
@@ -121,11 +105,31 @@ def describe_generated_map(
         item.location_id for item in catalog.runtime_locations
         if item.mission_key == map_key
     )
-    runtime_set = set(runtime_ids)
+    set(runtime_ids)
     declared_physical = {
         item.location_id for item in catalog.physical_locations
         if item.map_key == map_key
     }
+    return catalog, declared_physical, map_key, runtime_ids
+
+
+def describe_generated_map(
+    path: Path,
+    manifest_path: Path,
+    config_path: Path,
+    *,
+    map_key: str | None = None,
+    catalog: ContentCatalog | None = None,
+) -> dict:
+    data = path.read_bytes()
+    text = data.decode("utf-8")
+    re.findall(r"\bentityDef\s+([^\s{]+)", text)
+    event_ids = sorted({
+        int(value) for value in re.findall(r"AP_CHECK_EVENT_(\d+)", text)
+    })
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    catalog, declared_physical, map_key, runtime_ids = _describe_generated_map_catalog(catalog, config_path, map_key)
     physical_ids = sorted(value for value in event_ids if value in declared_physical)
     identity = json.loads(IDENTITY_PATH.read_text(encoding="utf-8"))
     return {

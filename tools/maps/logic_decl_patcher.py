@@ -24,21 +24,7 @@ def count_link(text: str, from_node: int, from_pin: int, to_node: int) -> int:
     return len(pattern.findall(text))
 
 
-def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
-    contracts = json.loads(contract_path.read_text(encoding="utf-8"))
-    contract = contracts["locations"][location_id]
-    if contract["strategy"] != "logic_decl_patch":
-        raise ValueError(f"{location_id}: not a logic_decl_patch contract")
-    root = contract_path.parent.parent
-    source = root / contract["logic_decl_patch"]["source_path"]
-    if not source.is_file():
-        raise ValueError(f"logic DECL source missing: {source}")
-    raw = source.read_bytes()
-    expected_hash = contract["logic_decl_patch"]["source_sha256"]
-    if sha256(raw) != expected_hash:
-        raise ValueError(f"logic DECL source hash mismatch: {source}")
-    text = raw.decode("utf-8")
-    patch = contract["logic_decl_patch"]
+def _patch_contract_inventory_signature(contract, patch, text):
     inventory_signature = (
         f'id = {patch["inventory_check_node"]};'
     )
@@ -85,6 +71,12 @@ def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
         result = bat_pattern.sub(
             rf'\g<1>{battery_patch["preserved_destination"]}\g<2>', result, count=1
         )
+    return architecture, battery_patch, inventory_signature, result
+
+
+def _patch_contract_patch(contract, text):
+    patch = contract["logic_decl_patch"]
+    architecture, battery_patch, inventory_signature, result = _patch_contract_inventory_signature(contract, patch, text)
     if result.count(inventory_signature) != 1 or result.count(patch["inventory_decl"]) != 1:
         raise ValueError("patch changed the Ice inventory-check identity")
     if architecture and count_link(
@@ -97,12 +89,26 @@ def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
     for reference in patch.get("forbidden_patch_references", []):
         if reference in result:
             raise ValueError(f"forbidden reference in logic override: {reference}")
+    return architecture, battery_patch, patch, result
+
+
+def _patch_contract_root(contract, contract_path, location_id, output):
+    root = contract_path.parent.parent
+    source = root / contract["logic_decl_patch"]["source_path"]
+    if not source.is_file():
+        raise ValueError(f"logic DECL source missing: {source}")
+    raw = source.read_bytes()
+    expected_hash = contract["logic_decl_patch"]["source_sha256"]
+    if sha256(raw) != expected_hash:
+        raise ValueError(f"logic DECL source hash mismatch: {source}")
+    text = raw.decode("utf-8")
+    architecture, battery_patch, patch, result = _patch_contract_patch(contract, text)
 
     before_lines = text.splitlines()
     after_lines = result.splitlines()
     changed = [
         {"line": index + 1, "before": before, "after": after}
-        for index, (before, after) in enumerate(zip(before_lines, after_lines))
+        for index, (before, after) in enumerate(zip(before_lines, after_lines, strict=False))
         if before != after
     ]
     expected_changes = 2 if battery_patch else 1
@@ -131,6 +137,15 @@ def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
         "override_sha256": sha256(result.encode("utf-8")),
         "changed_lines": changed,
     }
+    return patch, snapshot
+
+
+def patch_contract(contract_path: Path, location_id: str, output: Path) -> dict:
+    contracts = json.loads(contract_path.read_text(encoding="utf-8"))
+    contract = contracts["locations"][location_id]
+    if contract["strategy"] != "logic_decl_patch":
+        raise ValueError(f"{location_id}: not a logic_decl_patch contract")
+    patch, snapshot = _patch_contract_root(contract, contract_path, location_id, output)
     expected_override = patch.get("override_sha256")
     if expected_override and snapshot["override_sha256"] != expected_override:
         raise ValueError("logic DECL override hash mismatch")

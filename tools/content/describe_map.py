@@ -9,8 +9,7 @@ from doom_eap.content.content_catalog import load_content_catalog, thaw_content
 from tools.maps.map_semantic_baseline import baseline_path
 
 
-def describe(map_key: str) -> dict:
-    catalog = load_content_catalog()
+def _describe_physical(catalog, map_key):
     spec = catalog.map(map_key)
     physical = [
         {"id": item.location_id, "name": item.name, "strategy": item.strategy}
@@ -28,6 +27,12 @@ def describe(map_key: str) -> dict:
         }
         for item in catalog.publishers if item.map_key == map_key
     ]
+    return physical, publishers, runtime, spec
+
+
+def describe(map_key: str) -> dict:
+    catalog = load_content_catalog()
+    physical, publishers, runtime, spec = _describe_physical(catalog, map_key)
     assets = [
         {
             "key": item.key,

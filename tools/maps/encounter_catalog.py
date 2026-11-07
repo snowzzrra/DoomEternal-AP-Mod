@@ -7,7 +7,6 @@ from pathlib import Path
 
 from tools.maps.ap_map_generator import find_matching_brace
 
-
 ENTITY_START = re.compile(r"(?m)^entity\s*\{")
 ENTITY_HEADER = re.compile(r'entityDef\s+(\S+)\s*\{\s*inherit\s*=\s*"([^"]*)";\s*class\s*=\s*"([^"]+)";')
 MEMBER = re.compile(r'\s*([\w.\[\]-]+)\s*=\s*(\{|"(?:\\.|[^"\\])*"|[^;{}]+;)')
@@ -30,6 +29,34 @@ def parse_object(text):
     return _parse_object(text, 0, len(text), endings)
 
 
+def _parse_object_offset(match, name, result, value):
+    value = value.rstrip(";").strip()
+    if value in {"true", "false", "NULL"}:
+        result[name] = {"true": True, "false": False, "NULL": None}[value]
+    else:
+        try:
+            result[name] = int(value)
+        except ValueError:
+            result[name] = float(value)
+    offset = match.end()
+    return offset
+
+
+def _parse_member_value(endings, limit, match, name, result, text, value):
+    if value == "{":
+        end = endings.get(match.end() - 1)
+        if end is None or end > limit:
+            raise ValueError("Unbalanced braces while parsing entities content")
+        result[name] = _parse_object(text, match.end(), end - 1, endings)
+        offset = end
+    elif value.startswith('"'):
+        result[name] = json.loads(value)
+        offset = match.end()
+    else:
+        offset = _parse_object_offset(match, name, result, value)
+    return offset
+
+
 def _parse_object(text, offset, limit, endings):
     result = {}
     while offset < limit:
@@ -41,29 +68,10 @@ def _parse_object(text, offset, limit, endings):
         name, value = match.groups()
         if name in result:
             raise ValueError(f"Duplicate entity property: {name}")
-        if value == "{":
-            end = endings.get(match.end() - 1)
-            if end is None or end > limit:
-                raise ValueError("Unbalanced braces while parsing entities content")
-            result[name] = _parse_object(text, match.end(), end - 1, endings)
-            offset = end
-        elif value.startswith('"'):
-            result[name] = json.loads(value)
-            offset = match.end()
-        else:
-            value = value.rstrip(";").strip()
-            if value in {"true", "false", "NULL"}:
-                result[name] = {"true": True, "false": False, "NULL": None}[value]
-            else:
-                try:
-                    result[name] = int(value)
-                except ValueError:
-                    result[name] = float(value)
-            offset = match.end()
+        offset = _parse_member_value(endings, limit, match, name, result, text, value)
         while offset < limit and (text[offset].isspace() or text[offset] == ";"):
             offset += 1
     return result
-
 
 
 def list_items(value):
@@ -75,11 +83,10 @@ def list_items(value):
     return items
 
 
-
 def entity_records(text, *, include_names=None):
     starts = [match.start() for match in ENTITY_START.finditer(text)]
     source_line = 1 + text[:starts[0]].count("\n") if starts else 1
-    for start, end in zip(starts, starts[1:] + [len(text)]):
+    for start, end in zip(starts, starts[1:] + [len(text)], strict=False):
         block = text[start:end]
         block_line = source_line
         source_line += block.count("\n")
@@ -108,7 +115,6 @@ def entity_records(text, *, include_names=None):
         }
 
 
-
 def walk_values(value, path=""):
     if isinstance(value, dict):
         for name, child in value.items():
@@ -118,7 +124,6 @@ def walk_values(value, path=""):
             yield from walk_values(child, f"{path}[{index}]")
     else:
         yield path, value
-
 
 
 def text_sha256(text):

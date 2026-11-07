@@ -49,8 +49,7 @@ def read_json(path: Path) -> Any:
         raise ValueError(f"{path.relative_to(ROOT)}: {error}") from error
 
 
-def check_authorial() -> dict[str, int]:
-    json_paths = sorted(path for root_name in JSON_ROOTS for path in (ROOT / root_name).rglob("*.json"))
+def _check_authorial_json_paths(json_paths):
     for path in json_paths:
         read_json(path)
 
@@ -67,24 +66,10 @@ def check_authorial() -> dict[str, int]:
         raise ValueError("data/content_identity.json: invalid game identity")
     if identity["apworld_revision"] != "0.8.0":
         raise ValueError("data/content_identity.json: invalid official APWorld revision")
-    if identity["content_revision"] != "0.8.0":
-        raise ValueError("data/content_identity.json: invalid content revision")
-    if identity["release_version"] != "0.8.0":
-        raise ValueError("data/content_identity.json: invalid release revision")
-    if not identity["slot_data_revision"]:
-        raise ValueError("data/content_identity.json: slot_data_revision must not be empty")
+    return identity
 
-    campaign_goal = read_json(ROOT / "data/campaign_goal_contract.json")
-    if campaign_goal.get("release") != identity["release_version"]:
-        raise ValueError("data/campaign_goal_contract.json: release diverges from content identity")
 
-    catalog = load_content_catalog(ROOT)
-    location_ids = [location.location_id for location in (*catalog.physical_locations, *catalog.runtime_locations)]
-    if any(location_id < 7_770_000 or location_id >= 7_780_000 for location_id in location_ids):
-        raise ValueError("location ID outside reserved DOOM Eternal range")
-
-    commands = read_json(ROOT / "data/items.json")
-    item_ids = [int(item_id) for item_id in commands]
+def _check_authorial_expected_manifests(catalog, item_ids):
     if len(item_ids) != len(set(item_ids)):
         raise ValueError("duplicate item IDs")
     if any(item_id < 7_770_000 or item_id >= 7_780_000 for item_id in item_ids):
@@ -112,6 +97,36 @@ def check_authorial() -> dict[str, int]:
     }
     if projected_names != expected_names:
         raise ValueError("data/location_names.json is stale")
+    return expected_manifests
+
+
+def _check_authorial_identity(json_paths):
+    identity = _check_authorial_json_paths(json_paths)
+    if identity["content_revision"] != "0.8.0":
+        raise ValueError("data/content_identity.json: invalid content revision")
+    if identity["release_version"] != "0.8.0":
+        raise ValueError("data/content_identity.json: invalid release revision")
+    if not identity["slot_data_revision"]:
+        raise ValueError("data/content_identity.json: slot_data_revision must not be empty")
+
+    campaign_goal = read_json(ROOT / "data/campaign_goal_contract.json")
+    if campaign_goal.get("release") != identity["release_version"]:
+        raise ValueError("data/campaign_goal_contract.json: release diverges from content identity")
+
+    catalog = load_content_catalog(ROOT)
+    location_ids = [location.location_id for location in (*catalog.physical_locations, *catalog.runtime_locations)]
+    if any(location_id < 7_770_000 or location_id >= 7_780_000 for location_id in location_ids):
+        raise ValueError("location ID outside reserved DOOM Eternal range")
+
+    commands = read_json(ROOT / "data/items.json")
+    item_ids = [int(item_id) for item_id in commands]
+    return catalog, item_ids, location_ids
+
+
+def check_authorial() -> dict[str, int]:
+    json_paths = sorted(path for root_name in JSON_ROOTS for path in (ROOT / root_name).rglob("*.json"))
+    catalog, item_ids, location_ids = _check_authorial_identity(json_paths)
+    expected_manifests = _check_authorial_expected_manifests(catalog, item_ids)
 
     return {
         "json_files": len(json_paths),

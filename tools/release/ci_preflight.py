@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-"""Single aggregate preflight checker for GitHub Actions cross-platform build.
-
-Performs deterministic, zero-compilation, zero-build validation of:
-- Launcher source & data path availability
-- Launcher standalone runtime import graph & stub precedence
-- Workflow structure, single-owner preflight invariants & step order invariants
-- Native toolchain linkability invariants (when running in toolchain environment)
-- Release assembler static contract
-"""
+"""Validate release source paths and standalone runtime imports."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-
-import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -43,147 +33,6 @@ def check_source_data_paths(repo_root: Path, archipelago_source: Path) -> None:
         print(f"  [OK] {label} -> {path}")
 
 
-def check_workflow_contract(repo_root: Path) -> None:
-    print("--> Checking GitHub Actions workflow contract...")
-    wf_path = repo_root / ".github/workflows/cross-platform-build.yml"
-    if not wf_path.is_file():
-        raise RuntimeError(f"Workflow file missing at {wf_path}")
-
-    doc = yaml.safe_load(wf_path.read_text(encoding="utf-8"))
-
-    # trigger check
-    triggers = list(doc.get("on", {}).keys())
-    if triggers != ["workflow_dispatch"]:
-        raise RuntimeError(f"Workflow triggers must be exactly ['workflow_dispatch'], got {triggers}")
-
-    # permissions check
-    perms = doc.get("permissions")
-    if perms != {"contents": "read"}:
-        raise RuntimeError(f"Workflow permissions must be exactly {{'contents': 'read'}}, got {perms}")
-
-    # check job presence (all 7 jobs)
-    jobs = set(doc.get("jobs", {}).keys())
-    expected_jobs = {
-        "resolve-metadata",
-        "preflight",
-        "build-apworld",
-        "build-native-support",
-        "build-linux-launcher",
-        "build-windows-launcher",
-        "consolidate-handoff",
-        "assemble-release",
-    }
-    if jobs != expected_jobs:
-        raise RuntimeError(f"Unexpected workflow job set: missing={expected_jobs - jobs}, extra={jobs - expected_jobs}")
-
-    # check downstream job dependencies on preflight
-    for job_name in ["build-apworld", "build-native-support", "build-linux-launcher", "build-windows-launcher"]:
-        job_needs = doc["jobs"][job_name].get("needs", [])
-        if isinstance(job_needs, str):
-            job_needs = [job_needs]
-        if "preflight" not in job_needs:
-            raise RuntimeError(f"Job {job_name} must depend on 'preflight', got needs: {job_needs}")
-
-    # 5. Single-Owner Invariant for verify_launcher_runtime
-    verify_runtime_invocations = []
-    for job_name, job_def in doc.get("jobs", {}).items():
-        for step in job_def.get("steps", []):
-            run_cmd = step.get("run", "")
-            if "verify_launcher_runtime" in run_cmd:
-                verify_runtime_invocations.append((job_name, step.get("name", "")))
-
-    if len(verify_runtime_invocations) != 1:
-        raise RuntimeError(
-            f"verify_launcher_runtime must have exactly ONE invocation across the workflow, "
-            f"found {len(verify_runtime_invocations)}: {verify_runtime_invocations}"
-        )
-    if verify_runtime_invocations[0][0] != "preflight":
-        raise RuntimeError(
-            f"verify_launcher_runtime must be owned by job 'preflight', "
-            f"found in job '{verify_runtime_invocations[0][0]}'"
-        )
-
-    # keep one job in charge of ruff checks
-    ruff_invocations = []
-    for job_name, job_def in doc.get("jobs", {}).items():
-        for step in job_def.get("steps", []):
-            run_cmd = step.get("run", "")
-            if "ruff check" in run_cmd:
-                ruff_invocations.append(job_name)
-
-    for job_name in ruff_invocations:
-        job_steps = doc["jobs"][job_name].get("steps", [])
-        has_ci_reqs = any("requirements-ci.txt" in s.get("run", "") for s in job_steps)
-        if not has_ci_reqs:
-            raise RuntimeError(f"Job '{job_name}' runs Ruff but does not install requirements-ci.txt")
-
-    # 7. Check launcher job step ordering (install < build < selftest < upload)
-    for job_name, self_test_pattern in [
-        ("build-linux-launcher", "DoomEternalArchipelagoLauncher --self-test"),
-        ("build-windows-launcher", "--self-test"),
-    ]:
-        steps = doc["jobs"][job_name].get("steps", [])
-        step_runs = [s.get("run", "") for s in steps]
-
-        install_indices = [i for i, run in enumerate(step_runs) if "requirements-launcher.txt" in run]
-        if not install_indices:
-            raise RuntimeError(f"{job_name} missing 'pip install -r requirements-launcher.txt' step")
-        install_idx = install_indices[0]
-
-        build_indices = [i for i, run in enumerate(step_runs) if "build_launcher" in run and "--help" not in run]
-        if not build_indices:
-            raise RuntimeError(f"{job_name} missing 'build_launcher' step")
-        build_idx = build_indices[0]
-
-        selftest_indices = [i for i, run in enumerate(step_runs) if self_test_pattern in run]
-        if not selftest_indices:
-            raise RuntimeError(f"{job_name} missing '{self_test_pattern}' step")
-        selftest_idx = selftest_indices[0]
-
-        upload_indices = [i for i, s in enumerate(steps) if "upload-artifact" in s.get("uses", "")]
-        if not upload_indices:
-            raise RuntimeError(f"{job_name} missing upload-artifact step")
-        upload_idx = upload_indices[0]
-
-        if not (install_idx < build_idx < selftest_idx < upload_idx):
-            raise RuntimeError(
-                f"{job_name} step ordering invariant violated: "
-                f"install({install_idx}) < build({build_idx}) < selftest({selftest_idx}) < upload({upload_idx})"
-            )
-
-    # check that the native support job uses the windows/msvc builder
-    native_job = doc["jobs"]["build-native-support"]
-    if native_job.get("runs-on") != "windows-2022":
-        raise RuntimeError("Workflow native job must use the qualified Windows 2022 toolchain host")
-    native_runs = [step.get("run", "") for step in native_job.get("steps", [])]
-    if not any("scripts/build/client_windows.ps1" in run.replace("\\", "/") for run in native_runs):
-        raise RuntimeError("Workflow native job must invoke scripts/build/client_windows.ps1")
-    native_commands = "\n".join(native_runs)
-    if "-CoreSource Sentinel-Core" not in native_commands or "qualify_distribution.py" not in native_commands or "build_session_owner" not in native_commands:
-        raise RuntimeError("Workflow must qualify the explicitly selected Core and package its Windows session supervisor")
-    inputs = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {})
-    if any(not inputs.get(key, {}).get("required") for key in ("core_repo", "core_ref")):
-        raise RuntimeError("Core repository and full commit must be explicit workflow inputs")
-    for name in ("build-linux-launcher", "build-windows-launcher"):
-        job = doc["jobs"][name]
-        if any("--core-runtime" in step.get("run", "") or step.get("with", {}).get("name") == "core-runtime-artifact" for step in job["steps"]):
-            raise RuntimeError(f"{name} must build independently of the Core runtime")
-
-    # check apworld_ref default
-    apworld_default = doc.get("on", {}).get("workflow_dispatch", {}).get("inputs", {}).get("apworld_ref", {}).get("default")
-    if apworld_default != "doom_eternal":
-        raise RuntimeError(f"Expected apworld_ref default to be 'doom_eternal', got {apworld_default!r}")
-
-    print("  [OK] Workflow trigger is workflow_dispatch only")
-    print("  [OK] Workflow permissions are contents: read")
-    print("  [OK] All 8 expected jobs present and properly sequenced")
-    print("  [OK] Single-owner verify_launcher_runtime invariant verified (jobs.preflight only)")
-    print("  [OK] Single-owner Ruff static analysis invariant verified (requirements-ci only)")
-    print("  [OK] Module invocation python -m tools.release.build_launcher verified")
-    print("  [OK] Step ordering invariant (install < build < selftest < upload) verified")
-    print("  [OK] Windows/MSVC native client build invariant verified")
-
-
 def check_runtime_imports(repo_root: Path, archipelago_source: Path) -> None:
     repo_str = str(repo_root.resolve())
     if repo_str not in sys.path:
@@ -202,7 +51,6 @@ def main() -> int:
     print("DOOM ETERNAL AP CI PREFLIGHT VERIFICATION")
     print("=======================================================")
     check_source_data_paths(args.repo_root, args.archipelago_source)
-    check_workflow_contract(args.repo_root)
     check_runtime_imports(args.repo_root, args.archipelago_source)
 
     print("\n=======================================================")

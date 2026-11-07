@@ -60,46 +60,8 @@ def _verified_outputs(plan: APWorldBuildPlan, outputs: Any) -> bool:
 
     expected: dict[str, dict[str, int | str]] = {}
     for item in outputs:
-        if not isinstance(item, dict):
+        if not _record_expected_output(plan, item, expected):
             return False
-        relative = _safe_relative(item.get("path"))
-        if relative is None:
-            return False
-        path = plan.output_root / relative
-        if path.is_symlink():
-            return False
-        members = item.get("members")
-        if members is not None:
-            if not path.is_dir() or not isinstance(members, dict):
-                return False
-            for member, metadata in members.items():
-                member_path = _safe_relative(member)
-                if member_path is None or not isinstance(metadata, dict):
-                    return False
-                expected_path = (relative / member_path).as_posix()
-                digest = metadata.get("sha256")
-                size = metadata.get("size")
-                if not isinstance(digest, str) or len(digest) != 64:
-                    return False
-                if not isinstance(size, int) or size < 0:
-                    return False
-                if expected_path in expected:
-                    return False
-                expected[expected_path] = {"sha256": digest, "size": size}
-            continue
-        digest = item.get("sha256")
-        size = item.get("size")
-        if not path.is_file() or not isinstance(digest, str) or len(digest) != 64:
-            return False
-        if size is not None and (not isinstance(size, int) or size < 0):
-            return False
-        expected_path = relative.as_posix()
-        if expected_path in expected:
-            return False
-        expected[expected_path] = {
-            "sha256": digest,
-            "size": path.stat().st_size if size is None else size,
-        }
 
     inventory = _member_hashes(plan.output_root)
     if inventory is None:
@@ -109,6 +71,58 @@ def _verified_outputs(plan: APWorldBuildPlan, outputs: Any) -> bool:
         if actual_metadata != metadata:
             return False
     return set(inventory) == set(expected)
+
+
+def _record_expected_output(plan, item, expected):
+    if not isinstance(item, dict):
+        return False
+    relative = _safe_relative(item.get("path"))
+    if relative is None:
+        return False
+    path = plan.output_root / relative
+    if path.is_symlink():
+        return False
+    members = item.get("members")
+    if members is not None:
+        return _record_expected_members(path, relative, members, expected)
+    return _record_expected_file(path, relative, item, expected)
+
+
+def _record_expected_members(path, relative, members, expected):
+    if not path.is_dir() or not isinstance(members, dict):
+        return False
+    for member, metadata in members.items():
+        member_path = _safe_relative(member)
+        if member_path is None or not isinstance(metadata, dict):
+            return False
+        if not _record_expected_metadata((relative / member_path).as_posix(), metadata, expected):
+            return False
+    return True
+
+
+def _record_expected_metadata(key, metadata, expected):
+    digest, size = metadata.get("sha256"), metadata.get("size")
+    if not isinstance(digest, str) or len(digest) != 64:
+        return False
+    if not isinstance(size, int) or size < 0:
+        return False
+    if key in expected:
+        return False
+    expected[key] = {"sha256": digest, "size": size}
+    return True
+
+
+def _record_expected_file(path, relative, item, expected):
+    digest, size = item.get("sha256"), item.get("size")
+    if not path.is_file() or not isinstance(digest, str) or len(digest) != 64:
+        return False
+    if size is not None and (not isinstance(size, int) or size < 0):
+        return False
+    key = relative.as_posix()
+    if key in expected:
+        return False
+    expected[key] = {"sha256": digest, "size": path.stat().st_size if size is None else size}
+    return True
 
 
 @dataclass(frozen=True)
@@ -130,15 +144,7 @@ def apworld_fingerprint(apworld_root: Path) -> str:
     ).hexdigest()
 
 
-def canonicalize_native_apworld(path: Path) -> None:
-    """Normalize metadata only after Archipelago's native builder chose content."""
-    with zipfile.ZipFile(path, "r") as source:
-        infos = source.infolist()
-        names = [info.filename for info in infos]
-        if len(names) != len(set(names)):
-            raise RuntimeError("native APWorld contains duplicate members")
-        members = {info.filename: source.read(info) for info in infos if not info.is_dir()}
-
+def _canonicalize_native_apworld_manifest_name(members, path):
     manifest_name = "doometernal/archipelago.json"
     if manifest_name not in members:
         raise RuntimeError(f"native APWorld is missing {manifest_name}")
@@ -159,6 +165,19 @@ def canonicalize_native_apworld(path: Path) -> None:
             info.external_attr = (0o100644 << 16)
             info.compress_type = zipfile.ZIP_DEFLATED
             output.writestr(info, members[name])
+    return temporary
+
+
+def canonicalize_native_apworld(path: Path) -> None:
+    """Normalize metadata only after Archipelago's native builder chose content."""
+    with zipfile.ZipFile(path, "r") as source:
+        infos = source.infolist()
+        names = [info.filename for info in infos]
+        if len(names) != len(set(names)):
+            raise RuntimeError("native APWorld contains duplicate members")
+        members = {info.filename: source.read(info) for info in infos if not info.is_dir()}
+
+    temporary = _canonicalize_native_apworld_manifest_name(members, path)
     temporary.replace(path)
 
 
@@ -205,18 +224,7 @@ def run_standard_build(plan: APWorldBuildPlan) -> None:
     subprocess.run(plan.command, check=True)
 
 
-def build_apworld(
-    *,
-    output: Path,
-    archipelago_source: Path,
-    archipelago_python: str,
-    cache_root: Path | None = None,
-) -> Path:
-    """Build or restore canonical DOOM Eternal APWorld from verified cache."""
-    archipelago_source = archipelago_source.resolve()
-    output = output.resolve()
-    if output.name != "doometernal.apworld":
-        raise ValueError("APWorld output must be doometernal.apworld")
+def _build_apworld_world_source(archipelago_python, archipelago_source, cache_root, output):
     if not (archipelago_source / "Launcher.py").is_file():
         raise ValueError(f"invalid Archipelago source: {archipelago_source}")
     world_source = archipelago_source / "worlds/doometernal"
@@ -289,6 +297,21 @@ def build_apworld(
     if not restored:
         raise RuntimeError(f"published APWorld cache could not be restored: {restore_reason}")
     return output
+
+
+def build_apworld(
+    *,
+    output: Path,
+    archipelago_source: Path,
+    archipelago_python: str,
+    cache_root: Path | None = None,
+) -> Path:
+    """Build or restore canonical DOOM Eternal APWorld from verified cache."""
+    archipelago_source = archipelago_source.resolve()
+    output = output.resolve()
+    if output.name != "doometernal.apworld":
+        raise ValueError("APWorld output must be doometernal.apworld")
+    return _build_apworld_world_source(archipelago_python, archipelago_source, cache_root, output)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

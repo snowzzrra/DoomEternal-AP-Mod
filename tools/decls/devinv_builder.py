@@ -12,10 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from doom_eap.content.map_registry import load_map_registry
-from doom_eap.runtime.item_reconciliation import load_starting_ownership
 from doom_eap.contracts.tag_prerequisites import (
-    TAG_PAID_NORMAL_MOD_UPGRADES, TAG_REQUIRED_ENGINE_PERKS, TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+    TAG_PAID_NORMAL_MOD_UPGRADES,
+    TAG_REQUIRED_BLOOD_PUNCH_PERKS,
+    TAG_REQUIRED_ENGINE_PERKS,
 )
+from doom_eap.runtime.inventory import load_starting_ownership
 
 SOURCE_OWNER = "gameresources"
 SOURCE_PATH = "generated/decls/devinvloadout/devinvloadout/sp/e1m1.decl"
@@ -322,19 +324,168 @@ _CODEX_ENTRIES_RE = re.compile(
 _CODEX_ITEM_RE = re.compile(r'\t\t\titem\[(?P<index>\d+)\] = "(?P<path>[^"]+)";')
 
 
-def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str, Any]]:
-    """Load declarative public-ID -> DevInv representations."""
-    try:
-        document = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        raise ValueError(f"could not load DevInv start mapping: {error}") from error
+def _validate_currency_mapping(entry, item_id):
+    if set(entry) != {"name", "kind", "currency", "countPerItem"}:
+        raise ValueError(f"DevInv currency mapping {item_id} has invalid fields")
+    if not isinstance(entry["currency"], str) or not entry["currency"].startswith("CURRENCY_"):
+        raise ValueError(f"DevInv currency mapping {item_id} has invalid currency")
+    if isinstance(entry["countPerItem"], bool) or not isinstance(entry["countPerItem"], int) or entry["countPerItem"] < 1:
+        raise ValueError(f"DevInv currency mapping {item_id} has invalid countPerItem")
+
+
+def _validate_progressive_mapping(entry, item_id):
+    tiers = entry.get("tiers")
+    if set(entry) != {"name", "kind", "field", "tiers"} or entry.get("field") not in DEVINV_ALLOWED_FIELDS:
+        raise ValueError(f"DevInv progressive mapping {item_id} has invalid fields")
     if (
-        not isinstance(document, dict)
-        or document.get("schema_version") != DEVINV_MAPPING_SCHEMA_VERSION
-        or document.get("mapping_revision") != 1
-        or not isinstance(document.get("source"), str)
+        not isinstance(tiers, list)
+        or not tiers
+        or any(not isinstance(path, str) or not path for path in tiers)
+        or len(tiers) != len(set(tiers))
     ):
-        raise ValueError("unsupported DevInv start mapping schema")
+        raise ValueError(f"DevInv progressive mapping {item_id} has invalid ordered tiers")
+
+
+def _validate_charge_mapping(entry, item_id):
+    if set(entry) != {"name", "kind", "storage", "start_inventory_eligible"}:
+        raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid fields")
+    if entry["storage"] != "ap_stored_charge" or entry["start_inventory_eligible"] is not True:
+        raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid storage contract")
+
+
+def _validate_special_weapon_mapping_representations(item_id, representations):
+    for representation in representations:
+        if not isinstance(representation, dict):
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed representation")
+        allowed = {"field", "path", "flags", "dedupe"}
+        if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation fields")
+        if not isinstance(representation.get("path"), str) or not representation["path"]:
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation path")
+        flags = representation.get("flags", [])
+        if not isinstance(flags, list) or any(flag not in DEVINV_ALLOWED_FLAGS for flag in flags):
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation flags")
+
+
+def _validate_special_weapon_mapping_quantities(entry, item_id, states):
+    quantities = []
+    for state in states:
+        if not isinstance(state, dict) or set(state) != {"quantity", "representations"}:
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed state")
+        quantity = state["quantity"]
+        representations = state["representations"]
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid state quantity")
+        quantities.append(quantity)
+        if not isinstance(representations, list) or not representations:
+            raise ValueError(f"DevInv special-weapon mapping {item_id} has empty state")
+        _validate_special_weapon_mapping_representations(item_id, representations)
+    if quantities != list(range(1, entry["max_quantity"] + 1)):
+        raise ValueError(f"DevInv special-weapon mapping {item_id} states must be contiguous")
+
+
+def _validate_special_weapon_mapping(entry, item_id):
+    states = entry.get("states")
+    if set(entry) != {"name", "kind", "state_family", "max_quantity", "replacement", "states"}:
+        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid fields")
+    if (
+        not isinstance(entry["state_family"], str)
+        or entry["replacement"] != "derived_highest_state_with_targeted_remove"
+        or isinstance(entry["max_quantity"], bool)
+        or not isinstance(entry["max_quantity"], int)
+        or entry["max_quantity"] < 1
+        or not isinstance(states, list)
+        or len(states) != entry["max_quantity"]
+    ):
+        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid states")
+    _validate_special_weapon_mapping_quantities(entry, item_id, states)
+
+
+def _validate_key_mapping_allowed(item_id, representation):
+    allowed = {"field", "path", "flags", "dedupe"}
+    if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+        raise ValueError(f"DevInv key mapping {item_id} has invalid representation fields")
+    if not isinstance(representation.get("path"), str) or not representation["path"]:
+        raise ValueError(f"DevInv key mapping {item_id} has invalid representation path")
+    flags = representation.get("flags", [])
+    if (
+        not isinstance(flags, list)
+        or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
+        or len(flags) != len(set(flags))
+    ):
+        raise ValueError(f"DevInv key mapping {item_id} has invalid representation flags")
+
+
+def _validate_key_mapping_map_key(entry, item_id, representations):
+    if not isinstance(entry.get("map_key"), str) or not entry["map_key"]:
+        raise ValueError(f"DevInv key mapping {item_id} has invalid map_key")
+    for representation in representations:
+        if not isinstance(representation, dict):
+            raise ValueError(f"DevInv key mapping {item_id} has malformed representation")
+        _validate_key_mapping_allowed(item_id, representation)
+        if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
+            raise ValueError(f"DevInv key mapping {item_id} has invalid dedupe key")
+
+
+def _validate_key_mapping(entry, item_id):
+    representations = entry.get("representations")
+    if set(entry) != {"name", "kind", "map_key", "representations"} or not isinstance(representations, list) or not representations:
+        raise ValueError(f"DevInv key mapping {item_id} has invalid fields")
+    _validate_key_mapping_map_key(entry, item_id, representations)
+
+
+def _validate_inventory_mapping_allowed(item_id, representation):
+    allowed = {"field", "path", "flags", "dedupe"}
+    if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
+        raise ValueError(f"DevInv mapping item {item_id} has invalid representation fields")
+    if not isinstance(representation.get("path"), str) or not representation["path"]:
+        raise ValueError(f"DevInv mapping item {item_id} has invalid representation path")
+    flags = representation.get("flags", [])
+    if (
+        not isinstance(flags, list)
+        or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
+        or len(flags) != len(set(flags))
+    ):
+        raise ValueError(f"DevInv mapping item {item_id} has invalid representation flags")
+
+
+def _validate_inventory_mapping(entry, item_id):
+    representations = entry.get("representations")
+    if set(entry) != {"name", "kind", "representations"} or not isinstance(representations, list) or not representations:
+        raise ValueError(f"DevInv mapping item {item_id} has invalid representations")
+    for representation in representations:
+        if not isinstance(representation, dict):
+            raise ValueError(f"DevInv mapping item {item_id} has malformed representation")
+        _validate_inventory_mapping_allowed(item_id, representation)
+        if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
+            raise ValueError(f"DevInv mapping item {item_id} has invalid dedupe key")
+
+
+def _load_devinv_mapping_kind(item_id, names, raw_entry):
+    entry = dict(raw_entry)
+    name = entry.get("name")
+    kind = entry.get("kind")
+    if not isinstance(name, str) or not name.strip() or name in names:
+        raise ValueError(f"DevInv mapping item {item_id} has duplicate or invalid name")
+    if kind not in DEVINV_ALLOWED_KINDS:
+        raise ValueError(f"DevInv mapping item {item_id} has invalid kind: {kind!r}")
+    names.add(name)
+    if kind == "currency":
+        _validate_currency_mapping(entry, item_id)
+    elif kind == "progressive":
+        _validate_progressive_mapping(entry, item_id)
+    elif kind == "stored_charge":
+        _validate_charge_mapping(entry, item_id)
+    elif kind == "special_weapon":
+        _validate_special_weapon_mapping(entry, item_id)
+    elif kind == "key":
+        _validate_key_mapping(entry, item_id)
+    else:
+        _validate_inventory_mapping(entry, item_id)
+    return entry
+
+
+def _load_devinv_mapping_raw_items(document):
     raw_items = document.get("items")
     if not isinstance(raw_items, dict) or not raw_items:
         raise ValueError("DevInv start mapping lacks items")
@@ -349,120 +500,25 @@ def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str,
             raise ValueError(f"non-canonical or duplicate DevInv mapping ID: {raw_id!r}")
         if not isinstance(raw_entry, dict):
             raise ValueError(f"DevInv mapping item {item_id} is not an object")
-        entry = dict(raw_entry)
-        name = entry.get("name")
-        kind = entry.get("kind")
-        if not isinstance(name, str) or not name.strip() or name in names:
-            raise ValueError(f"DevInv mapping item {item_id} has duplicate or invalid name")
-        if kind not in DEVINV_ALLOWED_KINDS:
-            raise ValueError(f"DevInv mapping item {item_id} has invalid kind: {kind!r}")
-        names.add(name)
-        if kind == "currency":
-            if set(entry) != {"name", "kind", "currency", "countPerItem"}:
-                raise ValueError(f"DevInv currency mapping {item_id} has invalid fields")
-            if not isinstance(entry["currency"], str) or not entry["currency"].startswith("CURRENCY_"):
-                raise ValueError(f"DevInv currency mapping {item_id} has invalid currency")
-            if isinstance(entry["countPerItem"], bool) or not isinstance(entry["countPerItem"], int) or entry["countPerItem"] < 1:
-                raise ValueError(f"DevInv currency mapping {item_id} has invalid countPerItem")
-        elif kind == "progressive":
-            tiers = entry.get("tiers")
-            if set(entry) != {"name", "kind", "field", "tiers"} or entry.get("field") not in DEVINV_ALLOWED_FIELDS:
-                raise ValueError(f"DevInv progressive mapping {item_id} has invalid fields")
-            if (
-                not isinstance(tiers, list)
-                or not tiers
-                or any(not isinstance(path, str) or not path for path in tiers)
-                or len(tiers) != len(set(tiers))
-            ):
-                raise ValueError(f"DevInv progressive mapping {item_id} has invalid ordered tiers")
-        elif kind == "stored_charge":
-            if set(entry) != {"name", "kind", "storage", "start_inventory_eligible"}:
-                raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid fields")
-            if entry["storage"] != "ap_stored_charge" or entry["start_inventory_eligible"] is not True:
-                raise ValueError(f"DevInv stored-charge mapping {item_id} has invalid storage contract")
-        elif kind == "special_weapon":
-            states = entry.get("states")
-            if set(entry) != {"name", "kind", "state_family", "max_quantity", "replacement", "states"}:
-                raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid fields")
-            if (
-                not isinstance(entry["state_family"], str)
-                or entry["replacement"] != "derived_highest_state_with_targeted_remove"
-                or isinstance(entry["max_quantity"], bool)
-                or not isinstance(entry["max_quantity"], int)
-                or entry["max_quantity"] < 1
-                or not isinstance(states, list)
-                or len(states) != entry["max_quantity"]
-            ):
-                raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid states")
-            quantities = []
-            for state in states:
-                if not isinstance(state, dict) or set(state) != {"quantity", "representations"}:
-                    raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed state")
-                quantity = state["quantity"]
-                representations = state["representations"]
-                if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
-                    raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid state quantity")
-                quantities.append(quantity)
-                if not isinstance(representations, list) or not representations:
-                    raise ValueError(f"DevInv special-weapon mapping {item_id} has empty state")
-                for representation in representations:
-                    if not isinstance(representation, dict):
-                        raise ValueError(f"DevInv special-weapon mapping {item_id} has malformed representation")
-                    allowed = {"field", "path", "flags", "dedupe"}
-                    if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
-                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation fields")
-                    if not isinstance(representation.get("path"), str) or not representation["path"]:
-                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation path")
-                    flags = representation.get("flags", [])
-                    if not isinstance(flags, list) or any(flag not in DEVINV_ALLOWED_FLAGS for flag in flags):
-                        raise ValueError(f"DevInv special-weapon mapping {item_id} has invalid representation flags")
-            if quantities != list(range(1, entry["max_quantity"] + 1)):
-                raise ValueError(f"DevInv special-weapon mapping {item_id} states must be contiguous")
-        elif kind == "key":
-            representations = entry.get("representations")
-            if set(entry) != {"name", "kind", "map_key", "representations"} or not isinstance(representations, list) or not representations:
-                raise ValueError(f"DevInv key mapping {item_id} has invalid fields")
-            if not isinstance(entry.get("map_key"), str) or not entry["map_key"]:
-                raise ValueError(f"DevInv key mapping {item_id} has invalid map_key")
-            for representation in representations:
-                if not isinstance(representation, dict):
-                    raise ValueError(f"DevInv key mapping {item_id} has malformed representation")
-                allowed = {"field", "path", "flags", "dedupe"}
-                if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
-                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation fields")
-                if not isinstance(representation.get("path"), str) or not representation["path"]:
-                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation path")
-                flags = representation.get("flags", [])
-                if (
-                    not isinstance(flags, list)
-                    or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
-                    or len(flags) != len(set(flags))
-                ):
-                    raise ValueError(f"DevInv key mapping {item_id} has invalid representation flags")
-                if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
-                    raise ValueError(f"DevInv key mapping {item_id} has invalid dedupe key")
-        else:
-            representations = entry.get("representations")
-            if set(entry) != {"name", "kind", "representations"} or not isinstance(representations, list) or not representations:
-                raise ValueError(f"DevInv mapping item {item_id} has invalid representations")
-            for representation in representations:
-                if not isinstance(representation, dict):
-                    raise ValueError(f"DevInv mapping item {item_id} has malformed representation")
-                allowed = {"field", "path", "flags", "dedupe"}
-                if set(representation) - allowed or representation.get("field") not in DEVINV_ALLOWED_FIELDS:
-                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation fields")
-                if not isinstance(representation.get("path"), str) or not representation["path"]:
-                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation path")
-                flags = representation.get("flags", [])
-                if (
-                    not isinstance(flags, list)
-                    or any(not isinstance(flag, str) or flag not in DEVINV_ALLOWED_FLAGS for flag in flags)
-                    or len(flags) != len(set(flags))
-                ):
-                    raise ValueError(f"DevInv mapping item {item_id} has invalid representation flags")
-                if "dedupe" in representation and (not isinstance(representation["dedupe"], str) or not representation["dedupe"]):
-                    raise ValueError(f"DevInv mapping item {item_id} has invalid dedupe key")
+        entry = _load_devinv_mapping_kind(item_id, names, raw_entry)
         result[item_id] = entry
+    return result
+
+
+def load_devinv_mapping(path: Path = DEVINV_MAPPING_PATH) -> dict[int, dict[str, Any]]:
+    """Load declarative public-ID -> DevInv representations."""
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"could not load DevInv start mapping: {error}") from error
+    if (
+        not isinstance(document, dict)
+        or document.get("schema_version") != DEVINV_MAPPING_SCHEMA_VERSION
+        or document.get("mapping_revision") != 1
+        or not isinstance(document.get("source"), str)
+    ):
+        raise ValueError("unsupported DevInv start mapping schema")
+    result = _load_devinv_mapping_raw_items(document)
     return result
 
 
@@ -477,17 +533,22 @@ def _entry_for_name(name: str, mapping: Mapping[int, dict[str, Any]]) -> dict[st
         raise ValueError(f"unsupported starting_inventory item: {name!r}") from error
 
 
-def _materialized_representations(
-    name: str, quantity: int, mapping: Mapping[int, dict[str, Any]], seen_dedupe: set[str],
-    starting_inventory: Mapping[str, int],
-) -> list[tuple[str, str, tuple[str, ...]]]:
-    entry = _entry_for_name(name, mapping)
-    # frag upgrades can unlock the base throwable when equipped.
-    if name in {"Frag Grenade Cooldown", "Frag Grenade Concussive Blast", "Frag Grenade Cluster Bombs",
-                "Second Frag Grenade"} and not starting_inventory.get("Frag Grenade"):
-        return []
-    if entry["kind"] == "currency":
-        return []
+def _materialized_representations_materialized(entry, quantity, seen_dedupe):
+    materialized = []
+    for raw in entry["representations"]:
+        dedupe = raw.get("dedupe")
+        if dedupe is not None and dedupe in seen_dedupe:
+            continue
+        if dedupe is not None:
+            seen_dedupe.add(dedupe)
+        materialized.append((raw["field"], raw["path"], tuple(sorted(raw.get("flags", ())))) )
+    return materialized * quantity if not any(raw.get("dedupe") for raw in entry["representations"]) else materialized + [
+        (raw["field"], raw["path"], tuple(sorted(raw.get("flags", ()))))
+        for raw in entry["representations"] if raw.get("dedupe") is None
+    ] * (quantity - 1)
+
+
+def _materialized_representations_kind(entry, name, quantity, seen_dedupe):
     if entry["kind"] == "stored_charge":
         # Stored charges are AP ownership state, not native DevInv inventory.
         return []
@@ -509,18 +570,21 @@ def _materialized_representations(
             raise ValueError(f"starting_inventory quantity for {name!r} exceeds {len(tiers)} progressive tiers")
         return [(entry["field"], path, ("equip",) if path == "perk/player/blood_punch/base" else ())
                 for path in tiers[:quantity]]
-    materialized = []
-    for raw in entry["representations"]:
-        dedupe = raw.get("dedupe")
-        if dedupe is not None and dedupe in seen_dedupe:
-            continue
-        if dedupe is not None:
-            seen_dedupe.add(dedupe)
-        materialized.append((raw["field"], raw["path"], tuple(sorted(raw.get("flags", ())))) )
-    return materialized * quantity if not any(raw.get("dedupe") for raw in entry["representations"]) else materialized + [
-        (raw["field"], raw["path"], tuple(sorted(raw.get("flags", ()))))
-        for raw in entry["representations"] if raw.get("dedupe") is None
-    ] * (quantity - 1)
+    return _materialized_representations_materialized(entry, quantity, seen_dedupe)
+
+
+def _materialized_representations(
+    name: str, quantity: int, mapping: Mapping[int, dict[str, Any]], seen_dedupe: set[str],
+    starting_inventory: Mapping[str, int],
+) -> list[tuple[str, str, tuple[str, ...]]]:
+    entry = _entry_for_name(name, mapping)
+    # frag upgrades can unlock the base throwable when equipped.
+    if name in {"Frag Grenade Cooldown", "Frag Grenade Concussive Blast", "Frag Grenade Cluster Bombs",
+                "Second Frag Grenade"} and not starting_inventory.get("Frag Grenade"):
+        return []
+    if entry["kind"] == "currency":
+        return []
+    return _materialized_representations_kind(entry, name, quantity, seen_dedupe)
 
 
 def _remove_base_combat_shotgun(source: str) -> str:
@@ -711,44 +775,7 @@ def _validate_starting_currencies(source, starting):
         raise ValueError("starting currency must use durable delivery")
 
 
-def build_devinv_loadout(
-    starting_inventory: Mapping[str, int] | None = None,
-    starting_weapon: str | None = None,
-    *, starting=None,
-) -> str:
-    """Build safe E1M1 DevInv from resolved AP item names.
-
-    ``starting_inventory`` and ``starting_weapon`` are already resolved seed
-    values. Unknown names, malformed quantities, duplicate starting weapon
-    ownership, and random/unresolved weapon values fail closed.
-    """
-    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
-    if starting_inventory is None:
-        starting_inventory = {}
-    if not isinstance(starting_inventory, Mapping):
-        raise ValueError("starting_inventory must be an object of canonical item names")
-    if any(not isinstance(name, str) for name in starting_inventory):
-        raise ValueError("starting_inventory names must be strings")
-    if starting_weapon is not None and (
-        not isinstance(starting_weapon, str) or starting_weapon not in STARTING_WEAPON_NAMES
-    ):
-        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
-
-    mapping = load_devinv_mapping()
-    by_name = _mapping_by_name(mapping)
-    for name, quantity in starting_inventory.items():
-        _entry_for_name(name, mapping)
-        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
-            raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
-        if starting_weapon == name:
-            raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
-    source = canonical_base()
-    keep_vanilla_shotgun = starting_weapon in (None, "Combat Shotgun")
-    if not keep_vanilla_shotgun:
-        source = _remove_base_combat_shotgun(source)
-
-    entries: list[str] = []
-    index = 8 if keep_vanilla_shotgun else 7
+def _build_devinv_loadout_seen_dedupe(by_name, entries, index, mapping, source, starting_inventory, starting_weapon):
     seen_dedupe: set[str] = set()
     currency_totals: dict[str, int] = {}
     for name in sorted(starting_inventory):
@@ -775,6 +802,53 @@ def build_devinv_loadout(
             raise ValueError("canonical DevInv startingInventory block is missing or ambiguous")
         block = "\n".join(entries) + "\n"
         source = source.replace(marker, block + "\t\t}\n\t\tcurrencyToGive = {", 1)
+    return currency_totals, index, source
+
+
+def _build_devinv_loadout_by_name(starting_inventory, starting_weapon):
+    if starting_weapon is not None and (
+        not isinstance(starting_weapon, str) or starting_weapon not in STARTING_WEAPON_NAMES
+    ):
+        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
+
+    mapping = load_devinv_mapping()
+    by_name = _mapping_by_name(mapping)
+    for name, quantity in starting_inventory.items():
+        _entry_for_name(name, mapping)
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
+        if starting_weapon == name:
+            raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
+    source = canonical_base()
+    keep_vanilla_shotgun = starting_weapon in (None, "Combat Shotgun")
+    if not keep_vanilla_shotgun:
+        source = _remove_base_combat_shotgun(source)
+    return by_name, keep_vanilla_shotgun, mapping, source
+
+
+def build_devinv_loadout(
+    starting_inventory: Mapping[str, int] | None = None,
+    starting_weapon: str | None = None,
+    *, starting=None,
+) -> str:
+    """Build safe E1M1 DevInv from resolved AP item names.
+
+    ``starting_inventory`` and ``starting_weapon`` are already resolved seed
+    values. Unknown names, malformed quantities, duplicate starting weapon
+    ownership, and random/unresolved weapon values fail closed.
+    """
+    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
+    if starting_inventory is None:
+        starting_inventory = {}
+    if not isinstance(starting_inventory, Mapping):
+        raise ValueError("starting_inventory must be an object of canonical item names")
+    if any(not isinstance(name, str) for name in starting_inventory):
+        raise ValueError("starting_inventory names must be strings")
+    by_name, keep_vanilla_shotgun, mapping, source = _build_devinv_loadout_by_name(starting_inventory, starting_weapon)
+
+    entries: list[str] = []
+    index = 8 if keep_vanilla_shotgun else 7
+    currency_totals, index, source = _build_devinv_loadout_seen_dedupe(by_name, entries, index, mapping, source, starting_inventory, starting_weapon)
     source = source.replace("\t\t\tnum = 8;", f"\t\t\tnum = {index};", 1)
     if currency_totals:
         source = _add_currency_totals(source, currency_totals)
@@ -787,45 +861,7 @@ def build_devinv(*, starting_inventory=None, starting_weapon=None, starting=None
     return build_devinv_loadout(starting_inventory, starting_weapon, starting=starting)
 
 
-def validate_devinv_source(
-    source: str,
-    starting_inventory: Mapping[str, int] | None = None,
-    starting_weapon: str | None = None,
-    *, starting=None,
-) -> None:
-    """Validate canonical base, preserved stats, and optional materialization."""
-    _validate_starting_currencies(source, starting)
-    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
-    for marker in (
-        "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
-        'STAT_SUIT_PAGE_UNLOCKED', 'STAT_RUNE_PAGE_UNLOCKED',
-        "clearAllBeforeApply = true;",
-    ):
-        if marker not in source:
-            raise ValueError(f"DevInvLoadout missing required marker: {marker}")
-    if "STAT_CHALLENGE_PAGE_UNLOCKED" in source or "strip" in source.lower():
-        raise ValueError("DevInvLoadout contains unsupported page/stripping capability")
-    _assert_codex_dossier(source)
-    if starting_inventory is not None and not isinstance(starting_inventory, Mapping):
-        raise ValueError("starting_inventory must be an object")
-    if starting_weapon is not None and starting_weapon not in STARTING_WEAPON_NAMES:
-        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
-    match = _STARTING_INVENTORY_RE.search(source)
-    if match is None:
-        raise ValueError("DevInvLoadout startingInventory block is missing or ambiguous")
-    num_match = re.search(r"\t\t\tnum = (?P<num>\d+);", match.group("body"))
-    item_matches = list(_ITEM_BLOCK_RE.finditer(match.group("body")))
-    if num_match is None:
-        raise ValueError("DevInvLoadout startingInventory num is missing")
-    declared_num = int(num_match.group("num"))
-    indices = [int(item_match.group("index")) for item_match in item_matches]
-    if indices != list(range(declared_num)):
-        raise ValueError("DevInvLoadout startingInventory indices are not contiguous or num is untruthful")
-    item_blocks = {
-        int(item_match.group("index")): item_match.group("body")
-        for item_match in item_matches
-    }
-
+def _validate_devinv_source_by_name(item_blocks, source, starting_inventory):
     mapping = load_devinv_mapping()
     by_name = _mapping_by_name(mapping)
     if starting_inventory is not None:
@@ -849,55 +885,73 @@ def validate_devinv_source(
         path_match = _ITEM_PATH_RE.search(body)
         if path_match is not None and path_match.group("path") in weapon_paths:
             weapon_entries.append((index, body, path_match.group("path")))
+    return by_name, mapping, weapon_entries, weapon_paths
 
-    shotgun_entries = [entry for entry in weapon_entries if entry[2] == COMBAT_SHOTGUN_PATH]
-    if starting_weapon in (None, "Combat Shotgun"):
-        vanilla_shotguns = [entry for entry in shotgun_entries if entry[0] < 8]
-        if (
-            len(vanilla_shotguns) != 1
-            or vanilla_shotguns[0][0] != 5
-            or "equip = true;" not in vanilla_shotguns[0][1]
-        ):
-            raise ValueError("DevInvLoadout vanilla Combat Shotgun must be exactly one equipped entry")
-        if starting_weapon == "Combat Shotgun" and len(shotgun_entries) != 1:
-            raise ValueError("DevInvLoadout Combat Shotgun must use vanilla entry without dynamic duplicate")
-    elif any(index < 7 for index, _, _ in shotgun_entries):
-        raise ValueError("DevInvLoadout non-shotgun starting weapon retained vanilla Combat Shotgun")
 
-    dynamic_start = 8 if starting_weapon in (None, "Combat Shotgun") else 7
-    dynamic_blocks = [body for index, body in item_blocks.items() if index >= dynamic_start]
+def _validate_devinv_source_starting_inventory(source, starting, starting_inventory, starting_weapon):
+    _validate_starting_currencies(source, starting)
+    starting_inventory, starting_weapon = devinv_starting_values(starting, starting_inventory, starting_weapon)
+    for marker in (
+        "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
+        'STAT_SUIT_PAGE_UNLOCKED', 'STAT_RUNE_PAGE_UNLOCKED',
+        "clearAllBeforeApply = true;",
+    ):
+        if marker not in source:
+            raise ValueError(f"DevInvLoadout missing required marker: {marker}")
+    if "STAT_CHALLENGE_PAGE_UNLOCKED" in source or "strip" in source.lower():
+        raise ValueError("DevInvLoadout contains unsupported page/stripping capability")
+    _assert_codex_dossier(source)
+    if starting_inventory is not None and not isinstance(starting_inventory, Mapping):
+        raise ValueError("starting_inventory must be an object")
+    if starting_weapon is not None and starting_weapon not in STARTING_WEAPON_NAMES:
+        raise ValueError(f"unsupported or unresolved starting_weapon: {starting_weapon!r}")
+    match = _STARTING_INVENTORY_RE.search(source)
+    if match is None:
+        raise ValueError("DevInvLoadout startingInventory block is missing or ambiguous")
+    return match, starting_inventory, starting_weapon
 
+
+def _validate_devinv_source_dynamic_blocks(by_name, dynamic_blocks, expected, starting_weapon):
+    actual: dict[tuple[str, str, tuple[str, ...]], int] = {}
+    for body in dynamic_blocks:
+        field_match = re.search(r"\b(item|perk) = \"([^\"]+)\";", body)
+        if field_match is None:
+            raise ValueError("DevInvLoadout dynamic entry has no item or perk")
+        flags = tuple(sorted(flag for flag in DEVINV_ALLOWED_FLAGS if f"{flag} = true;" in body))
+        key = (field_match.group(1), field_match.group(2), flags)
+        actual[key] = actual.get(key, 0) + 1
+    for key, count in expected.items():
+        if actual.get(key, 0) != count:
+            raise ValueError(f"DevInvLoadout did not materialize representation {key!r} count {count}")
+    if starting_weapon is not None and starting_weapon != "Combat Shotgun":
+        weapon_representation = by_name[starting_weapon]["representations"][0]
+        key = (weapon_representation["field"], weapon_representation["path"], ("equip",))
+        expected[key] = expected.get(key, 0) + 1
+        if actual.get(key, 0) != expected[key]:
+            raise ValueError("DevInvLoadout resolved starting weapon was not materialized")
+    return actual
+
+
+def _validate_devinv_source_seen_dedupe(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon):
+    expected: dict[tuple[str, str, tuple[str, ...]], int] = {}
+    seen_dedupe: set[str] = set()
+    for name, quantity in starting_inventory.items():
+        _entry_for_name(name, mapping)
+        if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
+        if starting_weapon == name:
+            raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
+        for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe, starting_inventory):
+            expected[(field, path, flags)] = expected.get((field, path, flags), 0) + 1
+    actual = _validate_devinv_source_dynamic_blocks(by_name, dynamic_blocks, expected, starting_weapon)
+    unexpected = {key: count for key, count in actual.items() if count != expected.get(key, 0)}
+    if unexpected:
+        raise ValueError(f"DevInvLoadout contains unexpected dynamic representations: {unexpected!r}")
+
+
+def _validate_devinv_source_selected_path(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon, weapon_entries, weapon_paths):
     if starting_inventory is not None:
-        expected: dict[tuple[str, str, tuple[str, ...]], int] = {}
-        seen_dedupe: set[str] = set()
-        for name, quantity in starting_inventory.items():
-            entry = _entry_for_name(name, mapping)
-            if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
-                raise ValueError(f"starting_inventory quantity must be positive integer: {name!r}")
-            if starting_weapon == name:
-                raise ValueError(f"starting weapon is duplicated in starting_inventory: {name!r}")
-            for field, path, flags in _materialized_representations(name, quantity, mapping, seen_dedupe, starting_inventory):
-                expected[(field, path, flags)] = expected.get((field, path, flags), 0) + 1
-        actual: dict[tuple[str, str, tuple[str, ...]], int] = {}
-        for body in dynamic_blocks:
-            field_match = re.search(r"\b(item|perk) = \"([^\"]+)\";", body)
-            if field_match is None:
-                raise ValueError("DevInvLoadout dynamic entry has no item or perk")
-            flags = tuple(sorted(flag for flag in DEVINV_ALLOWED_FLAGS if f"{flag} = true;" in body))
-            key = (field_match.group(1), field_match.group(2), flags)
-            actual[key] = actual.get(key, 0) + 1
-        for key, count in expected.items():
-            if actual.get(key, 0) != count:
-                raise ValueError(f"DevInvLoadout did not materialize representation {key!r} count {count}")
-        if starting_weapon is not None and starting_weapon != "Combat Shotgun":
-            weapon_representation = by_name[starting_weapon]["representations"][0]
-            key = (weapon_representation["field"], weapon_representation["path"], ("equip",))
-            expected[key] = expected.get(key, 0) + 1
-            if actual.get(key, 0) != expected[key]:
-                raise ValueError("DevInvLoadout resolved starting weapon was not materialized")
-        unexpected = {key: count for key, count in actual.items() if count != expected.get(key, 0)}
-        if unexpected:
-            raise ValueError(f"DevInvLoadout contains unexpected dynamic representations: {unexpected!r}")
+        _validate_devinv_source_seen_dedupe(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon)
 
     selected_path = (
         by_name[starting_weapon]["representations"][0]["path"]
@@ -912,6 +966,11 @@ def validate_devinv_source(
         if path in weapon_paths and "equip = true;" in body and path != selected_path:
             raise ValueError("DevInvLoadout starting_inventory weapon must not be equipped")
     equipped_weapons = [body for _, body, _ in weapon_entries if "equip = true;" in body]
+    return equipped_weapons, selected_path
+
+
+def _validate_devinv_source_equipped_weapons(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon, weapon_entries, weapon_paths):
+    equipped_weapons, selected_path = _validate_devinv_source_selected_path(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon, weapon_entries, weapon_paths)
     if len(equipped_weapons) != 1:
         raise ValueError("DevInvLoadout must contain exactly one equipped weapon")
     if starting_weapon is not None:
@@ -919,6 +978,57 @@ def validate_devinv_source(
         equipped_selected = sum("equip = true;" in entry[1] for entry in selected_entries)
         if len(selected_entries) != 1 or equipped_selected != 1:
             raise ValueError("DevInvLoadout resolved starting_weapon must have exactly one equipped ownership entry")
+
+
+def _validate_devinv_source_vanilla_shotguns(shotgun_entries, starting_weapon):
+    vanilla_shotguns = [entry for entry in shotgun_entries if entry[0] < 8]
+    if (
+        len(vanilla_shotguns) != 1
+        or vanilla_shotguns[0][0] != 5
+        or "equip = true;" not in vanilla_shotguns[0][1]
+    ):
+        raise ValueError("DevInvLoadout vanilla Combat Shotgun must be exactly one equipped entry")
+    if starting_weapon == "Combat Shotgun" and len(shotgun_entries) != 1:
+        raise ValueError("DevInvLoadout Combat Shotgun must use vanilla entry without dynamic duplicate")
+
+
+def _validate_devinv_source_item_blocks(item_matches, source, starting_inventory, starting_weapon):
+    item_blocks = {
+        int(item_match.group("index")): item_match.group("body")
+        for item_match in item_matches
+    }
+
+    by_name, mapping, weapon_entries, weapon_paths = _validate_devinv_source_by_name(item_blocks, source, starting_inventory)
+
+    shotgun_entries = [entry for entry in weapon_entries if entry[2] == COMBAT_SHOTGUN_PATH]
+    if starting_weapon in (None, "Combat Shotgun"):
+        _validate_devinv_source_vanilla_shotguns(shotgun_entries, starting_weapon)
+    elif any(index < 7 for index, _, _ in shotgun_entries):
+        raise ValueError("DevInvLoadout non-shotgun starting weapon retained vanilla Combat Shotgun")
+
+    dynamic_start = 8 if starting_weapon in (None, "Combat Shotgun") else 7
+    dynamic_blocks = [body for index, body in item_blocks.items() if index >= dynamic_start]
+
+    _validate_devinv_source_equipped_weapons(by_name, dynamic_blocks, mapping, starting_inventory, starting_weapon, weapon_entries, weapon_paths)
+
+
+def validate_devinv_source(
+    source: str,
+    starting_inventory: Mapping[str, int] | None = None,
+    starting_weapon: str | None = None,
+    *, starting=None,
+) -> None:
+    """Validate canonical base, preserved stats, and optional materialization."""
+    match, starting_inventory, starting_weapon = _validate_devinv_source_starting_inventory(source, starting, starting_inventory, starting_weapon)
+    num_match = re.search(r"\t\t\tnum = (?P<num>\d+);", match.group("body"))
+    item_matches = list(_ITEM_BLOCK_RE.finditer(match.group("body")))
+    if num_match is None:
+        raise ValueError("DevInvLoadout startingInventory num is missing")
+    declared_num = int(num_match.group("num"))
+    indices = [int(item_match.group("index")) for item_match in item_matches]
+    if indices != list(range(declared_num)):
+        raise ValueError("DevInvLoadout startingInventory indices are not contiguous or num is untruthful")
+    _validate_devinv_source_item_blocks(item_matches, source, starting_inventory, starting_weapon)
 
 
 def output_path_for_map(mod_root: Path, registry_path: Path, map_key: str) -> Path:
@@ -990,8 +1100,33 @@ TAG_BLOOD_PUNCH_LOADOUT_BLOCKS = (
 )
 
 
-def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = False) -> None:
-    """Keep authored engine prerequisites; paid upgrades belong to native WUP purchases."""
+def _validate_tag_devinv_source_perk_paths(item_matches):
+    perk_paths = set()
+    item_paths = set()
+    for m in item_matches:
+        body = m.group("body")
+        perk_m = _PERK_PATH_RE.search(body)
+        if perk_m:
+            perk_paths.add(perk_m.group("path"))
+        item_m = _ITEM_PATH_RE.search(body)
+        if item_m:
+            item_paths.add(item_m.group("path"))
+
+    forbidden_items = item_paths & TAG_FORBIDDEN_AP_ITEMS
+    if forbidden_items:
+        raise ValueError(f"TAG DevInvLoadout contains forbidden AP items: {forbidden_items}")
+
+    forbidden_perks = perk_paths & (TAG_FORBIDDEN_MASTERIES | TAG_FORBIDDEN_AP_PERKS)
+    if forbidden_perks:
+        raise ValueError(f"TAG DevInvLoadout contains forbidden AP perks: {forbidden_perks}")
+
+    for p in perk_paths:
+        if p.startswith(("perk/player/argent/", "perk/player/runes/", "perk/player/suit/")):
+            raise ValueError(f"TAG DevInvLoadout contains forbidden AP perk: {p}")
+    return perk_paths
+
+
+def _validate_tag_devinv_source_marker(source):
     for marker in (
         "startingInventory", "currencyToGive", "CURRENCY_PRAETOR_UPGRADE",
         "STAT_SUIT_PAGE_UNLOCKED", "STAT_RUNE_PAGE_UNLOCKED",
@@ -1015,28 +1150,7 @@ def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = F
     if indices != list(range(declared_num)):
         raise ValueError("TAG DevInvLoadout startingInventory indices are not contiguous")
 
-    perk_paths = set()
-    item_paths = set()
-    for m in item_matches:
-        body = m.group("body")
-        perk_m = _PERK_PATH_RE.search(body)
-        if perk_m:
-            perk_paths.add(perk_m.group("path"))
-        item_m = _ITEM_PATH_RE.search(body)
-        if item_m:
-            item_paths.add(item_m.group("path"))
-
-    forbidden_items = item_paths & TAG_FORBIDDEN_AP_ITEMS
-    if forbidden_items:
-        raise ValueError(f"TAG DevInvLoadout contains forbidden AP items: {forbidden_items}")
-
-    forbidden_perks = perk_paths & (TAG_FORBIDDEN_MASTERIES | TAG_FORBIDDEN_AP_PERKS)
-    if forbidden_perks:
-        raise ValueError(f"TAG DevInvLoadout contains forbidden AP perks: {forbidden_perks}")
-
-    for p in perk_paths:
-        if p.startswith("perk/player/argent/") or p.startswith("perk/player/runes/") or p.startswith("perk/player/suit/"):
-            raise ValueError(f"TAG DevInvLoadout contains forbidden AP perk: {p}")
+    perk_paths = _validate_tag_devinv_source_perk_paths(item_matches)
 
     pregranted = TAG_PAID_NORMAL_MOD_UPGRADES & perk_paths
     if pregranted:
@@ -1044,6 +1158,12 @@ def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = F
     missing_engine = TAG_REQUIRED_ENGINE_PERKS - perk_paths
     if missing_engine:
         raise ValueError(f"TAG DevInvLoadout missing authored engine perks: {missing_engine}")
+    return perk_paths
+
+
+def validate_tag_devinv_source(source: str, *, progressive_blood_punch: bool = False) -> None:
+    """Keep authored engine prerequisites; paid upgrades belong to native WUP purchases."""
+    perk_paths = _validate_tag_devinv_source_marker(source)
 
     missing_bp = TAG_REQUIRED_BLOOD_PUNCH_PERKS - perk_paths
     if missing_bp and not progressive_blood_punch:
@@ -1054,6 +1174,67 @@ def canonical_decl_text(raw_bytes: bytes) -> tuple[str, bytes]:
     """Decode strict UTF-8 and normalize all line endings (CRLF and lone CR to LF)."""
     text = raw_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
     return text, text.encode("utf-8")
+
+
+def _build_tag_devinv_overrides_source_inventory(baseline_currency, baseline_currency_block, baseline_inventory_block, declaration_key, source):
+    source_inventory = _STARTING_INVENTORY_ANY_RE.search(source)
+    source_currency = _CURRENCY_BLOCK_RE.search(source)
+    # Preserve declaration framing and unrelated fields; replace only loadout data.
+    if source_inventory is None:
+        edit_start = source.find("\tedit = {\n")
+        edit_end = source.find("\n\t}", edit_start + 1)
+        if edit_start < 0 or edit_end < 0:
+            raise ValueError(f"TAG DevInv source lacks editable loadout block: {declaration_key}")
+        override = (
+            source[: edit_start + len("\tedit = {\n")]
+            + baseline_inventory_block
+            + "\n"
+            + source[edit_start + len("\tedit = {\n") :]
+        )
+    else:
+        override = (
+            source[: source_inventory.start()]
+            + baseline_inventory_block
+            + source[source_inventory.end() :]
+        )
+    source_currency = _CURRENCY_BLOCK_RE.search(override)
+    if source_currency is not None:
+        override = (
+            override[: source_currency.start("body")]
+            + baseline_currency.group("body")
+            + override[source_currency.end("body") :]
+        )
+    inherited_fields = []
+    if "currencyToGive = {" not in override:
+        inherited_fields.append(baseline_currency_block)
+    if "STAT_SUIT_PAGE_UNLOCKED" not in override:
+        inherited_fields.append(PAGE_STATS_BLOCK.rstrip("\n"))
+    if "clearAllBeforeApply = true;" not in override:
+        inherited_fields.append("\t\tclearAllBeforeApply = true;")
+    if inherited_fields:
+        edit_end = override.rfind("\n\t}")
+        if edit_end < 0:
+            raise ValueError(f"TAG DevInv source has no editable declaration: {declaration_key}")
+        override = (
+            override[:edit_end]
+            + "\n"
+            + "\n".join(inherited_fields)
+            + override[edit_end:]
+        )
+    return override
+
+
+def _build_tag_devinv_overrides_blood_punch_bodies(existing_bodies, progressive_blood_punch, starting_inventory):
+    blood_punch_bodies = [] if progressive_blood_punch else list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS)
+    if progressive_blood_punch:
+        existing_bodies = [body for body in existing_bodies if "perk/player/blood_punch/" not in body]
+        quantity = (starting_inventory or {}).get("Progressive Blood Punch", 0)
+        for field, path, flags in _materialized_representations(
+                "Progressive Blood Punch", quantity, load_devinv_mapping(), set(), starting_inventory or {}):
+            blood_punch_bodies.append(_ITEM_BLOCK_RE.search(_decl_item(field, path, flags, 0)).group("body"))
+    all_bodies = existing_bodies[:4] + blood_punch_bodies + existing_bodies[4:]
+    new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
+    return all_bodies, new_items
 
 
 def build_tag_devinv_overrides(
@@ -1077,15 +1258,7 @@ def build_tag_devinv_overrides(
     existing_bodies = [m.group("body") for m in _ITEM_BLOCK_RE.finditer(baseline_inventory.group("body"))
                        if not ((perk := _PERK_PATH_RE.search(m.group("body"))) and
                                perk.group("path") in TAG_PAID_NORMAL_MOD_UPGRADES)]
-    blood_punch_bodies = [] if progressive_blood_punch else list(TAG_BLOOD_PUNCH_LOADOUT_BLOCKS)
-    if progressive_blood_punch:
-        existing_bodies = [body for body in existing_bodies if "perk/player/blood_punch/" not in body]
-        quantity = (starting_inventory or {}).get("Progressive Blood Punch", 0)
-        for field, path, flags in _materialized_representations(
-                "Progressive Blood Punch", quantity, load_devinv_mapping(), set(), starting_inventory or {}):
-            blood_punch_bodies.append(_ITEM_BLOCK_RE.search(_decl_item(field, path, flags, 0)).group("body"))
-    all_bodies = existing_bodies[:4] + blood_punch_bodies + existing_bodies[4:]
-    new_items = [f"\t\t\titem[{i}] = {{\n{body}\n\t\t\t}}" for i, body in enumerate(all_bodies)]
+    all_bodies, new_items = _build_tag_devinv_overrides_blood_punch_bodies(existing_bodies, progressive_blood_punch, starting_inventory)
     baseline_body = f"\t\t\tnum = {len(all_bodies)};\n" + "\n".join(new_items)
     baseline_inventory_block = (
         "\t\tstartingInventory = {\n"
@@ -1103,50 +1276,7 @@ def build_tag_devinv_overrides(
         source, canonical_bytes = canonical_decl_text(source_bytes)
         if hashlib.sha256(canonical_bytes).hexdigest() != record["sha256"]:
             raise ValueError(f"TAG DevInv source hash drifted: {declaration_key}")
-        source_inventory = _STARTING_INVENTORY_ANY_RE.search(source)
-        source_currency = _CURRENCY_BLOCK_RE.search(source)
-        # Preserve declaration framing and unrelated fields; replace only loadout data.
-        if source_inventory is None:
-            edit_start = source.find("\tedit = {\n")
-            edit_end = source.find("\n\t}", edit_start + 1)
-            if edit_start < 0 or edit_end < 0:
-                raise ValueError(f"TAG DevInv source lacks editable loadout block: {declaration_key}")
-            override = (
-                source[: edit_start + len("\tedit = {\n")]
-                + baseline_inventory_block
-                + "\n"
-                + source[edit_start + len("\tedit = {\n") :]
-            )
-        else:
-            override = (
-                source[: source_inventory.start()]
-                + baseline_inventory_block
-                + source[source_inventory.end() :]
-            )
-        source_currency = _CURRENCY_BLOCK_RE.search(override)
-        if source_currency is not None:
-            override = (
-                override[: source_currency.start("body")]
-                + baseline_currency.group("body")
-                + override[source_currency.end("body") :]
-            )
-        inherited_fields = []
-        if "currencyToGive = {" not in override:
-            inherited_fields.append(baseline_currency_block)
-        if "STAT_SUIT_PAGE_UNLOCKED" not in override:
-            inherited_fields.append(PAGE_STATS_BLOCK.rstrip("\n"))
-        if "clearAllBeforeApply = true;" not in override:
-            inherited_fields.append("\t\tclearAllBeforeApply = true;")
-        if inherited_fields:
-            edit_end = override.rfind("\n\t}")
-            if edit_end < 0:
-                raise ValueError(f"TAG DevInv source has no editable declaration: {declaration_key}")
-            override = (
-                override[:edit_end]
-                + "\n"
-                + "\n".join(inherited_fields)
-                + override[edit_end:]
-            )
+        override = _build_tag_devinv_overrides_source_inventory(baseline_currency, baseline_currency_block, baseline_inventory_block, declaration_key, source)
         codex_match = _CODEX_ENTRIES_RE.search(override)
         if codex_match is None:
             override = override.replace(

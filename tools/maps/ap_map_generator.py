@@ -6,24 +6,20 @@ import os
 import re
 from pathlib import Path
 
+from doom_eap.content.item_classification import (
+    load_item_classifications,
+    notification_entity_name,
+    notification_style_for_item,
+)
 from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
-from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ENTITY_PREFIXES
 from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
     MASTERY_ITEM_BITS,
     build_primitive,
     validate_primitive_registry,
 )
-from doom_eap.content.item_classification import (
-    load_item_classifications,
-    notification_entity_name,
-    notification_style_for_item,
-)
-from doom_eap.runtime.item_reconciliation import (
-    AP_RECEIPT_FEEDBACK,
-    SUPPORTED_RECEIPT_FEEDBACK,
-    load_policy_registry,
-)
+from doom_eap.runtime.inventory import AP_RECEIPT_FEEDBACK, SUPPORTED_RECEIPT_FEEDBACK, load_policy_registry
+from doom_eap.runtime.observers import BOOTSTRAP_ENTITY_PREFIXES
 from tools.maps.notification_formatting import (
     ITEM_NOTIFICATION_HEADER_KEY,
     LOCATION_NOTIFICATION_HEADER_KEY,
@@ -33,6 +29,7 @@ from tools.maps.notification_formatting import (
     placement_sent_key,
     progressive_notification_stage_count,
 )
+
 AP_PICKUP_HITBOX_SIZE = 6
 RPC_ENTITY_PREFIX = "ap_rpc_v3"
 LEGACY_RPC_ENTITY_PREFIXES = ("ap_rpc_v2_",)
@@ -171,8 +168,37 @@ def remove_property_blocks(content, property_name):
     return ''.join(result)
 
 
-def remove_visual_child_entities(content, removals):
-    """Remove configured visual children only when their vanilla shape is exact."""
+def _remove_visual_child_entities_bounds(bind_parent, content, entity_name, model, preserve_entity, seen_entities):
+    if entity_name in seen_entities:
+        raise ValueError(f"Duplicate visual child removal entity: {entity_name}")
+    seen_entities.add(entity_name)
+    if content.count(f"entityDef {entity_name} {{") != 1:
+        raise ValueError(f"Visual child removal entity is not unique: {entity_name}")
+    bounds = find_entity_block_bounds(content, entity_name)
+    if bounds is None:
+        raise ValueError(f"Visual child removal entity not found: {entity_name}")
+    block = content[bounds[0]:bounds[1]]
+    models = re.findall(r'\bmodel\s*=\s*"([^"]+)";', block)
+    bind_parents = re.findall(r'\bbindParent\s*=\s*"([^"]+)";', block)
+    if models != [model] or bind_parents != [bind_parent]:
+        raise ValueError(
+            f"Visual child removal signature drifted: {entity_name}; "
+            f"models={models}, bind_parents={bind_parents}"
+        )
+    if (
+        'inherit = "func/animated";' not in block
+        or 'class = "idAnimated";' not in block
+        or extract_target_names(block)
+    ):
+        raise ValueError(f"Visual child removal is not a targetless animated child: {entity_name}")
+    if content.count(f"entityDef {preserve_entity} {{") != 1:
+        raise ValueError(
+            f"Visual child removal preserve entity is not unique: {preserve_entity}"
+        )
+    return bounds
+
+
+def _remove_visual_child_entities_validated(content, removals):
     if not isinstance(removals, list):
         raise ValueError("visual_child_removals must be a list")
 
@@ -194,38 +220,19 @@ def remove_visual_child_entities(content, removals):
             for value in (entity_name, model, bind_parent, preserve_entity)
         ):
             raise ValueError("visual child removal fields must be non-empty strings")
-        if entity_name in seen_entities:
-            raise ValueError(f"Duplicate visual child removal entity: {entity_name}")
-        seen_entities.add(entity_name)
-        if content.count(f"entityDef {entity_name} {{") != 1:
-            raise ValueError(f"Visual child removal entity is not unique: {entity_name}")
-        bounds = find_entity_block_bounds(content, entity_name)
-        if bounds is None:
-            raise ValueError(f"Visual child removal entity not found: {entity_name}")
-        block = content[bounds[0]:bounds[1]]
-        models = re.findall(r'\bmodel\s*=\s*"([^"]+)";', block)
-        bind_parents = re.findall(r'\bbindParent\s*=\s*"([^"]+)";', block)
-        if models != [model] or bind_parents != [bind_parent]:
-            raise ValueError(
-                f"Visual child removal signature drifted: {entity_name}; "
-                f"models={models}, bind_parents={bind_parents}"
-            )
-        if (
-            'inherit = "func/animated";' not in block
-            or 'class = "idAnimated";' not in block
-            or extract_target_names(block)
-        ):
-            raise ValueError(f"Visual child removal is not a targetless animated child: {entity_name}")
-        if content.count(f"entityDef {preserve_entity} {{") != 1:
-            raise ValueError(
-                f"Visual child removal preserve entity is not unique: {preserve_entity}"
-            )
+        bounds = _remove_visual_child_entities_bounds(bind_parent, content, entity_name, model, preserve_entity, seen_entities)
         validated.append((entity_name, preserve_entity, bounds))
 
     for _entity_name, _preserve_entity, bounds in sorted(
         validated, key=lambda item: item[2][0], reverse=True
     ):
         content = content[:bounds[0]] + content[bounds[1]:]
+    return content, validated
+
+
+def remove_visual_child_entities(content, removals):
+    """Remove configured visual children only when their vanilla shape is exact."""
+    content, validated = _remove_visual_child_entities_validated(content, removals)
 
     for entity_name, preserve_entity, _bounds in validated:
         if content.count(f"entityDef {entity_name} {{") != 0:
@@ -270,6 +277,64 @@ EDIT_OPEN_RE = re.compile(
 )
 
 
+def _suppress_vanilla_secret_found_ui_inherit_matches(block):
+    inherit_matches = list(SECRET_INHERIT_RE.finditer(block))
+    class_matches = list(SECRET_CLASS_RE.finditer(block))
+    if len(inherit_matches) != 1 or len(class_matches) != 1:
+        raise ValueError(
+            "Unexpected Secret target declaration: malformed, mismatched, "
+            "or duplicate identity"
+        )
+    if len(EXPAND_INHERITANCE_FALSE_RE.findall(block)) != 1:
+        raise ValueError(
+            "Unexpected Secret target declaration: expandInheritance must be false"
+        )
+    if any(
+        re.search(rf'\b{re.escape(field)}\s*=', block, flags=re.IGNORECASE)
+        for field in SECRET_PRESENTATION_FIELDS
+    ):
+        raise ValueError(
+            "Unexpected Secret target declaration: inline presentation fields"
+        )
+    if COUNT_ASSIGNMENT_RE.search(block):
+        raise ValueError(
+            "Unexpected Secret target declaration: count already present"
+        )
+    edit_matches = list(EDIT_OPEN_RE.finditer(block))
+    if len(edit_matches) != 1:
+        raise ValueError(
+            "Unexpected Secret target declaration: edit block is not unique"
+        )
+
+    block = SECRET_INHERIT_RE.sub(
+        lambda match: (
+            f'{match.group(1)}"target/relay"{match.group(2)}'
+        ),
+        block,
+        count=1,
+    )
+    block = SECRET_CLASS_RE.sub(
+        lambda match: (
+            f'{match.group(1)}"idTarget_Count"{match.group(2)}'
+        ),
+        block,
+        count=1,
+    )
+    block = EDIT_OPEN_RE.sub(
+        lambda match: (
+            f'{match.group(0)}{match.group("indent")}\tcount = 1;'
+            f'{match.group("newline")}'
+        ),
+        block,
+        count=1,
+    )
+    if len(COUNT_ASSIGNMENT_RE.findall(block)) != 1:
+        raise ValueError(
+            "Secret target suppression failed to add exactly one count"
+        )
+    return block
+
+
 def suppress_vanilla_secret_found_ui(content):
     """Replace inherited Secret targets with local non-popup relay semantics.
 
@@ -288,60 +353,7 @@ def suppress_vanilla_secret_found_ui(content):
             updated.append("entity {" + block)
             continue
 
-        inherit_matches = list(SECRET_INHERIT_RE.finditer(block))
-        class_matches = list(SECRET_CLASS_RE.finditer(block))
-        if len(inherit_matches) != 1 or len(class_matches) != 1:
-            raise ValueError(
-                "Unexpected Secret target declaration: malformed, mismatched, "
-                "or duplicate identity"
-            )
-        if len(EXPAND_INHERITANCE_FALSE_RE.findall(block)) != 1:
-            raise ValueError(
-                "Unexpected Secret target declaration: expandInheritance must be false"
-            )
-        if any(
-            re.search(rf'\b{re.escape(field)}\s*=', block, flags=re.IGNORECASE)
-            for field in SECRET_PRESENTATION_FIELDS
-        ):
-            raise ValueError(
-                "Unexpected Secret target declaration: inline presentation fields"
-            )
-        if COUNT_ASSIGNMENT_RE.search(block):
-            raise ValueError(
-                "Unexpected Secret target declaration: count already present"
-            )
-        edit_matches = list(EDIT_OPEN_RE.finditer(block))
-        if len(edit_matches) != 1:
-            raise ValueError(
-                "Unexpected Secret target declaration: edit block is not unique"
-            )
-
-        block = SECRET_INHERIT_RE.sub(
-            lambda match: (
-                f'{match.group(1)}"target/relay"{match.group(2)}'
-            ),
-            block,
-            count=1,
-        )
-        block = SECRET_CLASS_RE.sub(
-            lambda match: (
-                f'{match.group(1)}"idTarget_Count"{match.group(2)}'
-            ),
-            block,
-            count=1,
-        )
-        block = EDIT_OPEN_RE.sub(
-            lambda match: (
-                f'{match.group(0)}{match.group("indent")}\tcount = 1;'
-                f'{match.group("newline")}'
-            ),
-            block,
-            count=1,
-        )
-        if len(COUNT_ASSIGNMENT_RE.findall(block)) != 1:
-            raise ValueError(
-                "Secret target suppression failed to add exactly one count"
-            )
+        block = _suppress_vanilla_secret_found_ui_inherit_matches(block)
         updated.append("entity {" + block)
     result = "".join(updated)
     if ACTIVE_SECRET_INHERIT_RE.search(result) or ACTIVE_SECRET_CLASS_RE.search(result):
@@ -438,19 +450,7 @@ def find_entity_block_bounds(content, entity_name, *, index=None):
     return block_start, block_end
 
 
-def remove_inline_currency_transaction(content, contract):
-    """Remove one exact inline GiveItems currency mutation, fail closed."""
-    required = {
-        "entity", "class", "property", "currency", "count",
-        "original_targets", "preserved_requirement",
-    }
-    if not isinstance(contract, dict) or set(contract) != required:
-        raise ValueError("Inline currency removal contract schema drift")
-    bounds = find_entity_block_bounds(content, contract["entity"])
-    if bounds is None:
-        raise ValueError(
-            f"Inline currency owner not found: {contract['entity']}"
-        )
+def _remove_inline_currency_transaction_end(bounds, content, contract):
     start, end = bounds
     block = content[start:end]
     class_line = f'class = "{contract["class"]}";'
@@ -486,6 +486,23 @@ def remove_inline_currency_transaction(content, contract):
     updated = block[:match.start()] + block[close_exclusive:]
     if contract["property"] in updated or contract["currency"] in updated:
         raise ValueError("Inline currency transaction was not fully removed")
+    return class_line, end, start, updated
+
+
+def remove_inline_currency_transaction(content, contract):
+    """Remove one exact inline GiveItems currency mutation, fail closed."""
+    required = {
+        "entity", "class", "property", "currency", "count",
+        "original_targets", "preserved_requirement",
+    }
+    if not isinstance(contract, dict) or set(contract) != required:
+        raise ValueError("Inline currency removal contract schema drift")
+    bounds = find_entity_block_bounds(content, contract["entity"])
+    if bounds is None:
+        raise ValueError(
+            f"Inline currency owner not found: {contract['entity']}"
+        )
+    class_line, end, start, updated = _remove_inline_currency_transaction_end(bounds, content, contract)
     if extract_target_names(updated) != contract["original_targets"]:
         raise ValueError("Inline currency removal changed target ordering")
     if updated.count(class_line) != 1:
@@ -536,32 +553,12 @@ def neutralize_conditional_pickup(content, entity_name):
     return content[:start] + block + content[end:]
 
 
-def apply_native_entity_contract(block, contract):
-    required_snippets = contract.get("required_snippets", [])
-    missing_snippets = [snippet for snippet in required_snippets if snippet not in block]
-    if missing_snippets:
-        raise ValueError(
-            "Native entity contract source drift; missing required snippet(s): "
-            + ", ".join(repr(snippet) for snippet in missing_snippets)
-        )
-    expected_targets = contract.get("original_targets")
-    if expected_targets is not None and extract_target_names(block) != expected_targets:
-        raise ValueError(
-            "Native entity contract source target drift: "
-            f"expected {expected_targets}, got {extract_target_names(block)}"
-        )
-    if "remove_block" in contract:
-        if not re.search(rf'\b{re.escape(contract["remove_block"])}\s*=\s*\{{', block):
-            raise ValueError(
-                "Native entity contract source drift; missing removable block: "
-                f"{contract['remove_block']}"
-            )
-        block = remove_property_blocks(block, contract["remove_block"])
+def _apply_native_entity_contract_retain_stat(block, contract):
     for property_name, value in contract.get("add_properties", {}).items():
         if not isinstance(value, bool) or re.search(rf'\b{re.escape(property_name)}\s*=', block):
             raise ValueError(f"Native entity contract property drift: {property_name}")
         block, replacements = re.subn(r'(\bedit\s*=\s*\{)',
-            lambda match: match.group(1) + f'\n\t\t\t{property_name} = {str(value).lower()};', block, count=1)
+            lambda match, property_name=property_name, value=value: match.group(1) + f'\n\t\t\t{property_name} = {str(value).lower()};', block, count=1)
         if replacements != 1:
             raise ValueError("Native entity contract edit block missing")
     for property_name, value in contract.get("set_properties", {}).items():
@@ -588,6 +585,31 @@ def apply_native_entity_contract(block, contract):
         block = retain_single_stat_increase(
             block, "pickup_statIncreases", retain_stat
         )
+    return block
+
+
+def apply_native_entity_contract(block, contract):
+    required_snippets = contract.get("required_snippets", [])
+    missing_snippets = [snippet for snippet in required_snippets if snippet not in block]
+    if missing_snippets:
+        raise ValueError(
+            "Native entity contract source drift; missing required snippet(s): "
+            + ", ".join(repr(snippet) for snippet in missing_snippets)
+        )
+    expected_targets = contract.get("original_targets")
+    if expected_targets is not None and extract_target_names(block) != expected_targets:
+        raise ValueError(
+            "Native entity contract source target drift: "
+            f"expected {expected_targets}, got {extract_target_names(block)}"
+        )
+    if "remove_block" in contract:
+        if not re.search(rf'\b{re.escape(contract["remove_block"])}\s*=\s*\{{', block):
+            raise ValueError(
+                "Native entity contract source drift; missing removable block: "
+                f"{contract['remove_block']}"
+            )
+        block = remove_property_blocks(block, contract["remove_block"])
+    block = _apply_native_entity_contract_retain_stat(block, contract)
     return block
 
 
@@ -648,10 +670,7 @@ def _timeline_event_targets(block):
     ]
 
 
-def apply_checkpoint_cleanup_contract(content, contract):
-    """Retarget one hash-locked native timeline event without moving it."""
-    if not isinstance(contract, dict):
-        raise ValueError("checkpoint_cleanup must be an object")
+def _apply_checkpoint_cleanup_contract_unknown(content, contract):
     unknown = sorted(set(contract) - CHECKPOINT_CLEANUP_CONTRACT_KEYS)
     missing = sorted(CHECKPOINT_CLEANUP_CONTRACT_KEYS - set(contract))
     if unknown or missing:
@@ -703,6 +722,14 @@ def apply_checkpoint_cleanup_contract(content, contract):
             f"Checkpoint cleanup event definition drift for {source_entity}: "
             f"expected {[contract['event_def']]}, got {event_defs}"
         )
+    return block, end, source_entity, start
+
+
+def apply_checkpoint_cleanup_contract(content, contract):
+    """Retarget one hash-locked native timeline event without moving it."""
+    if not isinstance(contract, dict):
+        raise ValueError("checkpoint_cleanup must be an object")
+    block, end, source_entity, start = _apply_checkpoint_cleanup_contract_unknown(content, contract)
 
     original_line = f'entity = "{contract["original_target"]}";'
     replacement_line = f'entity = "{contract["replacement_target"]}";'
@@ -722,173 +749,205 @@ def apply_checkpoint_cleanup_contract(content, contract):
     return content[:start] + updated + content[end:]
 
 
+def _validate_target_policies_graph_only(content, entity_name, policy):
+    graph_only = {"safe_target_graph", "forbidden_target_terms"}
+    unused_graph = sorted(
+        set(policy) & graph_only if "preserve_targets" not in policy else ()
+    )
+    if unused_graph:
+        raise ValueError(
+            f"Target policy has unused target-graph field(s) for {entity_name}: "
+            + ", ".join(unused_graph)
+        )
+    bounds = find_entity_block_bounds(content, entity_name)
+    if bounds is None:
+        raise ValueError(f"Target policy source entity not found: {entity_name}")
+    source_block = content[bounds[0]:bounds[1]]
+    validate_sentinel_crystal_policy(entity_name, policy, source_block)
+    source_targets = extract_target_names(source_block)
+    for key in ("drop_targets", "preserve_targets"):
+        if key not in policy:
+            continue
+        targets = policy[key]
+        if not isinstance(targets, list) or not all(isinstance(target, str) for target in targets):
+            raise ValueError(f"{key} must be a list of target names: {entity_name}")
+        missing = sorted(set(targets) - set(source_targets))
+        if missing:
+            raise ValueError(
+                f"{entity_name} {key} missing from source targets: "
+                + ", ".join(missing)
+            )
+    return source_block
+
+
+def _validate_target_policies_duplicate_policy(entity_name, policy):
+    if policy.get("ap_touch_only"):
+        if "native_entity_contract" not in policy:
+            raise ValueError(
+                f"ap_touch_only requires native_entity_contract: {entity_name}"
+            )
+        if policy.get("independent_ap_trigger"):
+            raise ValueError(
+                f"ap_touch_only cannot use independent_ap_trigger: {entity_name}"
+            )
+        if not policy.get("no_auto_visual"):
+            raise ValueError(
+                f"ap_touch_only requires no_auto_visual: {entity_name}"
+            )
+    duplicate_policy = policy.get("duplicate_policy")
+    if duplicate_policy not in (None, *DUPLICATE_POLICIES):
+        raise ValueError(
+            f"Unsupported duplicate policy for {entity_name}: {duplicate_policy}"
+        )
+    if duplicate_policy == "native_only" and "native_entity_contract" not in policy:
+        raise ValueError(
+            f"native_only duplicate policy requires native_entity_contract: {entity_name}"
+        )
+
+
+def _validate_target_policies_universal_size_override(content, entity_name, independent_only, policy):
+    universal_size_override = set(policy) - {"permanent_resource_budget"} == {"independent_size"}
+    unused_independent = sorted(
+        set(policy) & independent_only
+        if not policy.get("independent_ap_trigger") and not universal_size_override
+        else ()
+    )
+    if policy.get("ap_touch_only") or (
+        policy.get("duplicate_policy") == "native_only" and "native_entity_contract" in policy
+    ):
+        unused_independent = [
+            key for key in unused_independent if key != "no_auto_visual"
+        ]
+    if unused_independent:
+        raise ValueError(
+            f"Target policy has unused independent-trigger field(s) for {entity_name}: "
+            + ", ".join(unused_independent)
+        )
+    source_block = _validate_target_policies_graph_only(content, entity_name, policy)
+    if set(policy.get("drop_targets", [])) & set(policy.get("preserve_targets", [])):
+        raise ValueError(f"{entity_name} cannot preserve and drop the same target")
+    return source_block
+
+
+def _validate_target_policies_original_targets(contract, entity_name):
+    if (
+        "original_targets" not in contract
+        or not isinstance(contract["original_targets"], list)
+        or not all(
+            isinstance(target, str)
+            for target in contract["original_targets"]
+        )
+    ):
+        raise ValueError(
+            f"native_entity_contract requires exact original_targets: {entity_name}"
+        )
+    snippets = contract.get("required_snippets")
+    if (
+        not isinstance(snippets, list)
+        or len(snippets) < 3
+        or not all(isinstance(snippet, str) and snippet for snippet in snippets)
+    ):
+        raise ValueError(
+            f"native_entity_contract requires stable required_snippets: {entity_name}"
+        )
+    return snippets
+
+
+def _validate_target_policies_contract(entity_name, policy):
+    contract = policy["native_entity_contract"]
+    if not isinstance(contract, dict) or not contract:
+        raise ValueError(f"native_entity_contract must be an object: {entity_name}")
+    unknown_contract = sorted(set(contract) - NATIVE_ENTITY_CONTRACT_KEYS)
+    if unknown_contract:
+        raise ValueError(
+            f"Native entity contract has unsupported key(s) for {entity_name}: "
+            + ", ".join(unknown_contract)
+        )
+    snippets = _validate_target_policies_original_targets(contract, entity_name)
+    evidence = "\n".join(snippets)
+    if not any(token in evidence for token in ("inherit =", "class =")):
+        raise ValueError(
+            f"native_entity_contract lacks a stable owner class: {entity_name}"
+        )
+    if not any(
+        token in evidence
+        for token in ("whenToSave =", "saveType =", "stat =", "class = \"idTarget_Count\";")
+    ):
+        raise ValueError(
+            f"native_entity_contract lacks a save writer: {entity_name}"
+        )
+    if not any(
+        token in evidence
+        for token in (
+            "useableComponentDecl =",
+            "currency",
+            "currencyAmount",
+            "target_relay",
+            "2_battery_required",
+            "triggerDef =",
+            "transitionName =",
+            "class = \"idTarget_Count\";",
+        )
+    ):
+        raise ValueError(
+            f"native_entity_contract lacks a reward/progression edge: {entity_name}"
+        )
+    return contract
+
+
+def _validate_target_policies_independent_only(content, entity_name, policy):
+    _validate_target_policies_duplicate_policy(entity_name, policy)
+    independent_only = {
+        "remove_original", "independent_entity_name", "independent_position",
+        "independent_size", "independent_targets", "independent_visual",
+        "completion_targets", "no_auto_visual", "preserve_layers", "preserve_visual_layers", "bind_parent",
+        "reveal_entity",
+    }
+    if "reveal_entity" in policy and not all(
+        isinstance(policy.get(key), str) and policy[key].strip()
+        for key in ("reveal_entity", "gate_relay")
+    ):
+        raise ValueError(f"Pickup reveal requires a show entity and gate relay: {entity_name}")
+    source_block = _validate_target_policies_universal_size_override(content, entity_name, independent_only, policy)
+    if "native_entity_contract" in policy:
+        contract = _validate_target_policies_contract(entity_name, policy)
+        apply_native_entity_contract(source_block, contract)
+    cleanup = policy.get("checkpoint_cleanup")
+    if cleanup is not None and not isinstance(cleanup, dict):
+        raise ValueError(f"checkpoint_cleanup must be an object: {entity_name}")
+
+
+def _validate_target_policies_expected_check(config_entities, content, entity_name, policy):
+    expected_check = f"AP_CHECK_{entity_name.upper()}"
+    if expected_check not in config_entities:
+        raise ValueError(
+            f"Target policy has no configured AP check: {entity_name}"
+        )
+    if not isinstance(policy, dict):
+        raise ValueError(f"Target policy must be an object: {entity_name}")
+    unknown = sorted(set(policy) - set(TARGET_POLICY_CONSUMERS))
+    if unknown:
+        raise ValueError(
+            f"Target policy has unsupported key(s) for {entity_name}: "
+            + ", ".join(unknown)
+        )
+    if "legacy_alias_of" in policy:
+        primary = policy["legacy_alias_of"]
+        if (type(primary) is not int or not entity_name.endswith("_b") or
+                set(policy) != {"legacy_alias_of"} or
+                config_entities.get(f"AP_CHECK_{entity_name[:-2].upper()}") != primary or
+                find_entity_block_bounds(content, entity_name[:-2]) is None):
+            raise ValueError(f"Legacy pickup alias has no matching primary check: {entity_name}")
+        return
+    _validate_target_policies_independent_only(content, entity_name, policy)
+
+
 def validate_target_policies(config_entities, target_policies, content):
     """Fail closed for configured policy keys before map generation mutates them."""
     if not isinstance(target_policies, dict):
         raise ValueError("target_policies must be an object")
     for entity_name, policy in target_policies.items():
-        expected_check = f"AP_CHECK_{entity_name.upper()}"
-        if expected_check not in config_entities:
-            raise ValueError(
-                f"Target policy has no configured AP check: {entity_name}"
-            )
-        if not isinstance(policy, dict):
-            raise ValueError(f"Target policy must be an object: {entity_name}")
-        unknown = sorted(set(policy) - set(TARGET_POLICY_CONSUMERS))
-        if unknown:
-            raise ValueError(
-                f"Target policy has unsupported key(s) for {entity_name}: "
-                + ", ".join(unknown)
-            )
-        if "legacy_alias_of" in policy:
-            primary = policy["legacy_alias_of"]
-            if (type(primary) is not int or not entity_name.endswith("_b") or
-                    set(policy) != {"legacy_alias_of"} or
-                    config_entities.get(f"AP_CHECK_{entity_name[:-2].upper()}") != primary or
-                    find_entity_block_bounds(content, entity_name[:-2]) is None):
-                raise ValueError(f"Legacy pickup alias has no matching primary check: {entity_name}")
-            continue
-        if policy.get("ap_touch_only"):
-            if "native_entity_contract" not in policy:
-                raise ValueError(
-                    f"ap_touch_only requires native_entity_contract: {entity_name}"
-                )
-            if policy.get("independent_ap_trigger"):
-                raise ValueError(
-                    f"ap_touch_only cannot use independent_ap_trigger: {entity_name}"
-                )
-            if not policy.get("no_auto_visual"):
-                raise ValueError(
-                    f"ap_touch_only requires no_auto_visual: {entity_name}"
-                )
-        duplicate_policy = policy.get("duplicate_policy")
-        if duplicate_policy not in (None, *DUPLICATE_POLICIES):
-            raise ValueError(
-                f"Unsupported duplicate policy for {entity_name}: {duplicate_policy}"
-            )
-        if duplicate_policy == "native_only" and "native_entity_contract" not in policy:
-            raise ValueError(
-                f"native_only duplicate policy requires native_entity_contract: {entity_name}"
-            )
-        independent_only = {
-            "remove_original", "independent_entity_name", "independent_position",
-            "independent_size", "independent_targets", "independent_visual",
-            "completion_targets", "no_auto_visual", "preserve_layers", "preserve_visual_layers", "bind_parent",
-            "reveal_entity",
-        }
-        if "reveal_entity" in policy and not all(
-            isinstance(policy.get(key), str) and policy[key].strip()
-            for key in ("reveal_entity", "gate_relay")
-        ):
-            raise ValueError(f"Pickup reveal requires a show entity and gate relay: {entity_name}")
-        universal_size_override = set(policy) - {"permanent_resource_budget"} == {"independent_size"}
-        unused_independent = sorted(
-            set(policy) & independent_only
-            if not policy.get("independent_ap_trigger") and not universal_size_override
-            else ()
-        )
-        if policy.get("ap_touch_only") or (
-            policy.get("duplicate_policy") == "native_only" and "native_entity_contract" in policy
-        ):
-            unused_independent = [
-                key for key in unused_independent if key != "no_auto_visual"
-            ]
-        if unused_independent:
-            raise ValueError(
-                f"Target policy has unused independent-trigger field(s) for {entity_name}: "
-                + ", ".join(unused_independent)
-            )
-        graph_only = {"safe_target_graph", "forbidden_target_terms"}
-        unused_graph = sorted(
-            set(policy) & graph_only if "preserve_targets" not in policy else ()
-        )
-        if unused_graph:
-            raise ValueError(
-                f"Target policy has unused target-graph field(s) for {entity_name}: "
-                + ", ".join(unused_graph)
-            )
-        bounds = find_entity_block_bounds(content, entity_name)
-        if bounds is None:
-            raise ValueError(f"Target policy source entity not found: {entity_name}")
-        source_block = content[bounds[0]:bounds[1]]
-        validate_sentinel_crystal_policy(entity_name, policy, source_block)
-        source_targets = extract_target_names(source_block)
-        for key in ("drop_targets", "preserve_targets"):
-            if key not in policy:
-                continue
-            targets = policy[key]
-            if not isinstance(targets, list) or not all(isinstance(target, str) for target in targets):
-                raise ValueError(f"{key} must be a list of target names: {entity_name}")
-            missing = sorted(set(targets) - set(source_targets))
-            if missing:
-                raise ValueError(
-                    f"{entity_name} {key} missing from source targets: "
-                    + ", ".join(missing)
-                )
-        if set(policy.get("drop_targets", [])) & set(policy.get("preserve_targets", [])):
-            raise ValueError(f"{entity_name} cannot preserve and drop the same target")
-        if "native_entity_contract" in policy:
-            contract = policy["native_entity_contract"]
-            if not isinstance(contract, dict) or not contract:
-                raise ValueError(f"native_entity_contract must be an object: {entity_name}")
-            unknown_contract = sorted(set(contract) - NATIVE_ENTITY_CONTRACT_KEYS)
-            if unknown_contract:
-                raise ValueError(
-                    f"Native entity contract has unsupported key(s) for {entity_name}: "
-                    + ", ".join(unknown_contract)
-                )
-            if (
-                "original_targets" not in contract
-                or not isinstance(contract["original_targets"], list)
-                or not all(
-                    isinstance(target, str)
-                    for target in contract["original_targets"]
-                )
-            ):
-                raise ValueError(
-                    f"native_entity_contract requires exact original_targets: {entity_name}"
-                )
-            snippets = contract.get("required_snippets")
-            if (
-                not isinstance(snippets, list)
-                or len(snippets) < 3
-                or not all(isinstance(snippet, str) and snippet for snippet in snippets)
-            ):
-                raise ValueError(
-                    f"native_entity_contract requires stable required_snippets: {entity_name}"
-                )
-            evidence = "\n".join(snippets)
-            if not any(token in evidence for token in ("inherit =", "class =")):
-                raise ValueError(
-                    f"native_entity_contract lacks a stable owner class: {entity_name}"
-                )
-            if not any(
-                token in evidence
-                for token in ("whenToSave =", "saveType =", "stat =", "class = \"idTarget_Count\";")
-            ):
-                raise ValueError(
-                    f"native_entity_contract lacks a save writer: {entity_name}"
-                )
-            if not any(
-                token in evidence
-                for token in (
-                    "useableComponentDecl =",
-                    "currency",
-                    "currencyAmount",
-                    "target_relay",
-                    "2_battery_required",
-                    "triggerDef =",
-                    "transitionName =",
-                    "class = \"idTarget_Count\";",
-                )
-            ):
-                raise ValueError(
-                    f"native_entity_contract lacks a reward/progression edge: {entity_name}"
-                )
-            apply_native_entity_contract(source_block, contract)
-        cleanup = policy.get("checkpoint_cleanup")
-        if cleanup is not None and not isinstance(cleanup, dict):
-            raise ValueError(f"checkpoint_cleanup must be an object: {entity_name}")
+        _validate_target_policies_expected_check(config_entities, content, entity_name, policy)
 
 
 def bind_parent_from_source(policy, block):
@@ -1003,18 +1062,7 @@ def _list_item_names(block, property_name):
     )
 
 
-def find_sentinel_crystal_pairs(blocks):
-    """Resolve each functional crystal owner to its exact destructible top."""
-    named_blocks = [
-        (_entity_name_from_block(block), block)
-        for block in blocks
-    ]
-    top_blocks = [
-        (name, block)
-        for name, block in named_blocks
-        if name and is_sentinel_crystal_top(block)
-    ]
-    pairs = {}
+def _find_sentinel_crystal_pairs_named_blocks(named_blocks, pairs, top_blocks):
     for source_name, source_block in named_blocks:
         if not source_name or not is_sentinel_crystal_source(source_block):
             continue
@@ -1032,21 +1080,25 @@ def find_sentinel_crystal_pairs(blocks):
                 f"{source_name} (found {len(candidates)})"
             )
         pairs[source_name] = candidates[0][0]
+
+
+def find_sentinel_crystal_pairs(blocks):
+    """Resolve each functional crystal owner to its exact destructible top."""
+    named_blocks = [
+        (_entity_name_from_block(block), block)
+        for block in blocks
+    ]
+    top_blocks = [
+        (name, block)
+        for name, block in named_blocks
+        if name and is_sentinel_crystal_top(block)
+    ]
+    pairs = {}
+    _find_sentinel_crystal_pairs_named_blocks(named_blocks, pairs, top_blocks)
     return pairs
 
 
-def validate_sentinel_crystal_policy(entity_name, policy, source_block):
-    """Fail closed on Sentinel Crystal target ownership and story graph."""
-    if not is_sentinel_crystal_source(source_block):
-        return
-    if not policy.get("independent_ap_trigger") or not policy.get("remove_original"):
-        raise ValueError(
-            f"Sentinel Crystal requires independent AP removal: {entity_name}"
-        )
-    if "independent_size" in policy:
-        raise ValueError(
-            f"Sentinel Crystal cannot define independent_size: {entity_name}"
-        )
+def _validate_sentinel_crystal_policy_preserve_targets(entity_name, policy):
     if policy.get("drop_targets", []) != []:
         raise ValueError(
             f"Sentinel Crystal drop_targets must be empty: {entity_name}"
@@ -1098,6 +1150,162 @@ def validate_sentinel_crystal_policy(entity_name, policy, source_block):
         )
 
 
+def validate_sentinel_crystal_policy(entity_name, policy, source_block):
+    """Fail closed on Sentinel Crystal target ownership and story graph."""
+    if not is_sentinel_crystal_source(source_block):
+        return
+    if not policy.get("independent_ap_trigger") or not policy.get("remove_original"):
+        raise ValueError(
+            f"Sentinel Crystal requires independent AP removal: {entity_name}"
+        )
+    if "independent_size" in policy:
+        raise ValueError(
+            f"Sentinel Crystal cannot define independent_size: {entity_name}"
+        )
+    return _validate_sentinel_crystal_policy_preserve_targets(entity_name, policy)
+
+
+def _assert_sentinel_crystal_transform_block(check_ids, content, source_name, top_name):
+    for block in content.split("entity {")[1:]:
+        if source_name in extract_target_names(block):
+            referrer = _entity_name_from_block(block) or "<unnamed>"
+            raise ValueError(
+                "Sentinel Crystal source has generated target reference: "
+                f"{source_name} <- {referrer}"
+            )
+    if content.count(f"entityDef {top_name} {{") != 0:
+        raise ValueError(f"Sentinel Crystal top was not removed: {top_name}")
+    if SENTINEL_CRYSTAL_TOP_MODEL in content:
+        raise ValueError(
+            f"Sentinel Crystal top model remains after removal: {top_name}"
+        )
+    trigger_name = f"ap_independent_{source_name}"
+    trigger_bounds = find_entity_block_bounds(content, trigger_name)
+    if trigger_bounds is None:
+        raise ValueError(f"Sentinel Crystal AP trigger missing: {trigger_name}")
+    if content.count(f"entityDef {trigger_name} {{") != 1:
+        raise ValueError(f"Sentinel Crystal AP trigger is not unique: {trigger_name}")
+    trigger_block = content[trigger_bounds[0]:trigger_bounds[1]]
+    trigger_targets = extract_target_names(trigger_block)
+    ap_check = check_ids.get(source_name, f"AP_CHECK_{source_name.upper()}")
+    expected_trigger_targets = [ap_check]
+    if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+        expected_trigger_targets.extend(
+            (
+                SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+                SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+            )
+        )
+    if trigger_targets != expected_trigger_targets:
+        raise ValueError(
+            f"Sentinel Crystal AP trigger target drift: {trigger_name}; "
+            f"expected {expected_trigger_targets}, got {trigger_targets}"
+        )
+    return ap_check, trigger_block, trigger_name, trigger_targets
+
+
+def _assert_sentinel_crystal_transform_objective_bounds(content):
+    objective_bounds = find_entity_block_bounds(
+        content, SENTINEL_CRYSTAL_OBJECTIVE_TARGET
+    )
+    if objective_bounds is None:
+        raise ValueError(
+            "Bridge Sentinel Crystal objective target is missing"
+        )
+    objective_block = content[objective_bounds[0]:objective_bounds[1]]
+    if extract_target_names(objective_block) != []:
+        raise ValueError(
+            "Bridge Sentinel Crystal objective target has native targets"
+        )
+    for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
+        if term.lower() in objective_block.lower():
+            raise ValueError(
+                "Bridge Sentinel Crystal objective target has forbidden "
+                f"reward term: {term}"
+            )
+    continuation_bounds = find_entity_block_bounds(
+        content, SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET
+    )
+    if continuation_bounds is None:
+        raise ValueError(
+            "Bridge Sentinel Crystal continuation target is missing"
+        )
+    continuation_block = content[
+        continuation_bounds[0]:continuation_bounds[1]
+    ]
+    if extract_target_names(continuation_block) != []:
+        raise ValueError(
+            "Bridge Sentinel Crystal continuation target has native targets"
+        )
+    for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
+        if term.lower() in continuation_block.lower():
+            raise ValueError(
+                "Bridge Sentinel Crystal continuation target has forbidden "
+                f"reward term: {term}"
+            )
+
+
+def _assert_sentinel_crystal_transform_ap_check_bounds(ap_check, content, location_ids, source_name, trigger_markers, trigger_name):
+    if trigger_markers:
+        raise ValueError(
+            f"Sentinel Crystal AP trigger retains vanilla markers: {trigger_name}; "
+            + ", ".join(trigger_markers)
+        )
+
+    if content.count(f"entityDef {ap_check} {{") != 1:
+        raise ValueError(f"Sentinel Crystal AP check relay is not unique: {ap_check}")
+    ap_check_bounds = find_entity_block_bounds(content, ap_check)
+    if ap_check_bounds is None:
+        raise ValueError(f"Sentinel Crystal AP check relay missing: {ap_check}")
+    ap_check_block = content[ap_check_bounds[0]:ap_check_bounds[1]]
+    ap_check_targets = extract_target_names(ap_check_block)
+    if any(
+        term.lower() in target.lower()
+        for target in ap_check_targets
+        for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
+    ):
+        raise ValueError(f"Sentinel Crystal AP check has forbidden target: {ap_check}")
+
+    visual_matches = re.findall(r'entityDef (ap_location_visual_\d+) \{', content)
+    location_id = location_ids.get(ap_check)
+    if location_id is not None:
+        matching_visuals = [f"ap_location_visual_{location_id}"]
+    elif len(visual_matches) == 1:
+        matching_visuals = visual_matches
+    else:
+        matching_visuals = []
+    if len(matching_visuals) != 1:
+        raise ValueError(
+            f"Sentinel Crystal AP visual is not unique: {source_name}"
+        )
+    return matching_visuals
+
+
+def _assert_sentinel_crystal_transform_ap_check(check_ids, content, location_ids, source_name, top_name):
+    if find_entity_block_bounds(content, source_name) is not None:
+        raise ValueError(f"Sentinel Crystal source was emitted: {source_name}")
+    ap_check, trigger_block, trigger_name, trigger_targets = _assert_sentinel_crystal_transform_block(check_ids, content, source_name, top_name)
+    if any(
+        term.lower() in target.lower()
+        for target in trigger_targets
+        for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
+    ):
+        raise ValueError(f"Sentinel Crystal AP trigger has forbidden target: {trigger_name}")
+    trigger_markers = [
+        marker for marker in SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS
+        if marker.lower() in trigger_block.lower()
+    ]
+    matching_visuals = _assert_sentinel_crystal_transform_ap_check_bounds(ap_check, content, location_ids, source_name, trigger_markers, trigger_name)
+    if content.count(f"entityDef {matching_visuals[0]} {{") != 1:
+        raise ValueError(
+            f"Sentinel Crystal AP visual is not unique: {matching_visuals[0]}"
+        )
+    visual_bounds = find_entity_block_bounds(content, matching_visuals[0])
+    if visual_bounds is None:
+        raise ValueError(f"Sentinel Crystal AP visual missing: {matching_visuals[0]}")
+    return visual_bounds
+
+
 def assert_sentinel_crystal_transform(
     content, pairs, location_ids=None, check_ids=None
 ):
@@ -1105,92 +1313,7 @@ def assert_sentinel_crystal_transform(
     location_ids = location_ids or {}
     check_ids = check_ids or {}
     for source_name, top_name in pairs.items():
-        if find_entity_block_bounds(content, source_name) is not None:
-            raise ValueError(f"Sentinel Crystal source was emitted: {source_name}")
-        for block in content.split("entity {")[1:]:
-            if source_name in extract_target_names(block):
-                referrer = _entity_name_from_block(block) or "<unnamed>"
-                raise ValueError(
-                    "Sentinel Crystal source has generated target reference: "
-                    f"{source_name} <- {referrer}"
-                )
-        if content.count(f"entityDef {top_name} {{") != 0:
-            raise ValueError(f"Sentinel Crystal top was not removed: {top_name}")
-        if SENTINEL_CRYSTAL_TOP_MODEL in content:
-            raise ValueError(
-                f"Sentinel Crystal top model remains after removal: {top_name}"
-            )
-        trigger_name = f"ap_independent_{source_name}"
-        trigger_bounds = find_entity_block_bounds(content, trigger_name)
-        if trigger_bounds is None:
-            raise ValueError(f"Sentinel Crystal AP trigger missing: {trigger_name}")
-        if content.count(f"entityDef {trigger_name} {{") != 1:
-            raise ValueError(f"Sentinel Crystal AP trigger is not unique: {trigger_name}")
-        trigger_block = content[trigger_bounds[0]:trigger_bounds[1]]
-        trigger_targets = extract_target_names(trigger_block)
-        ap_check = check_ids.get(source_name, f"AP_CHECK_{source_name.upper()}")
-        expected_trigger_targets = [ap_check]
-        if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
-            expected_trigger_targets.extend(
-                (
-                    SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
-                    SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
-                )
-            )
-        if trigger_targets != expected_trigger_targets:
-            raise ValueError(
-                f"Sentinel Crystal AP trigger target drift: {trigger_name}; "
-                f"expected {expected_trigger_targets}, got {trigger_targets}"
-            )
-        if any(
-            term.lower() in target.lower()
-            for target in trigger_targets
-            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
-        ):
-            raise ValueError(f"Sentinel Crystal AP trigger has forbidden target: {trigger_name}")
-        trigger_markers = [
-            marker for marker in SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS
-            if marker.lower() in trigger_block.lower()
-        ]
-        if trigger_markers:
-            raise ValueError(
-                f"Sentinel Crystal AP trigger retains vanilla markers: {trigger_name}; "
-                + ", ".join(trigger_markers)
-            )
-
-        if content.count(f"entityDef {ap_check} {{") != 1:
-            raise ValueError(f"Sentinel Crystal AP check relay is not unique: {ap_check}")
-        ap_check_bounds = find_entity_block_bounds(content, ap_check)
-        if ap_check_bounds is None:
-            raise ValueError(f"Sentinel Crystal AP check relay missing: {ap_check}")
-        ap_check_block = content[ap_check_bounds[0]:ap_check_bounds[1]]
-        ap_check_targets = extract_target_names(ap_check_block)
-        if any(
-            term.lower() in target.lower()
-            for target in ap_check_targets
-            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS
-        ):
-            raise ValueError(f"Sentinel Crystal AP check has forbidden target: {ap_check}")
-
-        visual_matches = re.findall(r'entityDef (ap_location_visual_\d+) \{', content)
-        location_id = location_ids.get(ap_check)
-        if location_id is not None:
-            matching_visuals = [f"ap_location_visual_{location_id}"]
-        elif len(visual_matches) == 1:
-            matching_visuals = visual_matches
-        else:
-            matching_visuals = []
-        if len(matching_visuals) != 1:
-            raise ValueError(
-                f"Sentinel Crystal AP visual is not unique: {source_name}"
-            )
-        if content.count(f"entityDef {matching_visuals[0]} {{") != 1:
-            raise ValueError(
-                f"Sentinel Crystal AP visual is not unique: {matching_visuals[0]}"
-            )
-        visual_bounds = find_entity_block_bounds(content, matching_visuals[0])
-        if visual_bounds is None:
-            raise ValueError(f"Sentinel Crystal AP visual missing: {matching_visuals[0]}")
+        visual_bounds = _assert_sentinel_crystal_transform_ap_check(check_ids, content, location_ids, source_name, top_name)
         visual_block = content[visual_bounds[0]:visual_bounds[1]]
         forbidden_markers = [
             marker for marker in SENTINEL_CRYSTAL_FORBIDDEN_PRESENTATION_MARKERS
@@ -1203,48 +1326,10 @@ def assert_sentinel_crystal_transform(
             )
 
         if source_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
-            objective_bounds = find_entity_block_bounds(
-                content, SENTINEL_CRYSTAL_OBJECTIVE_TARGET
-            )
-            if objective_bounds is None:
-                raise ValueError(
-                    "Bridge Sentinel Crystal objective target is missing"
-                )
-            objective_block = content[objective_bounds[0]:objective_bounds[1]]
-            if extract_target_names(objective_block) != []:
-                raise ValueError(
-                    "Bridge Sentinel Crystal objective target has native targets"
-                )
-            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
-                if term.lower() in objective_block.lower():
-                    raise ValueError(
-                        "Bridge Sentinel Crystal objective target has forbidden "
-                        f"reward term: {term}"
-                    )
-            continuation_bounds = find_entity_block_bounds(
-                content, SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET
-            )
-            if continuation_bounds is None:
-                raise ValueError(
-                    "Bridge Sentinel Crystal continuation target is missing"
-                )
-            continuation_block = content[
-                continuation_bounds[0]:continuation_bounds[1]
-            ]
-            if extract_target_names(continuation_block) != []:
-                raise ValueError(
-                    "Bridge Sentinel Crystal continuation target has native targets"
-                )
-            for term in SENTINEL_CRYSTAL_FORBIDDEN_TARGET_TERMS:
-                if term.lower() in continuation_block.lower():
-                    raise ValueError(
-                        "Bridge Sentinel Crystal continuation target has forbidden "
-                        f"reward term: {term}"
-                    )
+            _assert_sentinel_crystal_transform_objective_bounds(content)
 
 
-def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
-    """Create an AP trigger independent from an ownership-hidden pickup."""
+def _generate_independent_pickup_trigger_policy(block, entity_name, policy):
     policy = policy or {}
     layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
     layers = f"\t{layers_match.group(1).strip()}\n" if layers_match and policy.get("preserve_layers", True) else ""
@@ -1264,6 +1349,12 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
         if not position_match or _spawn_position_from_block(block) is None:
             raise ValueError(f"Independent AP trigger requires spawnPosition: {entity_name}")
         position = position_match.group(1)
+    return layers, policy, position
+
+
+def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=None):
+    """Create an AP trigger independent from an ownership-hidden pickup."""
+    layers, policy, position = _generate_independent_pickup_trigger_policy(block, entity_name, policy)
     hitbox_size = policy.get(
         "independent_size",
         [AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE, AP_PICKUP_HITBOX_SIZE],
@@ -1318,38 +1409,7 @@ def generate_independent_pickup_trigger(entity_name, ap_check_id, block, policy=
 '''
 
 
-def generate_inert_location_visual(block, policy):
-    """Create rendered marker plus local-removal and reconciliation targets."""
-    visual = policy.get("independent_visual")
-    if not visual:
-        return ""
-    required = {"entity_name", "model", "position", "scale"}
-    missing = sorted(required - set(visual))
-    if missing:
-        raise ValueError(f"Independent AP visual is missing: {', '.join(missing)}")
-    if len(visual["position"]) != 3 or len(visual["scale"]) != 3:
-        raise ValueError("Independent AP visual position and scale require three values")
-    layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
-    layers = (
-        f"\t{layers_match.group(1).strip()}\n"
-        if layers_match and policy.get("preserve_visual_layers", True)
-        else ""
-    )
-    position = visual["position"]
-    scale = visual["scale"]
-    entity_class = visual.get("class", "idDynamicEntity")
-    inherit = visual.get("inherit")
-    inherit_line = f'\t\tinherit = "{inherit}";\n' if inherit else ""
-    automap_decl = visual.get("automap_properties_decl")
-    automap_line = (
-        f'\t\t\tautomapPropertiesDecl = "{automap_decl}";\n'
-        if automap_decl else ""
-    )
-    think_decl = visual.get("thinkComponentDecl")
-    think_line = (
-        f'\t\t\tthinkComponentDecl = "{think_decl}";\n'
-        if think_decl else ""
-    )
+def _generate_inert_location_visual_orientation(block, policy, visual):
     orientation = visual.get("spawn_orientation")
     if orientation is None and policy.get("preserve_rotation"):
         orientation_match = re.search(r'\bspawnOrientation\s*=\s*\{', block)
@@ -1373,6 +1433,10 @@ def generate_inert_location_visual(block, policy):
         save_match = re.search(r'\bwhenToSave\s*=\s*"[^"]+";', block)
         if save_match:
             reveal_flags += f"\t\t\t{save_match.group(0)}\n"
+    return bind_info_line, cleanup_name, orientation_line, reveal_flags
+
+
+def _generate_inert_location_visual_reconciliation_name(bind_info_line, cleanup_name, position, visual):
     reconciliation_name = visual.get("reconciliation_entity")
     if cleanup_name and not reconciliation_name:
         location_match = re.fullmatch(
@@ -1387,7 +1451,7 @@ def generate_inert_location_visual(block, policy):
             f"AP visual reconciliation entity is missing: {visual['entity_name']}"
         )
     helper_position = "\n".join(
-        f"\t\t\t\t{axis} = {value};" for axis, value in zip(("x", "y", "z"), position)
+        f"\t\t\t\t{axis} = {value};" for axis, value in zip(("x", "y", "z"), position, strict=False)
     )
     cleanup = ""
     if cleanup_name:
@@ -1446,6 +1510,43 @@ def generate_inert_location_visual(block, policy):
 \t}}
 }}
 '''
+    return cleanup, reconciliation
+
+
+def generate_inert_location_visual(block, policy):
+    """Create rendered marker plus local-removal and reconciliation targets."""
+    visual = policy.get("independent_visual")
+    if not visual:
+        return ""
+    required = {"entity_name", "model", "position", "scale"}
+    missing = sorted(required - set(visual))
+    if missing:
+        raise ValueError(f"Independent AP visual is missing: {', '.join(missing)}")
+    if len(visual["position"]) != 3 or len(visual["scale"]) != 3:
+        raise ValueError("Independent AP visual position and scale require three values")
+    layers_match = re.search(r'(\s*layers\s*\{\s*"[^"]+"\s*\})', block)
+    layers = (
+        f"\t{layers_match.group(1).strip()}\n"
+        if layers_match and policy.get("preserve_visual_layers", True)
+        else ""
+    )
+    position = visual["position"]
+    scale = visual["scale"]
+    entity_class = visual.get("class", "idDynamicEntity")
+    inherit = visual.get("inherit")
+    inherit_line = f'\t\tinherit = "{inherit}";\n' if inherit else ""
+    automap_decl = visual.get("automap_properties_decl")
+    automap_line = (
+        f'\t\t\tautomapPropertiesDecl = "{automap_decl}";\n'
+        if automap_decl else ""
+    )
+    think_decl = visual.get("thinkComponentDecl")
+    think_line = (
+        f'\t\t\tthinkComponentDecl = "{think_decl}";\n'
+        if think_decl else ""
+    )
+    bind_info_line, cleanup_name, orientation_line, reveal_flags = _generate_inert_location_visual_orientation(block, policy, visual)
+    cleanup, reconciliation = _generate_inert_location_visual_reconciliation_name(bind_info_line, cleanup_name, position, visual)
     return f'''entity {{
 {layers}\tentityDef {visual["entity_name"]} {{
 {inherit_line}\t\tclass = "{entity_class}";
@@ -1502,8 +1603,7 @@ def donor_kind_from_block(block):
     return inherit.split("/", 1)[0] if inherit else "other"
 
 
-def resolve_donor_model_override(content, location_block, asset):
-    """Resolve the structural donor independently from its replacement slot."""
+def _resolve_donor_model_override_replacement_policy(asset, content, location_block):
     if asset.get("strategy") != "donor_model_override":
         raise ValueError("asset is not a donor_model_override")
     replacement_policy = asset.get("replacement_slot_policy")
@@ -1537,6 +1637,12 @@ def resolve_donor_model_override(content, location_block, asset):
         donor_block,
         flags=re.DOTALL,
     )
+    return model_match
+
+
+def resolve_donor_model_override(content, location_block, asset):
+    """Resolve the structural donor independently from its replacement slot."""
+    model_match = _resolve_donor_model_override_replacement_policy(asset, content, location_block)
     if model_match is None:
         raise ValueError("donor model is missing")
     return model_match.group(1)
@@ -1616,6 +1722,32 @@ def remove_sentinel_crystal_source_references(content, source_names):
     return "".join(rewritten)
 
 
+def _add_ap_check_target_activation_state(ap_check_id, block, entity_name, target_names, target_policy):
+    activation_state = target_policy.get("activation_state")
+    if activation_state is not None:
+        if not isinstance(activation_state, str) or not activation_state:
+            raise ValueError(f"Invalid check activation state: {entity_name}")
+        states = list(re.finditer(
+            rf'\bitem\[\d+\]\s*=\s*\{{\s*stateName\s*=\s*"{re.escape(activation_state)}";', block
+        ))
+        if len(states) != 1:
+            raise ValueError(f"Check activation state missing or ambiguous: {entity_name}")
+        state = states[0]
+        end = find_matching_brace(block, block.index("{", state.start()))
+        if "stateActivateList" in block[state.end():end]:
+            raise ValueError(f"Check activation state already has targets: {entity_name}")
+        block = (block[:state.end()] + '\n\t\t\t\t\tstateActivateList = {\n'
+                 f'\t\t\t\t\t\tnum = 1;\n\t\t\t\t\t\titem[0] = "{ap_check_id}";\n'
+                 '\t\t\t\t\t}' + block[state.end():])
+    else:
+        target_names.append(ap_check_id)
+    block = replace_targets_block(block, target_names)
+    if target_policy.get("gate_relay"):
+        if not re.search(r'flags\s*=\s*\{\s*hide\s*=\s*true;', block):
+            block = block.replace("edit = {", "edit = {\n\t\t\tflags = { hide = true; }", 1)
+    return block
+
+
 def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
     existing_targets = extract_target_names(block)
     target_policy = target_policy or {}
@@ -1642,28 +1774,7 @@ def add_ap_check_target(block, entity_name, ap_check_id, target_policy=None):
             target for target in existing_targets if target in preserve_set
         ]
 
-    activation_state = target_policy.get("activation_state")
-    if activation_state is not None:
-        if not isinstance(activation_state, str) or not activation_state:
-            raise ValueError(f"Invalid check activation state: {entity_name}")
-        states = list(re.finditer(
-            rf'\bitem\[\d+\]\s*=\s*\{{\s*stateName\s*=\s*"{re.escape(activation_state)}";', block
-        ))
-        if len(states) != 1:
-            raise ValueError(f"Check activation state missing or ambiguous: {entity_name}")
-        state = states[0]
-        end = find_matching_brace(block, block.index("{", state.start()))
-        if "stateActivateList" in block[state.end():end]:
-            raise ValueError(f"Check activation state already has targets: {entity_name}")
-        block = (block[:state.end()] + '\n\t\t\t\t\tstateActivateList = {\n'
-                 f'\t\t\t\t\t\tnum = 1;\n\t\t\t\t\t\titem[0] = "{ap_check_id}";\n'
-                 '\t\t\t\t\t}' + block[state.end():])
-    else:
-        target_names.append(ap_check_id)
-    block = replace_targets_block(block, target_names)
-    if target_policy.get("gate_relay"):
-        if not re.search(r'flags\s*=\s*\{\s*hide\s*=\s*true;', block):
-            block = block.replace("edit = {", "edit = {\n\t\t\tflags = { hide = true; }", 1)
+    block = _add_ap_check_target_activation_state(ap_check_id, block, entity_name, target_names, target_policy)
     return block
 
 
@@ -1710,16 +1821,7 @@ def replace_pickup_reveal_target(content, entity_name, location_id, policy):
     return content[:bounds[0]] + block + content[bounds[1]:]
 
 
-def build_universal_physical_policy(
-    ap_check_id, location_id, block, visual_model=AP_QUESTION_MARK_MODEL, policy=None
-):
-    """Generate an independent trigger and visual for any generic physical location.
-
-    Preserves original vanilla relay targets for doors, gates, and other world
-    events. Independent AP trigger fires vanilla relays, AP_CHECK, then visual
-    cleanup in sequence.
-    """
-    visual_name = f"ap_location_visual_{location_id}"
+def _build_universal_physical_policy_cleanup_name(block, location_id, policy):
     cleanup_name = f"ap_remove_location_visual_{location_id}"
     reconciliation_name = f"ap_hide_location_visual_{location_id}"
 
@@ -1729,7 +1831,7 @@ def build_universal_physical_policy(
     visual_z_offset = policy.get("independent_visual_z_offset", 1.5)
     if (
         isinstance(visual_z_offset, bool)
-        or not isinstance(visual_z_offset, (int, float))
+        or not isinstance(visual_z_offset, int | float)
     ):
         raise ValueError("Independent AP visual z offset must be numeric")
     if configured_position is not None:
@@ -1754,11 +1856,25 @@ def build_universal_physical_policy(
                 coordinates[1],
                 coordinates[2] + visual_z_offset,
             ]
+    return cleanup_name, policy, position, reconciliation_name
+
+
+def build_universal_physical_policy(
+    ap_check_id, location_id, block, visual_model=AP_QUESTION_MARK_MODEL, policy=None
+):
+    """Generate an independent trigger and visual for any generic physical location.
+
+    Preserves original vanilla relay targets for doors, gates, and other world
+    events. Independent AP trigger fires vanilla relays, AP_CHECK, then visual
+    cleanup in sequence.
+    """
+    visual_name = f"ap_location_visual_{location_id}"
+    cleanup_name, policy, position, reconciliation_name = _build_universal_physical_policy_cleanup_name(block, location_id, policy)
 
     independent_targets = [ap_check_id, cleanup_name]
 
     think_match = re.search(r'\bthinkComponentDecl\s*=\s*"([^"]+)";', block)
-    think_component = think_match.group(1) if think_match else None
+    think_match.group(1) if think_match else None
     return {
         "independent_ap_trigger": True,
         "independent_targets": independent_targets,
@@ -1873,21 +1989,7 @@ def generate_automap_location_helper(source_block, location_id, policy=None):
 '''
 
 
-def audit_preserved_target_graph(content, entity_name, target_policy):
-    """Fail closed when a pickup's retained vanilla branch can grant a reward.
-
-    Scripted tutorial pickups are converted to ordinary AP triggers.  Their
-    retained targets therefore need an explicit, source-verified graph rather
-    than relying on a propitem DECL to suppress a hidden idProp2 reward.
-    """
-    if not target_policy:
-        return
-    roots = target_policy.get("preserve_targets", [])
-    expected_graph = target_policy.get("safe_target_graph")
-    forbidden_terms = target_policy.get("forbidden_target_terms", [])
-    if not roots or expected_graph is None or not forbidden_terms:
-        return
-
+def _audit_preserved_target_graph_pending(content, entity_name, expected_graph, forbidden_terms, roots):
     pending = list(roots)
     visited = set()
     while pending:
@@ -1919,6 +2021,24 @@ def audit_preserved_target_graph(content, entity_name, target_policy):
             )
         pending.extend(actual_targets)
         visited.add(target_name)
+
+
+def audit_preserved_target_graph(content, entity_name, target_policy):
+    """Fail closed when a pickup's retained vanilla branch can grant a reward.
+
+    Scripted tutorial pickups are converted to ordinary AP triggers.  Their
+    retained targets therefore need an explicit, source-verified graph rather
+    than relying on a propitem DECL to suppress a hidden idProp2 reward.
+    """
+    if not target_policy:
+        return
+    roots = target_policy.get("preserve_targets", [])
+    expected_graph = target_policy.get("safe_target_graph")
+    forbidden_terms = target_policy.get("forbidden_target_terms", [])
+    if not roots or expected_graph is None or not forbidden_terms:
+        return
+
+    _audit_preserved_target_graph_pending(content, entity_name, expected_graph, forbidden_terms, roots)
 
 def generate_event_relay(
     ap_check_id, location_id, spawn_pos_text, include_notification=True,
@@ -2006,11 +2126,25 @@ PLACEMENT_FIELDS = {
 }
 
 
+def _normalize_placement_metadata_trap(location_id, seen, value):
+    if location_id in seen:
+        raise ValueError(f"placement metadata duplicates location {location_id}")
+    seen.add(location_id)
+    for field in ("location_name", "item_name", "recipient_name"):
+        if not isinstance(value[field], str) or not value[field].strip():
+            raise ValueError(f"placement metadata {field} must be non-empty")
+    for field in ("item_id", "recipient_slot", "classification"):
+        if not isinstance(value[field], int) or isinstance(value[field], bool):
+            raise ValueError(f"placement metadata {field} must be an integer")
+    if not isinstance(value["trap"], bool) or not isinstance(value["local"], bool):
+        raise ValueError("placement metadata trap/local must be boolean")
+
+
 def normalize_placement_metadata(placement_metadata):
     """Validate immutable scout output before it can affect generated sources."""
     if placement_metadata is None:
         return None
-    if not isinstance(placement_metadata, (list, tuple)):
+    if not isinstance(placement_metadata, list | tuple):
         raise ValueError("placement_metadata must be a list")
     records = []
     seen = set()
@@ -2020,17 +2154,7 @@ def normalize_placement_metadata(placement_metadata):
         location_id = value["location_id"]
         if not isinstance(location_id, int) or isinstance(location_id, bool) or location_id <= 0:
             raise ValueError("placement metadata has invalid location_id")
-        if location_id in seen:
-            raise ValueError(f"placement metadata duplicates location {location_id}")
-        seen.add(location_id)
-        for field in ("location_name", "item_name", "recipient_name"):
-            if not isinstance(value[field], str) or not value[field].strip():
-                raise ValueError(f"placement metadata {field} must be non-empty")
-        for field in ("item_id", "recipient_slot", "classification"):
-            if not isinstance(value[field], int) or isinstance(value[field], bool):
-                raise ValueError(f"placement metadata {field} must be an integer")
-        if not isinstance(value["trap"], bool) or not isinstance(value["local"], bool):
-            raise ValueError("placement metadata trap/local must be boolean")
+        _normalize_placement_metadata_trap(location_id, seen, value)
         if value["trap"] != bool(value["classification"] & 0b00100):
             raise ValueError(f"placement metadata trap mismatch at {location_id}")
         records.append(dict(value))
@@ -2346,6 +2470,157 @@ def generate_physical_pickup_spawn(item_id, command_value):
     return spawner + pickup
 
 
+def _generate_rpc_command_entities_is_no_op(blocks, command_value, item_classifications, item_id, item_names, receipt_feedback):
+    is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
+    if is_no_op:
+        return
+    item_id_int = int(item_id)
+    feedback = receipt_feedback.get(
+        item_id_int, receipt_feedback.get(str(item_id_int), AP_RECEIPT_FEEDBACK)
+    )
+    if feedback != AP_RECEIPT_FEEDBACK:
+        return
+    name = item_names.get(item_id_int)
+    if not name:
+        raise ValueError(f"Item {item_id} has no name in item_names; notification requires it")
+    if item_id_int not in item_classifications:
+        raise ValueError(
+            f"Item {item_id} has no packaged classification"
+        )
+    classification = item_classifications[item_id_int]
+
+    progressive_stage_count = progressive_notification_stage_count(
+        item_id_int, command_value
+    )
+    if progressive_stage_count is not None:
+        for stage in range(progressive_stage_count):
+            subtext_key = notification_key(item_id_int, command_value, stage=stage)
+            for slot in ("a", "b"):
+                blocks.append(generate_item_notification(
+                    item_id_int, subtext_key, classification,
+                    stage=stage, slot=slot,
+                ))
+    else:
+        subtext_key = notification_key(item_id_int, command_value)
+        for slot in ("a", "b"):
+            blocks.append(generate_item_notification(
+                item_id_int, subtext_key, classification, slot=slot
+            ))
+
+
+def _generate_rpc_command_entities_perks(blocks, command_value, item_id):
+    perks = command_value.get("perks", [])
+    if not perks:
+        raise ValueError(
+            f"Progressive perk item {item_id} has no perk stages"
+        )
+    for stage, perk in enumerate(perks):
+        effects = [perk] if isinstance(perk, str) else perk
+        if not isinstance(effects, list) or not effects or any(not isinstance(effect, str) for effect in effects):
+            raise ValueError(f"Progressive perk item {item_id} has invalid stage effects")
+        for index, effect in enumerate(effects):
+            entity_name = (
+                f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"
+                if isinstance(perk, str)
+                else f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}_{index}"
+            )
+            blocks.append(build_primitive(
+                "target_command", entity_name,
+                {"command": progressive_effect_command(effect) + ";"},
+            ))
+
+
+def _generate_rpc_command_entities_relay_targets(command_value, item_id, required_entities):
+    if not command_value:
+        raise ValueError(f"Multi-command item {item_id} has no commands")
+    relay_targets = []
+    command_blocks = []
+    for idx, cmd in enumerate(command_value):
+        cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
+        direct_bfg = int(item_id) == 7770006 and idx == 0 and cmd == "give weapon/player/bfg"
+        if command_requires_map_side_rpc(cmd):
+            required_entities.append(cmd_entity_name)
+        relay_targets.append(cmd_entity_name)
+        command_blocks.append(build_primitive(
+            "weapon_grant_direct" if direct_bfg else "target_command",
+            cmd_entity_name,
+            {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd + ";"},
+        ))
+    return command_blocks, relay_targets
+
+
+def _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback, required_entities):
+    if item_names and enable_notifications:
+        if item_classifications is None:
+            raise ValueError("item notifications require packaged classifications")
+        for item_id, command_value in items_dict.items():
+            _generate_rpc_command_entities_is_no_op(blocks, command_value, item_classifications, item_id, item_names, receipt_feedback)
+
+    generated = "".join(blocks)
+    missing_entities = [
+        entity_name
+        for entity_name in required_entities
+        if f"entityDef {entity_name} {{" not in generated
+    ]
+    if missing_entities:
+        raise ValueError(
+            "Map-side RPC entity missing for unsafe command(s): "
+            + ", ".join(sorted(missing_entities))
+        )
+    return generated
+
+
+def _append_structured_command(blocks, command_value, item_id):
+    command_type = command_value.get("type")
+    if int(item_id) in MASTERY_ITEM_BITS or command_type in {"no_op", "native_weapon_upgrade_points"}:
+        return
+    if command_type == "transient_effect":
+        return
+    if command_type == "physical_pickup_spawn":
+        blocks.append(generate_physical_pickup_spawn(item_id, command_value))
+        return
+    if command_type in {"progressive_perk", "progressive_item"}:
+        _generate_rpc_command_entities_perks(blocks, command_value, item_id)
+        return
+    if command_type == "perk":
+        perk = command_value.get("perk")
+        if not perk:
+            raise ValueError(f"Perk item {item_id} has no perk path")
+        blocks.append(build_primitive(
+            "target_command", f"{RPC_ENTITY_PREFIX}_{item_id}",
+            {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk};"},
+        ))
+        return
+    if command_type != "currency":
+        raise ValueError(f"Unsupported entity command type for item {item_id}: {command_value}")
+    currency = command_value["currency"]
+    count = int(command_value.get("count", 1))
+    blocks.append(build_primitive(
+        "currency_grant_direct", f"{RPC_ENTITY_PREFIX}_{item_id}",
+        {"currency": currency, "count": count},
+    ))
+    return
+
+
+def _append_command_entities(blocks, command_value, item_id, required_entities):
+    if isinstance(command_value, dict):
+        return _append_structured_command(blocks, command_value, item_id)
+    if isinstance(command_value, list):
+        command_blocks, relay_targets = _generate_rpc_command_entities_relay_targets(command_value, item_id, required_entities)
+        blocks.append(build_primitive(
+            "target_count_relay", f"{RPC_ENTITY_PREFIX}_{item_id}",
+            {"targets": relay_targets},
+        ))
+        blocks.extend(command_blocks)
+    else:
+        entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
+        if command_requires_map_side_rpc(command_value):
+            required_entities.append(entity_name)
+        blocks.append(build_primitive(
+            "target_command", entity_name, {"command": command_value + ";"}
+        ))
+
+
 def generate_rpc_command_entities(
     items_dict,
     item_names=None,
@@ -2354,8 +2629,8 @@ def generate_rpc_command_entities(
     enable_notifications=False,
 ):
     """Generate ap_rpc_v3_* effects and independent receipt notifications.
-    
-    item_names: dict[int, str] — item_id -> canonical name (from replay_policies)
+
+    item_names: dict[int, str] â€” item_id -> canonical name (from replay_policies)
     When enable_notifications is True, also generates ap_notify_item_<id> entities.
     """
     validate_primitive_registry()
@@ -2370,139 +2645,10 @@ def generate_rpc_command_entities(
     blocks = []
     required_entities = []
     for item_id, command_value in items_dict.items():
-        if isinstance(command_value, dict):
-            command_type = command_value.get("type")
-            if int(item_id) in MASTERY_ITEM_BITS or command_type in {"no_op", "native_weapon_upgrade_points"}:
-                continue
-            if command_type == "transient_effect":
-                continue
-            if command_type == "physical_pickup_spawn":
-                blocks.append(generate_physical_pickup_spawn(item_id, command_value))
-                continue
-            if command_type in {"progressive_perk", "progressive_item"}:
-                perks = command_value.get("perks", [])
-                if not perks:
-                    raise ValueError(
-                        f"Progressive perk item {item_id} has no perk stages"
-                    )
-                for stage, perk in enumerate(perks):
-                    effects = [perk] if isinstance(perk, str) else perk
-                    if not isinstance(effects, list) or not effects or any(not isinstance(effect, str) for effect in effects):
-                        raise ValueError(f"Progressive perk item {item_id} has invalid stage effects")
-                    for index, effect in enumerate(effects):
-                        entity_name = (
-                            f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}"
-                            if isinstance(perk, str)
-                            else f"{RPC_ENTITY_PREFIX}_{item_id}_{stage}_{index}"
-                        )
-                        blocks.append(build_primitive(
-                            "target_command", entity_name,
-                            {"command": progressive_effect_command(effect) + ";"},
-                        ))
-                continue
-
-            if command_type == "perk":
-                perk = command_value.get("perk")
-                if not perk:
-                    raise ValueError(f"Perk item {item_id} has no perk path")
-                blocks.append(build_primitive(
-                    "target_command", f"{RPC_ENTITY_PREFIX}_{item_id}",
-                    {"command": f"ai_ScriptCmdEnt player1 givePlayerPerk {perk};ai_ScriptCmdEnt player1 activatePlayerPerk {perk};"},
-                ))
-                continue
-
-            if command_type != "currency":
-                raise ValueError(f"Unsupported entity command type for item {item_id}: {command_value}")
-            currency = command_value["currency"]
-            count = int(command_value.get("count", 1))
-            blocks.append(build_primitive(
-                "currency_grant_direct", f"{RPC_ENTITY_PREFIX}_{item_id}",
-                {"currency": currency, "count": count},
-            ))
-            continue
-
-        if isinstance(command_value, list):
-            if not command_value:
-                raise ValueError(f"Multi-command item {item_id} has no commands")
-            relay_targets = []
-            command_blocks = []
-            for idx, cmd in enumerate(command_value):
-                cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
-                direct_bfg = int(item_id) == 7770006 and idx == 0 and cmd == "give weapon/player/bfg"
-                if command_requires_map_side_rpc(cmd):
-                    required_entities.append(cmd_entity_name)
-                relay_targets.append(cmd_entity_name)
-                command_blocks.append(build_primitive(
-                    "weapon_grant_direct" if direct_bfg else "target_command",
-                    cmd_entity_name,
-                    {"item": "weapon/player/bfg"} if direct_bfg else {"command": cmd + ";"},
-                ))
-
-            blocks.append(build_primitive(
-                "target_count_relay", f"{RPC_ENTITY_PREFIX}_{item_id}",
-                {"targets": relay_targets},
-            ))
-            blocks.extend(command_blocks)
-        else:
-            entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
-            if command_requires_map_side_rpc(command_value):
-                required_entities.append(entity_name)
-            blocks.append(build_primitive(
-                "target_command", entity_name, {"command": command_value + ";"}
-            ))
+        _append_command_entities(blocks, command_value, item_id, required_entities)
 
     # Only non-no_op items generate independent notification entities.
-    if item_names and enable_notifications:
-        if item_classifications is None:
-            raise ValueError("item notifications require packaged classifications")
-        for item_id, command_value in items_dict.items():
-            is_no_op = isinstance(command_value, dict) and command_value.get("type") == "no_op"
-            if is_no_op:
-                continue
-            item_id_int = int(item_id)
-            feedback = receipt_feedback.get(
-                item_id_int, receipt_feedback.get(str(item_id_int), AP_RECEIPT_FEEDBACK)
-            )
-            if feedback != AP_RECEIPT_FEEDBACK:
-                continue
-            name = item_names.get(item_id_int)
-            if not name:
-                raise ValueError(f"Item {item_id} has no name in item_names; notification requires it")
-            if item_id_int not in item_classifications:
-                raise ValueError(
-                    f"Item {item_id} has no packaged classification"
-                )
-            classification = item_classifications[item_id_int]
-            
-            progressive_stage_count = progressive_notification_stage_count(
-                item_id_int, command_value
-            )
-            if progressive_stage_count is not None:
-                for stage in range(progressive_stage_count):
-                    subtext_key = notification_key(item_id_int, command_value, stage=stage)
-                    for slot in ("a", "b"):
-                        blocks.append(generate_item_notification(
-                            item_id_int, subtext_key, classification,
-                            stage=stage, slot=slot,
-                        ))
-            else:
-                subtext_key = notification_key(item_id_int, command_value)
-                for slot in ("a", "b"):
-                    blocks.append(generate_item_notification(
-                        item_id_int, subtext_key, classification, slot=slot
-                    ))
-
-    generated = "".join(blocks)
-    missing_entities = [
-        entity_name
-        for entity_name in required_entities
-        if f"entityDef {entity_name} {{" not in generated
-    ]
-    if missing_entities:
-        raise ValueError(
-            "Map-side RPC entity missing for unsafe command(s): "
-            + ", ".join(sorted(missing_entities))
-        )
+    generated = _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback, required_entities)
     return generated
 
 def generate_system_command_entities(map_key="", runtime_map=""):
@@ -2605,7 +2751,7 @@ def validate_ap_lifecycle_entity(content, map_key):
 
 def generate_bootstrap_entities(runtime_map=""):
     """Return ownership-gated stat targets for supported maps."""
-    from doom_eap.runtime.bootstrap_actions import BOOTSTRAP_ACTIONS, BOOTSTRAP_STAT_PRIMITIVE
+    from doom_eap.runtime.observers import BOOTSTRAP_ACTIONS, BOOTSTRAP_STAT_PRIMITIVE
 
     return "".join(f'''entity {{
     entityDef {action["entity_name"]} {{
@@ -2667,6 +2813,61 @@ def load_explicit_location_feedback(
     return explicit
 
 
+def _apply_runtime_map_correctives_bounds(text):
+    bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
+    if bounds:
+        block = text[bounds[0]:bounds[1]]
+        new_targets = [
+            "slayergate_target_changelayer_slayergate_4",
+        ]
+        block = replace_targets_block(block, new_targets)
+        text = text[:bounds[0]] + block + text[bounds[1]:]
+
+    text = append_target_to_named_entity(
+        text,
+        "slayergate_target_relay_destroy_nest",
+        "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY",
+    )
+
+    for show_name in (
+        "slayergate_target_show_rune_post_combat",
+        "slayergate_target_show_rune_from_cp",
+        "slayergate_target_show_rune_after_combat",
+    ):
+        bounds = find_entity_block_bounds(text, show_name)
+        if bounds:
+            block = text[bounds[0]:bounds[1]]
+            block = replace_targets_block(block, [])
+            text = text[:bounds[0]] + block + text[bounds[1]:]
+
+    bounds = find_entity_block_bounds(text, "slayergate_progress_support_rune_mcity")
+    if bounds:
+        block = text[bounds[0]:bounds[1]]
+        block = replace_targets_block(block, [])
+        block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+        block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+        if "flags = {" in block:
+            if "flags = {\n\t\t\thide = true;" not in block:
+                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+        else:
+            block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+        text = text[:bounds[0]] + block + text[bounds[1]:]
+    return text
+
+
+def _apply_runtime_map_correctives_block(bounds, text):
+    block = text[bounds[0]:bounds[1]]
+    block = replace_targets_block(block, [])
+    block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+    block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
+    if "flags = {" in block:
+        if "flags = {\n\t\t\thide = true;" not in block:
+            block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
+    else:
+        block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+    return block
+
+
 def apply_runtime_map_correctives(text: str, map_key: str) -> str:
     """Apply focused runtime correctives for TAG maps."""
     if map_key == "e4m1_rig":
@@ -2693,56 +2894,11 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
 
         bounds = find_entity_block_bounds(text, "slayer_gate_progress_support_rune_1")
         if bounds:
-            block = text[bounds[0]:bounds[1]]
-            block = replace_targets_block(block, [])
-            block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-            block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-            if "flags = {" in block:
-                if "flags = {\n\t\t\thide = true;" not in block:
-                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
-            else:
-                block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+            block = _apply_runtime_map_correctives_block(bounds, text)
             text = text[:bounds[0]] + block + text[bounds[1]:]
 
     elif map_key == "e4m3_mcity":
-        bounds = find_entity_block_bounds(text, "slayergate_target_relay_explosion_delay1")
-        if bounds:
-            block = text[bounds[0]:bounds[1]]
-            new_targets = [
-                "slayergate_target_changelayer_slayergate_4",
-            ]
-            block = replace_targets_block(block, new_targets)
-            text = text[:bounds[0]] + block + text[bounds[1]:]
-
-        text = append_target_to_named_entity(
-            text,
-            "slayergate_target_relay_destroy_nest",
-            "AP_CHECK_SLAYERGATE_PROGRESS_SUPPORT_RUNE_MCITY",
-        )
-
-        for show_name in (
-            "slayergate_target_show_rune_post_combat",
-            "slayergate_target_show_rune_from_cp",
-            "slayergate_target_show_rune_after_combat",
-        ):
-            bounds = find_entity_block_bounds(text, show_name)
-            if bounds:
-                block = text[bounds[0]:bounds[1]]
-                block = replace_targets_block(block, [])
-                text = text[:bounds[0]] + block + text[bounds[1]:]
-
-        bounds = find_entity_block_bounds(text, "slayergate_progress_support_rune_mcity")
-        if bounds:
-            block = text[bounds[0]:bounds[1]]
-            block = replace_targets_block(block, [])
-            block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-            block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-            if "flags = {" in block:
-                if "flags = {\n\t\t\thide = true;" not in block:
-                    block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
-            else:
-                block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
-            text = text[:bounds[0]] + block + text[bounds[1]:]
+        text = _apply_runtime_map_correctives_bounds(text)
 
     elif map_key == "e5m3_hell":
         bounds = find_entity_block_bounds(text, "breach_wasteland_arena_encounter_manager_dlc2_2")
@@ -2765,103 +2921,37 @@ def apply_runtime_map_correctives(text: str, map_key: str) -> str:
     return text
 
 
-def generate_map(
-    input_file,
-    output_file,
-    config_file,
-    manifest_file,
-    items_dict,
-    item_names=None,
-    item_classifications=None,
-    receipt_feedback=None,
-    enable_notifications=True,
-    placement_metadata=None,
-    encounter_source=None,
-):
-    with open(config_file, encoding="utf-8") as f:
-        level_config = json.load(f)
-    config_path = Path(config_file)
-    descriptor_path = config_path.with_name("descriptor.json")
-    if descriptor_path.is_file():
-        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
-        level_config.setdefault("runtime_map", descriptor.get("runtime_map", ""))
-        level_config.setdefault("map_key", descriptor.get("key", ""))
-    package_assets = config_path.with_name("assets.json")
-    if config_path.name == "locations.json" and package_assets.is_file():
-        asset_document = json.loads(package_assets.read_text(encoding="utf-8"))
-        level_config = {
-            **level_config,
-            "assets": asset_document.get("assets", []),
-            "default_visual_asset": asset_document.get("default_visual_asset"),
-        }
-    if item_classifications is None:
-        item_classifications = load_item_classifications(
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "item_classifications.json"
-        )
-    map_key = level_config.get("map_key")
-    if not isinstance(map_key, str):
-        raise ValueError("map config requires string map_key")
-    from doom_eap.content.arena_checks import map_arena_config
-    map_arena_config(level_config, descriptor_path)
-    preserve_rotation = level_config.get("preserve_rotation", False)
-    if not isinstance(preserve_rotation, bool):
-        raise ValueError("map config preserve_rotation must be boolean")
-    preserve_visual_layers = level_config.get("preserve_visual_layers", True)
-    if not isinstance(preserve_visual_layers, bool):
-        raise ValueError("map config preserve_visual_layers must be boolean")
-    fast_travel_path = Path(__file__).resolve().parents[2] / "data" / "fast_travel.json"
-    fast_travel = json.loads(fast_travel_path.read_text(encoding="utf-8"))
-    canonical_visual = canonical_ap_visual_for_map(map_key)
-    config_entities = level_config.get("entities", {})
-    target_policies = level_config.get("target_policies", {})
-    asset_specs = {
-        asset["key"]: asset for asset in level_config.get("assets", [])
-    }
-    default_visual_asset = level_config.get("default_visual_asset")
-    if canonical_visual:
-        asset_specs[canonical_visual["key"]] = canonical_visual
-        default_visual_asset = canonical_visual["key"]
-    if default_visual_asset and default_visual_asset not in asset_specs:
-        raise ValueError(f"Unknown default_visual_asset: {default_visual_asset}")
-    default_visual_model = (
-        asset_specs[default_visual_asset]["model"]
-        if default_visual_asset
-        else AP_QUESTION_MARK_MODEL
+def _generate_map_visual(asset_specs, block, content, default_visual_asset, entity_name, preserve_rotation, preserve_visual_layers, target_policy):
+    target_policy.setdefault("preserve_rotation", preserve_rotation)
+    target_policy.setdefault(
+        "preserve_visual_layers", preserve_visual_layers
     )
-    neutralize_pickups = level_config.get("neutralize_pickups", [])
-    target_removals = level_config.get("target_removals", {})
-    remove_entities = level_config.get("remove_entities", [])
-    visual_child_removals = level_config.get("visual_child_removals", [])
-    neutralize_entity_references = level_config.get("neutralize_entity_references", [])
-    secret_encounters = level_config.get("secret_encounters", [])
-    declared_checks = (
-        *config_entities,
-        *(entry["ap_check"] for entry in secret_encounters),
-    )
-    placement_metadata = normalize_placement_metadata(placement_metadata)
-    if placement_metadata is not None:
-        placement_by_id = {
-            record["location_id"]: record for record in placement_metadata
-        }
-        declared_location_ids = set(config_entities.values()) | {
-            entry["location_id"] for entry in secret_encounters
-        }
-        missing_placements = sorted(declared_location_ids - set(placement_by_id))
-        if missing_placements:
-            raise ValueError(
-                "placement metadata is incomplete for generated map: "
-                + ", ".join(str(value) for value in missing_placements)
-            )
-    else:
-        placement_by_id = {}
-    location_feedback = load_explicit_location_feedback(
-        level_config.get("map_key"),
-        level_config.get("location_feedback", {}),
-        declared_checks,
-    )
-    manifest_data = {}
+    if is_sentinel_crystal_source(block):
+        target_policy.setdefault("independent_ap_trigger", True)
+        target_policy.setdefault("remove_original", True)
+        if entity_name != SENTINEL_CRYSTAL_BRIDGE_OWNER:
+            target_policy["preserve_targets"] = []
+    visual = target_policy.get("independent_visual")
+    if visual:
+        asset_key = visual.get("asset") or default_visual_asset
+        if asset_key:
+            if asset_key not in asset_specs:
+                raise ValueError(
+                    f"Unknown independent_visual asset: {asset_key}"
+                )
+            visual_asset = asset_specs[asset_key]
+            if visual_asset["strategy"] == "donor_model_override":
+                visual["model"] = resolve_donor_model_override(
+                    content, block, visual_asset
+                )
+                visual["_model_override"] = visual_asset["model"]
+            else:
+                visual["model"] = visual_asset["model"]
+    if target_policy.get("duplicate_policy") == "native_only":
+        target_policy["no_auto_visual"] = True
+
+
+def _generate_map_sentinel_check_ids(config_entities, input_file, level_config, map_key, neutralize_pickups, output_file, target_policies):
     sentinel_check_ids = {}
 
     source_metadata = validate_source_file(input_file, output_file)
@@ -2891,7 +2981,103 @@ def generate_map(
 
     for entity_name in neutralize_pickups:
         content = neutralize_conditional_pickup(content, entity_name)
+    return content, sentinel_check_ids, source_metadata
 
+
+def _generate_map_visual_policy(asset_specs, block, content, default_visual_asset, location_id, new_blocks, target_policy):
+    visual_policy = target_policy.get("independent_visual")
+    if visual_policy:
+        visual_policy.setdefault(
+            "reconciliation_entity",
+            f"ap_hide_location_visual_{location_id}",
+        )
+    if visual_policy and "_model_override" not in visual_policy:
+        asset_key = (
+            visual_policy.get("asset") or default_visual_asset
+        )
+        visual_asset = asset_specs.get(asset_key) if asset_key else None
+        if (
+            visual_asset
+            and visual_asset["strategy"] == "donor_model_override"
+        ):
+            visual_policy["model"] = resolve_donor_model_override(
+                content, block, visual_asset
+            )
+            visual_policy["_model_override"] = visual_asset["model"]
+    if not target_policy.get("remove_original", False):
+        if "native_entity_contract" in target_policy:
+            new_blocks.append(
+                "entity {" + apply_native_entity_contract(block, target_policy["native_entity_contract"])
+            )
+        else:
+            new_blocks.append(
+                "entity {" + neutralize_conditional_pickup_block(
+                    block,
+                    preserve_original_visual=target_policy.get(
+                        "preserve_original_visual", False
+                    ),
+                )
+            )
+
+
+def _load_map_config(config_file):
+    with open(config_file, encoding="utf-8") as f:
+        level_config = json.load(f)
+    config_path = Path(config_file)
+    descriptor_path = config_path.with_name("descriptor.json")
+    if descriptor_path.is_file():
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        level_config.setdefault("runtime_map", descriptor.get("runtime_map", ""))
+        level_config.setdefault("map_key", descriptor.get("key", ""))
+    package_assets = config_path.with_name("assets.json")
+    if config_path.name == "locations.json" and package_assets.is_file():
+        asset_document = json.loads(package_assets.read_text(encoding="utf-8"))
+        level_config = {
+            **level_config,
+            "assets": asset_document.get("assets", []),
+            "default_visual_asset": asset_document.get("default_visual_asset"),
+        }
+    return descriptor_path, level_config
+
+
+def _map_visual_assets(canonical_visual, level_config):
+    asset_specs = {
+        asset["key"]: asset for asset in level_config.get("assets", [])
+    }
+    default_visual_asset = level_config.get("default_visual_asset")
+    if canonical_visual:
+        asset_specs[canonical_visual["key"]] = canonical_visual
+        default_visual_asset = canonical_visual["key"]
+    if default_visual_asset and default_visual_asset not in asset_specs:
+        raise ValueError(f"Unknown default_visual_asset: {default_visual_asset}")
+    default_visual_model = (
+        asset_specs[default_visual_asset]["model"]
+        if default_visual_asset
+        else AP_QUESTION_MARK_MODEL
+    )
+    return asset_specs, default_visual_asset, default_visual_model
+
+
+def _map_placements(config_entities, placement_metadata, secret_encounters):
+    if placement_metadata is not None:
+        placement_by_id = {
+            record["location_id"]: record for record in placement_metadata
+        }
+        declared_location_ids = set(config_entities.values()) | {
+            entry["location_id"] for entry in secret_encounters
+        }
+        missing_placements = sorted(declared_location_ids - set(placement_by_id))
+        if missing_placements:
+            raise ValueError(
+                "placement metadata is incomplete for generated map: "
+                + ", ".join(str(value) for value in missing_placements)
+            )
+    else:
+        placement_by_id = {}
+    return placement_by_id
+
+
+def _remove_configured_targets(content, target_removals):
     for entity_name, removed_targets in target_removals.items():
         bounds = find_entity_block_bounds(content, entity_name)
         if bounds is None:
@@ -2910,15 +3096,19 @@ def generate_map(
             [target for target in existing_targets if target not in removed_targets],
         )
         content = content[:start] + block + content[end:]
+    return content
 
+
+def _remove_configured_entities(content, remove_entities):
     for entity_name in remove_entities:
         bounds = find_entity_block_bounds(content, entity_name)
         if bounds is None:
             raise ValueError(f"Configured removal entity not found: {entity_name}")
         content = content[:bounds[0]] + content[bounds[1]:]
+    return content
 
-    content = remove_visual_child_entities(content, visual_child_removals)
 
+def _neutralize_configured_references(content, neutralize_entity_references, target_policies):
     for _entity_name, policy in target_policies.items():
         cleanup = policy.get("checkpoint_cleanup")
         if cleanup:
@@ -2932,17 +3122,10 @@ def generate_map(
                 f"Expected exactly one neutralized entity reference for {entity_name}, "
                 f"found {replacements}"
             )
+    return content
 
-    content = remove_balanced_entity_blocks(content, (
-        "ap_logic_", "AP_CHECK_", NOTIFICATION_ENTITY_PREFIX, EVENT_ENTITY_PREFIX,
-        "ap_cmd_", RPC_ENTITY_PREFIX, *BOOTSTRAP_ENTITY_PREFIXES,
-        *LEGACY_RPC_ENTITY_PREFIXES, "ap_deathlink", "ap_rpc_auto_enable",
-        "ap_fast_travel_unlock_native", "ap_fast_travel_unlock",
-    ))
-    content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
-    content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
 
-    blocks = content.split("entity {")
+def _crystal_source_pairs(blocks, config_entities):
     sentinel_crystal_pairs = find_sentinel_crystal_pairs(blocks[1:])
     sentinel_crystal_top_names = set(sentinel_crystal_pairs.values())
     missing_crystal_checks = sorted(
@@ -2955,313 +3138,238 @@ def generate_map(
             "Every discovered Sentinel Crystal requires an AP check: "
             + ", ".join(missing_crystal_checks)
         )
-    new_blocks = [blocks[0]]
+    return sentinel_crystal_pairs, sentinel_crystal_top_names
 
-    modified_count = 0
-    for block in blocks[1:]:
-        # Normalized content assigns each declared entity its generation strategy.
-        declared_match = re.search(r'entityDef\s+([^\s{]+)', block)
-        declared_entity_name = declared_match.group(1).strip() if declared_match else ""
-        if declared_entity_name in sentinel_crystal_top_names:
-            continue
-        declared_ap_check = (
-            f"AP_CHECK_{declared_entity_name.upper()}"
-            if declared_match else ""
+
+def _physical_target_policy_location_id(ap_check_id, block, config_entities, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies):
+    location_id = config_entities[ap_check_id]
+    target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
+    target_policy.pop("permanent_resource_budget", None)
+    resolve_location_feedback_policy(
+        location_feedback, ap_check_id, target_policy
+    )
+    include_ap_feedback = True
+    if not target_policy:
+        target_policy = build_universal_physical_policy(
+            ap_check_id,
+            location_id,
+            block,
+            default_visual_model,
+            policy={
+                "preserve_rotation": preserve_rotation,
+                "preserve_visual_layers": preserve_visual_layers,
+            },
         )
-        if declared_ap_check in config_entities:
-            name_match = re.search(r'entityDef\s+([^\s{]+)', block)
-            if not name_match:
-                new_blocks.append("entity {" + block)
-                continue
+    elif set(target_policy) == {"independent_size"} or target_policy.get("reveal_entity"):
+        overrides = target_policy
+        target_policy = build_universal_physical_policy(
+            ap_check_id,
+            location_id,
+            block,
+            default_visual_model,
+            policy={
+                "preserve_rotation": preserve_rotation,
+                "preserve_visual_layers": preserve_visual_layers,
+            },
+        )
+        target_policy.update(overrides)
+    elif is_sentinel_crystal_source(block) and not target_policy.get(
+        "independent_ap_trigger"
+    ):
+        generic = build_universal_physical_policy(
+            ap_check_id,
+            location_id,
+            block,
+            default_visual_model,
+            policy={
+                "preserve_rotation": preserve_rotation,
+                "preserve_visual_layers": preserve_visual_layers,
+            },
+        )
+        generic.update(target_policy)
+        target_policy = generic
+    return include_ap_feedback, location_id, target_policy
 
-            entity_name = name_match.group(1).strip()
-            ap_check_id = f"AP_CHECK_{entity_name.upper()}"
 
-            manifest_data[ap_check_id] = config_entities[ap_check_id]
+def _physical_target_policy(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies):
+    include_ap_feedback, location_id, target_policy = _physical_target_policy_location_id(ap_check_id, block, config_entities, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
+    _generate_map_visual(asset_specs, block, content, default_visual_asset, entity_name, preserve_rotation, preserve_visual_layers, target_policy)
+    if (
+        "native_entity_contract" in target_policy
+        and not target_policy.get("no_auto_visual")
+        and not target_policy.get("independent_visual")
+    ):
+        universal = build_universal_physical_policy(
+            ap_check_id, location_id, block, default_visual_model,
+            policy=target_policy,
+        )
+        target_policy["independent_visual"] = universal["independent_visual"]
+        target_policy.setdefault("completion_targets", []).extend(
+            target for target in universal["completion_targets"]
+            if target not in target_policy["completion_targets"]
+        )
+    target_policy = bind_parent_from_source(target_policy, block)
+    if target_policy.get("independent_visual"):
+        target_policy["independent_visual"].setdefault(
+            "reconciliation_entity",
+            f"ap_hide_location_visual_{location_id}",
+        )
+
+    audit_preserved_target_graph(content, entity_name, target_policy)
+    return include_ap_feedback, location_id, target_policy
 
 
-
-            if "edit = {" in block:
-                location_id = config_entities[ap_check_id]
-                target_policy = copy.deepcopy(target_policies.get(entity_name, {}))
-                target_policy.pop("permanent_resource_budget", None)
-                feedback_policy = resolve_location_feedback_policy(
-                    location_feedback, ap_check_id, target_policy
-                )
-                include_ap_feedback = True
-                if not target_policy:
-                    target_policy = build_universal_physical_policy(
-                        ap_check_id,
-                        location_id,
-                        block,
-                        default_visual_model,
-                        policy={
-                            "preserve_rotation": preserve_rotation,
-                            "preserve_visual_layers": preserve_visual_layers,
-                        },
-                    )
-                elif set(target_policy) == {"independent_size"} or target_policy.get("reveal_entity"):
-                    overrides = target_policy
-                    target_policy = build_universal_physical_policy(
-                        ap_check_id,
-                        location_id,
-                        block,
-                        default_visual_model,
-                        policy={
-                            "preserve_rotation": preserve_rotation,
-                            "preserve_visual_layers": preserve_visual_layers,
-                        },
-                    )
-                    target_policy.update(overrides)
-                elif is_sentinel_crystal_source(block) and not target_policy.get(
-                    "independent_ap_trigger"
-                ):
-                    generic = build_universal_physical_policy(
-                        ap_check_id,
-                        location_id,
-                        block,
-                        default_visual_model,
-                        policy={
-                            "preserve_rotation": preserve_rotation,
-                            "preserve_visual_layers": preserve_visual_layers,
-                        },
-                    )
-                    generic.update(target_policy)
-                    target_policy = generic
-                target_policy.setdefault("preserve_rotation", preserve_rotation)
-                target_policy.setdefault(
-                    "preserve_visual_layers", preserve_visual_layers
-                )
-                if is_sentinel_crystal_source(block):
-                    target_policy.setdefault("independent_ap_trigger", True)
-                    target_policy.setdefault("remove_original", True)
-                    if entity_name != SENTINEL_CRYSTAL_BRIDGE_OWNER:
-                        target_policy["preserve_targets"] = []
-                visual = target_policy.get("independent_visual")
-                if visual:
-                    asset_key = visual.get("asset") or default_visual_asset
-                    if asset_key:
-                        if asset_key not in asset_specs:
-                            raise ValueError(
-                                f"Unknown independent_visual asset: {asset_key}"
-                            )
-                        visual_asset = asset_specs[asset_key]
-                        if visual_asset["strategy"] == "donor_model_override":
-                            visual["model"] = resolve_donor_model_override(
-                                content, block, visual_asset
-                            )
-                            visual["_model_override"] = visual_asset["model"]
-                        else:
-                            visual["model"] = visual_asset["model"]
-                if target_policy.get("duplicate_policy") == "native_only":
-                    target_policy["no_auto_visual"] = True
-                if (
-                    "native_entity_contract" in target_policy
-                    and not target_policy.get("no_auto_visual")
-                    and not target_policy.get("independent_visual")
-                ):
-                    universal = build_universal_physical_policy(
-                        ap_check_id, location_id, block, default_visual_model,
-                        policy=target_policy,
-                    )
-                    target_policy["independent_visual"] = universal["independent_visual"]
-                    target_policy.setdefault("completion_targets", []).extend(
-                        target for target in universal["completion_targets"]
-                        if target not in target_policy["completion_targets"]
-                    )
-                target_policy = bind_parent_from_source(target_policy, block)
-                if target_policy.get("independent_visual"):
-                    target_policy["independent_visual"].setdefault(
-                        "reconciliation_entity",
-                        f"ap_hide_location_visual_{location_id}",
-                    )
-
-                audit_preserved_target_graph(content, entity_name, target_policy)
-                
-                if not target_policy.get("no_auto_automap_helper"):
-                    new_blocks.append(
-                        generate_automap_location_helper(block, location_id, policy=target_policy)
-                    )
-                if "native_entity_contract" in target_policy and not target_policy.get("independent_ap_trigger"):
-                    native_contract = target_policy["native_entity_contract"]
-                    native = apply_native_entity_contract(block, native_contract)
-                    native = add_ap_check_target(
-                        native,
-                        entity_name,
-                        ap_check_id,
-                        {
-                            "original_targets": native_contract.get(
-                                "original_targets", extract_target_names(block)
-                            ),
-                            "drop_targets": target_policy.get("drop_targets", []),
-                            "preserve_targets": target_policy.get("preserve_targets"),
-                            "activation_state": target_policy.get("activation_state"),
-                        },
-                    )
-                    new_blocks.append("entity {" + native)
-                    new_blocks.append(generate_target_relay(
-                        ap_check_id,
-                        location_id,
-                        "",
-                        completion_targets=target_policy.get("completion_targets"),
-                        include_notification=include_ap_feedback,
-                    ))
-                    visual = generate_inert_location_visual(block, target_policy)
-                    if visual:
-                        new_blocks.append(visual)
-                    if include_ap_feedback:
-                        new_blocks.append(
-                            generate_pickup_notification(location_id, placement_by_id.get(location_id))
-                        )
-                    new_blocks.append(generate_check_event(location_id))
-                    modified_count += 1
-                    continue
-
-                if target_policy.get("independent_ap_trigger"):
-                    sentinel_source = is_sentinel_crystal_source(block)
-                    sentinel_top_name = sentinel_crystal_pairs.get(entity_name)
-                    if sentinel_source:
-                        sentinel_check_ids[entity_name] = ap_check_id
-                        target_policy["preserve_targets"] = []
-                        if entity_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
-                            target_policy["independent_targets"] = [
-                                ap_check_id,
-                                SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
-                                SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
-                            ]
-                        else:
-                            target_policy["independent_targets"] = [ap_check_id]
-                    elif sentinel_top_name:
-                        target_policy["preserve_targets"] = [
-                            target
-                            for target in target_policy.get("preserve_targets", [])
-                            if target != sentinel_top_name
-                        ]
-                    if not sentinel_source and (
-                        target_policy.get("remove_original", False)
-                        or (
-                            not target_policy.get("independent_visual")
-                            and not target_policy.get("no_auto_visual")
-                        )
-                    ):
-                        target_policy["independent_targets"] = build_independent_targets(
-                            block, ap_check_id, target_policy
-                        )
-
-                    manifest_data[ap_check_id] = location_id
-                    if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
-                        universal = build_universal_physical_policy(
-                            ap_check_id, location_id, block, default_visual_model, policy=target_policy
-                        )
-                        target_policy["independent_visual"] = universal["independent_visual"]
-                        if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("completion_targets", []):
-                            target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])
-                    if target_policy.get("independent_visual"):
-                        cleanup = target_policy["independent_visual"].get("cleanup_entity")
-                        if cleanup and not sentinel_source and cleanup not in target_policy.setdefault(
-                            "independent_targets", [ap_check_id]
-                        ):
-                            target_policy["independent_targets"].append(cleanup)
-                        if not sentinel_source:
-                            target_policy["completion_targets"] = [
-                                target
-                                for target in target_policy.get("completion_targets", [])
-                                if target != cleanup
-                            ]
-                    visual_policy = target_policy.get("independent_visual")
-                    if visual_policy:
-                        visual_policy.setdefault(
-                            "reconciliation_entity",
-                            f"ap_hide_location_visual_{location_id}",
-                        )
-                    if visual_policy and "_model_override" not in visual_policy:
-                        asset_key = (
-                            visual_policy.get("asset") or default_visual_asset
-                        )
-                        visual_asset = asset_specs.get(asset_key) if asset_key else None
-                        if (
-                            visual_asset
-                            and visual_asset["strategy"] == "donor_model_override"
-                        ):
-                            visual_policy["model"] = resolve_donor_model_override(
-                                content, block, visual_asset
-                            )
-                            visual_policy["_model_override"] = visual_asset["model"]
-                    if not target_policy.get("remove_original", False):
-                        if "native_entity_contract" in target_policy:
-                            new_blocks.append(
-                                "entity {" + apply_native_entity_contract(block, target_policy["native_entity_contract"])
-                            )
-                        else:
-                            new_blocks.append(
-                                "entity {" + neutralize_conditional_pickup_block(
-                                    block,
-                                    preserve_original_visual=target_policy.get(
-                                        "preserve_original_visual", False
-                                    ),
-                                )
-                            )
-                    new_blocks.append(
-                        generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
-                    )
-                    visual = generate_inert_location_visual(block, target_policy)
-                    if visual:
-                        replacement_model = target_policy[
-                            "independent_visual"
-                        ].get("_model_override")
-                        if replacement_model:
-                            visual = apply_injected_entity_model_override(
-                                visual, replacement_model
-                            )
-                        new_blocks.append(visual)
-                    secondary_ap_check_id = f"{ap_check_id}_B"
-                    secondary_location_id = config_entities.get(secondary_ap_check_id)
-                    completion_targets = list(target_policy.get("completion_targets") or [])
-                    if secondary_location_id is not None:
-                        manifest_data[secondary_ap_check_id] = secondary_location_id
-                        completion_targets.append(secondary_ap_check_id)
-                        if include_ap_feedback:
-                            new_blocks.append(
-                                generate_pickup_notification(
-                                    secondary_location_id, placement_by_id.get(secondary_location_id)
-                                )
-                            )
-                        new_blocks.append(generate_check_event(secondary_location_id))
-                        new_blocks.append(generate_target_relay(
-                            secondary_ap_check_id, secondary_location_id, "",
-                            include_notification=include_ap_feedback,
-                        ))
-                    new_blocks.append(generate_target_relay(
-                        ap_check_id,
-                        location_id,
-                        "",
-                        completion_targets=completion_targets,
-                        include_notification=include_ap_feedback,
-                    ))
-                    if include_ap_feedback:
-                        new_blocks.append(
-                            generate_pickup_notification(location_id, placement_by_id.get(location_id))
-                        )
-                    new_blocks.append(generate_check_event(location_id))
-                    modified_count += 1
-                    if secondary_location_id is not None:
-                        modified_count += 1
-                    continue
-                else:
-                    raise ValueError(f"Legacy non-independent physical check logic hit for {entity_name}")
-
-        new_blocks.append("entity {" + block)
-
-    map_content = remove_sentinel_crystal_source_references(
-        "".join(new_blocks),
-        sentinel_crystal_pairs,
+def _append_native_check(ap_check_id, block, entity_name, include_ap_feedback, location_id, modified_count, new_blocks, placement_by_id, target_policy):
+    native_contract = target_policy["native_entity_contract"]
+    native = apply_native_entity_contract(block, native_contract)
+    native = add_ap_check_target(
+        native,
+        entity_name,
+        ap_check_id,
+        {
+            "original_targets": native_contract.get(
+                "original_targets", extract_target_names(block)
+            ),
+            "drop_targets": target_policy.get("drop_targets", []),
+            "preserve_targets": target_policy.get("preserve_targets"),
+            "activation_state": target_policy.get("activation_state"),
+        },
     )
-    assert_sentinel_crystal_transform(
-        map_content,
-        sentinel_crystal_pairs,
-        manifest_data,
-        sentinel_check_ids,
+    new_blocks.append("entity {" + native)
+    new_blocks.append(generate_target_relay(
+        ap_check_id,
+        location_id,
+        "",
+        completion_targets=target_policy.get("completion_targets"),
+        include_notification=include_ap_feedback,
+    ))
+    visual = generate_inert_location_visual(block, target_policy)
+    if visual:
+        new_blocks.append(visual)
+    if include_ap_feedback:
+        new_blocks.append(
+            generate_pickup_notification(location_id, placement_by_id.get(location_id))
+        )
+    new_blocks.append(generate_check_event(location_id))
+    modified_count += 1
+    return modified_count
+
+
+def _append_independent_check_sentinel_source(ap_check_id, block, entity_name, sentinel_check_ids, sentinel_crystal_pairs, target_policy):
+    sentinel_source = is_sentinel_crystal_source(block)
+    sentinel_top_name = sentinel_crystal_pairs.get(entity_name)
+    if sentinel_source:
+        sentinel_check_ids[entity_name] = ap_check_id
+        target_policy["preserve_targets"] = []
+        if entity_name == SENTINEL_CRYSTAL_BRIDGE_OWNER:
+            target_policy["independent_targets"] = [
+                ap_check_id,
+                SENTINEL_CRYSTAL_OBJECTIVE_TARGET,
+                SENTINEL_CRYSTAL_BRIDGE_CONTINUATION_TARGET,
+            ]
+        else:
+            target_policy["independent_targets"] = [ap_check_id]
+    elif sentinel_top_name:
+        target_policy["preserve_targets"] = [
+            target
+            for target in target_policy.get("preserve_targets", [])
+            if target != sentinel_top_name
+        ]
+    if not sentinel_source and (
+        target_policy.get("remove_original", False)
+        or (
+            not target_policy.get("independent_visual")
+            and not target_policy.get("no_auto_visual")
+        )
+    ):
+        target_policy["independent_targets"] = build_independent_targets(
+            block, ap_check_id, target_policy
+        )
+    return sentinel_source
+
+
+def _append_independent_check_visual(ap_check_id, block, config_entities, include_ap_feedback, location_id, manifest_data, new_blocks, placement_by_id, target_policy):
+    visual = generate_inert_location_visual(block, target_policy)
+    if visual:
+        replacement_model = target_policy[
+            "independent_visual"
+        ].get("_model_override")
+        if replacement_model:
+            visual = apply_injected_entity_model_override(
+                visual, replacement_model
+            )
+        new_blocks.append(visual)
+    secondary_ap_check_id = f"{ap_check_id}_B"
+    secondary_location_id = config_entities.get(secondary_ap_check_id)
+    completion_targets = list(target_policy.get("completion_targets") or [])
+    if secondary_location_id is not None:
+        manifest_data[secondary_ap_check_id] = secondary_location_id
+        completion_targets.append(secondary_ap_check_id)
+        if include_ap_feedback:
+            new_blocks.append(
+                generate_pickup_notification(
+                    secondary_location_id, placement_by_id.get(secondary_location_id)
+                )
+            )
+        new_blocks.append(generate_check_event(secondary_location_id))
+        new_blocks.append(generate_target_relay(
+            secondary_ap_check_id, secondary_location_id, "",
+            include_notification=include_ap_feedback,
+        ))
+    new_blocks.append(generate_target_relay(
+        ap_check_id,
+        location_id,
+        "",
+        completion_targets=completion_targets,
+        include_notification=include_ap_feedback,
+    ))
+    if include_ap_feedback:
+        new_blocks.append(
+            generate_pickup_notification(location_id, placement_by_id.get(location_id))
+        )
+    return secondary_location_id
+
+
+def _append_independent_check_cleanup(ap_check_id, sentinel_source, target_policy):
+    cleanup = target_policy["independent_visual"].get("cleanup_entity")
+    if cleanup and not sentinel_source and cleanup not in target_policy.setdefault(
+        "independent_targets", [ap_check_id]
+    ):
+        target_policy["independent_targets"].append(cleanup)
+    if not sentinel_source:
+        target_policy["completion_targets"] = [
+            target
+            for target in target_policy.get("completion_targets", [])
+            if target != cleanup
+        ]
+
+
+def _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, include_ap_feedback, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy):
+    sentinel_source = _append_independent_check_sentinel_source(ap_check_id, block, entity_name, sentinel_check_ids, sentinel_crystal_pairs, target_policy)
+
+    manifest_data[ap_check_id] = location_id
+    if not target_policy.get("independent_visual") and not target_policy.get("no_auto_visual"):
+        universal = build_universal_physical_policy(
+            ap_check_id, location_id, block, default_visual_model, policy=target_policy
+        )
+        target_policy["independent_visual"] = universal["independent_visual"]
+        if universal["independent_visual"]["cleanup_entity"] not in target_policy.get("completion_targets", []):
+            target_policy.setdefault("completion_targets", []).append(universal["independent_visual"]["cleanup_entity"])
+    if target_policy.get("independent_visual"):
+        _append_independent_check_cleanup(ap_check_id, sentinel_source, target_policy)
+    _generate_map_visual_policy(asset_specs, block, content, default_visual_asset, location_id, new_blocks, target_policy)
+    new_blocks.append(
+        generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
     )
+    secondary_location_id = _append_independent_check_visual(ap_check_id, block, config_entities, include_ap_feedback, location_id, manifest_data, new_blocks, placement_by_id, target_policy)
+    new_blocks.append(generate_check_event(location_id))
+    modified_count += 1
+    if secondary_location_id is not None:
+        modified_count += 1
+    return modified_count
+
+
+def _compile_secret_checks(encounter_source, location_feedback, manifest_data, map_content, modified_count, placement_by_id, secret_encounters):
     secret_blocks = []
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]
@@ -3300,7 +3408,7 @@ def generate_map(
             original_content=encounter_source,
         )
         manifest_data[ap_check_id] = location_id
-        feedback_policy = location_feedback_policy(
+        location_feedback_policy(
             location_feedback, ap_check_id
         )
         include_ap_feedback = True
@@ -3318,6 +3426,162 @@ def generate_map(
             )
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
+    return map_content, modified_count, secret_blocks
+
+
+def _generate_map_source_hash_after(canonical_visual, final_content, level_config, map_key, modified_count, output_file, source_metadata):
+    if map_key == "hub":
+        from tools.maps.fortress_campaign import project_fortress
+        final_content = project_fortress(final_content, level_config)
+    validate_ap_lifecycle_entity(final_content, map_key)
+    assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
+    if canonical_visual and modified_count:
+        assert_canonical_ap_visuals(final_content, map_key, canonical_visual)
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:
+        f.write(final_content)
+
+    source_hash_after = compute_file_sha256(source_metadata["input_path"])
+    if source_hash_after != source_metadata["sha256_before"]:
+        raise ValueError(
+            f"Input source was modified during generation: {source_metadata['input_path']}"
+        )
+
+
+def _generate_map_descriptor_path(config_file, item_classifications):
+    descriptor_path, level_config = _load_map_config(config_file)
+    if item_classifications is None:
+        item_classifications = load_item_classifications(
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "item_classifications.json"
+        )
+    map_key = level_config.get("map_key")
+    if not isinstance(map_key, str):
+        raise ValueError("map config requires string map_key")
+    from doom_eap.content.arena_checks import map_arena_config
+    map_arena_config(level_config, descriptor_path)
+    preserve_rotation = level_config.get("preserve_rotation", False)
+    if not isinstance(preserve_rotation, bool):
+        raise ValueError("map config preserve_rotation must be boolean")
+    return item_classifications, level_config, map_key, preserve_rotation
+
+
+def _compile_physical_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, manifest_data, modified_count, new_blocks, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, target_policies):
+    include_ap_feedback, location_id, target_policy = _physical_target_policy(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
+
+    if not target_policy.get("no_auto_automap_helper"):
+        new_blocks.append(
+            generate_automap_location_helper(block, location_id, policy=target_policy)
+        )
+    if "native_entity_contract" in target_policy and not target_policy.get("independent_ap_trigger"):
+        modified_count = _append_native_check(ap_check_id, block, entity_name, include_ap_feedback, location_id, modified_count, new_blocks, placement_by_id, target_policy)
+        return modified_count
+    if target_policy.get("independent_ap_trigger"):
+        modified_count = _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, include_ap_feedback, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy)
+        return modified_count
+    else:
+        raise ValueError(f"Legacy non-independent physical check logic hit for {entity_name}")
+
+
+def _compile_physical_checks(asset_specs, blocks, config_entities, content, default_visual_asset, default_visual_model, location_feedback, manifest_data, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, sentinel_crystal_top_names, target_policies):
+    new_blocks = [blocks[0]]
+    modified_count = 0
+    for block in blocks[1:]:
+        declared_match = re.search(r'entityDef\s+([^\s{]+)', block)
+        declared_entity_name = declared_match.group(1).strip() if declared_match else ""
+        if declared_entity_name in sentinel_crystal_top_names:
+            continue
+        declared_ap_check = (
+            f"AP_CHECK_{declared_entity_name.upper()}"
+            if declared_match else ""
+        )
+        if declared_ap_check in config_entities:
+            entity_name, ap_check_id = declared_entity_name, declared_ap_check
+            manifest_data[ap_check_id] = config_entities[ap_check_id]
+            if "edit = {" in block:
+                modified_count = _compile_physical_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, manifest_data, modified_count, new_blocks, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, target_policies)
+                continue
+        new_blocks.append("entity {" + block)
+    return modified_count, new_blocks
+
+
+def generate_map(
+    input_file,
+    output_file,
+    config_file,
+    manifest_file,
+    items_dict,
+    item_names=None,
+    item_classifications=None,
+    receipt_feedback=None,
+    enable_notifications=True,
+    placement_metadata=None,
+    encounter_source=None,
+):
+    item_classifications, level_config, map_key, preserve_rotation = _generate_map_descriptor_path(config_file, item_classifications)
+    preserve_visual_layers = level_config.get("preserve_visual_layers", True)
+    if not isinstance(preserve_visual_layers, bool):
+        raise ValueError("map config preserve_visual_layers must be boolean")
+    fast_travel_path = Path(__file__).resolve().parents[2] / "data" / "fast_travel.json"
+    fast_travel = json.loads(fast_travel_path.read_text(encoding="utf-8"))
+    canonical_visual = canonical_ap_visual_for_map(map_key)
+    config_entities = level_config.get("entities", {})
+    target_policies = level_config.get("target_policies", {})
+    asset_specs, default_visual_asset, default_visual_model = _map_visual_assets(canonical_visual, level_config)
+    neutralize_pickups = level_config.get("neutralize_pickups", [])
+    target_removals = level_config.get("target_removals", {})
+    remove_entities = level_config.get("remove_entities", [])
+    visual_child_removals = level_config.get("visual_child_removals", [])
+    neutralize_entity_references = level_config.get("neutralize_entity_references", [])
+    secret_encounters = level_config.get("secret_encounters", [])
+    declared_checks = (
+        *config_entities,
+        *(entry["ap_check"] for entry in secret_encounters),
+    )
+    placement_metadata = normalize_placement_metadata(placement_metadata)
+    placement_by_id = _map_placements(config_entities, placement_metadata, secret_encounters)
+    location_feedback = load_explicit_location_feedback(
+        level_config.get("map_key"),
+        level_config.get("location_feedback", {}),
+        declared_checks,
+    )
+    manifest_data = {}
+    content, sentinel_check_ids, source_metadata = _generate_map_sentinel_check_ids(config_entities, input_file, level_config, map_key, neutralize_pickups, output_file, target_policies)
+
+    content = _remove_configured_targets(content, target_removals)
+
+    content = _remove_configured_entities(content, remove_entities)
+
+    content = remove_visual_child_entities(content, visual_child_removals)
+
+    content = _neutralize_configured_references(content, neutralize_entity_references, target_policies)
+
+    content = remove_balanced_entity_blocks(content, (
+        "ap_logic_", "AP_CHECK_", NOTIFICATION_ENTITY_PREFIX, EVENT_ENTITY_PREFIX,
+        "ap_cmd_", RPC_ENTITY_PREFIX, *BOOTSTRAP_ENTITY_PREFIXES,
+        *LEGACY_RPC_ENTITY_PREFIXES, "ap_deathlink", "ap_rpc_auto_enable",
+        "ap_fast_travel_unlock_native", "ap_fast_travel_unlock",
+    ))
+    content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
+    content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
+
+    blocks = content.split("entity {")
+    sentinel_crystal_pairs, sentinel_crystal_top_names = _crystal_source_pairs(blocks, config_entities)
+    modified_count, new_blocks = _compile_physical_checks(asset_specs, blocks, config_entities, content, default_visual_asset, default_visual_model, location_feedback, manifest_data, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, sentinel_crystal_top_names, target_policies)
+
+    map_content = remove_sentinel_crystal_source_references(
+        "".join(new_blocks),
+        sentinel_crystal_pairs,
+    )
+    assert_sentinel_crystal_transform(
+        map_content,
+        sentinel_crystal_pairs,
+        manifest_data,
+        sentinel_check_ids,
+    )
+    map_content, modified_count, secret_blocks = _compile_secret_checks(encounter_source, location_feedback, manifest_data, map_content, modified_count, placement_by_id, secret_encounters)
 
     from tools.maps.arena_checks import compile_arena_checks
     map_content, arena_manifest = compile_arena_checks(
@@ -3348,23 +3612,7 @@ def generate_map(
     )
     manifest_data.update(master_manifest)
     final_content = apply_runtime_map_correctives(final_content, map_key)
-    if map_key == "hub":
-        from tools.maps.fortress_campaign import project_fortress
-        final_content = project_fortress(final_content, level_config)
-    validate_ap_lifecycle_entity(final_content, map_key)
-    assert_no_weapon_mastery_token_currency(final_content, f"Generated map {map_key}")
-    if canonical_visual and modified_count:
-        assert_canonical_ap_visuals(final_content, map_key, canonical_visual)
-
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    with open(output_file, "w", encoding="utf-8", newline="\r\n") as f:
-        f.write(final_content)
-
-    source_hash_after = compute_file_sha256(source_metadata["input_path"])
-    if source_hash_after != source_metadata["sha256_before"]:
-        raise ValueError(
-            f"Input source was modified during generation: {source_metadata['input_path']}"
-        )
+    _generate_map_source_hash_after(canonical_visual, final_content, level_config, map_key, modified_count, output_file, source_metadata)
 
     os.makedirs(os.path.dirname(manifest_file), exist_ok=True)
     with open(manifest_file, "w", encoding="utf-8") as f:
@@ -3397,7 +3645,7 @@ if __name__ == "__main__":
     item_names, receipt_feedback = load_item_notification_policies(args.item_names)
 
     generate_map(
-        args.input, args.output, args.config, args.manifest, items_dict, 
+        args.input, args.output, args.config, args.manifest, items_dict,
         item_names=item_names,
         receipt_feedback=receipt_feedback,
         enable_notifications=not args.disable_item_notifications,

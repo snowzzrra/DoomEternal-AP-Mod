@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 RELEASE_ROOTS = frozenset({
     "client",
     "doometernal.apworld",

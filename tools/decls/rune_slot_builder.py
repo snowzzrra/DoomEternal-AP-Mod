@@ -1164,7 +1164,7 @@ CANONICAL_PLAYER_DECL_B64 = (
 )
 
 
-def validate_player_decl_structure(data: bytes) -> None:
+def _validate_player_decl_structure_coop_forbidden_fields(data):
     text = data.decode("utf-8", errors="replace")
 
     if text.strip().startswith("{") and "edit =" in text and "class =" not in text:
@@ -1197,6 +1197,11 @@ def validate_player_decl_structure(data: bytes) -> None:
     for token in required_tokens:
         if token not in text:
             raise ValueError(f"Canonical player.decl missing required field/token: {token}")
+    return text
+
+
+def validate_player_decl_structure(data: bytes) -> None:
+    text = _validate_player_decl_structure_coop_forbidden_fields(data)
 
     if text.count("runeSlotReq") != 1:
         raise ValueError(f"Expected exactly 1 runeSlotReq block, found {text.count('runeSlotReq')}")
@@ -1219,7 +1224,7 @@ def get_canonical_source() -> bytes:
     return raw
 
 
-def patch_player_decl(source_bytes: bytes | None = None) -> bytes:
+def _patch_player_decl_patched(source_bytes):
     if source_bytes is None:
         source_bytes = get_canonical_source()
     else:
@@ -1242,6 +1247,11 @@ def patch_player_decl(source_bytes: bytes | None = None) -> bytes:
     expected_diffs = [(40485, ord('1'), ord('0')), (40504, ord('2'), ord('0')), (40523, ord('3'), ord('0'))]
     if diffs != expected_diffs:
         raise ValueError(f"Unexpected byte diffs: {diffs} vs expected {expected_diffs}")
+    return patched
+
+
+def patch_player_decl(source_bytes: bytes | None = None) -> bytes:
+    patched = _patch_player_decl_patched(source_bytes)
 
     output_sha = hashlib.sha256(patched).hexdigest()
     if output_sha != PATCHED_OUTPUT_SHA256:

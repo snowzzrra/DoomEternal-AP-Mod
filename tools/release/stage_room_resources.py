@@ -16,22 +16,7 @@ from tools.release.prebuilt_room_resources import compute_room_resource_input_fi
 from tools.release.room_payloads import canonical_json
 
 
-def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
-    root, output, compressor = root.resolve(), output.resolve(), compressor.resolve()
-    if not output.is_relative_to(root / "build") or output == root / "build":
-        raise ValueError("Authorial output must be isolated beneath repository build/")
-    if output.exists():
-        raise FileExistsError(f"Authorial output already exists: {output}")
-    fingerprint, _ = compute_room_resource_input_fingerprint(root)
-    output.mkdir(parents=True)
-    staged, work = output / "mod", output / "work"
-    maps, manifests = work / "maps", work / "manifests"
-    maps.mkdir(parents=True)
-    manifests.mkdir()
-    shutil.copytree(root / "packaging/mod_assets", staged)
-    for declaration in staged.rglob("*.decl"):
-        declaration.write_bytes(first_party_text_bytes(declaration.read_bytes()))
-    registry = load_map_registry(root / "data/map_sources.json")["maps"]
+def _prepare_authorial_tree_generated(manifests, maps, registry, root, staged):
     sources, generated = {}, {}
 
     def run(module, *args):
@@ -70,6 +55,25 @@ def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
             entries[key] = {"name": key, "text": load_catalog().text("branding", "campaign_title", locale=GAME_LOCALES[language])}
         table["strings"] = [entries[key] for key in sorted(entries)]
         destination.write_text(json.dumps(table, indent=4, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    return generated, run, sha, sources
+
+
+def _prepare_authorial_tree_is_relative_to(compressor, output, root):
+    if not output.is_relative_to(root / "build") or output == root / "build":
+        raise ValueError("Authorial output must be isolated beneath repository build/")
+    if output.exists():
+        raise FileExistsError(f"Authorial output already exists: {output}")
+    fingerprint, _ = compute_room_resource_input_fingerprint(root)
+    output.mkdir(parents=True)
+    staged, work = output / "mod", output / "work"
+    maps, manifests = work / "maps", work / "manifests"
+    maps.mkdir(parents=True)
+    manifests.mkdir()
+    shutil.copytree(root / "packaging/mod_assets", staged)
+    for declaration in staged.rglob("*.decl"):
+        declaration.write_bytes(first_party_text_bytes(declaration.read_bytes()))
+    registry = load_map_registry(root / "data/map_sources.json")["maps"]
+    generated, run, sha, sources = _prepare_authorial_tree_generated(manifests, maps, registry, root, staged)
 
     from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
     audit = patch_mission_complete_maps(root / "data/mission_complete_map_contracts.json", generated, staged)
@@ -105,6 +109,12 @@ def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
     actual.pop("changed_lines", None)
     if expected != actual:
         raise ValueError("Ice logic DECL structural snapshot drift")
+    return fingerprint, sha, sources, staged
+
+
+def prepare_authorial_tree(root: Path, output: Path, compressor: Path) -> Path:
+    root, output, compressor = root.resolve(), output.resolve(), compressor.resolve()
+    fingerprint, sha, sources, staged = _prepare_authorial_tree_is_relative_to(compressor, output, root)
     if compute_room_resource_input_fingerprint(root)[0] != fingerprint:
         raise ValueError("Compiler inputs changed during authorial preparation")
     (output / "AUTHORIAL_BUILD_INPUTS.json").write_bytes(canonical_json({

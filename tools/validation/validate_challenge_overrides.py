@@ -18,15 +18,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from doom_eap.contracts.challenge_registry import load_challenge_registry
 from tools.decls.mission_challenge_decl_builder import (
+    AGGREGATE_LIST_PATH,
     AGGREGATE_SOURCE_OWNER,
     AGGREGATE_TARGET_OWNER,
-    AGGREGATE_LIST_PATH,
     CHILD_SOURCE_OWNER,
     CHILD_TARGET_OWNER,
     PLAN_B_REGISTRATIONS,
     _challenge_paths,
-    _plan_b_registration_override,
     _level_blocks,
+    _plan_b_registration_override,
 )
 
 
@@ -57,11 +57,42 @@ def _find_override_files(mod_root: Path) -> dict[str, Path]:
     return results
 
 
-def validate_overrides_from_files(
-    override_paths: list[Path],
-    registry_path: Path,
-) -> list[str]:
-    """Validate override files against registry. Returns list of error messages."""
+def _validate_overrides_from_files_content(assert_path, entries, errors, forbidden_currencies, found_ids, found_paths, fpath):
+    found_paths.add(assert_path)
+    content = fpath.read_text(encoding="utf-8")
+
+    # check for forbidden currencies
+    if forbidden_currencies.search(content):
+        errors.append(f"Override contains forbidden currency: {assert_path}")
+
+    # check that there's exactly one currency field
+    currency_count = content.count("currencyToGive")
+    if currency_count != 1:
+        errors.append(
+            f"Override has {currency_count} currencyToGive (expected 1): {assert_path}"
+        )
+
+    # validate exactly one num = 0
+    num_zero_count = len(re.findall(r'\bnum\s*=\s*0\s*;', content))
+    if num_zero_count != 1:
+        errors.append(
+            f"Override has {num_zero_count} num = 0 (expected 1): {assert_path}"
+        )
+
+    # find associated entry for location_id validation
+    for entry in entries:
+        if entry["completion_owner"]["path"] == assert_path:
+            found_ids.append(entry["location_id"])
+            # check that the completion stat stays the same
+            expected_stat = entry["completion_owner"]["completion_stat"]
+            if expected_stat not in content:
+                errors.append(
+                    f"Override missing completion_stat {expected_stat}: {assert_path}"
+                )
+            break
+
+
+def _validate_overrides_from_files_expected_paths(override_paths, registry_path):
     errors: list[str] = []
     entries = _load_registry(registry_path)
     expected_paths = _derive_expected_paths(entries)
@@ -91,38 +122,7 @@ def validate_overrides_from_files(
             errors.append(f"Extra override not in registry: {assert_path}")
             continue
 
-        found_paths.add(assert_path)
-        content = fpath.read_text(encoding="utf-8")
-
-        # check for forbidden currencies
-        if forbidden_currencies.search(content):
-            errors.append(f"Override contains forbidden currency: {assert_path}")
-
-        # check that there's exactly one currency field
-        currency_count = content.count("currencyToGive")
-        if currency_count != 1:
-            errors.append(
-                f"Override has {currency_count} currencyToGive (expected 1): {assert_path}"
-            )
-
-        # validate exactly one num = 0
-        num_zero_count = len(re.findall(r'\bnum\s*=\s*0\s*;', content))
-        if num_zero_count != 1:
-            errors.append(
-                f"Override has {num_zero_count} num = 0 (expected 1): {assert_path}"
-            )
-
-        # find associated entry for location_id validation
-        for entry in entries:
-            if entry["completion_owner"]["path"] == assert_path:
-                found_ids.append(entry["location_id"])
-                # check that the completion stat stays the same
-                expected_stat = entry["completion_owner"]["completion_stat"]
-                if expected_stat not in content:
-                    errors.append(
-                        f"Override missing completion_stat {expected_stat}: {assert_path}"
-                    )
-                break
+        _validate_overrides_from_files_content(assert_path, entries, errors, forbidden_currencies, found_ids, found_paths, fpath)
 
     # check for missing paths
     missing = expected_paths - found_paths
@@ -134,6 +134,15 @@ def validate_overrides_from_files(
     duplicates = [loc_id for loc_id, count in id_counts.items() if count > 1]
     if duplicates:
         errors.append(f"Duplicate location IDs found in overrides: {duplicates}")
+    return errors, expected_ids, found_ids
+
+
+def validate_overrides_from_files(
+    override_paths: list[Path],
+    registry_path: Path,
+) -> list[str]:
+    """Validate override files against registry. Returns list of error messages."""
+    errors, expected_ids, found_ids = _validate_overrides_from_files_expected_paths(override_paths, registry_path)
 
     if len(expected_ids) != len(set(found_ids)):
         errors.append(
@@ -143,77 +152,32 @@ def validate_overrides_from_files(
     return errors
 
 
-def validate_overrides_from_mod_root(
-    mod_root: Path,
-    registry_path: Path,
-) -> list[str]:
-    """Validate the distinct child and aggregate vanilla owner contracts."""
-    errors: list[str] = []
-    child_decl_root = mod_root / CHILD_TARGET_OWNER / "generated" / "decls"
-    aggregate_decl_root = mod_root / AGGREGATE_TARGET_OWNER / "generated" / "decls"
-    
-    if not child_decl_root.is_dir():
-        errors.append(f"Child owner directory missing: {CHILD_TARGET_OWNER}")
-        return errors
+def _validate_overrides_from_mod_root_decls(candidate, errors):
+    decls = candidate / "generated" / "decls"
+    if not decls.is_dir():
+        return
+    for fpath in decls.rglob("*.decl"):
+        rel = fpath.relative_to(decls).as_posix()
+        if (
+            rel.startswith("unlockable/mission_challenge/")
+            and candidate.name != CHILD_TARGET_OWNER
+        ):
+            errors.append(
+                f"Child override found outside {CHILD_TARGET_OWNER}: "
+                f"{candidate.name}: {rel}"
+            )
+        if rel == AGGREGATE_LIST_PATH and candidate.name != AGGREGATE_TARGET_OWNER:
+            errors.append(
+                f"Aggregate main.decl found outside {AGGREGATE_TARGET_OWNER}: "
+                f"{candidate.name}: {rel}"
+            )
+        if rel.startswith("warehouseofflinecontainer/"):
+            errors.append(
+                f"Forbidden warehouse aggregate override found in {candidate.name}: {rel}"
+            )
 
-    for candidate in mod_root.glob("gameresources*"):
-        decls = candidate / "generated" / "decls"
-        if not decls.is_dir():
-            continue
-        for fpath in decls.rglob("*.decl"):
-            rel = fpath.relative_to(decls).as_posix()
-            if (
-                rel.startswith("unlockable/mission_challenge/")
-                and candidate.name != CHILD_TARGET_OWNER
-            ):
-                errors.append(
-                    f"Child override found outside {CHILD_TARGET_OWNER}: "
-                    f"{candidate.name}: {rel}"
-                )
-            if rel == AGGREGATE_LIST_PATH and candidate.name != AGGREGATE_TARGET_OWNER:
-                errors.append(
-                    f"Aggregate main.decl found outside {AGGREGATE_TARGET_OWNER}: "
-                    f"{candidate.name}: {rel}"
-                )
-            if rel.startswith("warehouseofflinecontainer/"):
-                errors.append(
-                    f"Forbidden warehouse aggregate override found in {candidate.name}: {rel}"
-                )
 
-    overrides = _find_override_files(mod_root)
-    if not overrides:
-        return ["No mission challenge override files found under mod root"]
-    
-    errors.extend(validate_overrides_from_files(list(overrides.values()), registry_path))
-    registry = load_challenge_registry(registry_path)
-
-    aggregate_path = aggregate_decl_root / AGGREGATE_LIST_PATH
-    if not aggregate_path.is_file():
-        errors.append(
-            f"Missing aggregate Mission Challenge override in "
-            f"{AGGREGATE_TARGET_OWNER}: {AGGREGATE_LIST_PATH}"
-        )
-        return errors
-
-    aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
-    expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
-    if aggregate_source != expected_aggregate:
-        errors.append(
-            "Aggregate main.decl differs from canonical patch2 outside approved "
-            "Plan B fourth-challenge registrations"
-        )
-
-    blocks = [
-        (index, block)
-        for index, _, _, block in _level_blocks(aggregate_source)
-        if "_dev_" not in block
-    ]
-    expected_plan_b_missions = tuple(
-        plan["mission_key"] for plan in PLAN_B_REGISTRATIONS
-    )
-    if tuple(contract["mission_key"] for contract in plan_b_contracts) != expected_plan_b_missions:
-        errors.append("Plan B registration scope is not exactly DHB, Nekravol, and Nekravol II")
-    dummy_paths = {contract["dummy"]["path"] for contract in plan_b_contracts}
+def _validate_overrides_from_mod_root_plan_b_contracts(blocks, dummy_paths, errors, plan_b_contracts, registry):
     for contract in plan_b_contracts:
         label = contract["name"]
         matches = [
@@ -236,6 +200,11 @@ def validate_overrides_from_mod_root(
     ]
     if dummy_registry_owners:
         errors.append("Plan B dummy challenge acquired AP location ownership")
+
+
+def _validate_overrides_from_mod_root_dummy_paths(blocks, errors, plan_b_contracts, registry):
+    dummy_paths = {contract["dummy"]["path"] for contract in plan_b_contracts}
+    _validate_overrides_from_mod_root_plan_b_contracts(blocks, dummy_paths, errors, plan_b_contracts, registry)
     for contract in plan_b_contracts:
         aggregate = next(
             entry for entry in registry["all_mission_challenges"]
@@ -250,6 +219,20 @@ def validate_overrides_from_mod_root(
             errors.append(
                 f"{contract['name']} AP aggregate children include anything except {expected_count} real challenges"
             )
+
+
+def _validate_overrides_from_mod_root_blocks(aggregate_source, errors, mod_root, plan_b_contracts, registry):
+    blocks = [
+        (index, block)
+        for index, _, _, block in _level_blocks(aggregate_source)
+        if "_dev_" not in block
+    ]
+    expected_plan_b_missions = tuple(
+        plan["mission_key"] for plan in PLAN_B_REGISTRATIONS
+    )
+    if tuple(contract["mission_key"] for contract in plan_b_contracts) != expected_plan_b_missions:
+        errors.append("Plan B registration scope is not exactly DHB, Nekravol, and Nekravol II")
+    _validate_overrides_from_mod_root_dummy_paths(blocks, errors, plan_b_contracts, registry)
 
     if re.search(
         r"\bcompletionUnlock\b|warehouseofflinecontainer|CURRENCY_SENTINEL_BATTERY",
@@ -270,44 +253,53 @@ def validate_overrides_from_mod_root(
                     f"{candidate.name}: {protected}"
                 )
 
+
+def validate_overrides_from_mod_root(
+    mod_root: Path,
+    registry_path: Path,
+) -> list[str]:
+    """Validate the distinct child and aggregate vanilla owner contracts."""
+    errors: list[str] = []
+    child_decl_root = mod_root / CHILD_TARGET_OWNER / "generated" / "decls"
+    aggregate_decl_root = mod_root / AGGREGATE_TARGET_OWNER / "generated" / "decls"
+
+    if not child_decl_root.is_dir():
+        errors.append(f"Child owner directory missing: {CHILD_TARGET_OWNER}")
+        return errors
+
+    for candidate in mod_root.glob("gameresources*"):
+        _validate_overrides_from_mod_root_decls(candidate, errors)
+
+    overrides = _find_override_files(mod_root)
+    if not overrides:
+        return ["No mission challenge override files found under mod root"]
+
+    errors.extend(validate_overrides_from_files(list(overrides.values()), registry_path))
+    registry = load_challenge_registry(registry_path)
+
+    aggregate_path = aggregate_decl_root / AGGREGATE_LIST_PATH
+    if not aggregate_path.is_file():
+        errors.append(
+            f"Missing aggregate Mission Challenge override in "
+            f"{AGGREGATE_TARGET_OWNER}: {AGGREGATE_LIST_PATH}"
+        )
+        return errors
+
+    aggregate_source = aggregate_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
+    if aggregate_source != expected_aggregate:
+        errors.append(
+            "Aggregate main.decl differs from canonical patch2 outside approved "
+            "Plan B fourth-challenge registrations"
+        )
+
+    _validate_overrides_from_mod_root_blocks(aggregate_source, errors, mod_root, plan_b_contracts, registry)
+
     errors.extend(validate_vanilla_source_equivalence(mod_root, registry_path))
     return errors
 
 
-def validate_vanilla_source_equivalence(
-    mod_root: Path,
-    registry_path: Path,
-) -> list[str]:
-    """Verify that source DECL templates from vanilla_decls/owners/ represent the winning
-    vanilla copies and that generated overrides permit line-by-line drift ONLY in reward fields.
-    Also verifies invariant: generated_decl_paths ⊆ vanilla_decl_paths.
-    """
-    errors: list[str] = []
-    repo_root = mod_root.parent
-    vanilla_base = repo_root / "vanilla_decls" / "owners"
-    if not vanilla_base.is_dir():
-        vanilla_base = Path(__file__).resolve().parents[2] / "vanilla_decls" / "owners"
-
-    if not vanilla_base.is_dir():
-        return errors
-
-    candidate_owners = ["gameresources_patch3", "gameresources_patch2", "gameresources_patch1", "gameresources"]
-    registry = load_challenge_registry(registry_path)
-    entries = registry.get("mission_challenges", [])
-
-    for candidate in mod_root.glob("gameresources*"):
-        decls_dir = candidate / "generated" / "decls"
-        if decls_dir.is_dir():
-            for fpath in decls_dir.rglob("*.decl"):
-                rel_path = fpath.relative_to(decls_dir).as_posix()
-                if rel_path.startswith("unlockable/mission_challenge/") or rel_path == AGGREGATE_LIST_PATH or rel_path.startswith("warehouseofflinecontainer/"):
-                    found_vanilla = any(
-                        (vanilla_base / owner / "generated" / "decls" / rel_path).is_file()
-                        for owner in candidate_owners
-                    )
-                    if not found_vanilla:
-                        errors.append(f"Generated DECL path does not exist in vanilla corpus: {rel_path}")
-
+def _validate_vanilla_source_equivalence_aggregate_source_file(entries, errors, mod_root, registry, vanilla_base):
     for entry in entries:
         rel_path = entry["completion_owner"]["path"]
         source_file = (
@@ -374,6 +366,47 @@ def validate_vanilla_source_equivalence(
             )
 
     return errors
+
+
+def _validate_vanilla_source_equivalence_decls_dir(candidate, candidate_owners, errors, vanilla_base):
+    decls_dir = candidate / "generated" / "decls"
+    if decls_dir.is_dir():
+        for fpath in decls_dir.rglob("*.decl"):
+            rel_path = fpath.relative_to(decls_dir).as_posix()
+            if rel_path.startswith(("unlockable/mission_challenge/", "warehouseofflinecontainer/")) or rel_path == AGGREGATE_LIST_PATH:
+                found_vanilla = any(
+                    (vanilla_base / owner / "generated" / "decls" / rel_path).is_file()
+                    for owner in candidate_owners
+                )
+                if not found_vanilla:
+                    errors.append(f"Generated DECL path does not exist in vanilla corpus: {rel_path}")
+
+
+def validate_vanilla_source_equivalence(
+    mod_root: Path,
+    registry_path: Path,
+) -> list[str]:
+    """Verify that source DECL templates from vanilla_decls/owners/ represent the winning
+    vanilla copies and that generated overrides permit line-by-line drift ONLY in reward fields.
+    Also verifies invariant: generated_decl_paths ⊆ vanilla_decl_paths.
+    """
+    errors: list[str] = []
+    repo_root = mod_root.parent
+    vanilla_base = repo_root / "vanilla_decls" / "owners"
+    if not vanilla_base.is_dir():
+        vanilla_base = Path(__file__).resolve().parents[2] / "vanilla_decls" / "owners"
+
+    if not vanilla_base.is_dir():
+        return errors
+
+    candidate_owners = ["gameresources_patch3", "gameresources_patch2", "gameresources_patch1", "gameresources"]
+    registry = load_challenge_registry(registry_path)
+    entries = registry.get("mission_challenges", [])
+
+    for candidate in mod_root.glob("gameresources*"):
+        _validate_vanilla_source_equivalence_decls_dir(candidate, candidate_owners, errors, vanilla_base)
+
+    return _validate_vanilla_source_equivalence_aggregate_source_file(entries, errors, mod_root, registry, vanilla_base)
 
 
 def main() -> int:

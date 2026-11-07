@@ -13,9 +13,10 @@ from pathlib import Path
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.physical_options import PHYSICAL_OPTION_KEYS, map_physical_option_keys
 from doom_eap.launcher.launcher_core import ModCompiler, SeedManifest
-from doom_eap.runtime.context_registry import dlc_contexts
+from doom_eap.runtime.observers import dlc_contexts
 from tools.maps.ap_map_generator import generate_context_marker_overlay
 from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
+from tools.release.prebuilt_room_resources import compute_room_resource_input_fingerprint
 from tools.release.room_payloads import (
     BASE_RESOURCE_NAME,
     ROOM_PAYLOAD_MANIFEST_NAME,
@@ -27,7 +28,6 @@ from tools.release.room_payloads import (
     write_deterministic_zip,
     zip_directory,
 )
-from tools.release.prebuilt_room_resources import compute_room_resource_input_fingerprint
 
 
 def _sha(path: Path) -> str:
@@ -83,23 +83,7 @@ class StateCache:
         }, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
 
 
-def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
-                         map_sources_path: Path, output: Path, cache_root: Path) -> None:
-    root, staged, work, compressor, map_sources_path, output = (
-        path.resolve() for path in (root, staged, work, compressor, map_sources_path, output)
-    )
-    if os.name == "nt" and compressor.read_bytes()[:2] != b"MZ":
-        raise ValueError(f"Windows room build requires the PE compressor: {compressor}")
-    work.mkdir(parents=True, exist_ok=True)
-    output.mkdir(parents=True, exist_ok=True)
-    compiler = ModCompiler(root)
-    catalog = load_content_catalog(root)
-    raw_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
-    release_keys = tuple(spec.key for spec in catalog.compiler_maps())
-    maps = {
-        key: (entry["resource_path"], entry["relative_entities_path"], root / "vanillamaps" / entry["source_file"])
-        for key, entry in raw_sources.items() if key in release_keys
-    }
+def _build_room_resources_source_files(cache_root, catalog, compiler, compressor, map_sources_path, maps, raw_sources, release_keys, root):
     if set(maps) != set(release_keys):
         raise ValueError("room payload map set does not match the content catalog")
     source_snapshots, source_files = {}, {}
@@ -153,20 +137,10 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         packed.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run([str(compressor), "--compress", str(entities), str(packed)], check=True)
         cache.write(material, entities.read_bytes(), packed.read_bytes())
-
-    for context in dlc_contexts():
-        key = context.map_keys[0]
-        spec = catalog.maps[key]
-        target = staged / f"{Path(spec.resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
-        if not target.is_file():
-            text = (root / "vanillamaps" / spec.source_file).read_text(encoding="utf-8").rstrip()
-            entities = work / f"{key}-context.entities"
-            entities.write_text(text + "\n" + generate_context_marker_overlay(key, context.runtime_maps[0]).lstrip(),
-                                encoding="utf-8", newline="")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
+    return compile_state, plans, source_files, source_snapshots
 
 
+def _build_room_resources_base_members(catalog, compile_state, maps, output, plans, source_files, source_snapshots, staged, work):
     for key, (resource_path, relative, vanilla) in maps.items():
         target = staged / f"{Path(resource_path).stem}/maps/{relative}"
         plan = plans[key]
@@ -203,6 +177,42 @@ def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
         "context_targets": {context.identity: f"{Path(catalog.maps[context.map_keys[0]].resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
                             for context in dlc_contexts()},
     }
+    return manifest, payload_files, records
+
+
+def build_room_resources(root: Path, staged: Path, work: Path, compressor: Path,
+                         map_sources_path: Path, output: Path, cache_root: Path) -> None:
+    root, staged, work, compressor, map_sources_path, output = (
+        path.resolve() for path in (root, staged, work, compressor, map_sources_path, output)
+    )
+    if os.name == "nt" and compressor.read_bytes()[:2] != b"MZ":
+        raise ValueError(f"Windows room build requires the PE compressor: {compressor}")
+    work.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
+    compiler = ModCompiler(root)
+    catalog = load_content_catalog(root)
+    raw_sources = json.loads(map_sources_path.read_text(encoding="utf-8"))["maps"]
+    release_keys = tuple(spec.key for spec in catalog.compiler_maps())
+    maps = {
+        key: (entry["resource_path"], entry["relative_entities_path"], root / "vanillamaps" / entry["source_file"])
+        for key, entry in raw_sources.items() if key in release_keys
+    }
+    compile_state, plans, source_files, source_snapshots = _build_room_resources_source_files(cache_root, catalog, compiler, compressor, map_sources_path, maps, raw_sources, release_keys, root)
+
+    for context in dlc_contexts():
+        key = context.map_keys[0]
+        spec = catalog.maps[key]
+        target = staged / f"{Path(spec.resource_path).stem}/maps/{context.runtime_maps[0]}.entities"
+        if not target.is_file():
+            text = (root / "vanillamaps" / spec.source_file).read_text(encoding="utf-8").rstrip()
+            entities = work / f"{key}-context.entities"
+            entities.write_text(text + "\n" + generate_context_marker_overlay(key, context.runtime_maps[0]).lstrip(),
+                                encoding="utf-8", newline="")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run([str(compressor), "--compress", str(entities), str(target)], check=True)
+
+
+    manifest, payload_files, records = _build_room_resources_base_members(catalog, compile_state, maps, output, plans, source_files, source_snapshots, staged, work)
     validate_room_payload_manifest(manifest, known_maps={key: value["target_member"] for key, value in records.items()})
     write_deterministic_zip(payload_files, output / ROOM_PAYLOAD_RESOURCE_NAME)
     (output / ROOM_PAYLOAD_MANIFEST_NAME).write_bytes(canonical_json(manifest))

@@ -1,18 +1,25 @@
 """Extract native enemy origins without approving encounters or species pairs."""
 
 import argparse
-from collections import Counter
-from fractions import Fraction
 import hashlib
 import json
 import math
+from collections import Counter
+from fractions import Fraction
 from pathlib import Path
 
 from doom_eap.content.enemy_plan import BASE_COMBAT_COST
 from doom_eap.content.enemy_species import enemy_spawn_mask, project_species_profiles
 
-from .encounter_catalog import ENTITY_HEADER, ENTITY_START, SPAWN_CLASSES, entity_records, list_items, load_encounter_profiles, walk_values
-
+from .encounter_catalog import (
+    ENTITY_HEADER,
+    ENTITY_START,
+    SPAWN_CLASSES,
+    entity_records,
+    list_items,
+    load_encounter_profiles,
+    walk_values,
+)
 
 EMITTERS = {
     "spawnSingleAI": "immediate",
@@ -46,11 +53,11 @@ def _spawn_constraints(profile, script, event):
                  if (rule["script"], rule["event"]) == (script, event)), {})
 
 
-def extract_native_inventory(source, map_key, *, profiles=None):
+def _extract_native_inventory_profiles(map_key, profiles, source):
     profiles = profiles or {}
     selected, headers = set(), {}
     starts = [match.start() for match in ENTITY_START.finditer(source)]
-    for start, end in zip(starts, starts[1:] + [len(source)]):
+    for start, end in zip(starts, starts[1:] + [len(source)], strict=False):
         block = source[start:end]
         header = ENTITY_HEADER.search(block)
         if header is None:
@@ -61,87 +68,109 @@ def extract_native_inventory(source, map_key, *, profiles=None):
         headers[name] = kind
         if kind in SPAWN_CLASSES | {"idAI2", "idEncounterManager", "idArchvileTemplate"} or "eventDef" in block or "targets" in block or "systemSpawnTargets" in block:
             selected.add(name)
-    records = {row["name"]: row for row in entity_records(source, include_names=selected)}
-    protected_entities = {name: profile["protection"]["reason"] for profile in profiles.values()
-                          for name in profile.get("protection", {}).get("entities", [])}
+    return headers, profiles, selected
+
+
+def _extract_native_inventory_phases(adopted, edit, headers, kind, points, record, templates):
+    phases, waves = {}, {}
+    if kind in SPAWN_CLASSES:
+        points.append({"entity": record["name"], "class": kind, "sha256": record["sha256"],
+                       "layers": record["layers"], "references": sorted({
+                           value for _, value in walk_values(edit) if isinstance(value, str) and value in headers}),
+                       "definitions": [item["name"] for field in ("entityDefs", "initialEntityDefs")
+                                       for item in list_items(edit.get(field))]})
+        for field in ("entityDefs", "initialEntityDefs"):
+            templates.update(item["name"] for item in list_items(edit.get(field)))
+    if kind == "idEncounterManager":
+        adopted.update(list_items(edit.get("adoptedStandAloneAI")))
+    return phases, waves
+
+
+def _collect_direct_target(dependencies, direct, field, headers, index, kind, map_key, profiles, protected_entities, record, targets):
+    target = targets.get(f"item[{index}]")
+    if isinstance(target, str) and headers.get(target) == "idTarget_Spawn":
+        path = f"{field}.item[{index}]"
+        protection = profiles.get(record["name"], {}).get("protection", {})
+        reason = protected_entities.get(record["name"]) or protected_entities.get(target)
+        if protection.get("entire_encounter"):
+            reason = protection["reason"]
+        row = {"id": f"{map_key}/{record['name']}/{path}", "family": "direct_point",
+            "entity": record["name"], "owner": record["name"], "path": path, "reference": target,
+            "source_class": kind, "layers": record["layers"], "protected_reason": reason}
+        (direct if field == "targets" and kind in DIRECT_TARGET_EMITTERS else dependencies).append(row)
+
+
+def _collect_direct_activations(dependencies, direct, edit, headers, kind, map_key, profiles, protected_entities, record):
+    if kind != "idTarget_Remove":
+        for field in ("targets", "systemSpawnTargets"):
+            targets = edit.get(field) or {}
+            count = targets.get("num", 0)
+            if type(count) is not int or not 0 <= count <= 100000:
+                raise ValueError(f"Invalid native activation list: {map_key}/{record['name']}/{field}")
+            for index in range(count):
+                _collect_direct_target(dependencies, direct, field, headers, index, kind, map_key, profiles, protected_entities, record, targets)
+
+
+def _collect_native_emitter(arguments, call_path, edit, emitters, event, map_key, phases, profiles, record, script_path, waves):
+    parts = call_path.split(".")
+    native = parts[:2] == ["encounterComponent", "entityEvents"] and len(parts) == 6
+    script = int(parts[2][5:-1]) if native else None
+    index = int(parts[4][5:-1]) if native else None
+    owner = record["name"]
+    if "entityEvents" in parts:
+        owner_path = ".".join(parts[:parts.index("entityEvents") + 2])
+        owner = _at(edit, owner_path).get("entity") or owner
+    profile = profiles.get(record["name"], {})
+    reason = _protection(profile, script, index)
+    owner_protection = profiles.get(owner, {}).get("protection", {})
+    if owner_protection.get("entire_encounter"):
+        reason = owner_protection["reason"]
+    origin = {"id": f"{map_key}/{record['name']}/{call_path}", "entity": record["name"],
+              "owner": owner, "layers": record["layers"], "path": call_path, "script_index": script, "event_index": index,
+              "event_def": event, "family": EMITTERS.get(event, "unknown"),
+              "phase": f"{record['name']}/{script_path}/{phases.get(script_path, 0)}",
+              "wave": f"{record['name']}/{script_path}/{waves.get(script_path, 0)}",
+              "tutorial_hint": any("tutorial" in value.lower() for value in [record["name"], *record["layers"]]),
+              "protected_reason": reason, "arguments": arguments,
+              "spawn_constraints": _spawn_constraints(profile, script, index)}
+    emitters.append(origin)
+    legacy = profiles.get(record['name'], {}).get('legacy_protection')
+    if legacy:
+        origin['legacy_protected_reason'] = _protection({'protection': legacy}, script, index)
+
+
+def _collect_native_events(edit, emitters, map_key, phases, profiles, record, waves):
+    for path, event in walk_values(edit):
+        if not path.endswith(".eventDef") or not isinstance(event, str):
+            continue
+        call_path = path.rsplit(".", 1)[0]
+        call = _at(edit, call_path)
+        script_path = call_path.split(".events.", 1)[0]
+        arguments = list_items(call.get("args"))
+        if event in {"waitAIRemaining", "waitKillCount", "waitAIHealthLevel"}:
+            waves[script_path] = waves.get(script_path, 0) + 1
+        if event == "waitAIRemaining" and len(arguments) >= 3 and arguments[:3] == [
+                {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, {"int": 0}, {"string": ""}]:
+            phases[script_path] = phases.get(script_path, 0) + 1
+        if not event.startswith(("spawn", "staggeredAISpawn", "maintainAI")):
+            continue
+        _collect_native_emitter(arguments, call_path, edit, emitters, event, map_key, phases, profiles, record, script_path, waves)
+
+
+def _extract_native_inventory_adopted(headers, map_key, profiles, protected_entities, records, source):
     templates, adopted = set(), set()
     emitters, actors, summon_templates, points, direct, dependencies = [], [], [], [], [], []
     for record in records.values():
         edit, kind = record["edit"], record["class"]
-        if kind != "idTarget_Remove":
-            for field in ("targets", "systemSpawnTargets"):
-                targets = edit.get(field) or {}
-                count = targets.get("num", 0)
-                if type(count) is not int or not 0 <= count <= 100000:
-                    raise ValueError(f"Invalid native activation list: {map_key}/{record['name']}/{field}")
-                for index in range(count):
-                    target = targets.get(f"item[{index}]")
-                    if isinstance(target, str) and headers.get(target) == "idTarget_Spawn":
-                        path = f"{field}.item[{index}]"
-                        protection = profiles.get(record["name"], {}).get("protection", {})
-                        reason = protected_entities.get(record["name"]) or protected_entities.get(target)
-                        if protection.get("entire_encounter"):
-                            reason = protection["reason"]
-                        row = {"id": f"{map_key}/{record['name']}/{path}", "family": "direct_point",
-                            "entity": record["name"], "owner": record["name"], "path": path, "reference": target,
-                            "source_class": kind, "layers": record["layers"], "protected_reason": reason}
-                        (direct if field == "targets" and kind in DIRECT_TARGET_EMITTERS else dependencies).append(row)
-        phases, waves = {}, {}
-        if kind in SPAWN_CLASSES:
-            points.append({"entity": record["name"], "class": kind, "sha256": record["sha256"],
-                           "layers": record["layers"], "references": sorted({
-                               value for _, value in walk_values(edit) if isinstance(value, str) and value in headers}),
-                           "definitions": [item["name"] for field in ("entityDefs", "initialEntityDefs")
-                                           for item in list_items(edit.get(field))]})
-            for field in ("entityDefs", "initialEntityDefs"):
-                templates.update(item["name"] for item in list_items(edit.get(field)))
-        if kind == "idEncounterManager":
-            adopted.update(list_items(edit.get("adoptedStandAloneAI")))
+        _collect_direct_activations(dependencies, direct, edit, headers, kind, map_key, profiles, protected_entities, record)
+        phases, waves = _extract_native_inventory_phases(adopted, edit, headers, kind, points, record, templates)
         if kind == "idArchvileTemplate":
             summon_templates.append({"entity": record["name"], "sha256": record["sha256"],
                                      "layers": record["layers"],
                                      "spawn_types": list_items(edit.get("summonList", {}).get("aiSpawnTypeList")),
                                      "references": sorted({value for _, value in walk_values(edit)
                                                            if isinstance(value, str) and value in headers})})
-        for path, event in walk_values(edit):
-            if not path.endswith(".eventDef") or not isinstance(event, str):
-                continue
-            call_path = path.rsplit(".", 1)[0]
-            call = _at(edit, call_path)
-            script_path = call_path.split(".events.", 1)[0]
-            arguments = list_items(call.get("args"))
-            if event in {"waitAIRemaining", "waitKillCount", "waitAIHealthLevel"}:
-                waves[script_path] = waves.get(script_path, 0) + 1
-            if event == "waitAIRemaining" and len(arguments) >= 3 and arguments[:3] == [
-                    {"eEncounterSpawnType_t": "ENCOUNTER_SPAWN_ANY"}, {"int": 0}, {"string": ""}]:
-                phases[script_path] = phases.get(script_path, 0) + 1
-            if not event.startswith(("spawn", "staggeredAISpawn", "maintainAI")):
-                continue
-            parts = call_path.split(".")
-            native = parts[:2] == ["encounterComponent", "entityEvents"] and len(parts) == 6
-            script = int(parts[2][5:-1]) if native else None
-            index = int(parts[4][5:-1]) if native else None
-            owner = record["name"]
-            if "entityEvents" in parts:
-                owner_path = ".".join(parts[:parts.index("entityEvents") + 2])
-                owner = _at(edit, owner_path).get("entity") or owner
-            profile = profiles.get(record["name"], {})
-            reason = _protection(profile, script, index)
-            owner_protection = profiles.get(owner, {}).get("protection", {})
-            if owner_protection.get("entire_encounter"):
-                reason = owner_protection["reason"]
-            origin = {"id": f"{map_key}/{record['name']}/{call_path}", "entity": record["name"],
-                      "owner": owner, "layers": record["layers"], "path": call_path, "script_index": script, "event_index": index,
-                      "event_def": event, "family": EMITTERS.get(event, "unknown"),
-                      "phase": f"{record['name']}/{script_path}/{phases.get(script_path, 0)}",
-                      "wave": f"{record['name']}/{script_path}/{waves.get(script_path, 0)}",
-                      "tutorial_hint": any("tutorial" in value.lower() for value in [record["name"], *record["layers"]]),
-                      "protected_reason": reason, "arguments": arguments,
-                      "spawn_constraints": _spawn_constraints(profile, script, index)}
-            emitters.append(origin)
-            legacy = profiles.get(record['name'], {}).get('legacy_protection')
-            if legacy:
-                origin['legacy_protected_reason'] = _protection({'protection': legacy}, script, index)
+        _collect_native_events(edit, emitters, map_key, phases, profiles, record, waves)
     for record in records.values():
         if record["class"] != "idAI2":
             continue
@@ -158,6 +187,14 @@ def extract_native_inventory(source, map_key, *, profiles=None):
             "summon_templates": sorted(summon_templates, key=lambda row: row["entity"]),
             "direct_activations": sorted(direct, key=lambda row: row["id"]),
             "point_dependencies": sorted(dependencies, key=lambda row: row["id"])}
+
+
+def extract_native_inventory(source, map_key, *, profiles=None):
+    headers, profiles, selected = _extract_native_inventory_profiles(map_key, profiles, source)
+    records = {row["name"]: row for row in entity_records(source, include_names=selected)}
+    protected_entities = {name: profile["protection"]["reason"] for profile in profiles.values()
+                          for name in profile.get("protection", {}).get("entities", [])}
+    return _extract_native_inventory_adopted(headers, map_key, profiles, protected_entities, records, source)
 
 
 def build_native_inventory(root, map_keys=None):
@@ -189,7 +226,28 @@ def inventory_summary(inventory):
             "runtime_coverage_verified": False}
 
 
-def native_recipe_catalog(inventory, registry):
+def _native_recipe_catalog_template(actor_species, add, map_key, masks, origins, unresolved, value):
+    for row in value["actors"]:
+        if row["point_template"]:
+            continue
+        origin = {**row, "id": f"{map_key}/{row['entity']}", "family": "independent_actor"}
+        identity = {key: origin[key] for key in ("id", "family", "layers")}
+        if row["protected_reason"]:
+            origins.append({**identity, "protected_reason": row["protected_reason"]})
+        elif row["inherit"].startswith("ai/boss/"):
+            origins.append({**identity, "protected_reason": "native boss actor"})
+        elif actor_species(row):
+            add(origin, masks[actor_species(row)], 1, 1, "")
+        else:
+            unresolved.append({"id": origin["id"], "reason": f"unknown actor identity {row['inherit']}"})
+    for template in value["summon_templates"]:
+        for spawn_type, count in sorted(Counter(template.get("spawn_types", [])).items()):
+            add({"id": f"{map_key}/{template['entity']}/{spawn_type}", "phase": f"{template['entity']}/summons",
+                 "family": "summon", "entity": template["entity"], "layers": template.get("layers", []), "spawn_type": spawn_type},
+                enemy_spawn_mask(spawn_type), count, 0, "")
+
+
+def _native_recipe_catalog_identities(registry):
     identities = registry["species"]
     by_inherit = {inherit: species for species, row in identities.items() for inherit in row["inherits"]}
     population_types = {row["encounter_spawn_type"] for row in registry["population_encounter_conversion"]["values"].values()}
@@ -202,141 +260,188 @@ def native_recipe_catalog(inventory, registry):
         template = next(template for template in row["templates"] if template["role"] == "preferred")
         species[name] = {"spawn_type": physical[0], "ai": {key: template[key] for key in ("map_key", "entity", "sha256")}}
     masks = {name: enemy_spawn_mask(row["spawn_type"]) for name, row in species.items()}
+    return by_inherit, masks, species
+
+
+def _native_recipe_catalog_mask(add, args, family, masks, row):
+    mask = enemy_spawn_mask(args[0]["eEncounterSpawnType_t"])
+    count = args[1]["int"] if family in {"group", "staggered", "maintenance"} else 1
+    maximum = max(0, args[2]["int"]) if family == "maintenance" else count
+    argument = 5 if family == "maintenance" else 2 if family in {"group", "staggered"} else 1
+    target = args[argument]["entity"]
+    add({**row, "spawn_type": args[0]["eEncounterSpawnType_t"], "reference_argument": argument}, mask, count, maximum, target)
+    if family == "possessed":
+        add({**row, "id": row["id"] + "/spirit", "family": "spirit", "reference_argument": 3},
+            masks["spirit"], 1, 1, args[3]["entity"])
+
+
+def _native_recipe_catalog_args(add, masks, origins, row, unresolved):
+    args, family = row["arguments"], row["family"]
+    identity = {"id": row["id"], "family": family, "layers": list(row.get("layers", []))}
+    if row["protected_reason"]:
+        origins.append({**identity, "protected_reason": row["protected_reason"]})
+        return
+    if family in {"immediate", "possessed"} and not args[1]["entity"]:
+        origins.append({**identity, "inactive_reason": "native null spawn point"})
+        if family == "possessed":
+            origins.append({**identity, "id": row["id"] + "/spirit", "family": "spirit", "inactive_reason": "native null host spawn point"})
+        return
+    if family == "archvile" and not args[1]["entity"]:
+        origins.append({**identity, "inactive_reason": "native null archvile template"})
+        return
+    if family in {"immediate", "group", "staggered", "maintenance", "possessed"}:
+        _native_recipe_catalog_mask(add, args, family, masks, row)
+    elif family in {"archvile", "spirit", "buff_pod"}:
+        add({**row, "reference_argument": 0}, masks[family], 1, 1, args[0]["entity"])
+    else:
+        unresolved.append({"id": row["id"], "reason": f"unknown emitter {row['event_def']}"})
+
+
+def _native_recipe_catalog_runtime(actor_species, actors, add, map_key, masks, origins, point_actors, unresolved, value):
+    for row in value["emitters"]:
+        _native_recipe_catalog_args(add, masks, origins, row, unresolved)
+    for row in value.get("direct_activations", []):
+        templates = point_actors(row["reference"])
+        source_mask = sum({masks[actor_species(actors[name])] for name in templates if actor_species(actors[name])})
+        if source_mask:
+            add(row, source_mask, 1, 1, row["reference"])
+    _native_recipe_catalog_template(actor_species, add, map_key, masks, origins, unresolved, value)
+    runtime = []
+    return runtime
+
+
+def _native_recipe_catalog_points(actors, by_inherit, value):
+    points = {row["entity"]: row for row in value["points"]}
+    origins, unresolved = [], []
+
+    def actor_species(actor):
+        return by_inherit.get(actor["inherit"], by_inherit.get(actor.get("identity_inherit")))
+
+    def point_actors(name, visited=None):
+        visited = set() if visited is None else visited
+        if name in visited or name not in points:
+            return set()
+        visited.add(name)
+        point = points[name]
+        result = {entity for entity in point["definitions"] if entity in actors}
+        for reference in point["references"]:
+            result.update(point_actors(reference, visited))
+        return result
+    return actor_species, origins, point_actors, unresolved
+
+
+def _native_recipe_catalog_spawn_type(map_key, runtime, species):
+    for spawn_type in sorted({row["spawn_type"] for row in species.values()}):
+        costs = [BASE_COMBAT_COST[name] for name, row in species.items() if row["spawn_type"] == spawn_type]
+        runtime.append({"id": f"{map_key}/native_summons/{spawn_type}", "family": "summon", "runtime_only": True,
+            "spawn_type": spawn_type, "logical_types": [spawn_type], "logical_count": 100, "maximum_emissions": 0,
+            "binding": {"mode": "summon", "entity": ""}, "combat_cost": str(Fraction(sum(costs) * 100, len(costs)))})
+
+
+def _add_original_type(candidates, count, identity, logical_types, maximum, origin, origins, reference, unresolved):
+    if not logical_types:
+        unresolved.append({"id": origin["id"], "reason": "native logical mask is unresolved"})
+        return
+    original_type = origin.get("spawn_type", " ".join(logical_types))
+    if origin["family"] == "direct_point":
+        binding = {"mode": "direct_point", **{key: origin[key] for key in ("entity", "owner", "path", "reference")}}
+    elif "path" in origin:
+        binding = {"mode": "event", **{key: origin[key] for key in ("entity", "owner", "path", "event_def")},
+                   "argument": origin["reference_argument"], "reference": reference,
+                   "arguments": origin["arguments"]}
+    else:
+        binding = {"mode": origin["family"], "entity": origin["entity"]}
+        if origin["family"] == "summon":
+            binding["spawn_type"] = original_type
+    origins.append({**identity,
+        "phase": origin.get("phase", origin["id"]),
+        **({"wave": origin['wave']} if 'wave' in origin else {}),
+        **({"legacy_protected_reason": origin['legacy_protected_reason']} if origin.get('legacy_protected_reason') else {}),
+        **origin.get("spawn_constraints", {}),
+        "spawn_type": original_type, "logical_types": logical_types,
+        "logical_count": count, "maximum_emissions": maximum,
+        "binding": binding,
+        "combat_cost": str(Fraction(sum(BASE_COMBAT_COST[name] for name in candidates) * count, len(candidates)))})
+
+
+def _catalog_candidates(actor_species, actors, masks, source_mask, templates):
+    candidates = sorted({actor_species(actors[name]) for name in templates if actor_species(actors[name])})
+    matching = [name for name in candidates if masks[name] & source_mask]
+    if matching:
+        candidates = matching
+    if not candidates:
+        candidates = sorted(name for name in masks if masks[name] & source_mask)
+    return candidates
+
+
+def _catalog_logical_types(candidates, masks, source_mask, species, type_names):
+    logical_types = sorted({species[name]["spawn_type"] for name in candidates if masks[name] & source_mask})
+    if not logical_types:
+        logical_types = sorted(name for mask, name in type_names.items() if mask & source_mask)
+    return logical_types
+
+
+def _add_catalog_origin(_catalog_candidates, _catalog_logical_types, actor_species, actors, boss_mask, count, masks, maximum, origin, origins, point_actors, reference, source_mask, species, type_names, unresolved):
+    identity = {"id": origin["id"], "family": origin["family"], "layers": list(origin.get("layers", []))}
+    if origin.get("protected_reason"):
+        origins.append({**identity, "protected_reason": origin["protected_reason"]})
+        return
+    templates = point_actors(reference) if reference else set()
+    if templates and all(actors[name]["inherit"].startswith("ai/boss/") for name in templates):
+        origins.append({**identity, "protected_reason": "native boss actor"})
+        return
+    if not source_mask & ~boss_mask:
+        origins.append({**identity, "protected_reason": "native boss type"})
+        return
+    if count == 0:
+        origins.append({**identity, "inactive_reason": "native zero-count request"})
+        return
+    candidates = _catalog_candidates(actor_species, actors, masks, source_mask, templates)
+    if not candidates or count <= 0:
+        unresolved.append({"id": origin["id"], "reason": "logical population is unresolved"})
+        return
+    logical_types = _catalog_logical_types(candidates, masks, source_mask, species, type_names)
+    return _add_original_type(candidates, count, identity, logical_types, maximum, origin, origins, reference, unresolved)
+
+
+def native_recipe_catalog(inventory, registry):
+    by_inherit, masks, species = _native_recipe_catalog_identities(registry)
     boss_mask = enemy_spawn_mask("ENCOUNTER_SPAWN_ICON_OF_SIN ENCOUNTER_SPAWN_GLADIATOR ENCOUNTER_SPAWN_SAMUEL_BOSS")
     type_names = {row["encounter_value"]: row["encounter_spawn_type"]
                   for row in registry["population_encounter_conversion"]["values"].values()}
     maps = {}
     for map_key, value in inventory["maps"].items():
         actors = {row["entity"]: row for row in value["actors"]}
-        points = {row["entity"]: row for row in value["points"]}
-        origins, unresolved = [], []
+        actor_species, origins, point_actors, unresolved = _native_recipe_catalog_points(actors, by_inherit, value)
 
-        def actor_species(actor):
-            return by_inherit.get(actor["inherit"], by_inherit.get(actor.get("identity_inherit")))
 
-        def point_actors(name, visited=None):
-            visited = set() if visited is None else visited
-            if name in visited or name not in points:
-                return set()
-            visited.add(name)
-            point = points[name]
-            result = {entity for entity in point["definitions"] if entity in actors}
-            for reference in point["references"]:
-                result.update(point_actors(reference, visited))
-            return result
+        def add(origin, source_mask, count, maximum, reference, *, actor_species=actor_species, actors=actors, origins=origins, point_actors=point_actors, unresolved=unresolved):
+            return _add_catalog_origin(_catalog_candidates, _catalog_logical_types, actor_species, actors, boss_mask, count, masks, maximum, origin, origins, point_actors, reference, source_mask, species, type_names, unresolved)
 
-        def add(origin, source_mask, count, maximum, reference):
-            identity = {"id": origin["id"], "family": origin["family"], "layers": list(origin.get("layers", []))}
-            if origin.get("protected_reason"):
-                origins.append({**identity, "protected_reason": origin["protected_reason"]})
-                return
-            templates = point_actors(reference) if reference else set()
-            if templates and all(actors[name]["inherit"].startswith("ai/boss/") for name in templates):
-                origins.append({**identity, "protected_reason": "native boss actor"})
-                return
-            if not source_mask & ~boss_mask:
-                origins.append({**identity, "protected_reason": "native boss type"})
-                return
-            if count == 0:
-                origins.append({**identity, "inactive_reason": "native zero-count request"})
-                return
-            candidates = sorted({actor_species(actors[name]) for name in templates if actor_species(actors[name])})
-            matching = [name for name in candidates if masks[name] & source_mask]
-            if matching:
-                candidates = matching
-            if not candidates:
-                candidates = sorted(name for name in masks if masks[name] & source_mask)
-            if not candidates or count <= 0:
-                unresolved.append({"id": origin["id"], "reason": "logical population is unresolved"})
-                return
-            logical_types = sorted({species[name]["spawn_type"] for name in candidates if masks[name] & source_mask})
-            if not logical_types:
-                logical_types = sorted(name for mask, name in type_names.items() if mask & source_mask)
-            if not logical_types:
-                unresolved.append({"id": origin["id"], "reason": "native logical mask is unresolved"})
-                return
-            original_type = origin.get("spawn_type", " ".join(logical_types))
-            if origin["family"] == "direct_point":
-                binding = {"mode": "direct_point", **{key: origin[key] for key in ("entity", "owner", "path", "reference")}}
-            elif "path" in origin:
-                binding = {"mode": "event", **{key: origin[key] for key in ("entity", "owner", "path", "event_def")},
-                           "argument": origin["reference_argument"], "reference": reference,
-                           "arguments": origin["arguments"]}
-            else:
-                binding = {"mode": origin["family"], "entity": origin["entity"]}
-                if origin["family"] == "summon":
-                    binding["spawn_type"] = original_type
-            origins.append({**identity,
-                "phase": origin.get("phase", origin["id"]),
-                **({"wave": origin['wave']} if 'wave' in origin else {}),
-                **({"legacy_protected_reason": origin['legacy_protected_reason']} if origin.get('legacy_protected_reason') else {}),
-                **origin.get("spawn_constraints", {}),
-                "spawn_type": original_type, "logical_types": logical_types,
-                "logical_count": count, "maximum_emissions": maximum,
-                "binding": binding,
-                "combat_cost": str(Fraction(sum(BASE_COMBAT_COST[name] for name in candidates) * count, len(candidates)))})
-
-        for row in value["emitters"]:
-            args, family = row["arguments"], row["family"]
-            identity = {"id": row["id"], "family": family, "layers": list(row.get("layers", []))}
-            if row["protected_reason"]:
-                origins.append({**identity, "protected_reason": row["protected_reason"]})
-                continue
-            if family in {"immediate", "possessed"} and not args[1]["entity"]:
-                origins.append({**identity, "inactive_reason": "native null spawn point"})
-                if family == "possessed":
-                    origins.append({**identity, "id": row["id"] + "/spirit", "family": "spirit", "inactive_reason": "native null host spawn point"})
-                continue
-            if family == "archvile" and not args[1]["entity"]:
-                origins.append({**identity, "inactive_reason": "native null archvile template"})
-                continue
-            if family in {"immediate", "group", "staggered", "maintenance", "possessed"}:
-                mask = enemy_spawn_mask(args[0]["eEncounterSpawnType_t"])
-                count = args[1]["int"] if family in {"group", "staggered", "maintenance"} else 1
-                maximum = max(0, args[2]["int"]) if family == "maintenance" else count
-                argument = 5 if family == "maintenance" else 2 if family in {"group", "staggered"} else 1
-                target = args[argument]["entity"]
-                add({**row, "spawn_type": args[0]["eEncounterSpawnType_t"], "reference_argument": argument}, mask, count, maximum, target)
-                if family == "possessed":
-                    add({**row, "id": row["id"] + "/spirit", "family": "spirit", "reference_argument": 3},
-                        masks["spirit"], 1, 1, args[3]["entity"])
-            elif family in {"archvile", "spirit", "buff_pod"}:
-                add({**row, "reference_argument": 0}, masks[family], 1, 1, args[0]["entity"])
-            else:
-                unresolved.append({"id": row["id"], "reason": f"unknown emitter {row['event_def']}"})
-        for row in value.get("direct_activations", []):
-            templates = point_actors(row["reference"])
-            source_mask = sum({masks[actor_species(actors[name])] for name in templates if actor_species(actors[name])})
-            if source_mask:
-                add(row, source_mask, 1, 1, row["reference"])
-        for row in value["actors"]:
-            if row["point_template"]:
-                continue
-            origin = {**row, "id": f"{map_key}/{row['entity']}", "family": "independent_actor"}
-            identity = {key: origin[key] for key in ("id", "family", "layers")}
-            if row["protected_reason"]:
-                origins.append({**identity, "protected_reason": row["protected_reason"]})
-            elif row["inherit"].startswith("ai/boss/"):
-                origins.append({**identity, "protected_reason": "native boss actor"})
-            elif actor_species(row):
-                add(origin, masks[actor_species(row)], 1, 1, "")
-            else:
-                unresolved.append({"id": origin["id"], "reason": f"unknown actor identity {row['inherit']}"})
-        for template in value["summon_templates"]:
-            for spawn_type, count in sorted(Counter(template.get("spawn_types", [])).items()):
-                add({"id": f"{map_key}/{template['entity']}/{spawn_type}", "phase": f"{template['entity']}/summons",
-                     "family": "summon", "entity": template["entity"], "layers": template.get("layers", []), "spawn_type": spawn_type},
-                    enemy_spawn_mask(spawn_type), count, 0, "")
-        runtime = []
-        for spawn_type in sorted({row["spawn_type"] for row in species.values()}):
-            costs = [BASE_COMBAT_COST[name] for name, row in species.items() if row["spawn_type"] == spawn_type]
-            runtime.append({"id": f"{map_key}/native_summons/{spawn_type}", "family": "summon", "runtime_only": True,
-                "spawn_type": spawn_type, "logical_types": [spawn_type], "logical_count": 100, "maximum_emissions": 0,
-                "binding": {"mode": "summon", "entity": ""}, "combat_cost": str(Fraction(sum(costs) * 100, len(costs)))})
+        runtime = _native_recipe_catalog_runtime(actor_species, actors, add, map_key, masks, origins, point_actors, unresolved, value)
+        _native_recipe_catalog_spawn_type(map_key, runtime, species)
         maps[map_key] = {"source_sha256": value["source_sha256"], "runtime_map": value.get("runtime_map", map_key),
                          "origins": origins, "runtime_origins": runtime, "unresolved": unresolved,
                          "point_dependencies": value.get("point_dependencies", [])}
     return {"schema_version": 1, "species": species, "maps": maps}
+
+
+def _build_native_recipe_catalog_reference(find_entity_block_bounds, resolve_enemy_attribute_baselines, root, row, sources):
+    reference = row["ai"]
+    key = reference["map_key"]
+    if key not in sources:
+        sources[key] = (root / "vanillamaps" / (key + ".map")).read_text(encoding="utf-8")
+    start, end = find_entity_block_bounds(sources[key], reference["entity"])
+    values = resolve_enemy_attribute_baselines(sources[key][start:end])["aiHealth"]["components"]["components[0]"]
+    hitpoints = {}
+    for field in ("max", "starting"):
+        value = values[field]
+        if isinstance(value, dict) and set(value) == {"defaultValue"}:
+            value = value["defaultValue"]
+        if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (field == "max" and value == 0):
+            raise ValueError("Invalid native body health input")
+        hitpoints[field] = value
+    return hitpoints
 
 
 def build_native_recipe_catalog(root):
@@ -348,20 +453,7 @@ def build_native_recipe_catalog(root):
                                    json.loads((root / "content/catalog/enemy_species.json").read_bytes()))
     sources = {}
     for row in catalog["species"].values():
-        reference = row["ai"]
-        key = reference["map_key"]
-        if key not in sources:
-            sources[key] = (root / "vanillamaps" / (key + ".map")).read_text(encoding="utf-8")
-        start, end = find_entity_block_bounds(sources[key], reference["entity"])
-        values = resolve_enemy_attribute_baselines(sources[key][start:end])["aiHealth"]["components"]["components[0]"]
-        hitpoints = {}
-        for field in ("max", "starting"):
-            value = values[field]
-            if isinstance(value, dict) and set(value) == {"defaultValue"}:
-                value = value["defaultValue"]
-            if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or field == "max" and value == 0:
-                raise ValueError("Invalid native body health input")
-            hitpoints[field] = value
+        hitpoints = _build_native_recipe_catalog_reference(find_entity_block_bounds, resolve_enemy_attribute_baselines, root, row, sources)
         if hitpoints["starting"] > hitpoints["max"]:
             raise ValueError("Native body starts above its maximum health")
         row["hitpoints"] = hitpoints

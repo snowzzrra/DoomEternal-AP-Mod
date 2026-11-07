@@ -105,49 +105,7 @@ def _linux_xcb_libraries(plugin: Path) -> dict[str, Path]:
     return libraries
 
 
-def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
-    output_dir = output_dir.expanduser().resolve()
-    archipelago_source = archipelago_source.expanduser().resolve()
-    if not _within(output_dir, RELEASE_ROOT):
-        raise ValueError(f"launcher output must remain under {RELEASE_ROOT}")
-    if not (archipelago_source / "CommonClient.py").is_file():
-        raise ValueError(f"invalid Archipelago source: {archipelago_source}")
-    cache_root = Path(os.environ.get("AP_BUILD_CACHE_ROOT", REPO_ROOT / ".cache/ap-build"))
-    executable_name = f"{name}.exe" if os.name == "nt" else name
-    xcb_libraries: dict[str, Path] = {}
-    if sys.platform.startswith("linux"):
-        from PySide6.QtCore import QLibraryInfo
-
-        plugin = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)) / "platforms/libqxcb.so"
-        xcb_libraries = _linux_xcb_libraries(plugin)
-    # Hash library targets while keeping SONAME symlinks for PyInstaller.
-    key = content_key(
-        "launcher",
-        _launcher_inputs(archipelago_source) + [
-            (f"linux-xcb/{name}", path.resolve(strict=True))
-            for name, path in sorted(xcb_libraries.items())
-        ],
-        config={
-            "name": name,
-            "python": sys.executable,
-            "sys_version": sys.version,
-            "sys_platform": sys.platform,
-            "machine": platform.machine(),
-            "architecture": platform.architecture()[0],
-            "os_name": os.name,
-            "pyinstaller": _dependency_version("pyinstaller"),
-            "pyside6": _dependency_version("PySide6"),
-            "command": [
-                "onefile", "windowed" if os.name == 'nt' else "console", "standalone_runtime", "data", "manifests", "content",
-                *PYINSTALLER_EXCLUDES,
-            ],
-        },
-    )
-    output_dir.mkdir(parents=True, exist_ok=True)
-    hit, reason = restore(cache_root, "launcher", key, output_dir, (executable_name,))
-    if hit:
-        print(f"LAUNCHER cache=hit key={key}")
-        return output_dir / executable_name
+def _build_find_spec(archipelago_source, key, name, output_dir, reason, xcb_libraries):
     print(f"LAUNCHER cache=miss reason={reason} key={key}")
     if importlib.util.find_spec("PyInstaller") is None:
         raise RuntimeError(
@@ -231,6 +189,53 @@ def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
         ))
     subprocess.run(command, check=True, cwd=REPO_ROOT, env=build_environment)
     executable = output_dir / (f"{name}.exe" if os.name == "nt" else name)
+    return executable
+
+
+def build(output_dir: Path, archipelago_source: Path, name: str) -> Path:
+    output_dir = output_dir.expanduser().resolve()
+    archipelago_source = archipelago_source.expanduser().resolve()
+    if not _within(output_dir, RELEASE_ROOT):
+        raise ValueError(f"launcher output must remain under {RELEASE_ROOT}")
+    if not (archipelago_source / "CommonClient.py").is_file():
+        raise ValueError(f"invalid Archipelago source: {archipelago_source}")
+    cache_root = Path(os.environ.get("AP_BUILD_CACHE_ROOT", REPO_ROOT / ".cache/ap-build"))
+    executable_name = f"{name}.exe" if os.name == "nt" else name
+    xcb_libraries: dict[str, Path] = {}
+    if sys.platform.startswith("linux"):
+        from PySide6.QtCore import QLibraryInfo
+
+        plugin = Path(QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)) / "platforms/libqxcb.so"
+        xcb_libraries = _linux_xcb_libraries(plugin)
+    # Hash library targets while keeping SONAME symlinks for PyInstaller.
+    key = content_key(
+        "launcher",
+        _launcher_inputs(archipelago_source) + [
+            (f"linux-xcb/{name}", path.resolve(strict=True))
+            for name, path in sorted(xcb_libraries.items())
+        ],
+        config={
+            "name": name,
+            "python": sys.executable,
+            "sys_version": sys.version,
+            "sys_platform": sys.platform,
+            "machine": platform.machine(),
+            "architecture": platform.architecture()[0],
+            "os_name": os.name,
+            "pyinstaller": _dependency_version("pyinstaller"),
+            "pyside6": _dependency_version("PySide6"),
+            "command": [
+                "onefile", "windowed" if os.name == 'nt' else "console", "standalone_runtime", "data", "manifests", "content",
+                *PYINSTALLER_EXCLUDES,
+            ],
+        },
+    )
+    output_dir.mkdir(parents=True, exist_ok=True)
+    hit, reason = restore(cache_root, "launcher", key, output_dir, (executable_name,))
+    if hit:
+        print(f"LAUNCHER cache=hit key={key}")
+        return output_dir / executable_name
+    executable = _build_find_spec(archipelago_source, key, name, output_dir, reason, xcb_libraries)
     if not executable.is_file():
         raise RuntimeError(f"PyInstaller did not produce {executable}")
     publish(cache_root, "launcher", key, output_dir, (executable_name,))

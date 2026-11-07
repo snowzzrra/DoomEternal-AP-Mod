@@ -6,7 +6,6 @@ from pathlib import Path
 
 from intro_skip import patch, sha
 
-
 ROOT = Path(__file__).resolve().parents[2]
 DECL = "generated/decls/logicentity/maps/game/"
 ROUTES = {
@@ -32,8 +31,7 @@ ROUTES = {
 }
 
 
-def main():
-    recipes = []
+def _main_member(recipes):
     for name, (owner, member, expected, edge, required) in ROUTES.items():
         source = ROOT / "vanilla_decls/owners" / owner / member
         data = source.read_bytes()
@@ -63,6 +61,12 @@ def main():
         'outroTextCrawl = "campaign/dlc1/outro";', 'gameCompleteInfo = {',
         'missionSelectList = "missionlist_dlc1";')):
         raise ValueError("the_holt: campaign completion contract missing")
+    return before, expected, member, owner
+
+
+def main():
+    recipes = []
+    before, expected, member, owner = _main_member(recipes)
     after = before.replace('credits = "dlc1";', '', 1)
     if len(before.splitlines()) != len(after.splitlines()):
         raise ValueError("the_holt: campaign line count changed")

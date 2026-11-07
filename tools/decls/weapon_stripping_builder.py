@@ -126,21 +126,7 @@ def _source_payload(owner: dict) -> bytes:
     return payload
 
 
-def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
-    text = payload.decode("utf-8")
-    matches = []
-    for match in PAYLOAD_RE.finditer(text):
-        if (
-            match.group("inventory_item") == owner["inventory_item"]
-            and match.group("desired_count") == owner["desired_count"]
-        ):
-            matches.append(match)
-    canonical = _source_payload(owner).decode("utf-8")
-    canonical_matches = [
-        entry for entry in PAYLOAD_RE.finditer(canonical)
-        if entry.group("inventory_item") == owner["inventory_item"]
-        and entry.group("desired_count") == owner["desired_count"]
-    ]
+def _neutralize_canonical_match(canonical, canonical_matches, matches, owner, text):
     if len(canonical_matches) != 1:
         raise ValueError(f"{owner['name']}: canonical ownership payload drifted")
     canonical_match = canonical_matches[0]
@@ -171,6 +157,25 @@ def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
         if result.count(pickup) + result.count(inert) != 1:
             raise ValueError(f"{owner['name']}: spawned Hammer pickup drifted")
         result = result.replace(pickup, inert)
+    return body, empty, opening, result
+
+
+def _neutralize(owner: dict, payload: bytes) -> tuple[str, dict]:
+    text = payload.decode("utf-8")
+    matches = []
+    for match in PAYLOAD_RE.finditer(text):
+        if (
+            match.group("inventory_item") == owner["inventory_item"]
+            and match.group("desired_count") == owner["desired_count"]
+        ):
+            matches.append(match)
+    canonical = _source_payload(owner).decode("utf-8")
+    canonical_matches = [
+        entry for entry in PAYLOAD_RE.finditer(canonical)
+        if entry.group("inventory_item") == owner["inventory_item"]
+        and entry.group("desired_count") == owner["desired_count"]
+    ]
+    body, empty, opening, result = _neutralize_canonical_match(canonical, canonical_matches, matches, owner, text)
     return result, {
         "name": owner["name"], "container": owner["container"], "path": owner["path"],
         "source_sha256": owner["sha256"],
@@ -193,7 +198,7 @@ def _strip_ssg_meat_hook(payload: bytes) -> tuple[str, dict]:
         raise ValueError(f"ssg_meat_hook_grant: expected one givePerksOnReceive payload, found {count}")
     before = text.splitlines()
     after = result.splitlines()
-    changed = [(index + 1, left, right) for index, (left, right) in enumerate(zip(before, after)) if left != right]
+    changed = [(index + 1, left, right) for index, (left, right) in enumerate(zip(before, after, strict=False)) if left != right]
     if len(before) != len(after) or len(changed) != 1:
         raise ValueError("ssg_meat_hook_grant: override changed more than perk payload count")
     line_number, old_line, new_line = changed[0]

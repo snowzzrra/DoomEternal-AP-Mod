@@ -86,10 +86,7 @@ def _render_hell_target_list(original: str, targets: list[str]) -> str:
     )
 
 
-def _patch_hell(
-    contract: dict, root: Path, mod_root: Path,
-    *, retained_overrides: Mapping[str, bytes] | None = None,
-) -> dict:
+def _patch_hell_ap_check(contract, retained_overrides, root):
     if retained_overrides is None:
         source = root / contract["source_path"]
         raw = source.read_bytes()
@@ -120,6 +117,14 @@ def _patch_hell(
         source_sha = None
     if result.count(contract["ap_check"]) != 1:
         raise ValueError("Hell AP target was not inserted exactly once")
+    return after, before, override_raw, source_sha
+
+
+def _patch_hell(
+    contract: dict, root: Path, mod_root: Path,
+    *, retained_overrides: Mapping[str, bytes] | None = None,
+) -> dict:
+    after, before, override_raw, source_sha = _patch_hell_ap_check(contract, retained_overrides, root)
     override_sha = _sha256(override_raw)
     expected_override = contract["override_sha256"]
     if expected_override and override_sha != expected_override:
@@ -150,18 +155,7 @@ def _source_map_text(contract: dict, root: Path, source_maps: Mapping[str, str] 
     return source.replace("\r\n", "\n").replace("\r", "\n")
 
 
-def _patch_exultia(contract: dict, root: Path, generated_map: Path,
-                    publishers: tuple[PublisherContract, ...] = (),
-                    *, source_maps: Mapping[str, str] | None = None) -> dict:
-    source = _source_map_text(contract, root, source_maps)
-    source_bounds = find_entity_block_bounds(source, contract["owner"])
-    if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
-        raise ValueError("Exultia native owner is missing or duplicated in source")
-    source_block = source[source_bounds[0]:source_bounds[1]]
-    source_sha = _sha256(source_block.encode("utf-8"))
-    expected_source = contract["source_sha256"]
-    if expected_source and source_sha != expected_source:
-        raise ValueError("Exultia source owner hash mismatch")
+def _patch_exultia_owner(contract, generated_map, publishers, source_sha):
     text = generated_map.read_text(encoding="utf-8")
     if text.count(f"entityDef {contract['owner']}") != 1:
         raise ValueError("Exultia native owner is missing or duplicated")
@@ -187,6 +181,22 @@ def _patch_exultia(contract: dict, root: Path, generated_map: Path,
     after = compiled["owner_targets"] if compiled else [contract["ap_check"], *before]
     patched = replace_targets_block(block, after)
     result = text[:bounds[0]] + patched + text[bounds[1]:]
+    return after, before, compiled, result
+
+
+def _patch_exultia(contract: dict, root: Path, generated_map: Path,
+                    publishers: tuple[PublisherContract, ...] = (),
+                    *, source_maps: Mapping[str, str] | None = None) -> dict:
+    source = _source_map_text(contract, root, source_maps)
+    source_bounds = find_entity_block_bounds(source, contract["owner"])
+    if source_bounds is None or source.count(f"entityDef {contract['owner']}") != 1:
+        raise ValueError("Exultia native owner is missing or duplicated in source")
+    source_block = source[source_bounds[0]:source_bounds[1]]
+    source_sha = _sha256(source_block.encode("utf-8"))
+    expected_source = contract["source_sha256"]
+    if expected_source and source_sha != expected_source:
+        raise ValueError("Exultia source owner hash mismatch")
+    after, before, compiled, result = _patch_exultia_owner(contract, generated_map, publishers, source_sha)
     if compiled:
         result = result.rstrip() + "\n" + compiled["entities"]
     generated_map.write_text(result, encoding="utf-8", newline="")
@@ -316,13 +326,7 @@ def compile_publishers(publishers: tuple[PublisherContract, ...]) -> dict:
     }
 
 
-def _patch_sentinel_prime_end(
-    mission: dict,
-    publishers: tuple[PublisherContract, ...],
-    root: Path,
-    generated_map: Path,
-    *, source_maps: Mapping[str, str] | None = None,
-) -> dict:
+def _patch_sentinel_prime_end_source_bounds(generated_map, mission, root, source_maps):
     source = _source_map_text(mission, root, source_maps)
     source_bounds = find_entity_block_bounds(source, mission["owner"])
     if source_bounds is None or source.count(f"entityDef {mission['owner']}") != 1:
@@ -341,6 +345,17 @@ def _patch_sentinel_prime_end(
     bounds = find_entity_block_bounds(text, mission["owner"])
     if bounds is None or _sha256(text[bounds[0]:bounds[1]].encode("utf-8")) != source_sha:
         raise ValueError("generated Sentinel Prime terminal owner drift")
+    return bounds, source_block, source_sha, text
+
+
+def _patch_sentinel_prime_end(
+    mission: dict,
+    publishers: tuple[PublisherContract, ...],
+    root: Path,
+    generated_map: Path,
+    *, source_maps: Mapping[str, str] | None = None,
+) -> dict:
+    bounds, source_block, source_sha, text = _patch_sentinel_prime_end_source_bounds(generated_map, mission, root, source_maps)
     native = source_block.replace(
         f"entityDef {mission['owner']}",
         f"entityDef {mission['native_owner']}",
@@ -404,18 +419,7 @@ def _patch_declared_terminal(
     return audit
 
 
-def _patch_declared_terminal_text(
-    map_key: str,
-    owner: str,
-    publishers: tuple[PublisherContract, ...],
-    text: str,
-) -> tuple[str, dict]:
-    owner_pattern = rf"\bentityDef\s+{re.escape(owner)}\s*\{{"
-    if len(re.findall(owner_pattern, text)) != 1:
-        raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
-    bounds = find_entity_block_bounds(text, owner)
-    if bounds is None:
-        raise ValueError(f"{map_key}: terminal owner block not found: {owner}")
+def _patch_declared_terminal_text_block(bounds, map_key, owner, publishers, text):
     block = text[bounds[0]:bounds[1]]
     before = extract_target_names(block)
     compiled = compile_publishers(publishers)
@@ -478,6 +482,21 @@ def _patch_declared_terminal_text(
     }
 
 
+def _patch_declared_terminal_text(
+    map_key: str,
+    owner: str,
+    publishers: tuple[PublisherContract, ...],
+    text: str,
+) -> tuple[str, dict]:
+    owner_pattern = rf"\bentityDef\s+{re.escape(owner)}\s*\{{"
+    if len(re.findall(owner_pattern, text)) != 1:
+        raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
+    bounds = find_entity_block_bounds(text, owner)
+    if bounds is None:
+        raise ValueError(f"{map_key}: terminal owner block not found: {owner}")
+    return _patch_declared_terminal_text_block(bounds, map_key, owner, publishers, text)
+
+
 def patch_generated_map_text(map_key: str, text: str, mod_root: Path) -> tuple[str, dict]:
     """Apply catalog publisher contracts to one generated map text payload."""
     publishers = load_content_catalog(mod_root).publishers
@@ -523,30 +542,7 @@ def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> i
     )
 
 
-def patch_mission_complete_maps(
-    contract_path: Path, generated_maps: dict[str, Path], mod_root: Path,
-    *, source_maps: Mapping[str, str] | None = None,
-    retained_overrides: Mapping[str, bytes] | None = None,
-) -> dict:
-    contracts = json.loads(contract_path.read_text(encoding="utf-8"))
-    if contracts.get("schema_version") != 1:
-        raise ValueError("unsupported Mission Complete map contract schema")
-    root = contract_path.parent.parent
-    catalog = load_content_catalog(root)
-    publisher_contracts = catalog.publishers
-    contract_items = {
-        name: value for name, value in contracts.items()
-        if isinstance(value, dict) and "map_key" in value
-    }
-    unknown_keys = set(generated_maps) - set(catalog.maps)
-    if unknown_keys:
-        raise ValueError(f"unknown generated map input: {sorted(unknown_keys)}")
-    contract_items = {
-        name: contract
-        for name, contract in contract_items.items()
-        if contract["map_key"] in generated_maps
-    }
-    before_maps = {key: path.read_text(encoding="utf-8") for key, path in generated_maps.items()}
+def _patch_mission_complete_maps_audits(contract_items, generated_maps, mod_root, publisher_contracts, retained_overrides, root, source_maps):
     audits: dict[str, dict] = {}
     terminal_audit: dict | None = None
     for name, contract in contract_items.items():
@@ -585,10 +581,10 @@ def patch_mission_complete_maps(
             raise ValueError(f"{contract['map_key']}: standard AP event count drift")
         audit["event_target"] = f"ap_event_{contract['location_id']}"
         audit["owner_target_references"] = 1
-    from tools.maps.unified_campaign import project_stage_return
-    catalog = load_content_catalog(root)
-    catalog_audit = {}
-    contract_maps = {contract["map_key"] for contract in contract_items.values()}
+    return audits, terminal_audit
+
+
+def _patch_mission_complete_maps_return_audit(catalog, catalog_audit, contract_items, contract_maps, generated_maps, project_stage_return, root):
     for key, path in generated_maps.items():
         if key in contract_maps:
             continue
@@ -606,6 +602,44 @@ def patch_mission_complete_maps(
         return_audit[key] = changed
     unrelated_owners = {contract["owner"] for contract in contract_items.values() if "owner" in contract}
     unrelated_owners.update(name for names in return_audit.values() for name in names)
+    return return_audit, unrelated_owners
+
+
+def _patch_mission_complete_maps_contracts(contract_path, generated_maps):
+    contracts = json.loads(contract_path.read_text(encoding="utf-8"))
+    if contracts.get("schema_version") != 1:
+        raise ValueError("unsupported Mission Complete map contract schema")
+    root = contract_path.parent.parent
+    catalog = load_content_catalog(root)
+    publisher_contracts = catalog.publishers
+    contract_items = {
+        name: value for name, value in contracts.items()
+        if isinstance(value, dict) and "map_key" in value
+    }
+    unknown_keys = set(generated_maps) - set(catalog.maps)
+    if unknown_keys:
+        raise ValueError(f"unknown generated map input: {sorted(unknown_keys)}")
+    contract_items = {
+        name: contract
+        for name, contract in contract_items.items()
+        if contract["map_key"] in generated_maps
+    }
+    before_maps = {key: path.read_text(encoding="utf-8") for key, path in generated_maps.items()}
+    return before_maps, contract_items, publisher_contracts, root
+
+
+def patch_mission_complete_maps(
+    contract_path: Path, generated_maps: dict[str, Path], mod_root: Path,
+    *, source_maps: Mapping[str, str] | None = None,
+    retained_overrides: Mapping[str, bytes] | None = None,
+) -> dict:
+    before_maps, contract_items, publisher_contracts, root = _patch_mission_complete_maps_contracts(contract_path, generated_maps)
+    audits, terminal_audit = _patch_mission_complete_maps_audits(contract_items, generated_maps, mod_root, publisher_contracts, retained_overrides, root, source_maps)
+    from tools.maps.unified_campaign import project_stage_return
+    catalog = load_content_catalog(root)
+    catalog_audit = {}
+    contract_maps = {contract["map_key"] for contract in contract_items.values()}
+    return_audit, unrelated_owners = _patch_mission_complete_maps_return_audit(catalog, catalog_audit, contract_items, contract_maps, generated_maps, project_stage_return, root)
     unrelated_owners.update(audit["owner"] for audit in catalog_audit.values())
     unrelated = sum(
         _unrelated_entity_diff_count(

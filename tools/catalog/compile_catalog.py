@@ -9,7 +9,8 @@ if str(MOD_ROOT) not in sys.path:
 if str(MOD_ROOT / "tools" / "content") not in sys.path:
     sys.path.insert(0, str(MOD_ROOT / "tools" / "content"))
 
-from tools.content.compile_content_catalog import compile_catalog, main
+from tools.content.compile_content_catalog import compile_catalog as compile_catalog  # noqa: E402
+from tools.content.compile_content_catalog import main  # noqa: E402
 
 if __name__ == "__main__":
     raise SystemExit(main())

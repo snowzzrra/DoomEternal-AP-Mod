@@ -8,7 +8,6 @@ from functools import lru_cache
 from tools.maps.ap_map_generator import find_matching_brace
 from tools.maps.encounter_catalog import ENTITY_HEADER, MEMBER, list_items, parse_object
 
-
 _MISSING = object()
 _CLONE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*__ap_v070_s([0-9]{5})\Z")
 _AI_CLONE_NAME = re.compile(r"ap_v070_ai_[A-Za-z0-9_]+__ap_v070_s([0-9]{5})\Z")
@@ -78,7 +77,6 @@ def _edit_span(block):
     return match.end() - 1, find_matching_brace(block, match.end() - 1)
 
 
-
 def _value_span(block, path):
     opening, end = _edit_span(block)
     start = opening + 1
@@ -96,16 +94,14 @@ def _value_span(block, path):
     return opening, end
 
 
-
 def _edit(block, path, value):
     opening, end = _edit_span(block)
     body = _set(block[opening + 1:end - 1], path, value)
     return block[:opening + 1] + body + block[end - 1:]
 
 
-
 def _scaled(value, percent, field, *, zero=False):
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
         raise ValueError(f"Unqualified numeric base for {field}")
     if value < 0 or (not zero and value == 0):
         raise ValueError(f"Unqualified numeric base for {field}")
@@ -129,6 +125,58 @@ def _attribute_source(source_block):
     return header, begin, end, parse_object(source_block[begin + 1:end - 1])
 
 
+def _materialize_enemy_attributes_authored(base, damage_percent):
+    path = ("aiEditable", "damageOutModifiers")
+    authored = base(path)
+    if not isinstance(authored, dict) or type(authored.get("num")) is not int or authored["num"] < 0:
+        raise ValueError("Unqualified damageOutModifiers list")
+    try:
+        modifiers = list_items(authored)
+    except (KeyError, ValueError) as error:
+        raise ValueError("Unqualified damageOutModifiers list") from error
+    scaled = []
+    for modifier in modifiers:
+        if not isinstance(modifier, dict) or not isinstance(modifier.get("damageSource"), str):
+            raise ValueError("Unqualified damageOutModifiers entry")
+        item = dict(modifier)
+        item["damageModifier"] = _scaled(item.get("damageModifier"), damage_percent, "damageOutModifiers.damageModifier", zero=True)
+        scaled.append(item)
+    return path, scaled
+
+
+def _materialize_enemy_attributes_clone(clone_name, damage_percent, health_percent, size_percent):
+    clone = _AI_CLONE_NAME.fullmatch(clone_name)
+    if not clone or len(clone_name) >= 512 or not 1 <= int(clone.group(1)) <= 10000:
+        raise ValueError("Private AI clone needs ap_v070_ai_<unique>__ap_v070_sNNNNN")
+    for name, value in (("health", health_percent), ("damage", damage_percent), ("size", size_percent)):
+        if type(value) is not int or not 1 <= value <= 10000:
+            raise ValueError(f"{name}_percent must be an integer in 1..10000")
+
+
+def _materialize_enemy_attributes_scaled(base, body, damage_percent):
+    path, scaled = _materialize_enemy_attributes_authored(base, damage_percent)
+    if not any("DAMAGESRC_ALL" in (token.strip() for token in item["damageSource"].split("|")) for item in scaled):
+        scaled.append({"damageSource": "DAMAGESRC_ALL", "damageModifier": damage_percent / 100})
+    body = _set(body, path, {"num": len(scaled), **{f"item[{i}]": item for i, item in enumerate(scaled)}})
+    return body
+
+
+def _scale_enemy_health(base, body, health_percent):
+    if health_percent != 100:
+        for field in ("max", "starting"):
+            path = ("aiHealth", "components", "components[0]", field)
+            value = base(path)
+            if isinstance(value, dict):
+                if set(value) != {"defaultValue"}:
+                    raise ValueError("Unqualified branched health base: " + ".".join(path))
+                value = {"defaultValue": _scaled(value["defaultValue"], health_percent,
+                    ".".join(path), zero=field == "starting")}
+            else:
+                value = _scaled(value, health_percent, ".".join(path), zero=field == "starting")
+            body = _set(body, path, value)
+    return body
+
+
 def materialize_enemy_attributes(
     source_block,
     clone_name,
@@ -143,12 +191,7 @@ def materialize_enemy_attributes(
     Missing numerical bases are refused. Family eligibility and source selection
     belong to the caller; this helper does not qualify navigation or attachments.
     """
-    clone = _AI_CLONE_NAME.fullmatch(clone_name)
-    if not clone or len(clone_name) >= 512 or not 1 <= int(clone.group(1)) <= 10000:
-        raise ValueError("Private AI clone needs ap_v070_ai_<unique>__ap_v070_sNNNNN")
-    for name, value in (("health", health_percent), ("damage", damage_percent), ("size", size_percent)):
-        if type(value) is not int or not 1 <= value <= 10000:
-            raise ValueError(f"{name}_percent must be an integer in 1..10000")
+    _materialize_enemy_attributes_clone(clone_name, damage_percent, health_percent, size_percent)
     header, begin, end, properties = _attribute_source(source_block)
     body = source_block[begin + 1:end - 1]
     if base_properties is not None and not isinstance(base_properties, dict):
@@ -162,37 +205,9 @@ def materialize_enemy_attributes(
             raise ValueError("Unqualified inherited base: edit." + ".".join(path))
         return value
 
-    if health_percent != 100:
-        for field in ("max", "starting"):
-            path = ("aiHealth", "components", "components[0]", field)
-            value = base(path)
-            if isinstance(value, dict):
-                if set(value) != {"defaultValue"}:
-                    raise ValueError("Unqualified branched health base: " + ".".join(path))
-                value = {"defaultValue": _scaled(value["defaultValue"], health_percent,
-                    ".".join(path), zero=field == "starting")}
-            else:
-                value = _scaled(value, health_percent, ".".join(path), zero=field == "starting")
-            body = _set(body, path, value)
+    body = _scale_enemy_health(base, body, health_percent)
     if damage_percent != 100:
-        path = ("aiEditable", "damageOutModifiers")
-        authored = base(path)
-        if not isinstance(authored, dict) or type(authored.get("num")) is not int or authored["num"] < 0:
-            raise ValueError("Unqualified damageOutModifiers list")
-        try:
-            modifiers = list_items(authored)
-        except (KeyError, ValueError) as error:
-            raise ValueError("Unqualified damageOutModifiers list") from error
-        scaled = []
-        for modifier in modifiers:
-            if not isinstance(modifier, dict) or not isinstance(modifier.get("damageSource"), str):
-                raise ValueError("Unqualified damageOutModifiers entry")
-            item = dict(modifier)
-            item["damageModifier"] = _scaled(item.get("damageModifier"), damage_percent, "damageOutModifiers.damageModifier", zero=True)
-            scaled.append(item)
-        if not any("DAMAGESRC_ALL" in (token.strip() for token in item["damageSource"].split("|")) for item in scaled):
-            scaled.append({"damageSource": "DAMAGESRC_ALL", "damageModifier": damage_percent / 100})
-        body = _set(body, path, {"num": len(scaled), **{f"item[{i}]": item for i, item in enumerate(scaled)}})
+        body = _materialize_enemy_attributes_scaled(base, body, damage_percent)
     if size_percent != 100:
         for axis in ("x", "y", "z"):
             path = ("renderModelInfo", "scale", axis)

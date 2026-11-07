@@ -3,19 +3,14 @@
 import copy
 import hashlib
 import json
-import math
 from pathlib import Path
 
 from tools.maps.encounter_catalog import entity_records
 
-
 _CATALOG = Path(__file__).resolve().parents[2] / "content/catalog/enemy_attribute_baselines.json"
 
 
-def resolve_enemy_attribute_baselines(source_block, *, catalog=None):
-    """Return isolated authored values and SHA-qualified native input defaults."""
-    if catalog is None:
-        catalog = json.loads(_CATALOG.read_text(encoding="utf-8"))
+def _resolve_enemy_attribute_baselines_source_sha(catalog, source_block):
     if catalog.get("schema_version") != 1 or catalog.get("qualification") != "offline_native_defaults":
         raise ValueError("Unsupported enemy attribute baseline catalog")
     source_sha = hashlib.sha256(source_block.strip().encode("utf-8")).hexdigest()
@@ -37,6 +32,14 @@ def resolve_enemy_attribute_baselines(source_block, *, catalog=None):
         components["components[0]"] = {
             **template["hitpoint_input"], **components.get("components[0]", {}),
         }
+    return bases, health
+
+
+def resolve_enemy_attribute_baselines(source_block, *, catalog=None):
+    """Return isolated authored values and SHA-qualified native input defaults."""
+    if catalog is None:
+        catalog = json.loads(_CATALOG.read_text(encoding="utf-8"))
+    bases, health = _resolve_enemy_attribute_baselines_source_sha(catalog, source_block)
     if health is not None:
         bases["aiHealth"] = health
     return copy.deepcopy(bases)

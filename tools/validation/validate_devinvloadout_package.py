@@ -4,13 +4,12 @@
 from __future__ import annotations
 
 import argparse
-import re
 import json
+import re
 from pathlib import Path
 
 from doom_eap.content.map_registry import load_map_registry
 from tools.decls.devinv_builder import build_tag_devinv_overrides, devinv_starting_arguments, validate_devinv_source
-
 
 DECL_PREFIX = Path("generated/decls/devinvloadout")
 
@@ -34,25 +33,27 @@ def expected_decl_path(mod_root: Path, registry_path: Path, generated_map: Path)
     return mod_root / Path(resource_path).stem / DECL_PREFIX / f"{logical_decl}.decl"
 
 
-def validate(
-    mod_root: Path,
-    registry_path: Path,
-    generated_map: Path,
-    manifest_path: Path | None = None,
-) -> None:
-    expected = expected_decl_path(mod_root, registry_path, generated_map)
-    logical_suffix = expected.relative_to(mod_root).parts[1:]
-    candidates = [
-        path for path in mod_root.rglob("e1m1.decl")
-        if path.relative_to(mod_root).parts[1:] == logical_suffix
-    ]
-    if candidates != [expected]:
-        raise AssertionError(f"expected exactly one E1M1 DevInvLoadout at {expected}, got {candidates}")
-    legacy = mod_root / "gameresources" / Path(*logical_suffix)
-    if legacy.exists():
-        raise AssertionError(f"DevInvLoadout must not remain in gameresources: {legacy}")
+def _validate_tag_overrides(mod_root, options):
+    tag_overrides = build_tag_devinv_overrides(
+        **devinv_starting_arguments(options)
+    )
+    tag_paths = [mod_root / path for path in tag_overrides]
+    if options.get("runtime", options).get("use_dlc_content", True):
+        for tag_path in tag_paths:
+            if not tag_path.is_file():
+                raise AssertionError(f"missing TAG DevInv override: {tag_path}")
+            try:
+                tag_text = tag_path.read_text(encoding="utf-8")
+                if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
+                    raise ValueError("TAG DevInv override retains inherit declaration")
+                _validate_tag_starting(tag_text, options, tag_overrides[tag_path.relative_to(mod_root).as_posix()])
+            except ValueError as error:
+                raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
+    elif any(path.exists() for path in tag_paths):
+        raise AssertionError("DLC-OFF package contains TAG DevInv overrides")
 
-    text = expected.read_text(encoding="utf-8")
+
+def _validate_marker(manifest_path, mod_root, text):
     for marker in (
         'STAT_SUIT_PAGE_UNLOCKED',
         'STAT_RUNE_PAGE_UNLOCKED',
@@ -82,23 +83,29 @@ def validate(
         raise AssertionError(str(error)) from error
 
     if has_room_manifest:
-        tag_overrides = build_tag_devinv_overrides(
-            **devinv_starting_arguments(options)
-        )
-        tag_paths = [mod_root / path for path in tag_overrides]
-        if options.get("runtime", options).get("use_dlc_content", True):
-            for tag_path in tag_paths:
-                if not tag_path.is_file():
-                    raise AssertionError(f"missing TAG DevInv override: {tag_path}")
-                try:
-                    tag_text = tag_path.read_text(encoding="utf-8")
-                    if re.search(r"^[ \t]*inherit\s*=", tag_text, re.MULTILINE):
-                        raise ValueError("TAG DevInv override retains inherit declaration")
-                    _validate_tag_starting(tag_text, options, tag_overrides[tag_path.relative_to(mod_root).as_posix()])
-                except ValueError as error:
-                    raise AssertionError(f"invalid TAG DevInv override {tag_path}: {error}") from error
-        elif any(path.exists() for path in tag_paths):
-            raise AssertionError("DLC-OFF package contains TAG DevInv overrides")
+        _validate_tag_overrides(mod_root, options)
+
+
+def validate(
+    mod_root: Path,
+    registry_path: Path,
+    generated_map: Path,
+    manifest_path: Path | None = None,
+) -> None:
+    expected = expected_decl_path(mod_root, registry_path, generated_map)
+    logical_suffix = expected.relative_to(mod_root).parts[1:]
+    candidates = [
+        path for path in mod_root.rglob("e1m1.decl")
+        if path.relative_to(mod_root).parts[1:] == logical_suffix
+    ]
+    if candidates != [expected]:
+        raise AssertionError(f"expected exactly one E1M1 DevInvLoadout at {expected}, got {candidates}")
+    legacy = mod_root / "gameresources" / Path(*logical_suffix)
+    if legacy.exists():
+        raise AssertionError(f"DevInvLoadout must not remain in gameresources: {legacy}")
+
+    text = expected.read_text(encoding="utf-8")
+    _validate_marker(manifest_path, mod_root, text)
 
 
 def main() -> None:

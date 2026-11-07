@@ -14,25 +14,19 @@ import zipfile
 from pathlib import Path
 from typing import Any, cast
 
-from doom_eap.content.physical_options import PHYSICAL_OPTIONS
-from doom_eap.content.map_registry import load_map_registry, release_plan
-from doom_eap.content.item_classification import load_item_classification_identity
 from doom_eap.content.automap_visual_registry import load_automap_visual_registry, validate_generated_visuals
-from tools.validation.validate_item_notification_package import (
-    LOCATION_NOTIFICATION_RE,
-    NOTIFICATION_RE,
-    capability,
-    progressive_notification_stage_count,
-    entity_block,
-    string_table_names,
+from doom_eap.content.item_classification import load_item_classification_identity
+from doom_eap.content.map_registry import load_map_registry, release_plan
+from doom_eap.content.physical_options import PHYSICAL_OPTIONS
+from tools.maps.ap_map_generator import (
+    find_entity_block_bounds,
 )
-from tools.validation.release_layout import expected_release_roots
 from tools.release.release_manifest import load_release_manifest
 from tools.release.room_payloads import (
-    _decode_source_snapshot,
     BASE_RESOURCE_NAME,
     ROOM_PAYLOAD_MANIFEST_NAME,
     ROOM_PAYLOAD_RESOURCE_NAME,
+    _decode_source_snapshot,
     assemble_room_files,
     canonical_json,
     load_room_payload_manifest,
@@ -42,8 +36,14 @@ from tools.release.room_payloads import (
     sha256_bytes,
     write_deterministic_zip,
 )
-from tools.maps.ap_map_generator import (
-    find_entity_block_bounds,
+from tools.validation.release_layout import expected_release_roots
+from tools.validation.validate_item_notification_package import (
+    LOCATION_NOTIFICATION_RE,
+    NOTIFICATION_RE,
+    capability,
+    entity_block,
+    progressive_notification_stage_count,
+    string_table_names,
 )
 
 
@@ -61,8 +61,7 @@ def _read_entities(path: Path, decompressor: Path | None, temporary: Path) -> by
     subprocess.run(
         [str(decompressor), "--decompress", str(path), str(output)],
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     return output.read_bytes()
 
@@ -86,6 +85,50 @@ def _map_payload_path(mod_root: Path, plan) -> Path:
     return mod_root / resource_name / "maps" / plan.relative_entities_path
 
 
+def _assert_notifications_parts(map_key, progressive_stage_count, rpc_suffix, suffix):
+    parts = rpc_suffix.split("_")
+    if len(parts) != 2 or not parts[1].isdigit() or int(parts[1]) >= progressive_stage_count:
+        raise AssertionError(f"notification has invalid progressive stage: {map_key}/{suffix}")
+
+
+def _assert_notifications_effects(content, item_id, stage, stage_effects):
+    effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
+    for index in range(len(effects)):
+        rpc_name = (
+            f"ap_rpc_v3_{item_id}_{stage}"
+            if isinstance(stage_effects, str)
+            else f"ap_rpc_v3_{item_id}_{stage}_{index}"
+        )
+        entity_block(content, rpc_name)
+
+
+def _assert_notifications_notification(checked_rpc_ids, content, item_definitions, map_key, suffix):
+    notification = entity_block(content, f"ap_notify_item_{suffix}")
+    rpc_suffix = suffix.split('_', 1)[1].rsplit('_', 1)[0]
+    try:
+        item_id = int(rpc_suffix.split("_", 1)[0])
+    except ValueError as error:
+        raise AssertionError(f"notification has invalid item ID: {map_key}/{suffix}") from error
+    definition = item_definitions.get(str(item_id))
+    if definition is None:
+        raise AssertionError(f"notification has unknown item ID: {map_key}/{suffix}")
+    progressive_stage_count = progressive_notification_stage_count(item_id, definition)
+    if progressive_stage_count is not None:
+        _assert_notifications_parts(map_key, progressive_stage_count, rpc_suffix, suffix)
+    if item_id not in checked_rpc_ids:
+        checked_rpc_ids.add(item_id)
+        if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
+            pass
+        elif isinstance(definition, dict) and definition.get("type") in {
+            "progressive_perk", "progressive_item",
+        }:
+            for stage, stage_effects in enumerate(definition["perks"]):
+                _assert_notifications_effects(content, item_id, stage, stage_effects)
+        else:
+            entity_block(content, f"ap_rpc_v3_{item_id}")
+    return notification
+
+
 def _assert_notifications(
     content: str,
     map_key: str,
@@ -95,38 +138,7 @@ def _assert_notifications(
         raise AssertionError(f"forbidden receipt root: {map_key}")
     checked_rpc_ids: set[int] = set()
     for suffix in NOTIFICATION_RE.findall(content):
-        notification = entity_block(content, f"ap_notify_item_{suffix}")
-        rpc_suffix = suffix.split('_', 1)[1].rsplit('_', 1)[0]
-        try:
-            item_id = int(rpc_suffix.split("_", 1)[0])
-        except ValueError as error:
-            raise AssertionError(f"notification has invalid item ID: {map_key}/{suffix}") from error
-        definition = item_definitions.get(str(item_id))
-        if definition is None:
-            raise AssertionError(f"notification has unknown item ID: {map_key}/{suffix}")
-        progressive_stage_count = progressive_notification_stage_count(item_id, definition)
-        if progressive_stage_count is not None:
-            parts = rpc_suffix.split("_")
-            if len(parts) != 2 or not parts[1].isdigit() or int(parts[1]) >= progressive_stage_count:
-                raise AssertionError(f"notification has invalid progressive stage: {map_key}/{suffix}")
-        if item_id not in checked_rpc_ids:
-            checked_rpc_ids.add(item_id)
-            if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
-                pass
-            elif isinstance(definition, dict) and definition.get("type") in {
-                "progressive_perk", "progressive_item",
-            }:
-                for stage, stage_effects in enumerate(definition["perks"]):
-                    effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
-                    for index in range(len(effects)):
-                        rpc_name = (
-                            f"ap_rpc_v3_{item_id}_{stage}"
-                            if isinstance(stage_effects, str)
-                            else f"ap_rpc_v3_{item_id}_{stage}_{index}"
-                        )
-                        entity_block(content, rpc_name)
-            else:
-                entity_block(content, f"ap_rpc_v3_{item_id}")
+        notification = _assert_notifications_notification(checked_rpc_ids, content, item_definitions, map_key, suffix)
         if any(field in notification for field in (
             'triggerOnce = true;', 'removeAfterActivation = true;',
             'disableAfterActivation = true;', 'startOff = true;',
@@ -166,6 +178,23 @@ def _physical_entity_family(spec: dict[str, object], name: str) -> bool:
     return name in projected_names
 
 
+def _assert_runtime_contract_families_active_map(blocks, fast_travel_maps, map_key):
+    active_map = blocks["ap_rpc_auto_enable"]
+    if "AP_ACTIVE_MAP_V1" not in active_map or f"map_key={map_key}" not in active_map:
+        raise AssertionError(f"active-map publisher contract drift: {map_key}")
+    if map_key in fast_travel_maps:
+        ft_relay = blocks["ap_fast_travel_unlock"]
+        if 'class = "idTarget_Count";' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay class drift: {map_key}")
+        if 'inherit = "target/relay";' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay inherit drift: {map_key}")
+        if '"ap_fast_travel_unlock_native"' not in ft_relay:
+            raise AssertionError(f"Fast Travel relay missing native target: {map_key}")
+        ft_native = blocks["ap_fast_travel_unlock_native"]
+        if 'class = "idTarget_FastTravelUnlock";' not in ft_native:
+            raise AssertionError(f"Fast Travel native class drift: {map_key}")
+
+
 def _assert_runtime_contract_families(
     map_key: str,
     blocks: dict[str, str],
@@ -190,20 +219,7 @@ def _assert_runtime_contract_families(
         or re.search(r"\blayers\s*=", lifecycle)
     ):
         raise AssertionError(f"FirstThink lifecycle contract drift: {map_key}")
-    active_map = blocks["ap_rpc_auto_enable"]
-    if "AP_ACTIVE_MAP_V1" not in active_map or f"map_key={map_key}" not in active_map:
-        raise AssertionError(f"active-map publisher contract drift: {map_key}")
-    if map_key in fast_travel_maps:
-        ft_relay = blocks["ap_fast_travel_unlock"]
-        if 'class = "idTarget_Count";' not in ft_relay:
-            raise AssertionError(f"Fast Travel relay class drift: {map_key}")
-        if 'inherit = "target/relay";' not in ft_relay:
-            raise AssertionError(f"Fast Travel relay inherit drift: {map_key}")
-        if '"ap_fast_travel_unlock_native"' not in ft_relay:
-            raise AssertionError(f"Fast Travel relay missing native target: {map_key}")
-        ft_native = blocks["ap_fast_travel_unlock_native"]
-        if 'class = "idTarget_FastTravelUnlock";' not in ft_native:
-            raise AssertionError(f"Fast Travel native class drift: {map_key}")
+    _assert_runtime_contract_families_active_map(blocks, fast_travel_maps, map_key)
 
     families = {
         "AP checks": lambda name: name.startswith("AP_CHECK_"),
@@ -225,20 +241,30 @@ def _global_option_states() -> list[dict[str, bool]]:
     ]
 
 
-def _audit_room_selection(
-    resource_dir: Path,
-    payload_manifest: dict[str, object],
-) -> tuple[
-    list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
-    dict[str, bytes],
-    dict[str, bytes],
-]:
-    manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
-    base_members = read_zip(resource_dir / BASE_RESOURCE_NAME)
-    payload_members = read_zip(resource_dir / ROOM_PAYLOAD_RESOURCE_NAME)
-    expected_base_members = set(cast(list[str], payload_manifest["base_members"]))
-    if set(base_members) != expected_base_members:
-        raise AssertionError("room payload base member set drifted")
+def _audit_room_selection_expected_options(base_members, manifest_maps, map_key, options, payload_members, state):
+    record = manifest_maps[map_key]
+    expected_options = {
+        key: options[key] for key in record["option_keys"]
+    }
+    if state["options"] != expected_options:
+        raise AssertionError(
+            f"synthetic room payload state selection drifted: {map_key}"
+        )
+    target = str(record["target_member"])
+    if target not in base_members:
+        raise AssertionError(f"base room payload target is missing: {map_key}/{target}")
+    if state["source"] == "base":
+        selected_bytes = base_members[target]
+    else:
+        member = str(state["member"])
+        if member not in payload_members:
+            raise AssertionError(f"room payload member is missing: {map_key}/{member}")
+        selected_bytes = payload_members[member]
+    if sha256_bytes(selected_bytes) != state["sha256"]:
+        raise AssertionError(f"room payload state hash drifted: {map_key}")
+
+
+def _audit_room_selection_expected_payload_members(base_members, manifest_maps, payload_manifest, payload_members):
     expected_payload_members = {
         state["member"]
         for record in manifest_maps.values()
@@ -258,27 +284,26 @@ def _audit_room_selection(
                 f"synthetic room payload selection is incomplete: state={state_index}"
             )
         for map_key, state in selected.items():
-            record = manifest_maps[map_key]
-            expected_options = {
-                key: options[key] for key in record["option_keys"]
-            }
-            if state["options"] != expected_options:
-                raise AssertionError(
-                    f"synthetic room payload state selection drifted: {map_key}"
-                )
-            target = str(record["target_member"])
-            if target not in base_members:
-                raise AssertionError(f"base room payload target is missing: {map_key}/{target}")
-            if state["source"] == "base":
-                selected_bytes = base_members[target]
-            else:
-                member = str(state["member"])
-                if member not in payload_members:
-                    raise AssertionError(f"room payload member is missing: {map_key}/{member}")
-                selected_bytes = payload_members[member]
-            if sha256_bytes(selected_bytes) != state["sha256"]:
-                raise AssertionError(f"room payload state hash drifted: {map_key}")
+            _audit_room_selection_expected_options(base_members, manifest_maps, map_key, options, payload_members, state)
         selections.append((options, selected))
+    return selections
+
+
+def _audit_room_selection(
+    resource_dir: Path,
+    payload_manifest: dict[str, object],
+) -> tuple[
+    list[tuple[dict[str, bool], dict[str, dict[str, Any]]]],
+    dict[str, bytes],
+    dict[str, bytes],
+]:
+    manifest_maps = cast(dict[str, dict[str, Any]], payload_manifest["maps"])
+    base_members = read_zip(resource_dir / BASE_RESOURCE_NAME)
+    payload_members = read_zip(resource_dir / ROOM_PAYLOAD_RESOURCE_NAME)
+    expected_base_members = set(cast(list[str], payload_manifest["base_members"]))
+    if set(base_members) != expected_base_members:
+        raise AssertionError("room payload base member set drifted")
+    selections = _audit_room_selection_expected_payload_members(base_members, manifest_maps, payload_manifest, payload_members)
     if not any(
         state["source"] == "replacement"
         for _, selected in selections
@@ -286,6 +311,67 @@ def _audit_room_selection(
     ):
         raise AssertionError("synthetic room payload did not select replacements")
     return selections, base_members, payload_members
+
+
+def _audit_final_physical_states_relevant_options(authoritative_content, content_cache, expected_payloads, map_key, options, parsed_payloads, state_sha256):
+    if state_sha256 not in parsed_payloads:
+        parsed_payloads[state_sha256] = _runtime_entity_blocks(
+            content_cache[state_sha256].decode("utf-8")
+        )
+    actual = parsed_payloads[state_sha256]
+    relevant_options = tuple(
+        (option_key, options[option_key])
+        for option_key, spec in PHYSICAL_OPTIONS.items()
+        if spec["map_key"] == map_key
+    )
+    expected_key = (
+        map_key,
+        relevant_options,
+    )
+    if expected_key not in expected_payloads:
+        expected_content = authoritative_content[map_key]
+        expected = _runtime_entity_blocks(expected_content)
+        for option_key, spec in PHYSICAL_OPTIONS.items():
+            if spec["map_key"] == map_key and not options[option_key]:
+                expected = {
+                    name: block
+                    for name, block in expected.items()
+                    if not _physical_entity_family(spec, name)
+                }
+        expected_payloads[expected_key] = expected
+    return actual, expected_key
+
+
+def _audit_final_physical_states_changed(actual, expected, fast_travel_maps, map_key, state_index):
+    if set(actual) != set(expected):
+        missing = sorted(set(expected) - set(actual))
+        extra = sorted(set(actual) - set(expected))
+        raise AssertionError(
+            f"final runtime entity inventory drift: state={state_index} "
+            f"map={map_key} missing={missing} extra={extra}"
+        )
+    changed = [name for name in expected if actual[name] != expected[name]]
+    if changed:
+        raise AssertionError(
+            f"final runtime entity blocks drift: state={state_index} "
+            f"map={map_key} entities={sorted(changed)}"
+        )
+    required = set()
+    if map_key in fast_travel_maps:
+        required.add("ap_fast_travel_unlock")
+    if map_key == "e1m1_intro":
+        required.update({
+            "ap_remove_location_visual_7770008",
+            "ap_remove_location_visual_7770009",
+            "ap_remove_location_visual_7770014",
+            "ap_remove_location_visual_7770017",
+        })
+    absent = sorted(required - set(actual))
+    if absent:
+        raise AssertionError(
+            f"runtime targets absent in final state: state={state_index} "
+            f"map={map_key} entities={absent}"
+        )
 
 
 def _audit_final_physical_states(
@@ -333,67 +419,37 @@ def _audit_final_physical_states(
                 _read_cached_entities(
                     encoded_bytes, decompressor, temporary, content_cache
                 )
-                if state_sha256 not in parsed_payloads:
-                    parsed_payloads[state_sha256] = _runtime_entity_blocks(
-                        content_cache[state_sha256].decode("utf-8")
-                    )
-                actual = parsed_payloads[state_sha256]
-                relevant_options = tuple(
-                    (option_key, options[option_key])
-                    for option_key, spec in PHYSICAL_OPTIONS.items()
-                    if spec["map_key"] == map_key
-                )
-                expected_key = (
-                    map_key,
-                    relevant_options,
-                )
-                if expected_key not in expected_payloads:
-                    expected_content = authoritative_content[map_key]
-                    expected = _runtime_entity_blocks(expected_content)
-                    for option_key, spec in PHYSICAL_OPTIONS.items():
-                        if spec["map_key"] == map_key and not options[option_key]:
-                            expected = {
-                                name: block
-                                for name, block in expected.items()
-                                if not _physical_entity_family(spec, name)
-                            }
-                    expected_payloads[expected_key] = expected
+                actual, expected_key = _audit_final_physical_states_relevant_options(authoritative_content, content_cache, expected_payloads, map_key, options, parsed_payloads, state_sha256)
                 expected = expected_payloads[expected_key]
-                if set(actual) != set(expected):
-                    missing = sorted(set(expected) - set(actual))
-                    extra = sorted(set(actual) - set(expected))
-                    raise AssertionError(
-                        f"final runtime entity inventory drift: state={state_index} "
-                        f"map={map_key} missing={missing} extra={extra}"
-                    )
-                changed = [name for name in expected if actual[name] != expected[name]]
-                if changed:
-                    raise AssertionError(
-                        f"final runtime entity blocks drift: state={state_index} "
-                        f"map={map_key} entities={sorted(changed)}"
-                    )
-                required = set()
-                if map_key in fast_travel_maps:
-                    required.add("ap_fast_travel_unlock")
-                if map_key == "e1m1_intro":
-                    required.update({
-                        "ap_remove_location_visual_7770008",
-                        "ap_remove_location_visual_7770009",
-                        "ap_remove_location_visual_7770014",
-                        "ap_remove_location_visual_7770017",
-                    })
-                absent = sorted(required - set(actual))
-                if absent:
-                    raise AssertionError(
-                        f"runtime targets absent in final state: state={state_index} "
-                        f"map={map_key} entities={absent}"
-                    )
+                _audit_final_physical_states_changed(actual, expected, fast_travel_maps, map_key, state_index)
     return {
         "global_states": len(selections),
         "unique_map_states": len(unique_map_states),
         "unique_payload_hashes": len(unique_payload_hashes),
         "decompressed_payloads": len(content_cache),
     }
+
+
+def _audit_mod_payload_generated_notifications(enabled, generated, generated_text, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity):
+    generated_notifications = set(NOTIFICATION_RE.findall(generated_text))
+    packaged_notifications = set(NOTIFICATION_RE.findall(packaged_text))
+    packaged_locations = set(
+        LOCATION_NOTIFICATION_RE.findall(packaged_text)
+    )
+    generated_identity_required = (
+        require_generated_identity and plan.map_key not in physical_map_keys
+    )
+    if generated_identity_required and generated != packaged:
+        raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
+    if enabled:
+        if not packaged_notifications:
+            raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
+        if generated_identity_required and generated_notifications != packaged_notifications:
+            raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
+        _assert_notifications(packaged_text, plan.map_key, item_definitions)
+    elif "entityDef ap_rpc_item_" in packaged_text or packaged_notifications:
+        raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
+    return packaged_locations, packaged_notifications
 
 
 def audit_mod_payload(
@@ -433,24 +489,7 @@ def audit_mod_payload(
                     plan.map_key,
                     generated_text,
                 )
-            generated_notifications = set(NOTIFICATION_RE.findall(generated_text))
-            packaged_notifications = set(NOTIFICATION_RE.findall(packaged_text))
-            packaged_locations = set(
-                LOCATION_NOTIFICATION_RE.findall(packaged_text)
-            )
-            generated_identity_required = (
-                require_generated_identity and plan.map_key not in physical_map_keys
-            )
-            if generated_identity_required and generated != packaged:
-                raise AssertionError(f"generated and packaged map contents diverge: {plan.map_key}")
-            if enabled:
-                if not packaged_notifications:
-                    raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
-                if generated_identity_required and generated_notifications != packaged_notifications:
-                    raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
-                _assert_notifications(packaged_text, plan.map_key, item_definitions)
-            elif "entityDef ap_rpc_item_" in packaged_text or packaged_notifications:
-                raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
+            packaged_locations, packaged_notifications = _audit_mod_payload_generated_notifications(enabled, generated, generated_text, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity)
             records[plan.map_key] = {
                 "generated_source_sha256": hashlib.sha256(generated).hexdigest(),
                 "packaged_payload_sha256": hashlib.sha256(packaged).hexdigest(),
@@ -647,6 +686,35 @@ def audit_release(
     return records
 
 
+def _extract_playable_zip_expected_roots(files, launchers):
+    expected_roots = expected_release_roots(next(iter(launchers)))
+    roots = {name.split("/", 1)[0] for name in files}
+    if roots != expected_roots:
+        raise AssertionError(f"playable ZIP root layout is not exact: {sorted(roots)}")
+    required = {
+        "README.md",
+        "INSTALL.md",
+        "LICENSE",
+        "RELEASE_MANIFEST.json",
+        "doometernal.apworld",
+    }
+    missing = required - files
+    if missing:
+        raise AssertionError(f"playable ZIP lacks public layout files: {sorted(missing)}")
+    if any(
+        "licenses" in Path(name).parts
+        for name in files
+    ):
+        raise AssertionError("playable ZIP exposes internal resources")
+    nested_candidates = {
+        name for name in files
+        if name.lower().endswith(".zip")
+        and "DoomEternalArchipelagoPlayableTest-" in Path(name).name
+    }
+    if nested_candidates:
+        raise AssertionError(f"playable ZIP contains prior candidate: {sorted(nested_candidates)}")
+
+
 def _extract_playable_zip(
     playable_zip: Path,
     destination: Path,
@@ -664,32 +732,7 @@ def _extract_playable_zip(
             raise AssertionError("playable ZIP must contain exactly one root launcher")
         if any(name.startswith("client/DoomEternalArchipelagoLauncher") for name in files):
             raise AssertionError("playable ZIP contains launcher under client")
-        expected_roots = expected_release_roots(next(iter(launchers)))
-        roots = {name.split("/", 1)[0] for name in files}
-        if roots != expected_roots:
-            raise AssertionError(f"playable ZIP root layout is not exact: {sorted(roots)}")
-        required = {
-            "README.md",
-            "INSTALL.md",
-            "LICENSE",
-            "RELEASE_MANIFEST.json",
-            "doometernal.apworld",
-        }
-        missing = required - files
-        if missing:
-            raise AssertionError(f"playable ZIP lacks public layout files: {sorted(missing)}")
-        if any(
-            "licenses" in Path(name).parts
-            for name in files
-        ):
-            raise AssertionError("playable ZIP exposes internal resources")
-        nested_candidates = {
-            name for name in files
-            if name.lower().endswith(".zip")
-            and "DoomEternalArchipelagoPlayableTest-" in Path(name).name
-        }
-        if nested_candidates:
-            raise AssertionError(f"playable ZIP contains prior candidate: {sorted(nested_candidates)}")
+        _extract_playable_zip_expected_roots(files, launchers)
         archive.extractall(destination)
     client_dir = destination / "client"
     resource_dir = client_dir / "resources"

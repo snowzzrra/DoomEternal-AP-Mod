@@ -12,8 +12,8 @@ from itertools import product
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from doom_eap.content.physical_options import map_physical_option_keys
 from doom_eap.content.mastery_requirements import mastery_entries_for_profile, patch_mastery_decl
+from doom_eap.content.physical_options import map_physical_option_keys
 from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 BASE_RESOURCE_NAME = "base_mod.zip"
@@ -50,7 +50,7 @@ def plan_map_local_states(
         state_policy = "cartesian" if physical_keys else "off_only"
         option_keys = tuple(sorted(physical_keys))
         states = tuple(
-            dict(zip(option_keys, values))
+            dict(zip(option_keys, values, strict=False))
             for values in product((False, True), repeat=len(option_keys))
         )
         plans.append(MapLocalStatePlan(
@@ -128,40 +128,29 @@ def _state_key(options: Mapping[str, Any]) -> tuple[tuple[str, bool], ...]:
     return tuple(sorted((str(key), value) for key, value in options.items()))
 
 
-def validate_room_payload_manifest(
-    document: Mapping[str, Any],
-    *,
-    known_maps: Mapping[str, str] | None = None,
-) -> None:
-    if document.get("schema_version") != ROOM_PAYLOAD_SCHEMA_VERSION:
-        raise ValueError("room payload manifest schema version is unsupported")
-    if document.get("model") != "dependent_map_payloads":
-        raise ValueError("room payload manifest model is unsupported")
-    keys = document.get("physical_option_keys")
-    if keys != ["randomize_chainsaw", "randomize_dash", "randomize_first_battery"]:
-        raise ValueError("room payload physical option contract drifted")
-    physical_option_keys = {
-        "randomize_chainsaw", "randomize_dash", "randomize_first_battery",
-    }
-    map_option_keys = physical_option_keys
-    maps = document.get("maps")
-    if not isinstance(maps, Mapping) or not maps:
-        raise ValueError("room payload manifest maps are missing")
-    snapshots = document.get("source_snapshots")
-    if not isinstance(snapshots, Mapping) or set(snapshots) != set(maps):
-        raise ValueError("room payload source snapshots differ from the map set")
-    for map_key, snapshot in snapshots.items():
-        if not isinstance(map_key, str) or not map_key or _safe_member(map_key) != map_key or "/" in map_key:
-            raise ValueError("room payload snapshot map key is invalid")
-        if not isinstance(snapshot, Mapping) or set(snapshot) != {"member", "sha256", "size"}:
-            raise ValueError(f"room payload source snapshot fields are invalid: {map_key}")
-        if snapshot["member"] != f"sources/{map_key}.entities":
-            raise ValueError(f"room payload source snapshot member is invalid: {map_key}")
-        if (not isinstance(snapshot["sha256"], str) or len(snapshot["sha256"]) != 64
-                or any(char not in "0123456789abcdef" for char in snapshot["sha256"])):
-            raise ValueError(f"room payload source snapshot hash is invalid: {map_key}")
-        if type(snapshot["size"]) is not int or snapshot["size"] < 0:
-            raise ValueError(f"room payload source snapshot size is invalid: {map_key}")
+def _validate_room_payload_manifest_state_policy(map_key, map_option_keys, normalized_base_members, option_keys, record, seen_targets, target_member):
+    if target_member not in normalized_base_members or target_member in seen_targets:
+        raise ValueError(f"room payload target member is not unique/base-backed: {map_key}")
+    seen_targets.add(target_member)
+    state_policy = record.get("state_policy", "cartesian")
+    if state_policy == "cartesian":
+        expected_option_keys = sorted(map_physical_option_keys(map_key))
+    elif state_policy == "off_only":
+        expected_option_keys = list(map_physical_option_keys(map_key))
+    else:
+        raise ValueError(f"room payload state policy is invalid: {map_key}")
+    if (
+        not isinstance(option_keys, list)
+        or not all(isinstance(key, str) for key in option_keys)
+        or option_keys != expected_option_keys
+    ):
+        raise ValueError(f"room payload option keys are invalid: {map_key}")
+    if not set(option_keys) <= map_option_keys:
+        raise ValueError(f"room payload option key coverage is invalid: {map_key}")
+    return state_policy
+
+
+def _validate_room_payload_manifest_context_targets(document, snapshots):
     context_targets = document.get("context_targets")
     if not isinstance(context_targets, Mapping) or not context_targets:
         raise ValueError("room payload manifest context targets are missing")
@@ -176,84 +165,141 @@ def validate_room_payload_manifest(
     seen_members = {snapshot["member"] for snapshot in snapshots.values()}
     if document.get("enemy_resources"):
         raise ValueError("Unsupported enemy resource imports. Rebuild room resources for native recipes.")
+    return seen_members
+
+
+def _validate_room_payload_manifest_member(map_key, snapshot):
+    if not isinstance(snapshot, Mapping) or set(snapshot) != {"member", "sha256", "size"}:
+        raise ValueError(f"room payload source snapshot fields are invalid: {map_key}")
+    if snapshot["member"] != f"sources/{map_key}.entities":
+        raise ValueError(f"room payload source snapshot member is invalid: {map_key}")
+    if (not isinstance(snapshot["sha256"], str) or len(snapshot["sha256"]) != 64
+            or any(char not in "0123456789abcdef" for char in snapshot["sha256"])):
+        raise ValueError(f"room payload source snapshot hash is invalid: {map_key}")
+    if type(snapshot["size"]) is not int or snapshot["size"] < 0:
+        raise ValueError(f"room payload source snapshot size is invalid: {map_key}")
+
+
+def _validate_room_payload_manifest_physical_option_keys(document):
+    physical_option_keys = {
+        "randomize_chainsaw", "randomize_dash", "randomize_first_battery",
+    }
+    map_option_keys = physical_option_keys
+    maps = document.get("maps")
+    if not isinstance(maps, Mapping) or not maps:
+        raise ValueError("room payload manifest maps are missing")
+    snapshots = document.get("source_snapshots")
+    if not isinstance(snapshots, Mapping) or set(snapshots) != set(maps):
+        raise ValueError("room payload source snapshots differ from the map set")
+    for map_key, snapshot in snapshots.items():
+        if not isinstance(map_key, str) or not map_key or _safe_member(map_key) != map_key or "/" in map_key:
+            raise ValueError("room payload snapshot map key is invalid")
+        _validate_room_payload_manifest_member(map_key, snapshot)
+    return map_option_keys, maps, snapshots
+
+
+def _validate_room_payload_manifest_map_option_keys(document):
+    if document.get("schema_version") != ROOM_PAYLOAD_SCHEMA_VERSION:
+        raise ValueError("room payload manifest schema version is unsupported")
+    if document.get("model") != "dependent_map_payloads":
+        raise ValueError("room payload manifest model is unsupported")
+    keys = document.get("physical_option_keys")
+    if keys != ["randomize_chainsaw", "randomize_dash", "randomize_first_battery"]:
+        raise ValueError("room payload physical option contract drifted")
+    map_option_keys, maps, snapshots = _validate_room_payload_manifest_physical_option_keys(document)
+    seen_members = _validate_room_payload_manifest_context_targets(document, snapshots)
     base_members = document.get("base_members")
     if not isinstance(base_members, list) or any(not isinstance(name, str) for name in base_members):
         raise ValueError("room payload base member list is invalid")
     normalized_base_members = [_safe_member(name) for name in base_members]
     if len(set(normalized_base_members)) != len(normalized_base_members) or normalized_base_members != base_members:
         raise ValueError("room payload base member list contains duplicates")
+    return map_option_keys, maps, normalized_base_members, seen_members
+
+
+def _validate_room_payload_manifest_options(map_key, option_keys, state, state_keys):
+    options = state["options"]
+    if not isinstance(options, Mapping) or set(options) != set(option_keys):
+        raise ValueError(f"room payload state options are invalid: {map_key}")
+    if any(not isinstance(value, bool) for value in options.values()):
+        raise ValueError(f"room payload state option is not boolean: {map_key}")
+    state_key = _state_key(options)
+    if state_key in state_keys:
+        raise ValueError(f"duplicate room payload state: {map_key}")
+    state_keys.add(state_key)
+    source = state["source"]
+    member = state["member"]
+    if not isinstance(state["sha256"], str) or len(state["sha256"]) != 64 or any(
+        char not in "0123456789abcdef" for char in state["sha256"]
+    ):
+        raise ValueError(f"room payload state hash is invalid: {map_key}")
+    return member, source
+
+
+def _validate_room_payload_manifest_option_keys(map_key, map_option_keys, normalized_base_members, record, seen_targets):
+    if not isinstance(map_key, str) or not isinstance(record, Mapping):
+        raise ValueError("room payload map record is invalid")
+    option_keys = record.get("option_keys")
+    states = record.get("states")
+    target_member = record.get("target_member")
+    if not isinstance(target_member, str) or _safe_member(target_member) != target_member:
+        raise ValueError(f"room payload target member is missing: {map_key}")
+    state_policy = _validate_room_payload_manifest_state_policy(map_key, map_option_keys, normalized_base_members, option_keys, record, seen_targets, target_member)
+    if not isinstance(states, list) or not states:
+        raise ValueError(f"room payload states are missing: {map_key}")
+    return option_keys, state_policy, states
+
+
+def _validate_payload_states_member(map_key, option_keys, seen_members, state, state_keys):
+    if not isinstance(state, Mapping) or set(state) != {"options", "source", "member", "sha256"}:
+        raise ValueError(f"room payload state fields are invalid: {map_key}")
+    member, source = _validate_room_payload_manifest_options(map_key, option_keys, state, state_keys)
+    if source not in {"base", "replacement"}:
+        raise ValueError(f"room payload state source is invalid: {map_key}")
+    if member is not None:
+        if (not isinstance(member, str) or _safe_member(member) != member
+                or source != "replacement" or member in seen_members):
+            raise ValueError(f"room payload replacement member is invalid: {map_key}")
+        seen_members.add(member)
+    elif source != "base":
+        raise ValueError(f"room payload replacement member is missing: {map_key}")
+
+
+def _validate_payload_states(map_key, option_keys, seen_members, state_keys, states):
+    for state in states:
+        _validate_payload_states_member(map_key, option_keys, seen_members, state, state_keys)
+
+
+def _validate_room_payload_manifest_intersection(map_option_keys, maps, normalized_base_members, seen_members):
     if seen_members.intersection(normalized_base_members):
         raise ValueError("compiler source snapshots cannot be base room members")
     seen_targets: set[str] = set()
     for map_key, record in maps.items():
-        if not isinstance(map_key, str) or not isinstance(record, Mapping):
-            raise ValueError("room payload map record is invalid")
-        option_keys = record.get("option_keys")
-        states = record.get("states")
-        target_member = record.get("target_member")
-        if not isinstance(target_member, str) or _safe_member(target_member) != target_member:
-            raise ValueError(f"room payload target member is missing: {map_key}")
-        if target_member not in normalized_base_members or target_member in seen_targets:
-            raise ValueError(f"room payload target member is not unique/base-backed: {map_key}")
-        seen_targets.add(target_member)
-        state_policy = record.get("state_policy", "cartesian")
-        if state_policy == "cartesian":
-            expected_option_keys = sorted(map_physical_option_keys(map_key))
-        elif state_policy == "off_only":
-            expected_option_keys = list(map_physical_option_keys(map_key))
-        else:
-            raise ValueError(f"room payload state policy is invalid: {map_key}")
-        if (
-            not isinstance(option_keys, list)
-            or not all(isinstance(key, str) for key in option_keys)
-            or option_keys != expected_option_keys
-        ):
-            raise ValueError(f"room payload option keys are invalid: {map_key}")
-        if not set(option_keys) <= map_option_keys:
-            raise ValueError(f"room payload option key coverage is invalid: {map_key}")
-        if not isinstance(states, list) or not states:
-            raise ValueError(f"room payload states are missing: {map_key}")
+        option_keys, state_policy, states = _validate_room_payload_manifest_option_keys(map_key, map_option_keys, normalized_base_members, record, seen_targets)
         state_keys: set[tuple[tuple[str, bool], ...]] = set()
-        for state in states:
-            if not isinstance(state, Mapping) or set(state) != {"options", "source", "member", "sha256"}:
-                raise ValueError(f"room payload state fields are invalid: {map_key}")
-            options = state["options"]
-            if not isinstance(options, Mapping) or set(options) != set(option_keys):
-                raise ValueError(f"room payload state options are invalid: {map_key}")
-            if any(not isinstance(value, bool) for value in options.values()):
-                raise ValueError(f"room payload state option is not boolean: {map_key}")
-            state_key = _state_key(options)
-            if state_key in state_keys:
-                raise ValueError(f"duplicate room payload state: {map_key}")
-            state_keys.add(state_key)
-            source = state["source"]
-            member = state["member"]
-            if not isinstance(state["sha256"], str) or len(state["sha256"]) != 64 or any(
-                char not in "0123456789abcdef" for char in state["sha256"]
-            ):
-                raise ValueError(f"room payload state hash is invalid: {map_key}")
-            if source not in {"base", "replacement"}:
-                raise ValueError(f"room payload state source is invalid: {map_key}")
-            if member is not None:
-                if (not isinstance(member, str) or _safe_member(member) != member
-                        or source != "replacement" or member in seen_members):
-                    raise ValueError(f"room payload replacement member is invalid: {map_key}")
-                seen_members.add(member)
-            elif source != "base":
-                raise ValueError(f"room payload replacement member is missing: {map_key}")
+        _validate_payload_states(map_key, option_keys, seen_members, state_keys, states)
         if state_policy == "off_only":
             expected_states = {
                 tuple(sorted((key, False) for key in option_keys))
             }
         elif state_policy == "cartesian":
             expected_states = {
-                tuple(sorted(zip(option_keys, values)))
+                tuple(sorted(zip(option_keys, values, strict=False)))
                 for values in product((False, True), repeat=len(option_keys))
             }
         else:
             raise ValueError(f"room payload state policy is invalid: {map_key}")
         if state_keys != expected_states:
             raise ValueError(f"room payload state coverage is incomplete: {map_key}")
+
+
+def validate_room_payload_manifest(
+    document: Mapping[str, Any],
+    *,
+    known_maps: Mapping[str, str] | None = None,
+) -> None:
+    map_option_keys, maps, normalized_base_members, seen_members = _validate_room_payload_manifest_map_option_keys(document)
+    _validate_room_payload_manifest_intersection(map_option_keys, maps, normalized_base_members, seen_members)
     if known_maps is not None:
         if set(maps) != set(known_maps):
             raise ValueError("room payload map set disagrees with known release maps")
@@ -339,25 +385,7 @@ def read_source_snapshots(payload_resource: Path, manifest: Mapping[str, Any], m
     return result
 
 
-def assemble_room_files(
-    base_resource: Path,
-    payload_resource: Path,
-    payload_manifest: Mapping[str, Any],
-    options: Mapping[str, Any],
-) -> tuple[dict[str, bytes], dict[str, dict[str, Any]]]:
-    validate_room_payload_manifest(payload_manifest)
-    base = read_zip(base_resource)
-    if set(base) != set(payload_manifest["base_members"]):
-        raise ValueError("base room payload member set drifted")
-    selected = select_room_payloads(payload_manifest, options)
-    assembled = dict(base)
-    excluded_members = {
-        str(payload_manifest["maps"][map_key]["target_member"])
-        for map_key in payload_manifest["maps"]
-        if map_key not in selected
-    }
-    for member in excluded_members:
-        assembled.pop(member, None)
+def _assemble_room_files_expected_base_members(assembled, excluded_members, options, payload_manifest, payload_resource, selected):
     with zipfile.ZipFile(payload_resource) as archive:
         payloads = _payload_archive_members(archive, payload_manifest)
         for map_key, state in selected.items():
@@ -383,6 +411,28 @@ def assemble_room_files(
         if member not in assembled:
             raise ValueError(f"Mastery DECL is missing from room resources: {member}")
         assembled[member] = patch_mastery_decl(assembled[member].decode("utf-8"), entry).encode("utf-8")
+
+
+def assemble_room_files(
+    base_resource: Path,
+    payload_resource: Path,
+    payload_manifest: Mapping[str, Any],
+    options: Mapping[str, Any],
+) -> tuple[dict[str, bytes], dict[str, dict[str, Any]]]:
+    validate_room_payload_manifest(payload_manifest)
+    base = read_zip(base_resource)
+    if set(base) != set(payload_manifest["base_members"]):
+        raise ValueError("base room payload member set drifted")
+    selected = select_room_payloads(payload_manifest, options)
+    assembled = dict(base)
+    excluded_members = {
+        str(payload_manifest["maps"][map_key]["target_member"])
+        for map_key in payload_manifest["maps"]
+        if map_key not in selected
+    }
+    for member in excluded_members:
+        assembled.pop(member, None)
+    _assemble_room_files_expected_base_members(assembled, excluded_members, options, payload_manifest, payload_resource, selected)
     return assembled, selected
 
 

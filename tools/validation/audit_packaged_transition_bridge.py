@@ -87,7 +87,7 @@ def load_bridge(client_dir: Path, base_dir: Path, state_dir: Path, saves_base: P
     return module
 
 
-def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
+def _assert_packaged_manifest_source_root(client_dir, manifest_path):
     assert_packaged_slot_catalog(client_dir)
     source_root = Path(__file__).resolve().parents[2]
     manifest = load_release_manifest(manifest_path, package_root=manifest_path.parent)
@@ -116,6 +116,11 @@ def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
         raise AssertionError("unpacked bridge identity revision diverges")
     if "Ignoring unexpected goal transition event" in bridge.read_text(encoding="utf-8"):
         raise AssertionError("unpacked bridge still contains old goal-only handler")
+    return actual, source_root
+
+
+def assert_packaged_manifest(client_dir: Path, manifest_path: Path) -> str:
+    actual, source_root = _assert_packaged_manifest_source_root(client_dir, manifest_path)
     if not (client_dir / "doom_eap" / "presentation.py").is_file():
         raise AssertionError("packaged client lacks doom_eap/presentation.py")
     packaged_tools = client_dir / "tools"
@@ -161,15 +166,26 @@ def assert_generation_only_apworld(apworld_path: Path) -> None:
         raise AssertionError("packaged APWorld unexpectedly owns client startup")
 
 
-async def consume(
-    module, event: Path, expected: int | None, fail_send: bool = False,
-) -> list[dict]:
+async def _consume_sent(module, event, expected, fail_send):
+    from doom_eap.runtime import bridge_checks, bridge_config
+    from doom_eap.runtime.campaign import GoalProgress
+
     sent = []
 
     class Context:
         def __init__(self):
             self.session_state = {"goal_sent": False}
+            self.checks = bridge_checks.CheckRuntime(self)
+            self.goals = GoalProgress(module.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge_config.CULTIST_BASE_MAP, bridge_config.logger)
+            from doom_eap.runtime.inventory import ReceiptSession
+            from doom_eap.runtime.observers import PublisherDispatch
+
+            self.state_key = "packaged-audit"
+            self.receipt_session = ReceiptSession()
+            self.items = types.SimpleNamespace(check_and_update_event_session=event_session_ready)
+            self.publisher_dispatch = PublisherDispatch(bridge_checks.PUBLISHERS, self.goals, bridge_config.logger)
             self.locations_checked = set()
+            self.server_checked_locations_ready = True
             self.checked_locations = set()
             self.server_locations = {7770122, 7770123, 7770124, 7770162}
             if expected is not None:
@@ -184,29 +200,33 @@ async def consume(
         def persist_session_state(self):
             pass
 
-        async def send_mission_complete(self, *args, **kwargs):
-            return await module.DoomEternalContext.send_mission_complete(self, *args, **kwargs)
+    async def event_session_ready():
+        return True
 
-        async def send_campaign_goal(self, *args, **kwargs):
-            return await module.DoomEternalContext.send_campaign_goal(self, *args, **kwargs)
-
-    original = module.DOOM_BASE_DIR
-    original_dump_dir = module.INV_DUMP_DIR
-    module.DOOM_BASE_DIR = str(event.parent)
-    module.INV_DUMP_DIR = str(event.parent)
+    original = bridge_config.DOOM_BASE_DIR
+    original_dump_dir = bridge_config.INV_DUMP_DIR
+    bridge_config.DOOM_BASE_DIR = str(event.parent)
+    bridge_config.INV_DUMP_DIR = str(event.parent)
     context = Context()
     try:
-        await module.DoomEternalContext.check_campaign_goal_event(context)
+        await context.checks.check_campaign_goal_event()
         if not fail_send and sent:
             context.checked_locations.update(
                 location_id
                 for message in sent
                 for location_id in message.get("locations", ())
             )
-            await module.DoomEternalContext.check_campaign_goal_event(context)
+            await context.checks.check_campaign_goal_event()
     finally:
-        module.DOOM_BASE_DIR = original
-        module.INV_DUMP_DIR = original_dump_dir
+        bridge_config.DOOM_BASE_DIR = original
+        bridge_config.INV_DUMP_DIR = original_dump_dir
+    return sent
+
+
+async def consume(
+    module, event: Path, expected: int | None, fail_send: bool = False,
+) -> list[dict]:
+    sent = await _consume_sent(module, event, expected, fail_send)
     if expected is None:
         if event.exists() or sent:
             raise AssertionError("Hub -> mission transition must be ignored and consumed")
@@ -219,13 +239,22 @@ async def consume(
 
 
 async def evaluate_checked_state(module, slot_data, checked_locations, expect_goal):
+    from doom_eap.runtime import bridge_checks, bridge_config
+    from doom_eap.runtime.campaign import GoalProgress
+
     sent = []
 
     class Context:
         def __init__(self):
             self.session_state = {"goal_sent": False}
-            self.goal_dispatch_in_flight = False
-            self.goal_dispatch_sent = False
+            self.checks = bridge_checks.CheckRuntime(self)
+            self.goals = GoalProgress(module.CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge_config.CULTIST_BASE_MAP, bridge_config.logger)
+            self.locations_checked = set()
+            self.server_locations = set(bridge_config.DOOM_LOCATION_NAMES)
+            self.items_received = []
+            self.unified_campaign = types.SimpleNamespace(
+                plan={"sequence": [], "goal_stage": ""}, goal_admitted=lambda *_: True,
+            )
             self.server_checked_locations_ready = True
             self._connected_slot_data = slot_data
             self.checked_locations = set(checked_locations)
@@ -234,11 +263,11 @@ async def evaluate_checked_state(module, slot_data, checked_locations, expect_go
         async def send_msgs(self, messages):
             sent.extend(messages)
 
-    result = await module.DoomEternalContext.evaluate_campaign_goal(
-        Context(), "packaged transition audit"
-    )
+    from NetUtils import ClientStatus
+
+    result = await Context().checks.evaluate_campaign_goal("packaged transition audit")
     saw_goal = any(
-        message == {"cmd": "StatusUpdate", "status": module.ClientStatus.CLIENT_GOAL}
+        message == {"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}
         for message in sent
     )
     if result is not expect_goal or saw_goal is not expect_goal:
@@ -256,6 +285,154 @@ def event(path: Path, from_map: str, to_map: str) -> Path:
     return path
 
 
+def publisher_event(directory: Path, key: str) -> Path:
+    from doom_eap.runtime.bridge_checks import PUBLISHERS
+
+    publisher = next(publisher for publisher in PUBLISHERS if publisher.key == key)
+    trigger = next(iter(publisher.triggers_for("map_event_file")))
+    path = directory / trigger["filename"]
+    path.write_text(trigger["marker"] + "\n", encoding="utf-8")
+    return path
+
+
+def _main_game(bridge_sha256, client_dir, directory):
+    game = Path(directory) / "DOOMEternal"
+    base = game / "base"
+    base.mkdir(parents=True)
+    (game / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
+    saves_base = Path(directory) / "Saved Games" / "id Software" / "DOOMEternal" / "base"
+    saves_base.mkdir(parents=True)
+    old_state_home = os.environ.get("XDG_STATE_HOME")
+    bridge = load_bridge(client_dir, base, Path(directory) / "state", saves_base)
+    from doom_eap.runtime import bridge_checks, bridge_config
+    if old_state_home is None:
+        os.environ.pop("XDG_STATE_HOME", None)
+    else:
+        os.environ["XDG_STATE_HOME"] = old_state_home
+
+    if bridge_config.BRIDGE_FILE != (client_dir / "bridge_client.py").resolve():
+        raise AssertionError("loaded bridge is not the unpacked client bridge")
+    if bridge_config.BRIDGE_SHA256 != bridge_sha256:
+        raise AssertionError("loaded bridge SHA differs from unpacked bridge SHA")
+    if bridge_config.TRANSITION_HANDLER != "unified":
+        raise AssertionError("loaded bridge did not select unified transition handler")
+
+    identity_lines = []
+    original_logger = bridge_config.logger
+    bridge_config.logger = types.SimpleNamespace(
+        info=lambda template, *args: identity_lines.append(template % args)
+    )
+    bridge.log_mission_bridge_identity()
+    bridge_config.logger = original_logger
+    expected_identity = [
+        f"BRIDGE_REVISION=mission-unified-{bridge_sha256[:12]}",
+        f"BRIDGE_FILE={client_dir / 'bridge_client.py'}",
+        f"BRIDGE_SHA256={bridge_sha256}",
+        f"BRIDGE_EXECUTABLE_SHA256={hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest()}",
+        f"BRIDGE_PROTOCOL={bridge_config.BRIDGE_PROTOCOL}",
+        "GAME_NAME=DOOM Eternal",
+        "TRANSITION_HANDLER=unified",
+    ]
+    if identity_lines != expected_identity:
+        raise AssertionError(
+            f"unpacked bridge startup identity drift: {identity_lines!r}"
+        )
+
+    asyncio.run(consume(
+        bridge,
+        event(
+            base / "ap_transition_1_1.evt",
+            "game/sp/e1m1_intro/e1m1_intro",
+            "game/sp/hub/hub",
+        ),
+        None,
+    ))
+    asyncio.run(consume(
+        bridge,
+        event(
+            base / "ap_transition_1_2.evt",
+            "game/sp/e1m2_battle/e1m2_battle",
+            "game/hub/hub",
+        ),
+        None,
+    ))
+    asyncio.run(consume(
+        bridge,
+        event(
+            base / "ap_transition_1_3.evt",
+            "game/hub/hub",
+            "game/sp/e1m2_war/e1m2_war",
+        ),
+        None,
+    ))
+    retry_event = publisher_event(base, "cultist_base_mission_complete")
+    asyncio.run(consume(bridge, retry_event, 7770124, fail_send=True))
+    asyncio.run(consume(bridge, retry_event, 7770124))
+
+    goal_event = base / bridge.CAMPAIGN_GOAL_CONTRACT["event_filename"]
+    goal_event.write_text(
+        f"{bridge.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
+        encoding="utf-8",
+    )
+    goal_publisher = next(
+        publisher for publisher in bridge_checks.PUBLISHERS
+        if publisher.key == bridge.CAMPAIGN_GOAL_CONTRACT["publisher_key"]
+    )
+    goal_locations = {
+        effect["location_id"]
+        for effect in goal_publisher.effects
+        if effect["strategy"] == "location_check"
+    }
+    return bridge, bridge_config, goal_event, goal_locations
+
+
+def _main_bridge(bridge_sha256, client_dir, directory):
+    bridge, bridge_config, goal_event, goal_locations = _main_game(bridge_sha256, client_dir, directory)
+    if goal_locations != {7770414}:
+        raise AssertionError(f"Final Sin publisher effects drifted: {goal_locations!r}")
+    asyncio.run(consume(bridge, goal_event, 7770414, fail_send=True))
+    final_sin_sent = asyncio.run(consume(bridge, goal_event, 7770414))
+    if final_sin_sent != [{"cmd": "LocationChecks", "locations": [7770414]}]:
+        raise AssertionError(f"Final Sin event emitted unexpected messages: {final_sin_sent!r}")
+
+    required_capabilities = [
+        "cross_campaign_materialization_v1",
+        "goal_events_v1",
+        "goal_endpoint_events_v1",
+    ]
+    icon_goal = {
+        "goal": "Kill the Icon of Sin",
+        "goal_endpoint_event": "Internal Goal Endpoint: Kill the Icon of Sin",
+        "goal_endpoint_available": True,
+        "additional_victory_requirements": ["Complete All Slayer Gates"],
+        "use_dlc_content": True,
+        "include_dlc_missions": True,
+        "campaign_plan": {"goal_stage": "e5m4_boss"},
+        "required_capabilities": required_capabilities,
+    }
+    base_missions = {
+        location_id
+        for location_id, name in bridge_config.DOOM_LOCATION_NAMES.items()
+        if name.endswith(" - Mission Complete")
+        and name.split(" - ", 1)[0] not in bridge_config.DLC_MISSION_PREFIXES
+    }
+    base_end_checked = base_missions | {7770418, 7770414, 7770419}
+    asyncio.run(evaluate_checked_state(
+        bridge, dict(icon_goal, goal="Complete the Full Saga",
+                     goal_endpoint_event="Internal Goal Endpoint: Complete the Full Saga"),
+        base_end_checked,
+        False,
+    ))
+    all_gate_ids = {
+        location_id
+        for location_id, name in bridge_config.DOOM_LOCATION_NAMES.items()
+        if name.endswith(" - Slayer Gate Complete")
+    }
+    if len(all_gate_ids) != 8:
+        raise AssertionError(f"Slayer gate projection drifted: {all_gate_ids!r}")
+    return all_gate_ids, bridge, icon_goal
+
+
 def main() -> int:
     client_dir = Path(sys.argv[1]).resolve()
     source_registry = Path(sys.argv[2]).resolve()
@@ -271,136 +448,7 @@ def main() -> int:
         raise SystemExit("packaged challenge registry diverges from source")
 
     with tempfile.TemporaryDirectory() as directory:
-        game = Path(directory) / "DOOMEternal"
-        base = game / "base"
-        base.mkdir(parents=True)
-        (game / "DOOMEternalx64vk.exe").write_text("", encoding="utf-8")
-        saves_base = Path(directory) / "Saved Games" / "id Software" / "DOOMEternal" / "base"
-        saves_base.mkdir(parents=True)
-        old_state_home = os.environ.get("XDG_STATE_HOME")
-        bridge = load_bridge(client_dir, base, Path(directory) / "state", saves_base)
-        if old_state_home is None:
-            os.environ.pop("XDG_STATE_HOME", None)
-        else:
-            os.environ["XDG_STATE_HOME"] = old_state_home
-
-        if bridge.BRIDGE_FILE != (client_dir / "bridge_client.py").resolve():
-            raise AssertionError("loaded bridge is not the unpacked client bridge")
-        if bridge.BRIDGE_SHA256 != bridge_sha256:
-            raise AssertionError("loaded bridge SHA differs from unpacked bridge SHA")
-        if bridge.TRANSITION_HANDLER != "unified":
-            raise AssertionError("loaded bridge did not select unified transition handler")
-
-        identity_lines = []
-        original_logger = bridge.logger
-        bridge.logger = types.SimpleNamespace(
-            info=lambda template, *args: identity_lines.append(template % args)
-        )
-        bridge.log_mission_bridge_identity()
-        bridge.logger = original_logger
-        expected_identity = [
-            f"BRIDGE_REVISION=mission-unified-{bridge_sha256[:12]}",
-            f"BRIDGE_FILE={client_dir / 'bridge_client.py'}",
-            f"BRIDGE_SHA256={bridge_sha256}",
-            f"BRIDGE_PROTOCOL={bridge.BRIDGE_PROTOCOL}",
-            "GAME_NAME=DOOM Eternal",
-            "TRANSITION_HANDLER=unified",
-        ]
-        if identity_lines != expected_identity:
-            raise AssertionError(
-                f"unpacked bridge startup identity drift: {identity_lines!r}"
-            )
-
-        asyncio.run(consume(
-            bridge,
-            event(
-                base / "ap_transition_1_1.evt",
-                "game/sp/e1m1_intro/e1m1_intro",
-                "game/sp/hub/hub",
-            ),
-            None,
-        ))
-        asyncio.run(consume(
-            bridge,
-            event(
-                base / "ap_transition_1_2.evt",
-                "game/sp/e1m2_battle/e1m2_battle",
-                "game/hub/hub",
-            ),
-            None,
-        ))
-        asyncio.run(consume(
-            bridge,
-            event(
-                base / "ap_transition_1_3.evt",
-                "game/hub/hub",
-                "game/sp/e1m2_war/e1m2_war",
-            ),
-            None,
-        ))
-        retry_event = event(
-            base / "ap_transition_1_4.evt",
-            "game/sp/e1m3_cult/e1m3_cult",
-            "game/sp/e1m4_boss/e1m4_boss",
-        )
-        asyncio.run(consume(bridge, retry_event, 7770124, fail_send=True))
-        asyncio.run(consume(bridge, retry_event, 7770124))
-
-        goal_event = base / bridge.CAMPAIGN_GOAL_CONTRACT["event_filename"]
-        goal_event.write_text(
-            f"{bridge.CAMPAIGN_GOAL_CONTRACT['marker']}\n",
-            encoding="utf-8",
-        )
-        goal_publisher = next(
-            publisher for publisher in bridge.PUBLISHERS
-            if publisher.key == bridge.CAMPAIGN_GOAL_CONTRACT["publisher_key"]
-        )
-        goal_locations = {
-            effect["location_id"]
-            for effect in goal_publisher.effects
-            if effect["strategy"] == "location_check"
-        }
-        if goal_locations != {7770414}:
-            raise AssertionError(f"Final Sin publisher effects drifted: {goal_locations!r}")
-        asyncio.run(consume(bridge, goal_event, 7770414, fail_send=True))
-        final_sin_sent = asyncio.run(consume(bridge, goal_event, 7770414))
-        if final_sin_sent != [{"cmd": "LocationChecks", "locations": [7770414]}]:
-            raise AssertionError(f"Final Sin event emitted unexpected messages: {final_sin_sent!r}")
-
-        required_capabilities = [
-            "cross_campaign_materialization_v1",
-            "goal_events_v1",
-            "goal_endpoint_events_v1",
-        ]
-        icon_goal = {
-            "goal": "Kill the Icon of Sin",
-            "goal_endpoint_event": "Internal Goal Endpoint: Kill the Icon of Sin",
-            "goal_endpoint_available": True,
-            "additional_victory_requirements": ["Complete All Slayer Gates"],
-            "use_dlc_content": True,
-            "include_dlc_missions": True,
-            "required_capabilities": required_capabilities,
-        }
-        base_missions = {
-            location_id
-            for location_id, name in bridge.DOOM_LOCATION_NAMES.items()
-            if name.endswith(" - Mission Complete")
-            and name.split(" - ", 1)[0] not in bridge.DLC_MISSION_PREFIXES
-        }
-        base_end_checked = base_missions | {7770418, 7770414, 7770419}
-        asyncio.run(evaluate_checked_state(
-            bridge, dict(icon_goal, goal="Complete the Full Saga",
-                         goal_endpoint_event="Internal Goal Endpoint: Complete the Full Saga"),
-            base_end_checked,
-            False,
-        ))
-        all_gate_ids = {
-            location_id
-            for location_id, name in bridge.DOOM_LOCATION_NAMES.items()
-            if name.endswith(" - Slayer Gate Complete")
-        }
-        if len(all_gate_ids) != 8:
-            raise AssertionError(f"Slayer gate projection drifted: {all_gate_ids!r}")
+        all_gate_ids, bridge, icon_goal = _main_bridge(bridge_sha256, client_dir, directory)
         asyncio.run(evaluate_checked_state(
             bridge, icon_goal, {7770414, 7770418, *all_gate_ids}, True
         ))

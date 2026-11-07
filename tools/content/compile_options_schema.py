@@ -10,12 +10,11 @@ import inspect
 import json
 import os
 import sys
-from types import ModuleType, SimpleNamespace
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 from doom_eap.contracts.source_bytes import first_party_text_bytes
-
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = ROOT.parent / "Archipelago"
@@ -76,148 +75,174 @@ def _bounded_option_dict(option_type, option_dict_type):
     return issubclass(option_type, option_dict_type) and hasattr(option_type, "entry_limits")
 
 
+def _compile_schema_default(choice_keys, key, option_type):
+    if any(not isinstance(choice_key, str) or not choice_key for choice_key in choice_keys):
+        raise ValueError(f"option set {key} values must be non-empty strings")
+    default = getattr(option_type, "default", ())
+    if isinstance(default, str | bytes):
+        raise ValueError(f"invalid option set default for {key}")
+    try:
+        default_values = sorted(default)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"invalid option set default for {key}") from error
+    if any(value not in choice_keys for value in default_values):
+        raise ValueError(f"option set {key} default contains unknown values")
+    return default_values
+
+
+def _compile_schema_default_values(base, key, option_type, options, valid_keys):
+    try:
+        choice_keys = sorted(valid_keys)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"invalid option set values for {key}") from error
+    if key == "custom_missions":
+        stages = sys.modules["worlds.doometernal.generated_content"].CAMPAIGN_STAGES
+        mission_names = {stage["name"] for stage in stages if stage["kind"] == "mission"}
+        choice_keys = sorted(mission_names)
+    default_values = _compile_schema_default(choice_keys, key, option_type)
+    options.append(
+        {
+            **base,
+            "ui_type": "option_set",
+            "default": default_values,
+            "choices": [{"key": choice_key, "label": choice_key,
+                         **({"aliases": [stage["id"] for stage in stages if stage["name"] == choice_key]}
+                            if key == "custom_missions" else {})} for choice_key in choice_keys],
+        }
+    )
+
+
+def _compile_schema_special_names(base, key, option_type):
+    special_names = getattr(option_type, "special_range_names", {})
+    if not isinstance(special_names, dict):
+        raise ValueError(f"invalid named range values for {key}")
+    special_values = [
+        {
+            "key": name,
+            "label": name.replace("_", " ").title(),
+            "value": value,
+        }
+        for name, value in sorted(special_names.items())
+    ]
+    default = int(option_type.default)
+    default = next(
+        (
+            special["key"]
+            for special in special_values
+            if special_names[special["key"]] == default
+        ),
+        default,
+    )
+    named_range = {
+        **base,
+        "ui_type": "named_range",
+        "default": default,
+        "minimum": int(option_type.range_start),
+        "maximum": int(option_type.range_end),
+        "special_values": special_values,
+    }
+    if key == "praetor_suit_upgrades_in_pool":
+        named_range["maximum_label"] = "All"
+    return named_range
+
+
+def _compile_range_option(base, excluded, key, named_range_type, option_dict_type, option_type, options, range_type):
+    if issubclass(option_type, named_range_type):
+        named_range = _compile_schema_special_names(base, key, option_type)
+        options.append(named_range)
+        return
+    if _bounded_option_dict(option_type, option_dict_type):
+        options.append({**base, "ui_type": "option_dict", "default": dict(option_type.default),
+                        "entries": [{"key": name,
+                                     "label": getattr(option_type, "entry_labels", {}).get(name, name),
+                                     "minimum": getattr(option_type, "entry_minimum", 0), "maximum": maximum}
+                                    for name, maximum in sorted(option_type.entry_limits.items())]})
+        return
+    if issubclass(option_type, range_type):
+        options.append(
+            {
+                **base,
+                "ui_type": "range",
+                "default": int(option_type.default),
+                "minimum": int(option_type.range_start),
+                "maximum": int(option_type.range_end),
+            }
+        )
+        return
+    if option_type.__module__ != "Options" and key != "start_inventory":
+        raise ValueError(
+            f"unsupported DOOM Eternal option class: {key} ({option_type.__name__})"
+        )
+    excluded.append(
+        {
+            "key": key,
+            "source_class": option_type.__name__,
+            "reason": "complex_common_option_not_exposed_in_scalar_foundation",
+        }
+    )
+
+
+def _compile_option___module__(base, excluded, key, named_range_type, option_dict_type, option_set_type, option_type, options, range_type):
+    if issubclass(option_type, option_set_type) and option_type.__module__ != "Options":
+        valid_keys = getattr(option_type, "valid_keys", None)
+        if isinstance(valid_keys, str | bytes) or valid_keys is None:
+            raise ValueError(f"invalid option set values for {key}")
+        _compile_schema_default_values(base, key, option_type, options, valid_keys)
+        return
+    return _compile_range_option(base, excluded, key, named_range_type, option_dict_type, option_type, options, range_type)
+
+
+def _compile_option(choice_type, excluded, key, named_range_type, option_dict_type, option_set_type, option_type, options, range_type, toggle_type, world):
+    if int(getattr(option_type, "visibility", 1)) == 0:
+        excluded.append(
+            {
+                "key": key,
+                "source_class": option_type.__name__,
+                "reason": "hidden_compatibility_option",
+            }
+        )
+        return
+    base = {
+        "key": key,
+        "display_name": getattr(option_type, "display_name", key),
+        "description": inspect.cleandoc(option_type.__doc__ or ""),
+        "group": "Game Options",
+        "source_class": option_type.__name__,
+    }
+    if key in {"local_items", "non_local_items"}:
+        options.append({**base, "group": "Item & Location Options", "ui_type": "option_set", "default": [],
+                        "choices": [{"key": name, "label": name} for name in sorted(world.item_name_to_id)]})
+        return
+    if issubclass(option_type, toggle_type):
+        options.append({**base, "ui_type": "toggle", "default": bool(option_type.default)})
+        return
+    if issubclass(option_type, choice_type):
+        choices = [
+            {
+                "key": option_type.name_lookup[value],
+                "label": option_type.get_option_name(value),
+                "value": value,
+            }
+            for value in sorted(option_type.name_lookup)
+        ]
+        options.append(
+            {
+                **base,
+                "ui_type": "choice",
+                "default": option_type.name_lookup[option_type.default],
+                "choices": choices,
+            }
+        )
+        return
+    return _compile_option___module__(base, excluded, key, named_range_type, option_dict_type, option_set_type, option_type, options, range_type)
+
+
 def compile_schema(ap_root: Path) -> dict[str, Any]:
     world, toggle_type, choice_type, option_set_type, range_type, named_range_type, option_dict_type = _load_apworld(ap_root)
     options = []
     excluded = []
     for key, option_type in world.options_dataclass.type_hints.items():
-        if int(getattr(option_type, "visibility", 1)) == 0:
-            excluded.append(
-                {
-                    "key": key,
-                    "source_class": option_type.__name__,
-                    "reason": "hidden_compatibility_option",
-                }
-            )
-            continue
-        base = {
-            "key": key,
-            "display_name": getattr(option_type, "display_name", key),
-            "description": inspect.cleandoc(option_type.__doc__ or ""),
-            "group": "Game Options",
-            "source_class": option_type.__name__,
-        }
-        if key in {"local_items", "non_local_items"}:
-            options.append({**base, "group": "Item & Location Options", "ui_type": "option_set", "default": [],
-                            "choices": [{"key": name, "label": name} for name in sorted(world.item_name_to_id)]})
-            continue
-        if issubclass(option_type, toggle_type):
-            options.append({**base, "ui_type": "toggle", "default": bool(option_type.default)})
-            continue
-        if issubclass(option_type, choice_type):
-            choices = [
-                {
-                    "key": option_type.name_lookup[value],
-                    "label": option_type.get_option_name(value),
-                    "value": value,
-                }
-                for value in sorted(option_type.name_lookup)
-            ]
-            options.append(
-                {
-                    **base,
-                    "ui_type": "choice",
-                    "default": option_type.name_lookup[option_type.default],
-                    "choices": choices,
-                }
-            )
-            continue
-        if issubclass(option_type, option_set_type) and option_type.__module__ != "Options":
-            valid_keys = getattr(option_type, "valid_keys", None)
-            if isinstance(valid_keys, (str, bytes)) or valid_keys is None:
-                raise ValueError(f"invalid option set values for {key}")
-            try:
-                choice_keys = sorted(valid_keys)
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"invalid option set values for {key}") from error
-            if key == "custom_missions":
-                stages = sys.modules["worlds.doometernal.generated_content"].CAMPAIGN_STAGES
-                mission_names = {stage["name"] for stage in stages if stage["kind"] == "mission"}
-                choice_keys = sorted(mission_names)
-            if any(not isinstance(choice_key, str) or not choice_key for choice_key in choice_keys):
-                raise ValueError(f"option set {key} values must be non-empty strings")
-            default = getattr(option_type, "default", ())
-            if isinstance(default, (str, bytes)):
-                raise ValueError(f"invalid option set default for {key}")
-            try:
-                default_values = sorted(default)
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"invalid option set default for {key}") from error
-            if any(value not in choice_keys for value in default_values):
-                raise ValueError(f"option set {key} default contains unknown values")
-            options.append(
-                {
-                    **base,
-                    "ui_type": "option_set",
-                    "default": default_values,
-                    "choices": [{"key": choice_key, "label": choice_key,
-                                 **({"aliases": [stage["id"] for stage in stages if stage["name"] == choice_key]}
-                                    if key == "custom_missions" else {})} for choice_key in choice_keys],
-                }
-            )
-            continue
-        if issubclass(option_type, named_range_type):
-            special_names = getattr(option_type, "special_range_names", {})
-            if not isinstance(special_names, dict):
-                raise ValueError(f"invalid named range values for {key}")
-            special_values = [
-                {
-                    "key": name,
-                    "label": name.replace("_", " ").title(),
-                    "value": value,
-                }
-                for name, value in sorted(special_names.items())
-            ]
-            default = int(option_type.default)
-            default = next(
-                (
-                    special["key"]
-                    for special in special_values
-                    if special_names[special["key"]] == default
-                ),
-                default,
-            )
-            named_range = {
-                **base,
-                "ui_type": "named_range",
-                "default": default,
-                "minimum": int(option_type.range_start),
-                "maximum": int(option_type.range_end),
-                "special_values": special_values,
-            }
-            if key == "praetor_suit_upgrades_in_pool":
-                named_range["maximum_label"] = "All"
-            options.append(named_range)
-            continue
-        if _bounded_option_dict(option_type, option_dict_type):
-            options.append({**base, "ui_type": "option_dict", "default": dict(option_type.default),
-                            "entries": [{"key": name,
-                                         "label": getattr(option_type, "entry_labels", {}).get(name, name),
-                                         "minimum": getattr(option_type, "entry_minimum", 0), "maximum": maximum}
-                                        for name, maximum in sorted(option_type.entry_limits.items())]})
-            continue
-        if issubclass(option_type, range_type):
-            options.append(
-                {
-                    **base,
-                    "ui_type": "range",
-                    "default": int(option_type.default),
-                    "minimum": int(option_type.range_start),
-                    "maximum": int(option_type.range_end),
-                }
-            )
-            continue
-        if option_type.__module__ != "Options" and key != "start_inventory":
-            raise ValueError(
-                f"unsupported DOOM Eternal option class: {key} ({option_type.__name__})"
-            )
-        excluded.append(
-            {
-                "key": key,
-                "source_class": option_type.__name__,
-                "reason": "complex_common_option_not_exposed_in_scalar_foundation",
-            }
-        )
+        _compile_option(choice_type, excluded, key, named_range_type, option_dict_type, option_set_type, option_type, options, range_type, toggle_type, world)
 
     source = ap_root / "worlds/doometernal/options.py"
     document = {

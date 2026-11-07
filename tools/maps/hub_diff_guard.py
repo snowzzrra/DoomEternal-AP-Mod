@@ -65,7 +65,6 @@ PRESERVED_HUB_ANCHORS = {
 }
 
 
-
 def _blocks(text: str) -> dict[str, str]:
     result = {}
     position = 0
@@ -115,7 +114,56 @@ def _assert_visual_child_removals(source_text: str, generated_text: str) -> None
             raise ValueError(f"Hub armor anchor changed during visual removal: {anchor_name}")
 
 
-def assert_hub_diff_classified() -> dict:
+def _assert_hub_diff_classified_goal_owner(configured_visual_removals, generated_text, source_text):
+    for child_name, expected in EXPECTED_VISUAL_CHILD_REMOVALS.items():
+        configured = configured_visual_removals[child_name]
+        if (
+            configured.get("model") != expected["model"]
+            or configured.get("bind_parent") != expected["bind_parent"]
+            or configured.get("preserve_entity") != expected["preserve_entity"]
+        ):
+            raise ValueError(f"Hub visual child removal configuration drifted: {child_name}")
+    _assert_visual_child_removals(source_text, generated_text)
+    goal_owner = "trigger_transition_to_e2m3"
+    generated_bounds = find_entity_block_bounds(generated_text, goal_owner)
+    source_bounds = find_entity_block_bounds(source_text, goal_owner)
+    if generated_bounds is None or source_bounds is None:
+        raise ValueError("Hub Mars Core transition owner is missing")
+    if (
+        generated_text[generated_bounds[0]:generated_bounds[1]]
+        != source_text[source_bounds[0]:source_bounds[1]]
+    ):
+        raise ValueError("Hub Mars Core transition drifted while removing old goal")
+    if "ap_campaign_goal_event" in generated_text or "AP_GOAL_EVENT_" in generated_text:
+        raise ValueError("Hub still contains a campaign goal hook")
+
+
+def _assert_hub_diff_classified_changed(after, before, current):
+    changed = {name for name in before.keys() & after if before[name] != after[name]}
+    removed = set(before) - set(after)
+    added = set(after) - set(before)
+    unexpected_changed = changed - EXPECTED_CHANGED - EXPECTED_STATE_STATS_REMOVED
+    missing_state_stats_changes = EXPECTED_STATE_STATS_REMOVED - changed
+    if unexpected_changed or missing_state_stats_changes or removed != EXPECTED_REMOVED:
+        raise ValueError(
+            f"Unclassified Hub original-entity diff: changed={sorted(changed)}, "
+            f"unexpected_changed={sorted(unexpected_changed)}, "
+            f"missing_state_stats_changes={sorted(missing_state_stats_changes)}, "
+            f"removed={sorted(removed)}"
+        )
+    for name in EXPECTED_STATE_STATS_REMOVED:
+        if remove_property_blocks(before[name], "stateStats") != after[name]:
+            raise ValueError(
+                f"Unclassified Hub station drift: {name} differs beyond stateStats removal"
+            )
+    ap_checks = {
+        declaration for declaration, location_id in current["entities"].items()
+        if location_id in NEW_HUB_LOCATION_IDS
+    }
+    return added, ap_checks, changed, removed
+
+
+def _assert_hub_diff_classified_config_path():
     config_path = ROOT / "content/maps/hub/locations.json"
     current = json.loads(config_path.read_text(encoding="utf-8"))
     old = copy.deepcopy(current)
@@ -160,51 +208,16 @@ def assert_hub_diff_classified() -> dict:
         }
         if set(configured_visual_removals) != set(EXPECTED_VISUAL_CHILD_REMOVALS):
             raise ValueError("Hub visual child removal configuration is not exact")
-        for child_name, expected in EXPECTED_VISUAL_CHILD_REMOVALS.items():
-            configured = configured_visual_removals[child_name]
-            if (
-                configured.get("model") != expected["model"]
-                or configured.get("bind_parent") != expected["bind_parent"]
-                or configured.get("preserve_entity") != expected["preserve_entity"]
-            ):
-                raise ValueError(f"Hub visual child removal configuration drifted: {child_name}")
-        _assert_visual_child_removals(source_text, generated_text)
-        goal_owner = "trigger_transition_to_e2m3"
-        generated_bounds = find_entity_block_bounds(generated_text, goal_owner)
-        source_bounds = find_entity_block_bounds(source_text, goal_owner)
-        if generated_bounds is None or source_bounds is None:
-            raise ValueError("Hub Mars Core transition owner is missing")
-        if (
-            generated_text[generated_bounds[0]:generated_bounds[1]]
-            != source_text[source_bounds[0]:source_bounds[1]]
-        ):
-            raise ValueError("Hub Mars Core transition drifted while removing old goal")
-        if "ap_campaign_goal_event" in generated_text or "AP_GOAL_EVENT_" in generated_text:
-            raise ValueError("Hub still contains a campaign goal hook")
+        _assert_hub_diff_classified_goal_owner(configured_visual_removals, generated_text, source_text)
         before = _blocks(old_map.read_text(encoding="utf-8"))
         after = _blocks(new_map.read_text(encoding="utf-8"))
+    return after, before, current
 
-    changed = {name for name in before.keys() & after if before[name] != after[name]}
-    removed = set(before) - set(after)
-    added = set(after) - set(before)
-    unexpected_changed = changed - EXPECTED_CHANGED - EXPECTED_STATE_STATS_REMOVED
-    missing_state_stats_changes = EXPECTED_STATE_STATS_REMOVED - changed
-    if unexpected_changed or missing_state_stats_changes or removed != EXPECTED_REMOVED:
-        raise ValueError(
-            f"Unclassified Hub original-entity diff: changed={sorted(changed)}, "
-            f"unexpected_changed={sorted(unexpected_changed)}, "
-            f"missing_state_stats_changes={sorted(missing_state_stats_changes)}, "
-            f"removed={sorted(removed)}"
-        )
-    for name in EXPECTED_STATE_STATS_REMOVED:
-        if remove_property_blocks(before[name], "stateStats") != after[name]:
-            raise ValueError(
-                f"Unclassified Hub station drift: {name} differs beyond stateStats removal"
-            )
-    ap_checks = {
-        declaration for declaration, location_id in current["entities"].items()
-        if location_id in NEW_HUB_LOCATION_IDS
-    }
+
+def _assert_hub_diff_classified_after():
+    after, before, current = _assert_hub_diff_classified_config_path()
+
+    added, ap_checks, changed, removed = _assert_hub_diff_classified_changed(after, before, current)
     new_source_entities = {
         declaration.removeprefix("AP_CHECK_").lower()
         for declaration in ap_checks
@@ -221,6 +234,11 @@ def assert_hub_diff_classified() -> dict:
     }
     if unclassified_added:
         raise ValueError(f"Unclassified added Hub entities: {sorted(unclassified_added)}")
+    return added, changed, removed
+
+
+def assert_hub_diff_classified() -> dict:
+    added, changed, removed = _assert_hub_diff_classified_after()
     return {
         "new_fortress_checks": sorted(
             name for name in changed | removed if name not in ("trigger_transition_to_e2m2", "trigger_transition_to_e2m3")

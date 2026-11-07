@@ -6,7 +6,12 @@ import re
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_content_catalog
-from tools.maps.ap_map_generator import find_entity_block_bounds, find_matching_brace, neutralize_conditional_pickup_block, replace_targets_block
+from tools.maps.ap_map_generator import (
+    find_entity_block_bounds,
+    find_matching_brace,
+    neutralize_conditional_pickup_block,
+    replace_targets_block,
+)
 
 VISITS = ("from_e1m1", "from_e1m2", "from_e1m4", "from_e2m1",
           "from_e2m2", "from_e2m4", "from_e3m1")
@@ -23,16 +28,7 @@ def content_layers(phase: int) -> list[str]:
     return [f"game/sp/hub/ap_phase_{i}" for i in range(1, phase + 1)]
 
 
-def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
-    """Place only room-selected transactions and their checks in live layers."""
-    root = Path(__file__).resolve().parents[2]
-    groups = json.loads((root / "content/catalog/fortress.json").read_text(encoding="utf-8"))["spend_groups"]
-    active = set(active_group_ids)
-    if len(active) != len(active_group_ids) or active - {group["id"] for group in groups}:
-        raise ValueError("Fortress room contains invalid spend groups")
-    catalog = load_content_catalog()
-    config = json.loads((root / "content/maps/hub/locations.json").read_text(encoding="utf-8"))
-    aliases = {code: alias for alias, code in config["entities"].items()}
+def _project_spend_groups_location_ids(catalog, groups, text):
     location_ids = {name: code for code, name in catalog.location_names.items()}
     assemblies = {group["station"]: {group["station"]} for group in groups}
     lights = {}
@@ -49,36 +45,60 @@ def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
                       and re.search(r'\btargets\s*=\s*\{[^}]*"' + re.escape(station) + '"', block))
             if bound or socket:
                 members.add(match[1])
+    return assemblies, lights, location_ids
+
+
+def _project_spend_groups_layer(aliases, assemblies, codes, enabled, group, layers, text):
+    if len(layers) != 1:
+        raise ValueError(f"Fortress transaction splits content layers: {group['id']}")
+    layer = layers.pop() if enabled else "game/sp/hub/ap_excluded"
+    names = set() if enabled else assemblies[group["station"]].copy()
+    for code in codes:
+        alias = aliases[code]
+        source = alias.removeprefix("AP_CHECK_").lower()
+        names.update({source, alias, f"ap_independent_{source}",
+                      f"ap_location_visual_{code}", f"ap_automap_location_{code}",
+                      f"ap_remove_location_visual_{code}", f"ap_hide_location_visual_{code}",
+                      f"ap_hide_location_visual_{code}_model", f"ap_suppress_checked_{code}",
+                      f"ap_fortress_battery_placement_{code}"})
+        if not enabled:
+            bounds = find_entity_block_bounds(text, f"ap_notify_location_{code}")
+            if bounds:
+                text = text[:bounds[0]] + text[bounds[1]:]
+    if enabled:
+        names.discard(group["station"])
+    for name in names:
+        bounds = find_entity_block_bounds(text, name)
+        if bounds:
+            start, end = bounds
+            block = _layer(text[start:end], layer)
+            text = text[:start] + block + text[end:]
+    return text
+
+
+def _project_spend_groups_active(active_group_ids, groups, root, text):
+    active = set(active_group_ids)
+    if len(active) != len(active_group_ids) or active - {group["id"] for group in groups}:
+        raise ValueError("Fortress room contains invalid spend groups")
+    catalog = load_content_catalog()
+    config = json.loads((root / "content/maps/hub/locations.json").read_text(encoding="utf-8"))
+    aliases = {code: alias for alias, code in config["entities"].items()}
+    assemblies, lights, location_ids = _project_spend_groups_location_ids(catalog, groups, text)
     for members in assemblies.values():
         members.update(name for name, targets in lights.items() if len(targets) == 1 and targets[0] in members)
+    return active, aliases, assemblies, location_ids
+
+
+def project_spend_groups(text: str, active_group_ids: list[str]) -> str:
+    """Place only room-selected transactions and their checks in live layers."""
+    root = Path(__file__).resolve().parents[2]
+    groups = json.loads((root / "content/catalog/fortress.json").read_text(encoding="utf-8"))["spend_groups"]
+    active, aliases, assemblies, location_ids = _project_spend_groups_active(active_group_ids, groups, root, text)
     for group in groups:
         enabled = group["id"] in active
         codes = [location_ids[name] for name in group["locations"]]
         layers = {content_layer(code) for code in codes}
-        if len(layers) != 1:
-            raise ValueError(f"Fortress transaction splits content layers: {group['id']}")
-        layer = layers.pop() if enabled else "game/sp/hub/ap_excluded"
-        names = set() if enabled else assemblies[group["station"]].copy()
-        for code in codes:
-            alias = aliases[code]
-            source = alias.removeprefix("AP_CHECK_").lower()
-            names.update({source, alias, f"ap_independent_{source}",
-                          f"ap_location_visual_{code}", f"ap_automap_location_{code}",
-                          f"ap_remove_location_visual_{code}", f"ap_hide_location_visual_{code}",
-                          f"ap_hide_location_visual_{code}_model", f"ap_suppress_checked_{code}",
-                          f"ap_fortress_battery_placement_{code}"})
-            if not enabled:
-                bounds = find_entity_block_bounds(text, f"ap_notify_location_{code}")
-                if bounds:
-                    text = text[:bounds[0]] + text[bounds[1]:]
-        if enabled:
-            names.discard(group["station"])
-        for name in names:
-            bounds = find_entity_block_bounds(text, name)
-            if bounds:
-                start, end = bounds
-                block = _layer(text[start:end], layer)
-                text = text[:start] + block + text[end:]
+        text = _project_spend_groups_layer(aliases, assemblies, codes, enabled, group, layers, text)
     return text
 
 
@@ -164,36 +184,40 @@ def _portal_navigation(text: str) -> str:
     return text[:portal_bounds[0]] + portal + text[portal_bounds[1]:]
 
 
-def project_fortress(text: str, config: dict) -> str:
-    """Only the server-derived phase activates cumulative AP content layers.
+def _project_fortress_phase(all_scenery, skies, text):
+    for phase in range(8):
+        visit = VISITS[max(0, phase - 1)]
+        visit_bounds = find_entity_block_bounds(text, f"target_change_layer_{visit}")
+        if visit_bounds is None:
+            raise ValueError(f"Fortress visit transition is missing: {visit}")
+        visit_target = text[slice(*visit_bounds)]
+        checkpoint = re.search(r'\bcheckpointName = "([^"]+)";', visit_target)
+        spawn = re.search(r'\bplayerSpawnSpot = "([^"]+)";', visit_target)
+        if checkpoint is None or spawn is None:
+            raise ValueError(f"Fortress visit checkpoint is incomplete: {visit}")
+        sky = "sentinel" if phase in (2, 6, 7) else "phobos" if phase == 5 else "earth"
+        active = [f"game/sp/hub/{visit}", f"game/sp/hub/sky_{sky}"]
+        remove = [layer for layer in all_scenery + skies if layer not in active]
+        remove.append("game/sp/hub/ap_excluded")
+        layer_target = _layer(visit_target, None).replace(
+            f"entityDef target_change_layer_{visit}", f"entityDef ap_fortress_layers_{phase}", 1)
+        layer_target = re.sub(r'\s*(?:checkpointName|playerSpawnSpot)\s*=\s*"[^"]+";', '', layer_target)
+        layer_target = _set_native_list(
+            layer_target, "activate_Immediately", active + content_layers(max(1, phase)))
+        layer_target = _set_native_list(layer_target, "remove_Immediately", remove)
+        text += "\n" + layer_target + "\n"
+        targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,
+                    "target_interact_action_portal_usable", "ap_fortress_mission_select_enable"]
+        if phase == 7:
+            targets.append("target_show_engine_room_secret")
+        text += ('entity {\n\tentityDef ap_fortress_phase_' + str(phase) + ' {\n'
+                 '\tclass = "idTarget_Count";\n\texpandInheritance = false;\n\tedit = {\n'
+                 '\t\tcount = 1;\n\t\treuseable = true;\n' + _native_list("targets", targets) +
+                 '\t}\n}\n}\n')
+    return text
 
-    Native visit scenery remains authored. Common corridors are usable from the
-    initial Hub; battery reward doors retain their transactions. Native story
-    exits cannot bypass the unified Mission Select.
-    """
-    if "entityDef ap_fortress_phase_0 {" in text:
-        raise ValueError("Fortress campaign projection already applied")
-    if find_entity_block_bounds(text, "interact_hub_mission_select_1") is None:
-        raise ValueError("Fortress Mission Select interactable is missing")
-    mission_select_action = _mission_select_action(text)
-    mission_select_enable = mission_select_action.replace("ap_fortress_mission_select", "ap_fortress_mission_select_enable", 1)
-    mission_select_enable = mission_select_enable.replace('action = "IA_USE_SUCCEED";', 'action = "IA_ACTIVATE_ANY";', 1)
-    text = _portal_navigation(text)
-    bounds = find_entity_block_bounds(text, "interact_hub_master_level_panel")
-    if bounds is None:
-        raise ValueError("Fortress Master Levels interaction is missing")
-    panel = text[slice(*bounds)]
-    for field in ("interaction", "touchData"):
-        match = re.search(rf"\b{field}\s*=\s*\{{", panel)
-        if match is None:
-            raise ValueError(f"Fortress Master Levels {field} is missing")
-        end = find_matching_brace(panel, panel.index("{", match.start()))
-        panel = panel[:match.start()] + panel[end:]
-    panel = neutralize_conditional_pickup_block(panel)
-    text = text[:bounds[0]] + panel + text[bounds[1]:]
-    bounds = find_entity_block_bounds(text, "guis_func_guis_gui_4")
-    if bounds is None or 'swf = "swf/worldgui/guientity/hub_masterlevels.swf";' not in text[slice(*bounds)]:
-        raise ValueError("Fortress Master Levels hologram is missing")
+
+def _project_fortress_hologram(bounds, config, text):
     hologram = neutralize_conditional_pickup_block(text[slice(*bounds)])
     text = text[:bounds[0]] + hologram + text[bounds[1]:]
     for alias, code in config["entities"].items():
@@ -231,6 +255,32 @@ def project_fortress(text: str, config: dict) -> str:
                       '\texpandInheritance = false;\n\tedit = {\n' +
                       _native_list("targets", [alias]) + '\t}\n}\n}')
             text = text[:start] + hidden + _layer(relay, layer) + _layer(remove, layer) + text[end:]
+    return text
+
+
+def _project_fortress_mission_select_action(config, text):
+    if find_entity_block_bounds(text, "interact_hub_mission_select_1") is None:
+        raise ValueError("Fortress Mission Select interactable is missing")
+    mission_select_action = _mission_select_action(text)
+    mission_select_enable = mission_select_action.replace("ap_fortress_mission_select", "ap_fortress_mission_select_enable", 1)
+    mission_select_enable = mission_select_enable.replace('action = "IA_USE_SUCCEED";', 'action = "IA_ACTIVATE_ANY";', 1)
+    text = _portal_navigation(text)
+    bounds = find_entity_block_bounds(text, "interact_hub_master_level_panel")
+    if bounds is None:
+        raise ValueError("Fortress Master Levels interaction is missing")
+    panel = text[slice(*bounds)]
+    for field in ("interaction", "touchData"):
+        match = re.search(rf"\b{field}\s*=\s*\{{", panel)
+        if match is None:
+            raise ValueError(f"Fortress Master Levels {field} is missing")
+        end = find_matching_brace(panel, panel.index("{", match.start()))
+        panel = panel[:match.start()] + panel[end:]
+    panel = neutralize_conditional_pickup_block(panel)
+    text = text[:bounds[0]] + panel + text[bounds[1]:]
+    bounds = find_entity_block_bounds(text, "guis_func_guis_gui_4")
+    if bounds is None or 'swf = "swf/worldgui/guientity/hub_masterlevels.swf";' not in text[slice(*bounds)]:
+        raise ValueError("Fortress Master Levels hologram is missing")
+    text = _project_fortress_hologram(bounds, config, text)
     pattern = r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{"
     for match in reversed(list(re.finditer(pattern, text))):
         start = match.start()
@@ -247,38 +297,23 @@ def project_fortress(text: str, config: dict) -> str:
                        '\t\tsteps = { num = 0; }\n\t\taddSteps = { num = 0; }\n'
                        '\t\tentities = { num = 0; }\n\t}\n}\n}\n')
         text = text[:start] + replacement + text[end:]
+    return mission_select_action, mission_select_enable, text
+
+
+def project_fortress(text: str, config: dict) -> str:
+    """Only the server-derived phase activates cumulative AP content layers.
+
+    Native visit scenery remains authored. Common corridors are usable from the
+    initial Hub; battery reward doors retain their transactions. Native story
+    exits cannot bypass the unified Mission Select.
+    """
+    if "entityDef ap_fortress_phase_0 {" in text:
+        raise ValueError("Fortress campaign projection already applied")
+    mission_select_action, mission_select_enable, text = _project_fortress_mission_select_action(config, text)
 
     all_scenery = [f"game/sp/hub/{visit}" for visit in (*VISITS, "from_e3m4", "from_e1m2_post_prison")]
     skies = [f"game/sp/hub/sky_{sky}" for sky in ("earth", "sentinel", "phobos")]
-    for phase in range(8):
-        visit = VISITS[max(0, phase - 1)]
-        visit_bounds = find_entity_block_bounds(text, f"target_change_layer_{visit}")
-        if visit_bounds is None:
-            raise ValueError(f"Fortress visit transition is missing: {visit}")
-        visit_target = text[slice(*visit_bounds)]
-        checkpoint = re.search(r'\bcheckpointName = "([^"]+)";', visit_target)
-        spawn = re.search(r'\bplayerSpawnSpot = "([^"]+)";', visit_target)
-        if checkpoint is None or spawn is None:
-            raise ValueError(f"Fortress visit checkpoint is incomplete: {visit}")
-        sky = "sentinel" if phase in (2, 6, 7) else "phobos" if phase == 5 else "earth"
-        active = [f"game/sp/hub/{visit}", f"game/sp/hub/sky_{sky}"]
-        remove = [layer for layer in all_scenery + skies if layer not in active]
-        remove.append("game/sp/hub/ap_excluded")
-        layer_target = _layer(visit_target, None).replace(
-            f"entityDef target_change_layer_{visit}", f"entityDef ap_fortress_layers_{phase}", 1)
-        layer_target = re.sub(r'\s*(?:checkpointName|playerSpawnSpot)\s*=\s*"[^"]+";', '', layer_target)
-        layer_target = _set_native_list(
-            layer_target, "activate_Immediately", active + content_layers(max(1, phase)))
-        layer_target = _set_native_list(layer_target, "remove_Immediately", remove)
-        text += "\n" + layer_target + "\n"
-        targets = [f"ap_fortress_layers_{phase}", *CIRCULATION_ACTIONS,
-                    "target_interact_action_portal_usable", "ap_fortress_mission_select_enable"]
-        if phase == 7:
-            targets.append("target_show_engine_room_secret")
-        text += ('entity {\n\tentityDef ap_fortress_phase_' + str(phase) + ' {\n'
-                 '\tclass = "idTarget_Count";\n\texpandInheritance = false;\n\tedit = {\n'
-                 '\t\tcount = 1;\n\t\treuseable = true;\n' + _native_list("targets", targets) +
-                 '\t}\n}\n}\n')
+    text = _project_fortress_phase(all_scenery, skies, text)
 
     for match in reversed(list(re.finditer(r"entity\s*\{\s*(?:layers\s*\{[^}]*\}\s*)?entityDef\s+(\w+)\s*\{", text))):
         start = match.start()

@@ -29,17 +29,7 @@ def _source(key: str, manifest: dict) -> str:
     return raw.decode("utf-8")
 
 
-def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool = False,
-                             skip_dlc2_credits: bool = False) -> dict[str, bytes]:
-    manifest = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
-    result = {}
-    for tier in ("area_of_effect", "ai_charge_rate", "max_charges"):
-        source = _source("blood_punch_" + tier, manifest)
-        source, count = re.subn(r'notificationSubtext = "[^"]+";',
-            'notificationSubtext = "#str_decl_callout_ability_blood_punch_acquired_GHOST81679";', source)
-        if count != 1:
-            raise ValueError(f"Blood Punch notification source drifted: {tier}")
-        result[PREFIX + f"perks/perk/player/blood_punch/{tier}.decl"] = source.encode("utf8")
+def _build_campaign_overrides_progress(manifest, result, skip_dlc1_credits, skip_dlc2_credits):
     progress = _source("unmaykr_progress", manifest)
     name = 'name = "unmaykr_unlocked_To_unnmaykr_acquired";'
     first = progress.index(name)
@@ -66,6 +56,41 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
                 raise ValueError(f"Native {key} credits field drifted")
             source = source.replace(credits, "", 1)
         result[PREFIX + f"campaign/campaign/{key}.decl"] = source.encode("utf-8")
+
+
+def _unified_replay_entries(content_layers, hub_entries, manifest, stages):
+    authored = {}
+    for key in ("missionlist", "missionlist_dlc1", "missionlist_dlc2"):
+        for entry in _entries(_source(key, manifest)):
+            authored[re.search(r'mapName = "([^"]+)";', entry)[1]] = entry
+    rows = [authored[stage["map"]] for stage in stages]
+    # The first two Hub visits use the authored first-visit layers. Later visits
+    # select their own native layer sets; no inventory or completion is imported.
+    for phase in range(8):
+        entry = hub_entries[max(0, phase - 1)]
+        layers = re.search(r"devMenuActiveLayers = \{.*?\n\t\t\t\t\}", entry, re.DOTALL)[0]
+        values = re.findall(r'item\[\d+\] = "([^"]+)";', layers) + content_layers(phase)
+        layers = ('devMenuActiveLayers = {\n\t\t\t\t\tnum = ' + str(len(values)) + ';\n' +
+                  ''.join(f'\t\t\t\t\titem[{i}] = "{value}";\n' for i, value in enumerate(values)) +
+                  '\t\t\t\t}')
+        rows.append('\t\t\titem[0] = {\n\t\t\t\tmapName = "game/hub/hub";\n\t\t\t\t'
+                    + layers.replace("devMenuActiveLayers", "activeLayers") + "\n\t\t\t}\n")
+    rows = [re.sub(r"item\[\d+\]", f"item[{i}]", entry, count=1) for i, entry in enumerate(rows)]
+    return rows
+
+
+def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool = False,
+                             skip_dlc2_credits: bool = False) -> dict[str, bytes]:
+    manifest = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
+    result = {}
+    for tier in ("area_of_effect", "ai_charge_rate", "max_charges"):
+        source = _source("blood_punch_" + tier, manifest)
+        source, count = re.subn(r'notificationSubtext = "[^"]+";',
+            'notificationSubtext = "#str_decl_callout_ability_blood_punch_acquired_GHOST81679";', source)
+        if count != 1:
+            raise ValueError(f"Blood Punch notification source drifted: {tier}")
+        result[PREFIX + f"perks/perk/player/blood_punch/{tier}.decl"] = source.encode("utf8")
+    _build_campaign_overrides_progress(manifest, result, skip_dlc1_credits, skip_dlc2_credits)
     hub = (SOURCES / "hub.decl").read_bytes()
     if hashlib.sha256(hub).hexdigest() != manifest["hub"]["sha256"]:
         raise ValueError("Native Fortress DevMenu source drifted")
@@ -80,27 +105,11 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
     ).encode("utf-8")
     # Retain the native replay layers for all twenty stages. They differ from
     # new-game/checkpoint layers, including World Spear's early mission setup.
-    from doom_eap.content.content_catalog import load_content_catalog
     from doom_eap.content.campaign_stages import campaign_stages
+    from doom_eap.content.content_catalog import load_content_catalog
+    from tools.maps.fortress_campaign import content_layers
     stages = campaign_stages(load_content_catalog(SOURCES.parents[1]), include_master_levels=False)
-    authored = {}
-    for key in ("missionlist", "missionlist_dlc1", "missionlist_dlc2"):
-        for entry in _entries(_source(key, manifest)):
-            authored[re.search(r'mapName = "([^"]+)";', entry)[1]] = entry
-    rows = [authored[stage["map"]] for stage in stages]
-    # The first two Hub visits use the authored first-visit layers. Later visits
-    # select their own native layer sets; no inventory or completion is imported.
-    for phase in range(8):
-        from tools.maps.fortress_campaign import content_layers
-        entry = hub_entries[max(0, phase - 1)]
-        layers = re.search(r"devMenuActiveLayers = \{.*?\n\t\t\t\t\}", entry, re.DOTALL)[0]
-        values = re.findall(r'item\[\d+\] = "([^"]+)";', layers) + content_layers(phase)
-        layers = ('devMenuActiveLayers = {\n\t\t\t\t\tnum = ' + str(len(values)) + ';\n' +
-                  ''.join(f'\t\t\t\t\titem[{i}] = "{value}";\n' for i, value in enumerate(values)) +
-                  '\t\t\t\t}')
-        rows.append('\t\t\titem[0] = {\n\t\t\t\tmapName = "game/hub/hub";\n\t\t\t\t'
-                    + layers.replace("devMenuActiveLayers", "activeLayers") + "\n\t\t\t}\n")
-    rows = [re.sub(r"item\[\d+\]", f"item[{i}]", entry, count=1) for i, entry in enumerate(rows)]
+    rows = _unified_replay_entries(content_layers, hub_entries, manifest, stages)
     result[PREFIX + "missionselectinfolist/missionlist_ap_unified.decl"] = (
         "{\n\tedit = {\n\t\tmissionSelectList = {\n\t\t\tnum = 28;\n"
         + "".join(rows) + "\t\t}\n\t}\n}\n"
@@ -113,7 +122,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
     result[PREFIX + "campaign/campaign/main.decl"] = main.replace(
         'missionSelectList = "missionlist";', 'missionSelectList = "missionlist_ap_unified";'
     ).replace('credits = "credits";', '', 1).encode("utf-8")
-    resource_layers = content_layers(7) + ["game/sp/hub/ap_excluded"]
+    resource_layers = [*content_layers(7), "game/sp/hub/ap_excluded"]
     for layer in resource_layers:
         result[PREFIX + f"layer/{layer}.decl"] = b"{\n}\n"
     # New streamfiles also need typed entries in the effective common catalog.

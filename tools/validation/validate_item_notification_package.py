@@ -81,18 +81,7 @@ def expected_item_key(suffix: str) -> str:
     )
 
 
-def validate_item_notification_contract(
-    notification: str, suffix: str, classification: int
-) -> None:
-    style, rpc_suffix = suffix.split("_", 1)
-    rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
-    item_id = int(rpc_suffix.split("_", 1)[0])
-    expected_style = notification_style_for_item(item_id, classification)
-    if style != expected_style:
-        raise AssertionError(
-            f"item notification style diverges from classification: {suffix}"
-        )
-
+def _validate_item_notification_contract_required_fields(notification, rpc_suffix, style, suffix):
     required_fields = (
         MAJOR_NOTIFICATION_FIELDS if style == "major" else CODEX_NOTIFICATION_FIELDS
     )
@@ -113,6 +102,21 @@ def validate_item_notification_contract(
         raise AssertionError(
             f"item notification title/subtitle contract is incomplete: {suffix}"
         )
+
+
+def validate_item_notification_contract(
+    notification: str, suffix: str, classification: int
+) -> None:
+    style, rpc_suffix = suffix.split("_", 1)
+    rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
+    item_id = int(rpc_suffix.split("_", 1)[0])
+    expected_style = notification_style_for_item(item_id, classification)
+    if style != expected_style:
+        raise AssertionError(
+            f"item notification style diverges from classification: {suffix}"
+        )
+
+    _validate_item_notification_contract_required_fields(notification, rpc_suffix, style, suffix)
 
     forbidden_contract = (
         (
@@ -168,6 +172,23 @@ def capability(path: Path) -> bool:
     return value
 
 
+def _string_table_names_search(entry, names, path):
+    if not isinstance(entry, dict):
+        raise AssertionError(f"string table entry must be a dict: {path}")
+    if set(entry) != {"name", "text"}:
+        raise AssertionError(f"string table entry keys must be name/text: {path}")
+    name, text = entry["name"], entry["text"]
+    if not isinstance(name, str) or not name.strip():
+        raise AssertionError(f"string table name is empty: {path}")
+    if not isinstance(text, str) or not text.strip():
+        raise AssertionError(f"string table text is empty: {path}")
+    if CONTROL_CHARACTERS.search(name) or CONTROL_CHARACTERS.search(text):
+        raise AssertionError(f"string table contains control characters: {path}")
+    if name in names:
+        raise AssertionError(f"string table name is duplicated: {name}")
+    return name
+
+
 def string_table_names(path: Path) -> set[str]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if set(data) != {"strings"}:
@@ -177,19 +198,7 @@ def string_table_names(path: Path) -> set[str]:
         raise AssertionError(f"string table strings must be a list: {path}")
     names = set()
     for entry in strings:
-        if not isinstance(entry, dict):
-            raise AssertionError(f"string table entry must be a dict: {path}")
-        if set(entry) != {"name", "text"}:
-            raise AssertionError(f"string table entry keys must be name/text: {path}")
-        name, text = entry["name"], entry["text"]
-        if not isinstance(name, str) or not name.strip():
-            raise AssertionError(f"string table name is empty: {path}")
-        if not isinstance(text, str) or not text.strip():
-            raise AssertionError(f"string table text is empty: {path}")
-        if CONTROL_CHARACTERS.search(name) or CONTROL_CHARACTERS.search(text):
-            raise AssertionError(f"string table contains control characters: {path}")
-        if name in names:
-            raise AssertionError(f"string table name is duplicated: {name}")
+        name = _string_table_names_search(entry, names, path)
         names.add(name)
     return names
 
@@ -199,31 +208,67 @@ def string_table_values(path: Path) -> dict[str, str]:
     return {entry["name"]: entry["text"] for entry in data["strings"]}
 
 
-def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, manifest_path: Path) -> None:
-    maps = sorted(maps_dir.rglob("*.entities"))
-    if not maps:
-        raise AssertionError(f"no generated maps found: {maps_dir}")
-    content = "\n".join(path.read_text(encoding="utf-8") for path in maps)
-    receipts = set(RECEIPT_RE.findall(content))
-    notifications = set(NOTIFICATION_RE.findall(content))
-    headers = set(HEADER_RE.findall(content))
-    item_keys = set(ITEM_KEY_RE.findall(content))
-    location_notifications = set(LOCATION_NOTIFICATION_RE.findall(content))
-    location_strings = set(LOCATION_STRING_RE.findall(content))
-    table_paths = tuple(mod_root / table for table in STRING_TABLES)
-    commands = json.loads(
-        (client_dir / "data" / "items.json").read_text(encoding="utf-8")
-    )
-    classifications = load_item_classification_identity(
-        client_dir / "data" / "item_classifications.json"
-    )
-    notification_classifications = classifications
-    policies = json.loads(
-        (client_dir / "data" / "item_replay_policies.json").read_text(
-            encoding="utf-8"
+def _validate_location_notifications(content, location_notifications):
+    for location_id in location_notifications:
+        notification = entity_block(
+            content, f"ap_notify_location_{location_id}"
         )
-    ).get("items", {})
-    all_commands = commands
+        if any(field not in notification for field in CODEX_NOTIFICATION_FIELDS):
+            raise AssertionError(
+                f"location notification is not Codex: {location_id}"
+            )
+        if (
+            f'header = "{LOCATION_NOTIFICATION_HEADER_KEY}";' not in notification
+            or f'subtext = "#str_ap_location_{location_id}";' not in notification
+        ):
+            raise AssertionError(
+                f"location notification title/subtitle contract is incomplete: {location_id}"
+            )
+        if "SECRET_FOUND" in notification or "secret_found" in notification:
+            raise AssertionError(
+                f"location notification retains Secret Found: {location_id}"
+            )
+
+
+def _validate_expected_item_keys(expected_headers, headers, item_keys, location_notifications, location_strings, notifications, table_paths):
+    if headers != expected_headers:
+        raise AssertionError("enabled notifier headers diverge from notification entities")
+    expected_item_keys = expected_headers | {
+        expected_item_key(suffix) for suffix in notifications
+    }
+    if item_keys != expected_item_keys:
+        raise AssertionError("item notification title/subtitle keys diverge")
+    if not location_notifications or not any(
+        key == "#str_ap_location_sent" or key.startswith("#str_ap_location_sent_")
+        for key in location_strings
+    ):
+        raise AssertionError("package lacks Codex location feedback")
+    if not all(path.is_file() for path in table_paths):
+        raise AssertionError("enabled notifier build lacks English or Portuguese strings")
+
+
+def _validate_expected_locale_names(item_keys, locale_names, location_strings):
+    expected_locale_names = item_keys | location_strings
+    if not expected_locale_names <= locale_names[0]:
+        raise AssertionError("english.json is missing generated notification keys")
+    if not expected_locale_names <= locale_names[1]:
+        raise AssertionError("portuguese.json is missing generated notification keys")
+    expected_received_keys = {
+        key for key in item_keys if key.startswith("#str_ap_notify_item_received_")
+    }
+    for names, locale in zip(locale_names, ("english", "portuguese"), strict=False):
+        received_keys = {
+            key for key in names if key.startswith("#str_ap_notify_item_received_")
+        }
+        if received_keys != expected_received_keys:
+            raise AssertionError(
+                f"{locale}.json received-item notification keys diverge"
+            )
+    if locale_names[0] != locale_names[1]:
+        raise AssertionError("English and Portuguese string keys diverge")
+
+
+def _validate_runtime_dir(classifications, client_dir, commands, enabled, manifest_path, receipts):
     if {int(item_id) for item_id in commands} != set(classifications):
         raise AssertionError(
             "packaged item classifications do not cover item mapping"
@@ -249,6 +294,43 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
     if receipts:
         raise AssertionError("package contains forbidden ap_rpc_item receipt root")
 
+
+def _validate_expected_headers(headers, item_keys, location_notifications, location_strings, notifications, table_paths):
+    expected_headers = {ITEM_NOTIFICATION_HEADER_KEY} | {
+        expected_item_key(suffix)
+        for suffix in notifications
+        if suffix.startswith("major_")
+    }
+    _validate_expected_item_keys(expected_headers, headers, item_keys, location_notifications, location_strings, notifications, table_paths)
+    locale_names = [string_table_names(path) for path in table_paths]
+    _validate_expected_locale_names(item_keys, locale_names, location_strings)
+    locale_values = [string_table_values(path) for path in table_paths]
+    for values, locale in zip(locale_values, ("english", "portuguese"), strict=False):
+        if values.get(ITEM_NOTIFICATION_HEADER_KEY) != ITEM_NOTIFICATION_TITLE[locale]:
+            raise AssertionError("item notification title is not canonical")
+        if (
+            LOCATION_NOTIFICATION_HEADER_KEY in values
+            and values.get(LOCATION_NOTIFICATION_HEADER_KEY) != LOCATION_NOTIFICATION_TITLE[locale]
+        ):
+            raise AssertionError("location notification title is not canonical")
+
+
+def _validate_commands(client_dir, enabled, headers, item_keys, manifest_path, notifications, receipts):
+    commands = json.loads(
+        (client_dir / "data" / "items.json").read_text(encoding="utf-8")
+    )
+    classifications = load_item_classification_identity(
+        client_dir / "data" / "item_classifications.json"
+    )
+    notification_classifications = classifications
+    policies = json.loads(
+        (client_dir / "data" / "item_replay_policies.json").read_text(
+            encoding="utf-8"
+        )
+    ).get("items", {})
+    all_commands = commands
+    _validate_runtime_dir(classifications, client_dir, commands, enabled, manifest_path, receipts)
+
     if not enabled:
         if notifications or headers or item_keys:
             raise AssertionError(
@@ -257,6 +339,37 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
 
     if enabled and not notifications:
         raise AssertionError("enabled notifier build lacks notification entities")
+    return all_commands, notification_classifications, policies
+
+
+def _validate_classification(definition, expected_notifications, feedback, item_id, notification_classifications):
+    if feedback != "ap":
+        raise AssertionError(
+            f"unsupported packaged receipt feedback for item {item_id}: {feedback!r}"
+        )
+    classification = notification_classifications[item_id]
+    if isinstance(classification, dict):
+        classification = classification["classification"]
+    style = notification_style_for_item(item_id, classification)
+    progressive_stage_count = progressive_notification_stage_count(
+        item_id, definition
+    )
+    stages = (
+        range(progressive_stage_count)
+        if progressive_stage_count is not None
+        else (None,)
+    )
+    for stage in stages:
+        stage_suffix = f"_{stage}" if stage is not None else ""
+        expected_notifications.update(
+            f"{style}_{item_id}{stage_suffix}_{slot}" for slot in ("a", "b")
+        )
+
+
+def _validate_location_strings(client_dir, content, enabled, headers, item_keys, manifest_path, mod_root, notifications, receipts):
+    location_strings = set(LOCATION_STRING_RE.findall(content))
+    table_paths = tuple(mod_root / table for table in STRING_TABLES)
+    all_commands, notification_classifications, policies = _validate_commands(client_dir, enabled, headers, item_keys, manifest_path, notifications, receipts)
     expected_notifications = set()
     native_only_item_ids = set()
     for raw_item_id, definition in all_commands.items():
@@ -267,27 +380,7 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         if feedback == "native_only":
             native_only_item_ids.add(item_id)
             continue
-        if feedback != "ap":
-            raise AssertionError(
-                f"unsupported packaged receipt feedback for item {item_id}: {feedback!r}"
-            )
-        classification = notification_classifications[item_id]
-        if isinstance(classification, dict):
-            classification = classification["classification"]
-        style = notification_style_for_item(item_id, classification)
-        progressive_stage_count = progressive_notification_stage_count(
-            item_id, definition
-        )
-        stages = (
-            range(progressive_stage_count)
-            if progressive_stage_count is not None
-            else (None,)
-        )
-        for stage in stages:
-            stage_suffix = f"_{stage}" if stage is not None else ""
-            expected_notifications.update(
-                f"{style}_{item_id}{stage_suffix}_{slot}" for slot in ("a", "b")
-            )
+        _validate_classification(definition, expected_notifications, feedback, item_id, notification_classifications)
     if enabled and notifications != expected_notifications:
         missing = sorted(expected_notifications - notifications)
         unexpected = sorted(notifications - expected_notifications)
@@ -300,89 +393,10 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
         for suffix in notifications
     ):
         raise AssertionError("native-only item has notification entities")
-    expected_headers = {ITEM_NOTIFICATION_HEADER_KEY} | {
-        expected_item_key(suffix)
-        for suffix in notifications
-        if suffix.startswith("major_")
-    }
-    if headers != expected_headers:
-        raise AssertionError("enabled notifier headers diverge from notification entities")
-    expected_item_keys = expected_headers | {
-        expected_item_key(suffix) for suffix in notifications
-    }
-    if item_keys != expected_item_keys:
-        raise AssertionError("item notification title/subtitle keys diverge")
-    if not location_notifications or not any(
-        key == "#str_ap_location_sent" or key.startswith("#str_ap_location_sent_")
-        for key in location_strings
-    ):
-        raise AssertionError("package lacks Codex location feedback")
-    if not all(path.is_file() for path in table_paths):
-        raise AssertionError("enabled notifier build lacks English or Portuguese strings")
-    locale_names = [string_table_names(path) for path in table_paths]
-    expected_locale_names = item_keys | location_strings
-    if not expected_locale_names <= locale_names[0]:
-        raise AssertionError("english.json is missing generated notification keys")
-    if not expected_locale_names <= locale_names[1]:
-        raise AssertionError("portuguese.json is missing generated notification keys")
-    expected_received_keys = {
-        key for key in item_keys if key.startswith("#str_ap_notify_item_received_")
-    }
-    for names, locale in zip(locale_names, ("english", "portuguese")):
-        received_keys = {
-            key for key in names if key.startswith("#str_ap_notify_item_received_")
-        }
-        if received_keys != expected_received_keys:
-            raise AssertionError(
-                f"{locale}.json received-item notification keys diverge"
-            )
-    if locale_names[0] != locale_names[1]:
-        raise AssertionError("English and Portuguese string keys diverge")
-    locale_values = [string_table_values(path) for path in table_paths]
-    for values, locale in zip(locale_values, ("english", "portuguese")):
-        if values.get(ITEM_NOTIFICATION_HEADER_KEY) != ITEM_NOTIFICATION_TITLE[locale]:
-            raise AssertionError("item notification title is not canonical")
-        if (
-            LOCATION_NOTIFICATION_HEADER_KEY in values
-            and values.get(LOCATION_NOTIFICATION_HEADER_KEY) != LOCATION_NOTIFICATION_TITLE[locale]
-        ):
-            raise AssertionError("location notification title is not canonical")
+    return all_commands, location_strings, notification_classifications, table_paths
 
-    for suffix in notifications:
-        notification = entity_block(content, f"ap_notify_item_{suffix}")
-        if 'inherit = ' in notification:
-            raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
-        _, rpc_suffix = suffix.split("_", 1)
-        rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
-        item_id = int(rpc_suffix.split("_", 1)[0])
-        classification = notification_classifications.get(item_id)
-        if classification is None:
-            raise AssertionError(
-                f"item notification has no production classification: {suffix}"
-            )
-        validate_item_notification_contract(
-            notification,
-            suffix,
-            classification["classification"] if isinstance(classification, dict) else classification,
-        )
-        definition = all_commands[str(item_id)]
-        if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
-            continue
-        if isinstance(definition, dict) and definition.get("type") in {
-            "progressive_perk", "progressive_item",
-        }:
-            for stage, stage_effects in enumerate(definition["perks"]):
-                effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
-                for index in range(len(effects)):
-                    rpc_name = (
-                        f"ap_rpc_v3_{item_id}_{stage}"
-                        if isinstance(stage_effects, str)
-                        else f"ap_rpc_v3_{item_id}_{stage}_{index}"
-                    )
-                    entity_block(content, rpc_name)
-        else:
-            entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
 
+def _validate_style(notifications):
     for style in ("major", "filler"):
         pairs = {
             suffix.rsplit("_", 1)[0]
@@ -392,25 +406,67 @@ def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, ma
             if {f"{pair}_a", f"{pair}_b"} - notifications:
                 raise AssertionError(f"item notification lacks A/B dedupe pool: {pair}")
 
-    for location_id in location_notifications:
-        notification = entity_block(
-            content, f"ap_notify_location_{location_id}"
+
+def _validate_effects(content, item_id, stage, stage_effects):
+    effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
+    for index in range(len(effects)):
+        rpc_name = (
+            f"ap_rpc_v3_{item_id}_{stage}"
+            if isinstance(stage_effects, str)
+            else f"ap_rpc_v3_{item_id}_{stage}_{index}"
         )
-        if any(field not in notification for field in CODEX_NOTIFICATION_FIELDS):
-            raise AssertionError(
-                f"location notification is not Codex: {location_id}"
-            )
-        if (
-            f'header = "{LOCATION_NOTIFICATION_HEADER_KEY}";' not in notification
-            or f'subtext = "#str_ap_location_{location_id}";' not in notification
-        ):
-            raise AssertionError(
-                f"location notification title/subtitle contract is incomplete: {location_id}"
-            )
-        if "SECRET_FOUND" in notification or "secret_found" in notification:
-            raise AssertionError(
-                f"location notification retains Secret Found: {location_id}"
-            )
+        entity_block(content, rpc_name)
+
+
+def _validate_notification(content, notification_classifications, suffix):
+    notification = entity_block(content, f"ap_notify_item_{suffix}")
+    if 'inherit = ' in notification:
+        raise AssertionError(f"item notification must use direct HUD contract: {suffix}")
+    _, rpc_suffix = suffix.split("_", 1)
+    rpc_suffix = rpc_suffix.rsplit("_", 1)[0]
+    item_id = int(rpc_suffix.split("_", 1)[0])
+    classification = notification_classifications.get(item_id)
+    if classification is None:
+        raise AssertionError(
+            f"item notification has no production classification: {suffix}"
+        )
+    validate_item_notification_contract(
+        notification,
+        suffix,
+        classification["classification"] if isinstance(classification, dict) else classification,
+    )
+    return item_id, rpc_suffix
+
+
+def validate(enabled: bool, maps_dir: Path, mod_root: Path, client_dir: Path, manifest_path: Path) -> None:
+    maps = sorted(maps_dir.rglob("*.entities"))
+    if not maps:
+        raise AssertionError(f"no generated maps found: {maps_dir}")
+    content = "\n".join(path.read_text(encoding="utf-8") for path in maps)
+    receipts = set(RECEIPT_RE.findall(content))
+    notifications = set(NOTIFICATION_RE.findall(content))
+    headers = set(HEADER_RE.findall(content))
+    item_keys = set(ITEM_KEY_RE.findall(content))
+    location_notifications = set(LOCATION_NOTIFICATION_RE.findall(content))
+    all_commands, location_strings, notification_classifications, table_paths = _validate_location_strings(client_dir, content, enabled, headers, item_keys, manifest_path, mod_root, notifications, receipts)
+    _validate_expected_headers(headers, item_keys, location_notifications, location_strings, notifications, table_paths)
+
+    for suffix in notifications:
+        item_id, rpc_suffix = _validate_notification(content, notification_classifications, suffix)
+        definition = all_commands[str(item_id)]
+        if isinstance(definition, dict) and definition.get("type") in {"transient_effect", "native_weapon_upgrade_points"}:
+            continue
+        if isinstance(definition, dict) and definition.get("type") in {
+            "progressive_perk", "progressive_item",
+        }:
+            for stage, stage_effects in enumerate(definition["perks"]):
+                _validate_effects(content, item_id, stage, stage_effects)
+        else:
+            entity_block(content, f"ap_rpc_v3_{rpc_suffix}")
+
+    _validate_style(notifications)
+
+    _validate_location_notifications(content, location_notifications)
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)

@@ -134,10 +134,7 @@ def _base_corpus_source(path: str, expected_sha256: str) -> str:
     return payload.decode("utf-8")
 
 
-def _assert_reward_owner(entries: list[dict]) -> None:
-    owners = {entry["reward_owner"]["inherited_path"] for entry in entries}
-    hashes = {entry["reward_owner"]["sha256"] for entry in entries}
-    currencies = {entry["reward_owner"]["currency"] for entry in entries}
+def _assert_reward_owner_registry_paths(currencies, entries, hashes, owners):
     registry_paths = set(entry["completion_owner"]["path"] for entry in entries)
     if len(entries) != len(registry_paths) or len(set(entry["location_id"] for entry in entries)) != len(entries):
         raise ValueError("Mission Challenge entries have non-unique paths or location IDs")
@@ -150,8 +147,15 @@ def _assert_reward_owner(entries: list[dict]) -> None:
         raise ValueError("inherited Mission Challenge Suit Point reward is ambiguous")
 
 
+def _assert_reward_owner(entries: list[dict]) -> None:
+    owners = {entry["reward_owner"]["inherited_path"] for entry in entries}
+    hashes = {entry["reward_owner"]["sha256"] for entry in entries}
+    currencies = {entry["reward_owner"]["currency"] for entry in entries}
+    _assert_reward_owner_registry_paths(currencies, entries, hashes, owners)
+
+
 def _assert_proven_observer() -> None:
-    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_client.py").read_text(encoding="utf-8")
+    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_saves.py").read_text(encoding="utf-8")
     required = (
         "read_mission_challenge_records",
         "observe_mission_challenges",
@@ -206,7 +210,7 @@ def _challenge_paths(block: str) -> tuple[str, ...]:
     ))
 
 
-def _aggregate_contracts(registry: dict) -> list[dict]:
+def _aggregate_contracts_challenges(registry):
     challenges = registry["mission_challenges"]
     contracts = []
     for aggregate in registry["all_mission_challenges"]:
@@ -228,6 +232,11 @@ def _aggregate_contracts(registry: dict) -> list[dict]:
             "location_id": aggregate["location_id"],
             "unlockables": unlockables,
         })
+    return contracts
+
+
+def _aggregate_contracts(registry: dict) -> list[dict]:
+    contracts = _aggregate_contracts_challenges(registry)
     if not contracts:
         raise ValueError("Mission Challenge registry has no aggregate contracts")
     return contracts
@@ -251,11 +260,7 @@ def _plan_b_registration_contracts(registry: dict) -> tuple[dict, ...]:
     return tuple(contracts)
 
 
-def _assert_dummy_candidate(plan: dict) -> None:
-    candidate = _patch2_corpus_source(
-        plan["decl_path"],
-        plan["sha256"],
-    ).replace("\r\n", "\n")
+def _assert_dummy_candidate_required(candidate, plan):
     required = (
         'inherit = "mission_challenge/dlc1_challenge_base";',
         'unlockableFlags = "UNLOCKABLE_FLAG_HORDE_CHALLENGE";',
@@ -296,6 +301,15 @@ def _assert_dummy_candidate(plan: dict) -> None:
         raise ValueError(
             f"{plan['label']} dummy candidate unexpectedly owns persistence or reward"
         )
+    return forbidden
+
+
+def _assert_dummy_candidate(plan: dict) -> None:
+    candidate = _patch2_corpus_source(
+        plan["decl_path"],
+        plan["sha256"],
+    ).replace("\r\n", "\n")
+    forbidden = _assert_dummy_candidate_required(candidate, plan)
     base = _patch2_corpus_source(
         "unlockable/mission_challenge/dlc1_challenge_base.decl",
         "c1a96d4848f4a7b7a6e6e265e99a778a5ee82b636d006eed76e4ff6bd2149e99",

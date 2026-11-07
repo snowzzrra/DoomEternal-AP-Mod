@@ -9,8 +9,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from doom_eap.content.automap_visual_registry import load_automap_visual_registry
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog
@@ -65,28 +66,7 @@ def _map_record(spec: Any, generated_maps: Path | None) -> dict[str, Any]:
     return record
 
 
-def build_release_manifest(
-    root: Path,
-    *,
-    generated_maps: Path | None = None,
-    public_files: list[str] | None = None,
-    release_version: str | None = None,
-    apworld: Mapping[str, Any] | None = None,
-    room_resources: Path | None = None,
-) -> dict[str, Any]:
-    """Build canonical manifest from current source and optional build outputs."""
-    root = root.resolve()
-    from tools.release.build_cache import validate_source_contract
-
-    validate_source_contract(root)
-    identity = _identity(root)
-    visual_path = root / "data" / "checked_location_visuals.json"
-    visual = load_automap_visual_registry(visual_path)
-    catalog = load_content_catalog(root)
-    maps = {
-        spec.key: _map_record(spec, generated_maps)
-        for spec in catalog.enabled_maps()
-    }
+def _build_release_manifest_generated_hashes(identity, maps, release_version, room_resources, root, visual, visual_path):
     generated_hashes = {
         key: value["generated_map_sha256"]
         for key, value in maps.items()
@@ -140,6 +120,32 @@ def build_release_manifest(
             "sha256": _sha256(physical_path),
             "size": physical_path.stat().st_size,
         }
+    return result
+
+
+def build_release_manifest(
+    root: Path,
+    *,
+    generated_maps: Path | None = None,
+    public_files: list[str] | None = None,
+    release_version: str | None = None,
+    apworld: Mapping[str, Any] | None = None,
+    room_resources: Path | None = None,
+) -> dict[str, Any]:
+    """Build canonical manifest from current source and optional build outputs."""
+    root = root.resolve()
+    from tools.release.build_cache import validate_source_contract
+
+    validate_source_contract(root)
+    identity = _identity(root)
+    visual_path = root / "data" / "checked_location_visuals.json"
+    visual = load_automap_visual_registry(visual_path)
+    catalog = load_content_catalog(root)
+    maps = {
+        spec.key: _map_record(spec, generated_maps)
+        for spec in catalog.enabled_maps()
+    }
+    result = _build_release_manifest_generated_hashes(identity, maps, release_version, room_resources, root, visual, visual_path)
     if public_files is not None:
         result["public_files"] = sorted(public_files)
     if apworld is not None:
@@ -178,9 +184,7 @@ def _require_hash(value: Any, label: str) -> None:
         raise ValueError(f"release manifest {label} must be SHA-256")
 
 
-def _validate_map_metadata(map_key: str, value: Any) -> None:
-    if not isinstance(value, dict):
-        raise ValueError(f"release manifest room compiler map is invalid: {map_key}")
+def _validate_map_metadata_required(map_key, value):
     required = {
         "runtime_map", "generated_output", "resource_base", "resource_path",
         "resource_owner", "resource_priority", "relative_entities_path",
@@ -198,13 +202,76 @@ def _validate_map_metadata(map_key: str, value: Any) -> None:
         raise ValueError(f"release manifest map size invalid: {map_key}")
 
 
-def validate_release_manifest(
-    document: Mapping[str, Any],
-    *,
-    package_root: Path | None = None,
-    generated_maps: Path | None = None,
-) -> None:
-    """Validate schema and, when paths are supplied, validate packaged bytes."""
+def _validate_map_metadata(map_key: str, value: Any) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"release manifest room compiler map is invalid: {map_key}")
+    _validate_map_metadata_required(map_key, value)
+
+
+def _validate_release_manifest_resources(compiler, package_root):
+    for name, resource in compiler["resources"].items():
+        if name not in {"base_mod.zip", "room_payloads.zip", "room_payload_manifest.json"}:
+            raise ValueError(f"release manifest room compiler resource is unknown: {name}")
+        if not isinstance(resource, Mapping) or set(resource) != {"path", "sha256", "size"}:
+            raise ValueError(f"release manifest room compiler resource is invalid: {name}")
+        if resource["path"] != f"client/resources/{name}":
+            raise ValueError(f"release manifest room compiler resource path drifted: {name}")
+        _require_hash(resource["sha256"], f"room compiler resource {name}")
+        if not isinstance(resource["size"], int) or resource["size"] < 1:
+            raise ValueError(f"release manifest room compiler resource size is invalid: {name}")
+    if package_root is not None and set(compiler["resources"]) != {
+        "base_mod.zip", "room_payloads.zip", "room_payload_manifest.json"
+    }:
+        raise ValueError("release manifest room compiler resource set is incomplete")
+
+
+def _validate_release_manifest_public_files(compiler, document, generated_hashes, generated_maps):
+    if generated_maps is not None:
+        for key, expected in generated_hashes.items():
+            map_record = compiler["maps"].get(key)
+            generated = generated_maps / map_record["generated_output"] if map_record else None
+            if generated is None or not generated.is_file() or _sha256(generated) != expected:
+                raise ValueError(f"release manifest generated map hash drifted: {key}")
+    public_files = document.get("public_files")
+    if not isinstance(public_files, list) or not all(isinstance(path, str) for path in public_files):
+        raise ValueError("release manifest public_files is invalid")
+    return public_files
+
+
+def _validate_release_manifest_registry(package_root, physical, visual):
+    if physical is not None:
+        physical_file = package_root / physical["path"]
+        if package_root.name == "client":
+            physical_file = package_root / Path(physical["path"]).relative_to("client")
+        if (not physical_file.is_file() or _sha256(physical_file) != physical["sha256"]
+                or physical_file.stat().st_size != physical["size"]):
+            raise ValueError("release manifest physical pickup projection hash drifted")
+    registry = package_root / visual["path"]
+    if not registry.is_file() and package_root.name == "client":
+        registry = package_root / Path(visual["path"]).relative_to("client")
+    if registry.is_file() and _sha256(registry) != visual["sha256"]:
+        raise ValueError("release manifest checked-location visual registry hash drifted")
+
+
+def _validate_release_manifest_maps(compiler, package_root, physical, resources, visual):
+    if set(resources["maps"]) != set(compiler["maps"]):
+        raise ValueError("release manifest base-resource map set disagrees with room compiler")
+    for key, resource in resources["maps"].items():
+        compiler_map = compiler["maps"][key]
+        if any(resource.get(field) != compiler_map[field] for field in (
+            "resource_base", "resource_path", "resource_owner", "resource_priority", "relative_entities_path",
+        )):
+            raise ValueError(f"release manifest base-resource disagreement: {key}")
+
+    if package_root is not None:
+        _validate_release_manifest_registry(package_root, physical, visual)
+        for resource in compiler["resources"].values():
+            path = package_root / resource["path"]
+            if not path.is_file() or _sha256(path) != resource["sha256"] or path.stat().st_size != resource["size"]:
+                raise ValueError(f"release manifest room compiler resource hash drifted: {resource['path']}")
+
+
+def _validate_release_manifest_version(document):
     if not isinstance(document, Mapping):
         raise ValueError("release manifest must be an object")
     if document.get("schema_version") != MANIFEST_SCHEMA_VERSION:
@@ -221,6 +288,27 @@ def validate_release_manifest(
     for field in ("content_revision", "compiler_revision", "bridge_protocol_version"):
         if field not in identity:
             raise ValueError(f"release manifest content identity field missing: {field}")
+    return identity
+
+
+def _validate_release_manifest_compiler(document, identity, package_root):
+    compiler = document.get("room_compiler")
+    if not isinstance(compiler, Mapping) or not ROOM_COMPILER_FIELDS <= set(compiler):
+        raise ValueError("release manifest room compiler metadata is missing")
+    if compiler["schema_version"] != 1 or compiler["model"] != "direct_room_compile":
+        raise ValueError("release manifest room compiler model is unsupported")
+    if compiler["revision"] != identity["compiler_revision"] or not isinstance(compiler["maps"], Mapping):
+        raise ValueError("release manifest room compiler revision drifted")
+    if not isinstance(compiler["resources"], Mapping):
+        raise ValueError("release manifest room compiler resources are invalid")
+    _validate_release_manifest_resources(compiler, package_root)
+    for key, value in compiler["maps"].items():
+        _validate_map_metadata(str(key), value)
+    return compiler
+
+
+def _validate_release_manifest_identity(document):
+    identity = _validate_release_manifest_version(document)
 
     visual = document.get("checked_location_visuals")
     if not isinstance(visual, Mapping) or set(visual) != CHECKED_LOCATION_VISUAL_FIELDS:
@@ -235,7 +323,10 @@ def validate_release_manifest(
         for key, value in generated_hashes.items()
     ):
         raise ValueError("release manifest generated map hashes are invalid")
+    return generated_hashes, identity, visual
 
+
+def _validate_release_manifest_physical(document, identity, package_root):
     physical = document.get("physical_pickups")
     if physical is not None:
         if (not isinstance(physical, Mapping) or set(physical) != {"path", "sha256", "size"}
@@ -244,72 +335,28 @@ def validate_release_manifest(
             raise ValueError("release manifest physical pickup projection is invalid")
         _require_hash(physical["sha256"], "physical pickup projection")
 
-    compiler = document.get("room_compiler")
-    if not isinstance(compiler, Mapping) or not ROOM_COMPILER_FIELDS <= set(compiler):
-        raise ValueError("release manifest room compiler metadata is missing")
-    if compiler["schema_version"] != 1 or compiler["model"] != "direct_room_compile":
-        raise ValueError("release manifest room compiler model is unsupported")
-    if compiler["revision"] != identity["compiler_revision"] or not isinstance(compiler["maps"], Mapping):
-        raise ValueError("release manifest room compiler revision drifted")
-    if not isinstance(compiler["resources"], Mapping):
-        raise ValueError("release manifest room compiler resources are invalid")
-    for name, resource in compiler["resources"].items():
-        if name not in {"base_mod.zip", "room_payloads.zip", "room_payload_manifest.json"}:
-            raise ValueError(f"release manifest room compiler resource is unknown: {name}")
-        if not isinstance(resource, Mapping) or set(resource) != {"path", "sha256", "size"}:
-            raise ValueError(f"release manifest room compiler resource is invalid: {name}")
-        if resource["path"] != f"client/resources/{name}":
-            raise ValueError(f"release manifest room compiler resource path drifted: {name}")
-        _require_hash(resource["sha256"], f"room compiler resource {name}")
-        if not isinstance(resource["size"], int) or resource["size"] < 1:
-            raise ValueError(f"release manifest room compiler resource size is invalid: {name}")
-    if package_root is not None and set(compiler["resources"]) != {
-        "base_mod.zip", "room_payloads.zip", "room_payload_manifest.json"
-    }:
-        raise ValueError("release manifest room compiler resource set is incomplete")
-    for key, value in compiler["maps"].items():
-        _validate_map_metadata(str(key), value)
+    compiler = _validate_release_manifest_compiler(document, identity, package_root)
 
     resources = document.get("base_resources")
     if not isinstance(resources, Mapping) or not BASE_RESOURCE_FIELDS <= set(resources):
         raise ValueError("release manifest base-resource metadata is missing")
+    return compiler, physical, resources
+
+
+def validate_release_manifest(
+    document: Mapping[str, Any],
+    *,
+    package_root: Path | None = None,
+    generated_maps: Path | None = None,
+) -> None:
+    """Validate schema and, when paths are supplied, validate packaged bytes."""
+    generated_hashes, identity, visual = _validate_release_manifest_identity(document)
+
+    compiler, physical, resources = _validate_release_manifest_physical(document, identity, package_root)
     if resources["schema_version"] != 1 or not isinstance(resources["maps"], Mapping):
         raise ValueError("release manifest base-resource metadata is invalid")
-    if set(resources["maps"]) != set(compiler["maps"]):
-        raise ValueError("release manifest base-resource map set disagrees with room compiler")
-    for key, resource in resources["maps"].items():
-        compiler_map = compiler["maps"][key]
-        if any(resource.get(field) != compiler_map[field] for field in (
-            "resource_base", "resource_path", "resource_owner", "resource_priority", "relative_entities_path",
-        )):
-            raise ValueError(f"release manifest base-resource disagreement: {key}")
-
-    if package_root is not None:
-        if physical is not None:
-            physical_file = package_root / physical["path"]
-            if package_root.name == "client":
-                physical_file = package_root / Path(physical["path"]).relative_to("client")
-            if (not physical_file.is_file() or _sha256(physical_file) != physical["sha256"]
-                    or physical_file.stat().st_size != physical["size"]):
-                raise ValueError("release manifest physical pickup projection hash drifted")
-        registry = package_root / visual["path"]
-        if not registry.is_file() and package_root.name == "client":
-            registry = package_root / Path(visual["path"]).relative_to("client")
-        if registry.is_file() and _sha256(registry) != visual["sha256"]:
-            raise ValueError("release manifest checked-location visual registry hash drifted")
-        for resource in compiler["resources"].values():
-            path = package_root / resource["path"]
-            if not path.is_file() or _sha256(path) != resource["sha256"] or path.stat().st_size != resource["size"]:
-                raise ValueError(f"release manifest room compiler resource hash drifted: {resource['path']}")
-    if generated_maps is not None:
-        for key, expected in generated_hashes.items():
-            map_record = compiler["maps"].get(key)
-            generated = generated_maps / map_record["generated_output"] if map_record else None
-            if generated is None or not generated.is_file() or _sha256(generated) != expected:
-                raise ValueError(f"release manifest generated map hash drifted: {key}")
-    public_files = document.get("public_files")
-    if not isinstance(public_files, list) or not all(isinstance(path, str) for path in public_files):
-        raise ValueError("release manifest public_files is invalid")
+    _validate_release_manifest_maps(compiler, package_root, physical, resources, visual)
+    public_files = _validate_release_manifest_public_files(compiler, document, generated_hashes, generated_maps)
     if package_root is not None and not (package_root / "build").is_dir():
         validate_public_file_members(package_root, public_files)
 

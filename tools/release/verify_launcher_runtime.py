@@ -66,54 +66,7 @@ def check_syntax(repo_root: Path) -> None:
     print("  [OK] Python syntax compilation verified for runtime and release modules")
 
 
-def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> None:
-    root = (repo_root or REPO_ROOT).resolve()
-    ap_source = archipelago_source.resolve()
-    standalone_runtime = (root / "packaging/standalone_runtime").resolve()
-
-    if not root.is_dir():
-        raise RuntimeError(f"Repository root directory does not exist: {root}")
-    if not standalone_runtime.is_dir():
-        raise RuntimeError(f"Standalone runtime directory does not exist: {standalone_runtime}")
-    if not (ap_source / "CommonClient.py").is_file():
-        raise RuntimeError(f"Invalid Archipelago source (missing CommonClient.py): {ap_source}")
-
-    # strict static undefined name & syntax checks
-    check_undefined_names(root)
-    check_syntax(root)
-
-    # Configure sys.path in the exact precedence order used by PyInstaller
-    ordered_paths = [str(root), str(standalone_runtime), str(ap_source)]
-    remaining_paths = [p for p in sys.path if p not in ordered_paths]
-    sys.path[:] = ordered_paths + remaining_paths
-
-    importlib.invalidate_caches()
-    for mod in [
-        "ModuleUpdate", "MultiServer", "worlds", "Utils", "NetUtils", "CommonClient",
-        "doom_eap", "doom_eap.runtime.bridge_client", "doom_eap.launcher.launcher_app",
-        "doom_eap.launcher.launcher_controller",
-    ]:
-        sys.modules.pop(mod, None)
-
-    # check third-party dependencies
-    required_deps = [
-        "colorama",
-        "websockets",
-        "yaml",
-        "pathspec",
-        "typing_extensions",
-        "certifi",
-        "platformdirs",
-    ]
-    print("--> Checking third-party dependencies...")
-    for dep in required_deps:
-        try:
-            mod = importlib.import_module(dep)
-            ver = getattr(mod, "__version__", "unknown")
-            print(f"  [OK] {dep} ({ver})")
-        except ImportError as e:
-            raise RuntimeError(f"Missing required third-party dependency: {dep} ({e})") from e
-
+def _verify_runtime_ca_path(ap_source, standalone_runtime):
     import ssl
 
     import certifi
@@ -163,6 +116,134 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
             )
         print(f"  [OK] {mod_name} -> {mod_path}")
 
+
+def _verify_runtime_root(archipelago_source, repo_root):
+    root = (repo_root or REPO_ROOT).resolve()
+    ap_source = archipelago_source.resolve()
+    standalone_runtime = (root / "packaging/standalone_runtime").resolve()
+
+    if not root.is_dir():
+        raise RuntimeError(f"Repository root directory does not exist: {root}")
+    if not standalone_runtime.is_dir():
+        raise RuntimeError(f"Standalone runtime directory does not exist: {standalone_runtime}")
+    if not (ap_source / "CommonClient.py").is_file():
+        raise RuntimeError(f"Invalid Archipelago source (missing CommonClient.py): {ap_source}")
+
+    # strict static undefined name & syntax checks
+    check_undefined_names(root)
+    check_syntax(root)
+
+    # Configure sys.path in the exact precedence order used by PyInstaller
+    ordered_paths = [str(root), str(standalone_runtime), str(ap_source)]
+    remaining_paths = [p for p in sys.path if p not in ordered_paths]
+    sys.path[:] = ordered_paths + remaining_paths
+
+    importlib.invalidate_caches()
+    for mod in [
+        "ModuleUpdate", "MultiServer", "worlds", "Utils", "NetUtils", "CommonClient",
+        "doom_eap", "doom_eap.runtime.bridge_client", "doom_eap.launcher.launcher_app",
+        "doom_eap.launcher.launcher_controller",
+    ]:
+        sys.modules.pop(mod, None)
+
+    # check third-party dependencies
+    required_deps = [
+        "colorama",
+        "websockets",
+        "yaml",
+        "pathspec",
+        "typing_extensions",
+        "certifi",
+        "platformdirs",
+    ]
+    print("--> Checking third-party dependencies...")
+    for dep in required_deps:
+        try:
+            mod = importlib.import_module(dep)
+            ver = getattr(mod, "__version__", "unknown")
+            print(f"  [OK] {dep} ({ver})")
+        except ImportError as e:
+            raise RuntimeError(f"Missing required third-party dependency: {dep} ({e})") from e
+    return ap_source, root, standalone_runtime
+
+
+def _verify_runtime_bridge_mod(ap_source, fake_app, fake_config, fake_doom, fake_saves, fake_steam, root, tmp_dir):
+    os.environ["DOOM_AP_CONFIG_FILE"] = str(fake_config)
+    os.environ["DOOM_AP_APPLICATION_DIR"] = str(fake_app)
+    os.environ["ARCHIPELAGO_SOURCE"] = str(ap_source)
+
+    # Invalidate bridge_client cache and re-import under hermetic environment
+    sys.modules.pop("doom_eap.runtime.bridge_client", None)
+    bridge_mod = importlib.import_module("doom_eap.runtime.bridge_client")
+    bridge_config = importlib.import_module("doom_eap.runtime.bridge_config")
+
+    # check isolated paths are active
+    if bridge_config.CONFIG_FILE.resolve() != fake_config.resolve():
+        raise RuntimeError(
+            f"Bridge client used unexpected config: {bridge_config.CONFIG_FILE} != {fake_config}"
+        )
+    if Path(bridge_config.DOOM_BASE_DIR).resolve() != (fake_doom / "base").resolve():
+        raise RuntimeError(
+            f"Bridge client DOOM_BASE_DIR mismatch: {bridge_config.DOOM_BASE_DIR} != {fake_doom / 'base'}"
+        )
+    if Path(bridge_config.SAVE_GAMES_DIR).resolve() != fake_saves.resolve():
+        raise RuntimeError(
+            f"Bridge client SAVE_GAMES_DIR mismatch: {bridge_config.SAVE_GAMES_DIR} != {fake_saves}"
+        )
+    if Path(bridge_config.STEAM_REMOTE_DIR).resolve() != fake_steam.resolve():
+        raise RuntimeError(
+            f"Bridge client STEAM_REMOTE_DIR mismatch: {bridge_config.STEAM_REMOTE_DIR} != {fake_steam}"
+        )
+    if bridge_config.STEAM_ID3 != 12345678:
+        raise RuntimeError(
+            f"Bridge client STEAM_ID3 mismatch: {bridge_config.STEAM_ID3} != 12345678"
+        )
+
+    print(f"  [OK] doom_eap.runtime.bridge_client -> {bridge_mod.__file__}")
+    print(f"  [OK] Hermetic DOOM_BASE_DIR -> {bridge_config.DOOM_BASE_DIR}")
+    print(f"  [OK] Hermetic SAVE_GAMES_DIR -> {bridge_config.SAVE_GAMES_DIR}")
+    print(f"  [OK] Hermetic STEAM_REMOTE_DIR -> {bridge_config.STEAM_REMOTE_DIR}")
+
+    # check launcher app module
+    print("--> Checking DOOM Eternal launcher app importability...")
+    launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
+    print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
+
+    # check frozen mode identity resolution
+    print("--> Checking bridge runtime identity in simulated frozen environment...")
+    from doom_eap.runtime.bridge_config import resolve_bridge_identity
+    with tempfile.TemporaryDirectory(prefix="doomeap_preflight_frozen_") as frozen_dir_str:
+        frozen_dir = Path(frozen_dir_str)
+        missing_module = frozen_dir / "_MEI99999/doom_eap/runtime/bridge_client.py"
+        missing_app = frozen_dir / "app"
+        _b_file, b_sha, b_rev = resolve_bridge_identity(
+            application_dir=missing_app,
+            repo_root=root,
+            module_file=missing_module,
+            is_frozen=True,
+        )
+        if not b_sha or len(b_sha) != 64 or not b_rev.startswith("mission-unified-"):
+            raise RuntimeError(
+                f"Frozen mode identity resolution failed: sha={b_sha}, rev={b_rev}"
+            )
+        print(f"  [OK] Frozen bridge identity -> sha256={b_sha[:12]}... revision={b_rev}")
+
+    # 7. Hermetic LauncherController Construction from explicit fixture
+    print("--> Checking hermetic LauncherController construction...")
+    fixture_app = tmp_dir / "fixture_app"
+    fixture_client_data = fixture_app / "client" / "data"
+    fixture_client_data.mkdir(parents=True, exist_ok=True)
+    schema_source = root / "data" / "options_schema.json"
+    if not schema_source.is_file():
+        raise RuntimeError(f"Canonical schema source missing at {schema_source}")
+    return fixture_app, fixture_client_data, launcher_mod, schema_source
+
+
+def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> None:
+    ap_source, root, standalone_runtime = _verify_runtime_root(archipelago_source, repo_root)
+
+    _verify_runtime_ca_path(ap_source, standalone_runtime)
+
     # isolated bridge client verification
     print("--> Checking DOOM Eternal bridge client importability (hermetic setup)...")
     env_keys = (
@@ -196,73 +277,7 @@ def verify_runtime(archipelago_source: Path, repo_root: Path | None = None) -> N
         )
 
         try:
-            os.environ["DOOM_AP_CONFIG_FILE"] = str(fake_config)
-            os.environ["DOOM_AP_APPLICATION_DIR"] = str(fake_app)
-            os.environ["ARCHIPELAGO_SOURCE"] = str(ap_source)
-
-            # Invalidate bridge_client cache and re-import under hermetic environment
-            sys.modules.pop("doom_eap.runtime.bridge_client", None)
-            bridge_mod = importlib.import_module("doom_eap.runtime.bridge_client")
-
-            # check isolated paths are active
-            if bridge_mod.CONFIG_FILE.resolve() != fake_config.resolve():
-                raise RuntimeError(
-                    f"Bridge client used unexpected config: {bridge_mod.CONFIG_FILE} != {fake_config}"
-                )
-            if Path(bridge_mod.DOOM_BASE_DIR).resolve() != (fake_doom / "base").resolve():
-                raise RuntimeError(
-                    f"Bridge client DOOM_BASE_DIR mismatch: {bridge_mod.DOOM_BASE_DIR} != {fake_doom / 'base'}"
-                )
-            if Path(bridge_mod.SAVE_GAMES_DIR).resolve() != fake_saves.resolve():
-                raise RuntimeError(
-                    f"Bridge client SAVE_GAMES_DIR mismatch: {bridge_mod.SAVE_GAMES_DIR} != {fake_saves}"
-                )
-            if Path(bridge_mod.STEAM_REMOTE_DIR).resolve() != fake_steam.resolve():
-                raise RuntimeError(
-                    f"Bridge client STEAM_REMOTE_DIR mismatch: {bridge_mod.STEAM_REMOTE_DIR} != {fake_steam}"
-                )
-            if bridge_mod.STEAM_ID3 != 12345678:
-                raise RuntimeError(
-                    f"Bridge client STEAM_ID3 mismatch: {bridge_mod.STEAM_ID3} != 12345678"
-                )
-
-            print(f"  [OK] doom_eap.runtime.bridge_client -> {bridge_mod.__file__}")
-            print(f"  [OK] Hermetic DOOM_BASE_DIR -> {bridge_mod.DOOM_BASE_DIR}")
-            print(f"  [OK] Hermetic SAVE_GAMES_DIR -> {bridge_mod.SAVE_GAMES_DIR}")
-            print(f"  [OK] Hermetic STEAM_REMOTE_DIR -> {bridge_mod.STEAM_REMOTE_DIR}")
-
-            # check launcher app module
-            print("--> Checking DOOM Eternal launcher app importability...")
-            launcher_mod = importlib.import_module("doom_eap.launcher.launcher_app")
-            print(f"  [OK] doom_eap.launcher.launcher_app -> {launcher_mod.__file__}")
-
-            # check frozen mode identity resolution
-            print("--> Checking bridge runtime identity in simulated frozen environment...")
-            from doom_eap.runtime.bridge_client import resolve_bridge_identity
-            with tempfile.TemporaryDirectory(prefix="doomeap_preflight_frozen_") as frozen_dir_str:
-                frozen_dir = Path(frozen_dir_str)
-                missing_module = frozen_dir / "_MEI99999/doom_eap/runtime/bridge_client.py"
-                missing_app = frozen_dir / "app"
-                _b_file, b_sha, b_rev = resolve_bridge_identity(
-                    application_dir=missing_app,
-                    repo_root=root,
-                    module_file=missing_module,
-                    is_frozen=True,
-                )
-                if not b_sha or len(b_sha) != 64 or not b_rev.startswith("mission-unified-"):
-                    raise RuntimeError(
-                        f"Frozen mode identity resolution failed: sha={b_sha}, rev={b_rev}"
-                    )
-                print(f"  [OK] Frozen bridge identity -> sha256={b_sha[:12]}... revision={b_rev}")
-
-            # 7. Hermetic LauncherController Construction from explicit fixture
-            print("--> Checking hermetic LauncherController construction...")
-            fixture_app = tmp_dir / "fixture_app"
-            fixture_client_data = fixture_app / "client" / "data"
-            fixture_client_data.mkdir(parents=True, exist_ok=True)
-            schema_source = root / "data" / "options_schema.json"
-            if not schema_source.is_file():
-                raise RuntimeError(f"Canonical schema source missing at {schema_source}")
+            fixture_app, fixture_client_data, launcher_mod, schema_source = _verify_runtime_bridge_mod(ap_source, fake_app, fake_config, fake_doom, fake_saves, fake_steam, root, tmp_dir)
             shutil.copy2(schema_source, fixture_client_data / "options_schema.json")
 
             fake_user_state = tmp_dir / "user_state"

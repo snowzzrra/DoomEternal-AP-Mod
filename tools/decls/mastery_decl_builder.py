@@ -8,8 +8,8 @@ import hashlib
 import json
 from pathlib import Path
 
-from doom_eap.contracts.challenge_registry import load_challenge_registry
 from doom_eap.content.mastery_requirements import mastery_entries_for_profile, patch_mastery_decl
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
@@ -70,19 +70,18 @@ def _remove_single_block(source: str, field: str, entry_name: str) -> str:
 def _assert_proven_observer(masteries: list[dict]) -> None:
     if len(masteries) != 13:
         raise ValueError("refusing to strip rewards without the complete base mastery registry")
-    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_client.py").read_text(encoding="utf-8")
+    bridge = (ROOT / "doom_eap" / "runtime" / "bridge_saves.py").read_text(encoding="utf-8")
     required = (
         "check_weapon_mastery_locations",
         "read_weapon_mastery_records",
         "mastery_save_file",
     )
-    decoder = (ROOT / "doom_eap" / "runtime" / "save_records.py").read_text(encoding="utf-8")
     decoder_required = (
         "read_unlockable_record",
         "UnlockableManager_0_1_2",
         "unlockableIsUnlocked",
     )
-    if not all(token in bridge for token in required) or not all(token in decoder for token in decoder_required):
+    if not all(token in bridge for token in (*required, *decoder_required)):
         raise ValueError("refusing to strip mastery rewards without save reader/send path")
 
 

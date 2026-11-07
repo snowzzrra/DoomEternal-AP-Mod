@@ -65,6 +65,159 @@ def string_entries(entries: list[tuple[str, str]]) -> list[dict[str, str]]:
     return result
 
 
+def _build_string_table_item_id(definition, entries, item_names, output_path, placement_by_item, raw_item_id, referenced_keys):
+    item_id = int(raw_item_id)
+    try:
+        item_name = item_names[item_id]
+    except KeyError as error:
+        raise ValueError(f"item {item_id} has no notification name") from error
+    progressive_stage_count = progressive_notification_stage_count(
+        item_id, definition
+    )
+    stages = (
+        range(progressive_stage_count)
+        if progressive_stage_count is not None
+        else (None,)
+    )
+    for stage in stages:
+        key = notification_key(item_id, definition, stage=stage)
+        if key in referenced_keys:
+            records = placement_by_item.get(item_id, [])
+            text = None
+            if stage is None and len(records) == 1:
+                record = records[0]
+                text = item_receipt_text(
+                    item_name,
+                    local=bool(record["local"]),
+                    trap=bool(record["trap"]),
+                    recipient_name=str(record["recipient_name"]),
+                    locale=output_path.stem,
+                )
+            if text is None:
+                text = notification_text(
+                    item_id, definition, item_name, stage=stage
+                )
+            entries.append((key, text))
+        major_key = major_notification_key(item_id, definition, stage=stage)
+        if major_key in referenced_keys:
+            entries.append((
+                major_key,
+                major_notification_text(
+                    item_id,
+                    definition,
+                    item_name,
+                    stage=stage,
+                    locale=output_path.stem,
+                ),
+            ))
+
+
+def _build_string_table_location_keys(item_names, items, output_path, placement_by_item, referenced_keys):
+    entries: list[tuple[str, str]] = []
+    for raw_item_id, definition in sorted(items.items(), key=lambda entry: int(entry[0])):
+        if isinstance(definition, dict) and definition.get("type") == "no_op":
+            continue
+        _build_string_table_item_id(definition, entries, item_names, output_path, placement_by_item, raw_item_id, referenced_keys)
+
+    location_keys = {
+        key for key in referenced_keys if key.startswith("#str_ap_location_")
+    }
+    if ITEM_NOTIFICATION_HEADER_KEY in referenced_keys:
+        try:
+            entries.append((
+                ITEM_NOTIFICATION_HEADER_KEY,
+                ITEM_NOTIFICATION_TITLE[output_path.stem],
+            ))
+        except KeyError as error:
+            raise ValueError(
+                f"unsupported notification locale: {output_path.stem}"
+            ) from error
+    return entries, location_keys
+
+
+def _build_string_table_default_location_names(entries, location_names_path, output_path, referenced_keys):
+    default_location_names = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "location_names.json"
+    )
+    if location_names_path is None:
+        location_names_path = default_location_names
+    if location_names_path.resolve() == default_location_names.resolve():
+        from doom_eap.content.content_catalog import load_content_catalog
+        location_identity = {
+            "schema_version": 1,
+            "locations": {
+                str(location_id): name
+                for location_id, name
+                in load_content_catalog().location_names.items()
+            },
+        }
+    else:
+        location_identity = json.loads(
+            location_names_path.read_text(encoding="utf-8")
+        )
+    if location_identity.get("schema_version") != 1:
+        raise ValueError("unsupported location-name schema")
+    location_names = location_identity.get("locations", {})
+    if LOCATION_NOTIFICATION_HEADER_KEY in referenced_keys:
+        try:
+            entries.append((
+                LOCATION_NOTIFICATION_HEADER_KEY,
+                LOCATION_NOTIFICATION_TITLE[output_path.stem],
+            ))
+        except KeyError as error:
+            raise ValueError(
+            f"unsupported notification locale: {output_path.stem}"
+        ) from error
+    return location_names
+
+
+def _build_string_table_location_id(placement_names, record, required):
+    if not isinstance(record, dict) or set(record) != required:
+        raise ValueError("placement metadata has invalid fields")
+    location_id = record["location_id"]
+    location_name = record["location_name"]
+    if (
+        not isinstance(location_id, int)
+        or isinstance(location_id, bool)
+        or not isinstance(location_name, str)
+        or not location_name.strip()
+    ):
+        raise ValueError("placement metadata has invalid location identity")
+    if location_id in placement_names:
+        raise ValueError(f"placement metadata duplicates location {location_id}")
+    return location_id, location_name
+
+
+def _build_string_table_location_names(entries, location_keys, location_names_path, output_path, placement_names, placement_records, referenced_keys):
+    location_names = _build_string_table_default_location_names(entries, location_names_path, output_path, referenced_keys)
+    for key in sorted(location_keys):
+        if key == LOCATION_NOTIFICATION_HEADER_KEY:
+            continue
+        if key.startswith(PLACEMENT_SENT_KEY_PREFIX):
+            location_id = int(key.removeprefix(PLACEMENT_SENT_KEY_PREFIX))
+            record = placement_records.get(location_id)
+            if record is None:
+                raise ValueError(
+                    f"location {location_id} has no placement metadata for "
+                    "its sent presentation"
+                )
+            entries.append((key, location_sent_text(record, locale=output_path.stem)))
+            continue
+        location_id = key.removeprefix("#str_ap_location_")
+        if location_id in placement_names:
+            location_name = placement_names[location_id]
+        else:
+            try:
+                location_name = location_names[location_id]
+            except KeyError as error:
+                raise ValueError(
+                    f"location {location_id} has no canonical notification name"
+                ) from error
+        entries.append((key, location_notification_text(location_name)))
+
+
 def build_string_table(
     items_path: Path,
     policies_path: Path,
@@ -96,144 +249,14 @@ def build_string_table(
             "recipient_slot", "recipient_name", "classification", "trap", "local",
         }
         for record in metadata:
-            if not isinstance(record, dict) or set(record) != required:
-                raise ValueError("placement metadata has invalid fields")
-            location_id = record["location_id"]
-            location_name = record["location_name"]
-            if (
-                not isinstance(location_id, int)
-                or isinstance(location_id, bool)
-                or not isinstance(location_name, str)
-                or not location_name.strip()
-            ):
-                raise ValueError("placement metadata has invalid location identity")
-            if location_id in placement_names:
-                raise ValueError(f"placement metadata duplicates location {location_id}")
+            location_id, location_name = _build_string_table_location_id(placement_names, record, required)
             placement_names[location_id] = location_name.strip()
             placement_records[location_id] = record
             item_id = record["item_id"]
             placement_by_item.setdefault(item_id, []).append(record)
-    entries: list[tuple[str, str]] = []
-    for raw_item_id, definition in sorted(items.items(), key=lambda entry: int(entry[0])):
-        if isinstance(definition, dict) and definition.get("type") == "no_op":
-            continue
-        item_id = int(raw_item_id)
-        try:
-            item_name = item_names[item_id]
-        except KeyError as error:
-            raise ValueError(f"item {item_id} has no notification name") from error
-        progressive_stage_count = progressive_notification_stage_count(
-            item_id, definition
-        )
-        stages = (
-            range(progressive_stage_count)
-            if progressive_stage_count is not None
-            else (None,)
-        )
-        for stage in stages:
-            key = notification_key(item_id, definition, stage=stage)
-            if key in referenced_keys:
-                records = placement_by_item.get(item_id, [])
-                text = None
-                if stage is None and len(records) == 1:
-                    record = records[0]
-                    text = item_receipt_text(
-                        item_name,
-                        local=bool(record["local"]),
-                        trap=bool(record["trap"]),
-                        recipient_name=str(record["recipient_name"]),
-                        locale=output_path.stem,
-                    )
-                if text is None:
-                    text = notification_text(
-                        item_id, definition, item_name, stage=stage
-                    )
-                entries.append((key, text))
-            major_key = major_notification_key(item_id, definition, stage=stage)
-            if major_key in referenced_keys:
-                entries.append((
-                    major_key,
-                    major_notification_text(
-                        item_id,
-                        definition,
-                        item_name,
-                        stage=stage,
-                        locale=output_path.stem,
-                    ),
-                ))
-
-    location_keys = {
-        key for key in referenced_keys if key.startswith("#str_ap_location_")
-    }
-    if ITEM_NOTIFICATION_HEADER_KEY in referenced_keys:
-        try:
-            entries.append((
-                ITEM_NOTIFICATION_HEADER_KEY,
-                ITEM_NOTIFICATION_TITLE[output_path.stem],
-            ))
-        except KeyError as error:
-            raise ValueError(
-                f"unsupported notification locale: {output_path.stem}"
-            ) from error
+    entries, location_keys = _build_string_table_location_keys(item_names, items, output_path, placement_by_item, referenced_keys)
     if location_keys:
-        default_location_names = (
-            Path(__file__).resolve().parents[2]
-            / "data"
-            / "location_names.json"
-        )
-        if location_names_path is None:
-            location_names_path = default_location_names
-        if location_names_path.resolve() == default_location_names.resolve():
-            from doom_eap.content.content_catalog import load_content_catalog
-            location_identity = {
-                "schema_version": 1,
-                "locations": {
-                    str(location_id): name
-                    for location_id, name
-                    in load_content_catalog().location_names.items()
-                },
-            }
-        else:
-            location_identity = json.loads(
-                location_names_path.read_text(encoding="utf-8")
-            )
-        if location_identity.get("schema_version") != 1:
-            raise ValueError("unsupported location-name schema")
-        location_names = location_identity.get("locations", {})
-        if LOCATION_NOTIFICATION_HEADER_KEY in referenced_keys:
-            try:
-                entries.append((
-                    LOCATION_NOTIFICATION_HEADER_KEY,
-                    LOCATION_NOTIFICATION_TITLE[output_path.stem],
-                ))
-            except KeyError as error:
-                raise ValueError(
-                f"unsupported notification locale: {output_path.stem}"
-            ) from error
-        for key in sorted(location_keys):
-            if key == LOCATION_NOTIFICATION_HEADER_KEY:
-                continue
-            if key.startswith(PLACEMENT_SENT_KEY_PREFIX):
-                location_id = int(key.removeprefix(PLACEMENT_SENT_KEY_PREFIX))
-                record = placement_records.get(location_id)
-                if record is None:
-                    raise ValueError(
-                        f"location {location_id} has no placement metadata for "
-                        "its sent presentation"
-                    )
-                entries.append((key, location_sent_text(record, locale=output_path.stem)))
-                continue
-            location_id = key.removeprefix("#str_ap_location_")
-            if location_id in placement_names:
-                location_name = placement_names[location_id]
-            else:
-                try:
-                    location_name = location_names[location_id]
-                except KeyError as error:
-                    raise ValueError(
-                        f"location {location_id} has no canonical notification name"
-                    ) from error
-            entries.append((key, location_notification_text(location_name)))
+        _build_string_table_location_names(entries, location_keys, location_names_path, output_path, placement_names, placement_records, referenced_keys)
 
     serialized_entries = string_entries(entries)
     defined_keys = {entry["name"] for entry in serialized_entries}

@@ -132,24 +132,7 @@ def render_stage_routes(catalog):
             '    return nullptr;\n}\n}\n')
 
 
-def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
-    physical = [item for item in catalog.physical_locations
-                if not item.policy.get('legacy_alias_of') and selected_map in (None, item.map_key)]
-    if selected_map is not None and selected_map not in catalog.maps:
-        raise ValueError(f"unknown map key: {selected_map}")
-    # --map narrows catalog discovery while output remains a complete APWorld table.
-    if selected_map is not None:
-        physical = [item for item in catalog.physical_locations if not item.policy.get('legacy_alias_of')]
-    rows: list[tuple[str, int | None, str]] = [
-        (item.name, item.location_id, item.region) for item in physical
-    ]
-    rows.extend(
-        (item.name, item.location_id, item.region) for item in catalog.runtime_locations
-    )
-    route = catalog.route
-    rows.extend((item["name"], None, item["region"]) for item in route.get("virtual_locations", []))
-    if len({name for name, _, _ in rows}) != len(rows):
-        raise ValueError("generated APWorld locations are not unique")
+def _render_by_region(catalog, route, rows):
     by_region: dict[str, list[str]] = {}
     for name, _, region in rows:
         by_region.setdefault(region, []).append(name)
@@ -230,6 +213,48 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
         difficulty = catalog.region_metadata.get(region, {}).get("mission_difficulty")
         if difficulty is not None:
             lines.append(f"    {string(region)}: {dict(difficulty)!r},")
+    return lines, string
+
+
+def _render_physical(catalog, selected_map):
+    physical = [item for item in catalog.physical_locations
+                if not item.policy.get('legacy_alias_of') and selected_map in (None, item.map_key)]
+    if selected_map is not None and selected_map not in catalog.maps:
+        raise ValueError(f"unknown map key: {selected_map}")
+    # --map narrows catalog discovery while output remains a complete APWorld table.
+    if selected_map is not None:
+        physical = [item for item in catalog.physical_locations if not item.policy.get('legacy_alias_of')]
+    rows: list[tuple[str, int | None, str]] = [
+        (item.name, item.location_id, item.region) for item in physical
+    ]
+    return rows
+
+
+def _render_neutral(catalog, counts, lines, selected_map):
+    lines.append(f"MASTERY_REQUIREMENT_COUNTS = {counts!r}")
+    lines.append("")
+    targets = challenge_enemy_targets(catalog)
+    lines.append(f"CHALLENGE_ENEMY_TARGETS = {targets!r}")
+    lines.append("")
+    neutral = {item.name for item in catalog.physical_locations
+               if item.policy.get("permanent_resource_budget") is False
+               and (selected_map is None or item.map_key == selected_map)}
+    neutral.update(item.name for item in catalog.runtime_locations
+                   if item.data.get("permanent_resource_budget") is False
+                   and (selected_map is None or item.mission_key == selected_map))
+    return neutral
+
+
+def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
+    rows = _render_physical(catalog, selected_map)
+    rows.extend(
+        (item.name, item.location_id, item.region) for item in catalog.runtime_locations
+    )
+    route = catalog.route
+    rows.extend((item["name"], None, item["region"]) for item in route.get("virtual_locations", []))
+    if len({name for name, _, _ in rows}) != len(rows):
+        raise ValueError("generated APWorld locations are not unique")
+    lines, string = _render_by_region(catalog, route, rows)
     lines.extend(
         [
             "}",
@@ -252,17 +277,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     counts = {profile: {entry["signal"]["unlockable"]: entry["signal"]["rule_0_statCount"]
                         for entry in mastery_entries_for_profile(masteries, profile)}
               for profile in MASTERY_REQUIREMENT_DIVISORS}
-    lines.append(f"MASTERY_REQUIREMENT_COUNTS = {counts!r}")
-    lines.append("")
-    targets = challenge_enemy_targets(catalog)
-    lines.append(f"CHALLENGE_ENEMY_TARGETS = {targets!r}")
-    lines.append("")
-    neutral = {item.name for item in catalog.physical_locations
-               if item.policy.get("permanent_resource_budget") is False
-               and (selected_map is None or item.map_key == selected_map)}
-    neutral.update(item.name for item in catalog.runtime_locations
-                   if item.data.get("permanent_resource_budget") is False
-                   and (selected_map is None or item.mission_key == selected_map))
+    neutral = _render_neutral(catalog, counts, lines, selected_map)
     lines.append(f"RESOURCE_NEUTRAL_LOCATION_NAMES = frozenset({tuple(sorted(neutral))!r})")
     lines.append(f"ARENA_LOCATION_KINDS = {arena_location_kinds(catalog.root)!r}")
     lines.append(f"ARENA_LOCATION_RULES = {arena_location_rules(catalog.root)!r}")
@@ -270,10 +285,23 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     return "\n".join(lines)
 
 
-def compile_kill_sources(catalog, native):
-    reference = json.loads((catalog.root / 'content/catalog/killsanity_estimates.json').read_bytes())
-    if reference.get('schema_version') != 1 or reference.get('quantity') != 'conservative_estimate':
-        raise ValueError('Unsupported campaign kill estimate reference')
+def _compile_kill_sources_secret(alternatives, count, estimate, identity, key, location, native_sources, secret_locations, seen_events):
+    if identity in seen_events:
+        raise ValueError(f"Kill estimate repeats an event: {key}/{identity}")
+    seen_events.add(identity)
+    source = native_sources.get(identity)
+    if source is None or source.get("protected_reason"):
+        raise ValueError(f"Kill estimate refers to an absent or protected native event: {key}/{identity}")
+    secret = secret_locations.get((key, identity.split('/')[0]))
+    if secret is not None and location != secret:
+        raise ValueError(f"Kill estimate uses the wrong Secret Encounter: {key}/{identity}")
+    if type(count) is not int or count < 1:
+        raise ValueError(f"Kill estimate has an invalid event count: {key}/{identity}")
+    if identity in estimate.get('alternative_source_ids', []) and identity not in alternatives:
+        raise ValueError(f'Kill estimate needs an alternative-source plan: {key}/{identity}')
+
+
+def _compile_kill_sources_stage_ids(catalog, reference):
     stage_ids = set(catalog.maps) - {'hub'}
     if set(reference.get('maps', {})) != set(stage_ids):
         raise ValueError('Campaign kill estimates must cover the supported mission list')
@@ -289,50 +317,54 @@ def compile_kill_sources(catalog, native):
             progression_source_ids=[row['source_id'] for row in estimate.get('guaranteed_sources', [])])
         if estimate.get('source_alternatives'):
             kill_sources[key]['source_alternatives'] = estimate['source_alternatives']
+    return kill_sources, stage_ids
+
+
+def _compile_kill_sources_intersection(alternatives, by_id, count, identity, key, location):
+    if identity not in by_id:
+        by_id[identity] = {"source_id": identity, "map_key": key, "count": count, "repeatable": True}
+        if identity in alternatives:
+            by_id[identity].update({field: value for field, value in by_id[alternatives[identity]].items()
+                                   if field not in {'source_id', 'count'}})
+    row = by_id[identity]
+    if row["count"] != count:
+        raise ValueError(f"Guaranteed source and event counts differ: {key}/{identity}")
+    if not {"location", "region"}.intersection(row):
+        row["location"] = location
+
+
+def _compile_kill_sources_original(estimate, key, kill_sources, native, native_event_identity, secret_locations):
+    original = kill_sources[key]
+    by_id = {row["source_id"]: row for row in original["sources"]}
+    alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
+                    for branch in group['branches'] for member in branch}
+    native_sources = {native_event_identity(row): row for row in native["maps"][key]["origins"] if "binding" in row}
+    seen_events = set()
+    for location, events in estimate.get("event_sources", {}).items():
+        for identity, count in events.items():
+            _compile_kill_sources_secret(alternatives, count, estimate, identity, key, location, native_sources, secret_locations, seen_events)
+            _compile_kill_sources_intersection(alternatives, by_id, count, identity, key, location)
+    original["sources"] = list(by_id.values())
+    if estimate.get("conditional_managers"):
+        original["conditional_managers"] = estimate["conditional_managers"]
+
+
+def compile_kill_sources(catalog, native):
+    reference = json.loads((catalog.root / 'content/catalog/killsanity_estimates.json').read_bytes())
+    if reference.get('schema_version') != 1 or reference.get('quantity') != 'conservative_estimate':
+        raise ValueError('Unsupported campaign kill estimate reference')
+    kill_sources, stage_ids = _compile_kill_sources_stage_ids(catalog, reference)
     from doom_eap.content.native_enemy_plan import native_event_identity
     secret_locations = {(item.map_key, item.policy.get("manager", item.policy.get("manager_entity"))): item.name
                         for item in catalog.physical_locations if item.strategy == "secret_encounter"}
     for key, estimate in reference['maps'].items():
-        original = kill_sources[key]
-        by_id = {row["source_id"]: row for row in original["sources"]}
-        alternatives = {member: group['source_id'] for group in original.get('source_alternatives', [])
-                        for branch in group['branches'] for member in branch}
-        native_sources = {native_event_identity(row): row for row in native["maps"][key]["origins"] if "binding" in row}
-        seen_events = set()
-        for location, events in estimate.get("event_sources", {}).items():
-            for identity, count in events.items():
-                if identity in seen_events:
-                    raise ValueError(f"Kill estimate repeats an event: {key}/{identity}")
-                seen_events.add(identity)
-                source = native_sources.get(identity)
-                if source is None or source.get("protected_reason"):
-                    raise ValueError(f"Kill estimate refers to an absent or protected native event: {key}/{identity}")
-                secret = secret_locations.get((key, identity.split('/')[0]))
-                if secret is not None and location != secret:
-                    raise ValueError(f"Kill estimate uses the wrong Secret Encounter: {key}/{identity}")
-                if type(count) is not int or count < 1:
-                    raise ValueError(f"Kill estimate has an invalid event count: {key}/{identity}")
-                if identity in estimate.get('alternative_source_ids', []) and identity not in alternatives:
-                    raise ValueError(f'Kill estimate needs an alternative-source plan: {key}/{identity}')
-                if identity not in by_id:
-                    by_id[identity] = {"source_id": identity, "map_key": key, "count": count, "repeatable": True}
-                    if identity in alternatives:
-                        by_id[identity].update({field: value for field, value in by_id[alternatives[identity]].items()
-                                               if field not in {'source_id', 'count'}})
-                row = by_id[identity]
-                if row["count"] != count:
-                    raise ValueError(f"Guaranteed source and event counts differ: {key}/{identity}")
-                if not {"location", "region"}.intersection(row):
-                    row["location"] = location
-        original["sources"] = list(by_id.values())
-        if estimate.get("conditional_managers"):
-            original["conditional_managers"] = estimate["conditional_managers"]
+        _compile_kill_sources_original(estimate, key, kill_sources, native, native_event_identity, secret_locations)
     kill_catalog = dict(schema_version=2, quantity='conservative_estimate', maps=kill_sources)
     build_campaign_kill_budget(dict(stage_ids=stage_ids), None, catalog=kill_catalog)
     return kill_catalog
 
 
-def _prebuilt_enemy_catalogs(root: Path) -> tuple[dict, dict]:
+def _prebuilt_enemy_catalogs_provenance(root):
     from doom_eap.content.vanilla_enemy_profiles import CANONICAL_ORDER
     from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
 
@@ -351,6 +383,11 @@ def _prebuilt_enemy_catalogs(root: Path) -> tuple[dict, dict]:
             or profiles.get("schema_version") != 1 or tuple(profiles.get("order", ())) != CANONICAL_ORDER
             or set(profiles["maps"]) != set(CANONICAL_ORDER)):
         raise ValueError("Committed enemy catalogs have invalid map coverage or schema")
+    return descriptors, native, profiles
+
+
+def _prebuilt_enemy_catalogs(root: Path) -> tuple[dict, dict]:
+    descriptors, native, profiles = _prebuilt_enemy_catalogs_provenance(root)
     for key, descriptor in descriptors.items():
         if (native["maps"][key]["source_sha256"] != descriptor["source_sha256"]
                 or native["maps"][key]["runtime_map"] != descriptor["runtime_map"]
@@ -409,16 +446,44 @@ def compile_slot_catalog(catalog, native, kills, item_ids):
         battery_surplus_percent=fortress['battery_surplus_percent'])
 
 
-def _compile_catalog(
-    output: Path = DEFAULT_OUTPUT,
-    *,
-    output_root: Path | None = None,
-    check: bool = False,
-    map_key: str | None = None,
-    source_only: bool = False,
-    archipelago_source: Path = DEFAULT_AP_ROOT,
-) -> tuple[Path, ...]:
-    catalog = load_content_catalog()
+def _compile_catalog_json_name(catalog, output_root, write_artifact, write_bytes_artifact):
+    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json", "campaign_stages.json"]:
+        src = catalog.root / "data" / json_name
+        if src.exists():
+            content_bytes = src.read_bytes()
+            dst = output_root / json_name
+            write_bytes_artifact(dst, content_bytes)
+
+    from doom_eap.content.automap_visual_registry import build_authorial_registry, render_authorial_registry
+    from doom_eap.content.map_registry import _catalog_registry
+    from doom_eap.contracts.challenge_registry import challenge_registry_document
+    from doom_eap.contracts.publisher_contracts import publisher_contracts_document
+
+    compiled_sources = _catalog_registry(catalog.root)
+
+    generated_data = {
+        "physical_pickups.json": physical_pickup_stages(catalog),
+        "map_sources.json": compiled_sources,
+        "location_names.json": {
+            "schema_version": 1,
+            "source": "content/maps/*/locations.json + runtime.json",
+            "locations": {
+                str(item.location_id): item.name for item in (*catalog.physical_locations, *catalog.runtime_locations)
+            },
+        },
+        "runtime_locations.json": {item.name: item.location_id for item in catalog.runtime_locations},
+        "challenge_location_registry.json": challenge_registry_document(catalog),
+        "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
+        "campaign_goal_contract.json": dict(catalog.campaign_goal),
+    }
+    for name, value in generated_data.items():
+        rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"
+        write_artifact(catalog.root / "data" / name, rendered_json)
+        write_artifact(output_root / name, rendered_json)
+    return build_authorial_registry, render_authorial_registry
+
+
+def _compile_catalog_rendered(catalog, check, map_key, output):
     rendered = render(catalog, map_key)
     changed_paths: list[Path] = []
     projection_payloads: dict[Path, bytes] = {}
@@ -434,7 +499,10 @@ def _compile_catalog(
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(payload, encoding="utf-8", newline="\n")
             changed_paths.append(path)
+    return changed_paths, projection_payloads, rendered, write_artifact
 
+
+def _compile_catalog_setup_guide(catalog, changed_paths, check, output, projection_payloads, rendered, write_artifact):
     def write_bytes_artifact(path: Path, payload: bytes) -> None:
         payload = first_party_text_bytes(payload)
         projection_payloads[path] = payload
@@ -449,6 +517,52 @@ def _compile_catalog(
 
     write_artifact(output, rendered)
     setup_guide = (catalog.root / "docs/INSTALL.md").read_text(encoding="utf-8")
+    return setup_guide, write_bytes_artifact
+
+
+def _compile_catalog_build_authorial_registry(catalog, output_root, write_artifact, write_bytes_artifact):
+    build_authorial_registry, render_authorial_registry = _compile_catalog_json_name(catalog, output_root, write_artifact, write_bytes_artifact)
+    for spec in catalog.maps.values():
+        locations = json.loads(spec.level_config_path.read_text(encoding="utf-8"))
+        manifest = dict(locations.get("entities", {}))
+        manifest.update(
+            {
+                item.get("ap_check", f"AP_CHECK_SECRET_{item['location_id']}"): item["location_id"]
+                for item in locations.get("secret_encounters", [])
+            }
+        )
+        manifest.update(arena_manifest(catalog, spec.key))
+        manifest.update(physical_manifest(catalog, spec.key))
+        write_artifact(
+            catalog.root / "manifests" / f"{spec.key}.json",
+            json.dumps(manifest, indent=4) + "\n",
+        )
+
+    visuals_rendered = render_authorial_registry(build_authorial_registry(catalog.root))
+    for path in (catalog.root / "data" / "checked_location_visuals.json", output_root / "checked_location_visuals.json"):
+        write_artifact(path, visuals_rendered)
+
+    from doom_eap.contracts.foundation import load_foundation_contracts
+
+    compiled_foundation = load_foundation_contracts(authorial=True)
+    foundation_rendered = json.dumps(compiled_foundation, indent=2, sort_keys=True) + "\n"
+    for dst_path in [output_root / "foundation_contracts.json", catalog.root / "data" / "foundation_contracts.json"]:
+        write_artifact(dst_path, foundation_rendered)
+
+
+def _compile_catalog(
+    output: Path = DEFAULT_OUTPUT,
+    *,
+    output_root: Path | None = None,
+    check: bool = False,
+    map_key: str | None = None,
+    source_only: bool = False,
+    archipelago_source: Path = DEFAULT_AP_ROOT,
+) -> tuple[Path, ...]:
+    catalog = load_content_catalog()
+    changed_paths, projection_payloads, rendered, write_artifact = _compile_catalog_rendered(catalog, check, map_key, output)
+
+    setup_guide, write_bytes_artifact = _compile_catalog_setup_guide(catalog, changed_paths, check, output, projection_payloads, rendered, write_artifact)
     setup_guide = setup_guide.replace("(GAMEPLAY.md)", "(https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/GAMEPLAY.md)")
     write_artifact(output.parent / "docs/setup_en.md", setup_guide)
     write_bytes_artifact(output.with_name("enemy_options.py"),
@@ -534,65 +648,7 @@ def _compile_catalog(
     staging_gen = output_root / "generated_content.py"
     write_artifact(staging_gen, rendered)
 
-    for json_name in ["content_identity.json", "items.json", "item_replay_policies.json", "campaign_stages.json"]:
-        src = catalog.root / "data" / json_name
-        if src.exists():
-            content_bytes = src.read_bytes()
-            dst = output_root / json_name
-            write_bytes_artifact(dst, content_bytes)
-
-    from doom_eap.content.automap_visual_registry import build_authorial_registry, render_authorial_registry
-    from doom_eap.content.map_registry import _catalog_registry
-    from doom_eap.contracts.challenge_registry import challenge_registry_document
-    from doom_eap.contracts.publisher_contracts import publisher_contracts_document
-
-    compiled_sources = _catalog_registry(catalog.root)
-
-    generated_data = {
-        "physical_pickups.json": physical_pickup_stages(catalog),
-        "map_sources.json": compiled_sources,
-        "location_names.json": {
-            "schema_version": 1,
-            "source": "content/maps/*/locations.json + runtime.json",
-            "locations": {
-                str(item.location_id): item.name for item in (*catalog.physical_locations, *catalog.runtime_locations)
-            },
-        },
-        "runtime_locations.json": {item.name: item.location_id for item in catalog.runtime_locations},
-        "challenge_location_registry.json": challenge_registry_document(catalog),
-        "publisher_contracts.json": publisher_contracts_document(catalog.publishers),
-        "campaign_goal_contract.json": dict(catalog.campaign_goal),
-    }
-    for name, value in generated_data.items():
-        rendered_json = json.dumps(value, indent=2, sort_keys=True) + "\n"
-        write_artifact(catalog.root / "data" / name, rendered_json)
-        write_artifact(output_root / name, rendered_json)
-    for spec in catalog.maps.values():
-        locations = json.loads(spec.level_config_path.read_text(encoding="utf-8"))
-        manifest = dict(locations.get("entities", {}))
-        manifest.update(
-            {
-                item.get("ap_check", f"AP_CHECK_SECRET_{item['location_id']}"): item["location_id"]
-                for item in locations.get("secret_encounters", [])
-            }
-        )
-        manifest.update(arena_manifest(catalog, spec.key))
-        manifest.update(physical_manifest(catalog, spec.key))
-        write_artifact(
-            catalog.root / "manifests" / f"{spec.key}.json",
-            json.dumps(manifest, indent=4) + "\n",
-        )
-
-    visuals_rendered = render_authorial_registry(build_authorial_registry(catalog.root))
-    for path in (catalog.root / "data" / "checked_location_visuals.json", output_root / "checked_location_visuals.json"):
-        write_artifact(path, visuals_rendered)
-
-    from doom_eap.contracts.foundation import load_foundation_contracts
-
-    compiled_foundation = load_foundation_contracts(authorial=True)
-    foundation_rendered = json.dumps(compiled_foundation, indent=2, sort_keys=True) + "\n"
-    for dst_path in [output_root / "foundation_contracts.json", catalog.root / "data" / "foundation_contracts.json"]:
-        write_artifact(dst_path, foundation_rendered)
+    _compile_catalog_build_authorial_registry(catalog, output_root, write_artifact, write_bytes_artifact)
 
     identity_src = catalog.root / "data" / "content_identity.json"
     identity_data = json.loads(identity_src.read_text(encoding="utf-8")) if identity_src.exists() else {}
