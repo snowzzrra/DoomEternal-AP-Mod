@@ -13,13 +13,13 @@ def test_lost_supervisor_requires_positive_guest_exit(tmp_path):
     owner.process.stdin.closed = True
     owner._config_identity = (None,) * len(_INSTALL_KEYS)
     owner._game_observed = True
-    with patch("doom_eap.runtime.proton.windows_processes", return_value=None):
+    with patch("doom_eap.runtime.bridge_config.windows_processes", return_value=None):
         assert owner.observe()["state"] == "supervisor_unavailable"
         assert not owner.closable
         with pytest.raises(RuntimeError, match="Confirm DOOM Eternal"):
             owner.retire()
     owner._next_process_query = 0
-    with patch("doom_eap.runtime.proton.windows_processes", return_value=()):
+    with patch("doom_eap.runtime.bridge_config.windows_processes", return_value=()):
         assert owner.observe()["state"] == "game_exited"
         owner.retire()
     assert owner.process is None
@@ -31,7 +31,7 @@ def test_failed_preparation_does_not_report_game_exit_or_repeat_helpers(tmp_path
     owner.process.poll.return_value = 1
     owner.process.stdin.closed = True
     owner._config_identity = (None,) * len(_INSTALL_KEYS)
-    with patch("doom_eap.runtime.proton.windows_processes", return_value=()) as query:
+    with patch("doom_eap.runtime.bridge_config.windows_processes", return_value=()) as query:
         assert owner.observe()["state"] == "supervisor_unavailable"
         assert owner.closable
         assert owner.observe()["state"] == "supervisor_unavailable"
@@ -41,7 +41,7 @@ def test_failed_preparation_does_not_report_game_exit_or_repeat_helpers(tmp_path
 
 def test_proton_selection_precedes_campaign_routing(tmp_path):
     from doom_eap.launcher.launcher_integration import setup_failure_payload
-    from doom_eap.runtime.proton import ProtonSelectionError, runtime
+    from doom_eap.runtime.bridge_config import ProtonSelectionError, runtime
     prefix = tmp_path / "compatdata/782330"
     (prefix / "pfx").mkdir(parents=True)
     with pytest.raises(ProtonSelectionError) as refused:
@@ -52,13 +52,13 @@ def test_proton_selection_precedes_campaign_routing(tmp_path):
 
 
 def test_guest_identity_query_receives_the_selected_executable(tmp_path):
-    from doom_eap.runtime.proton import windows_path, windows_processes
+    from doom_eap.runtime.bridge_config import windows_path, windows_processes
     configuration = {'game_root': str(tmp_path / 'game')}
     response = Mock(returncode=0, stdout=json.dumps({'processes': [dict(
         pid=123, created=456, path='S:\\steamapps\\common\\DOOMEternal\\DOOMEternalx64vk.exe',
         same_executable=True)]}).encode())
-    with patch('doom_eap.runtime.proton.runtime', return_value=(['fixture-proton'], {})), \
-         patch('doom_eap.runtime.proton.subprocess.run', return_value=response) as run:
+    with patch('doom_eap.runtime.bridge_config.runtime', return_value=(['fixture-proton'], {})), \
+         patch('doom_eap.runtime.bridge_config.subprocess.run', return_value=response) as run:
         rows = windows_processes(configuration, tmp_path / 'owner.exe')
     assert rows[0]['same_executable'] is True
     command = run.call_args.args[0]

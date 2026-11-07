@@ -11,9 +11,7 @@ from delivery_signals import signal
 from websockets.legacy.client import connect
 
 from doom_eap.runtime import sentinel_protocol_generated as codec
-from doom_eap.runtime.ammo import LedgerAmmoRefill
-from doom_eap.runtime.ammo_adapters import AmmoStorage
-from doom_eap.runtime.ammo_refill import AmmoCommandScope
+from doom_eap.runtime.ammo import AmmoCommandScope, AmmoStorage, LedgerAmmoRefill
 from doom_eap.runtime.delivery import DeliveryCoordinator, DeliveryMode
 from doom_eap.runtime.ledger import (
     AmmoState,
@@ -212,6 +210,44 @@ class Worker:
                               "inventory", 1, payload, self.ctx.context_id, ReplayPolicy.ADDITIVE, True, 1)
         await self.delivery.plan((command,))
 
+    async def _deliver_ammo(self, blocked, request):
+        commands = await self.ledger.commands(self.key, (CommandState.PLANNED, CommandState.QUEUED,
+                                                        CommandState.DISPATCHED), None, 256)
+        for command in commands:
+            try:
+                await self.delivery.prepare(command.plan.command_id, b"a" * 64)
+            except Conflict:
+                blocked = True
+                break
+            await self.delivery.send(command.plan.command_id)
+            if request.get("recover", True):
+                await self.delivery.recover(command.plan.command_id)
+        return blocked
+
+
+    async def _command_action(self, action, request):
+        if "command_id" in request:
+            command = await self.ledger.command(self.key, request["command_id"])
+        else:
+            commands = await self.ledger.commands(self.key, tuple(CommandState), None, 1)
+            command, = commands
+        command_id = command.plan.command_id
+        if action == "prepare":
+            await self.delivery.prepare(command_id, b"a" * 64)
+        elif action == "send":
+            await self.delivery.send(command_id)
+        elif action == "result":
+            await self.delivery.recover(command_id)
+        elif action == "ack":
+            await self.delivery.ack(command_id)
+        elif action == "resolve":
+            await self.delivery.resolve(command_id, request.get("revision", command.revision),
+                                        ResolutionAction(request["resolution"]))
+        else:
+            stored, = await self.ledger.attempts(self.key, command_id, 0, 1)
+            self.transport.last = await self.rpc({"op": action, "reference": stored.attempt.reference.hex()})
+
+
     async def act(self, request, ap):
         action = request["action"]
         blocked = False
@@ -229,38 +265,9 @@ class Worker:
         elif action == "ammo_retry":
             await self.ammo.retry(request["operation_id"], request["revision"])
         elif action == "ammo_deliver":
-            commands = await self.ledger.commands(self.key, (CommandState.PLANNED, CommandState.QUEUED,
-                                                            CommandState.DISPATCHED), None, 256)
-            for command in commands:
-                try:
-                    await self.delivery.prepare(command.plan.command_id, b"a" * 64)
-                except Conflict:
-                    blocked = True
-                    break
-                await self.delivery.send(command.plan.command_id)
-                if request.get("recover", True):
-                    await self.delivery.recover(command.plan.command_id)
+            blocked = await self._deliver_ammo(blocked, request)
         else:
-            if "command_id" in request:
-                command = await self.ledger.command(self.key, request["command_id"])
-            else:
-                commands = await self.ledger.commands(self.key, tuple(CommandState), None, 1)
-                command, = commands
-            command_id = command.plan.command_id
-            if action == "prepare":
-                await self.delivery.prepare(command_id, b"a" * 64)
-            elif action == "send":
-                await self.delivery.send(command_id)
-            elif action == "result":
-                await self.delivery.recover(command_id)
-            elif action == "ack":
-                await self.delivery.ack(command_id)
-            elif action == "resolve":
-                await self.delivery.resolve(command_id, request.get("revision", command.revision),
-                                            ResolutionAction(request["resolution"]))
-            else:
-                stored, = await self.ledger.attempts(self.key, command_id, 0, 1)
-                self.transport.last = await self.rpc({"op": action, "reference": stored.attempt.reference.hex()})
+            await self._command_action(action, request)
         signal("done", **await self.snapshot(), reply=self.transport.last, blocked=blocked)
 
 

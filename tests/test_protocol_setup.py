@@ -4,9 +4,19 @@ from types import SimpleNamespace
 
 import pytest
 
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.location_setup import LocationSetup
-from doom_eap.runtime.protocol_feed import ProtocolFeed, hints_key
+from doom_eap.runtime.bridge_checks import CheckPublication, LocationSetup
+from doom_eap.runtime.native_transport import ProtocolFeed, hints_key
+
+
+def _assert_scouted_location_history(packets, send, setup):
+    assert setup.begin({"missing_locations": [20], "checked_locations": [10]}, {10, 20}) == {10, 20}
+    assert asyncio.run(setup.scout(CheckPublication(send, None, None))).current
+    assert packets == [{"cmd": "LocationScouts", "locations": [10, 20], "create_as_hint": 0}]
+    assert setup.consume({"locations": [(1, 20, 2, 0)]}, {20}) is None
+    assert not setup.ready_to_resolve
+    assert setup.consume({"locations": [(2, 10, 1, 1)]}, {10, 20}) is None
+    assert setup.ready_to_resolve and not setup.complete
+    assert setup.consume({"locations": [(2, 10, 1, 1)]}, {10, 20}) is None
 
 
 def test_placement_collection_waits_for_exact_history_and_preserves_scout_packet():
@@ -16,14 +26,7 @@ def test_placement_collection_waits_for_exact_history_and_preserves_scout_packet
     async def send(value):
         packets.extend(value)
 
-    assert setup.begin({"missing_locations": [20], "checked_locations": [10]}, {10, 20}) == {10, 20}
-    assert asyncio.run(setup.scout(CheckPublication(send, None, None))).current
-    assert packets == [{"cmd": "LocationScouts", "locations": [10, 20], "create_as_hint": 0}]
-    assert setup.consume({"locations": [(1, 20, 2, 0)]}, {20}) is None
-    assert not setup.ready_to_resolve
-    assert setup.consume({"locations": [(2, 10, 1, 1)]}, {10, 20}) is None
-    assert setup.ready_to_resolve and not setup.complete
-    assert setup.consume({"locations": [(2, 10, 1, 1)]}, {10, 20}) is None
+    _assert_scouted_location_history(packets, send, setup)
     setup.resolved()
     assert setup.complete and not setup.ready_to_resolve
     assert setup.received_ids == frozenset({10, 20})
@@ -56,8 +59,6 @@ def test_connected_rejection_retains_existing_contract(missing, checked, error):
         setup.begin({"missing_locations": missing, "checked_locations": checked}, {1})
 
 
-
-
 @pytest.mark.parametrize("failure", [False, True])
 def test_old_scout_cannot_complete_or_fail_new_connection(failure):
     async def run():
@@ -77,12 +78,10 @@ def test_old_scout_cannot_complete_or_fail_new_connection(failure):
     asyncio.run(run())
 
 
-
-
 def test_chat_echo_is_bounded_local_once_and_cannot_cross_connection(monkeypatch):
-    from doom_eap.runtime import protocol_feed
+    from doom_eap.runtime import native_transport
     now = [10.0]
-    monkeypatch.setattr(protocol_feed, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(native_transport, "time", SimpleNamespace(monotonic=lambda: now[0]))
     feed = ProtocolFeed()
     event = {"plain": "local: hello", "segments": [{"type": "player", "self": True}]}
     feed.record_echo("hello")
@@ -102,7 +101,7 @@ def test_chat_echo_is_bounded_local_once_and_cannot_cross_connection(monkeypatch
 
 
 def test_real_unknown_merit_name_is_retained_with_bounded_display_text():
-    from doom_eap.runtime.location_names import resolve_placement_records
+    from doom_eap.runtime.bridge_checks import resolve_placement_records
 
     names = SimpleNamespace(
         location_names=SimpleNamespace(lookup_in_slot=lambda *_: "Unknown Merit"),

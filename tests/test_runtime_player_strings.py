@@ -1,5 +1,3 @@
-"""Player text keeps remote data, trap privacy and native byte boundaries intact."""
-
 import logging
 import os
 import struct
@@ -9,9 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
-from doom_eap.runtime.campaign_menu import _reward_wire
-from doom_eap.runtime.materialization import ReconciliationBlock, reconciliation_runtime_block
-from doom_eap.runtime.mission_presentation import MissionPresentations
+from doom_eap.runtime.campaign import MissionPresentations, _reward_wire
 
 
 def test_rewards_preserve_unknown_and_trap_privacy():
@@ -26,12 +22,12 @@ def test_rewards_preserve_unknown_and_trap_privacy():
 
 
 def test_mastery_fallback_uses_placement_state_and_preserves_wire_layout(monkeypatch):
-    from doom_eap.runtime import mission_presentation
+    from doom_eap.runtime import campaign
 
     entry = {"location_id": 7, "signal": {}, "name": "Mastery", "gameplay_perk": "perk/mastery"}
     facts = SimpleNamespace(checked={7}, server_locations={7})
     presentations = MissionPresentations.__new__(MissionPresentations)
-    monkeypatch.setattr(mission_presentation, "player_text", lambda category, key: f"{category}.{key}")
+    monkeypatch.setattr(campaign, "player_text", lambda category, key: f"{category}.{key}")
     unknown, = presentations.mastery_snapshot(facts, {}, [entry])
     assert unknown.text == "game.menu.mastery_unknown"
     placement = {"item_name": "Dash", "local": True, "classification": 0, "recipient_name": "Slayer"}
@@ -60,20 +56,11 @@ def test_reward_wire_preserves_utf8_byte_limits(field, valid, invalid):
         _reward_wire(True, [(1, reward)])
 
 
-def test_reconciliation_wait_uses_code_when_wording_changes(monkeypatch):
-    monkeypatch.setattr(ReconciliationBlock.RUNTIME_NOT_READY, "_value_", "Changed wording")
-    block = reconciliation_runtime_block(evidence=SimpleNamespace(state="gameplay"), marker={}, runtime_ready=False,
-        campaign=None, active_slot=None, active_epoch=None, active_map=None, supported_maps=(), boundary=0, history_length=0)
-    assert block is ReconciliationBlock.RUNTIME_NOT_READY
-    assert str(block) == "Changed wording"
-
-
 def test_inactive_native_context_has_a_distinct_error_type():
     import asyncio
     from unittest.mock import AsyncMock
 
-    from doom_eap.runtime.inventory import WeaponPointsBlocked
-    from doom_eap.runtime.weapon_points import NativeGameplayInactive, SentinelWeaponPoints
+    from doom_eap.runtime.inventory import NativeGameplayInactive, SentinelWeaponPoints, WeaponPointsBlocked
 
     link = SentinelWeaponPoints(Path('unused'), 1, '0' * 64)
     link._transport = SimpleNamespace(connect=AsyncMock(), scope={}, observe=AsyncMock(return_value={'save_binding': bytes(16)}))
@@ -85,7 +72,7 @@ def test_inactive_native_context_has_a_distinct_error_type():
 def test_protocol_fallbacks_preserve_and_bound_remote_data(monkeypatch):
     root = Path(__file__).resolve().parents[1]
     monkeypatch.syspath_prepend(str(Path(os.environ.get("ARCHIPELAGO_SOURCE", root.parent / "Archipelago"))))
-    from doom_eap.runtime.protocol_feed_format import ProtocolNames, emit_hints, format_archipelago_event
+    from doom_eap.runtime.native_transport import ProtocolNames, emit_hints, format_archipelago_event
 
     class Names:
         def lookup_in_slot(self, *_):
@@ -108,11 +95,11 @@ def test_protocol_fallbacks_preserve_and_bound_remote_data(monkeypatch):
 def test_deathlink_local_message_keeps_player_data_and_fallback(monkeypatch, player, expected):
     import asyncio
 
-    from doom_eap.runtime import deathlink_session
-    from doom_eap.runtime.deathlink_receive import DeathLinkReceiver
+    from doom_eap.runtime import deathlink
+    from doom_eap.runtime.deathlink import DeathLinkReceiver
 
-    monkeypatch.setattr(deathlink_session.random, "choice", lambda messages: messages[0])
-    owner = deathlink_session.DeathLinkSession(DeathLinkReceiver(), deathlink_session.DEATHLINK_MESSAGES,
+    monkeypatch.setattr(deathlink.random, "choice", lambda messages: messages[0])
+    owner = deathlink.DeathLinkSession(DeathLinkReceiver(), deathlink.DEATHLINK_MESSAGES,
         lambda *args, **kwargs: None, logging.getLogger("deathlink"))
     owner.configure(True)
     sent = []
@@ -121,4 +108,4 @@ def test_deathlink_local_message_keeps_player_data_and_fallback(monkeypatch, pla
         sent.append(cause)
 
     asyncio.run(owner.report_local_death(player, send, None))
-    assert sent == [deathlink_session.DEATHLINK_MESSAGES[0].format(player=expected)]
+    assert sent == [deathlink.DEATHLINK_MESSAGES[0].format(player=expected)]

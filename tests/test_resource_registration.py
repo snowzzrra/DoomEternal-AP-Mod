@@ -50,6 +50,17 @@ def snapshot(base):
     return {path.relative_to(base): path.read_bytes() for path in base.rglob('*') if path.is_file()}
 
 
+def _assert_preserved_mask_and_mapping(actual, foreign, mask, unlisted):
+    assert actual[8:len(mask)] == foreign + unlisted
+    assert struct.unpack_from('<I', actual, 4)[0] == 3
+    assert struct.unpack_from('<Q', actual, len(mask))[0] == 123
+
+
+def _assert_unchanged_bank_registration(base, before, mapping, mask, name, updates):
+    assert snapshot(base) == before
+    assert updates['idRehash.map'] == mapping + f'{name};{len(mask)}\n'.encode()
+
+
 @pytest.mark.parametrize('count', [1, 63, 64, 65, 128, 129])
 def test_bank_registration_relocates_mask_and_preserves_foreign_tables(tmp_path, count):
     bank, info = staged_bank(tmp_path, count)
@@ -66,14 +77,11 @@ def test_bank_registration_relocates_mask_and_preserves_foreign_tables(tmp_path,
     banks, paths = {name: info}, {name: bank}
     updates = {}
     resource_bank.register_banks(base, banks, updates, bank_paths=paths)
-    assert snapshot(base) == before
-    assert updates['idRehash.map'] == mapping + f'{name};{len(mask)}\n'.encode()
+    _assert_unchanged_bank_registration(base, before, mapping, mask, name, updates)
     for filename, data in updates.items():
         (base / filename).write_bytes(data)
     actual = mask_payload(base / 'meta.resources')
-    assert actual[8:len(mask)] == foreign + unlisted
-    assert struct.unpack_from('<I', actual, 4)[0] == 3
-    assert struct.unpack_from('<Q', actual, len(mask))[0] == 123
+    _assert_preserved_mask_and_mapping(actual, foreign, mask, unlisted)
     bits = resource_bank.mask_tables(actual)[len(mask)]
     assert len(bits) == (count + 63) // 64 * 8
     assert int.from_bytes(bits, 'little') == (1 << count) - 1
@@ -104,15 +112,19 @@ def test_obsolete_table_removal_remaps_foreign_offsets(tmp_path):
     assert updates['idRehash.map'] == b'foreign.resources;8\n'
 
 
-@pytest.mark.parametrize('damage', ['bank', 'hash', 'bits', 'capacity', 'map_name', 'map_offset', 'spec', 'target'])
-def test_damaged_registration_stops_before_publication(installed_room, tmp_path, damage):
-    game, mod = installed_room(False)
-    base = game / 'base'
-    staging = tmp_path / 'staging'
-    plan = campaign_resources.plan_campaign_resources(game, mod, staging)
-    name, = plan['banks']['consolidated']
-    filename = 'meta.resources'
-    path = staging / filename
+def _damage_map_references(damage, name, path):
+    spec = json.loads(path.read_bytes())
+    refs = spec['mapFileRefs']
+    if damage == 'spec':
+        spec['mapFileRefs'] = [ref for ref in refs if spec['files'][ref['file']]['name'] != name]
+    else:
+        ref = next(ref for ref in refs if spec['files'][ref['file']]['name'] == name)
+        ref['map'] = 0
+    data = json.dumps(spec).encode()
+    return data
+
+
+def _damage_registration(damage, filename, name, path, plan, staging):
     if damage == 'bank':
         path = Path(plan['banks']['bank_paths'][name])
         data = bytearray(path.read_bytes())
@@ -136,15 +148,21 @@ def test_damaged_registration_stops_before_publication(installed_room, tmp_path,
     else:
         filename = 'packagemapspec.json'
         path = staging / filename
-        spec = json.loads(path.read_bytes())
-        refs = spec['mapFileRefs']
-        if damage == 'spec':
-            spec['mapFileRefs'] = [ref for ref in refs if spec['files'][ref['file']]['name'] != name]
-        else:
-            ref = next(ref for ref in refs if spec['files'][ref['file']]['name'] == name)
-            ref['map'] = 0
-        data = json.dumps(spec).encode()
+        data = _damage_map_references(damage, name, path)
     path.write_bytes(data)
+    return data, filename
+
+
+@pytest.mark.parametrize('damage', ['bank', 'hash', 'bits', 'capacity', 'map_name', 'map_offset', 'spec', 'target'])
+def test_damaged_registration_stops_before_publication(installed_room, tmp_path, damage):
+    game, mod = installed_room(False)
+    base = game / 'base'
+    staging = tmp_path / 'staging'
+    plan = campaign_resources.plan_campaign_resources(game, mod, staging)
+    name, = plan['banks']['consolidated']
+    filename = 'meta.resources'
+    path = staging / filename
+    data, filename = _damage_registration(damage, filename, name, path, plan, staging)
     if damage != 'bank':
         plan['updates'][filename]['sha256'] = hashlib.sha256(data).hexdigest()
     before = snapshot(base)

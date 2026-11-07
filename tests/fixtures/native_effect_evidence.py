@@ -4,11 +4,7 @@ from dataclasses import replace
 
 from native_transport_support import evidence_result
 
-from doom_eap.runtime.inventory_observation import (
-    currency_grant_result,
-    evidence_scope,
-    progression_observation,
-)
+from doom_eap.runtime.inventory import currency_grant_result, evidence_scope, progression_observation
 
 
 class EvidenceCore:

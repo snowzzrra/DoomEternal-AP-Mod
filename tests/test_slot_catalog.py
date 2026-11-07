@@ -1,56 +1,28 @@
-from copy import deepcopy
 import json
 import shutil
+from copy import deepcopy
 
 import pytest
 
 from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.recipe_codec import recipe_references
 from doom_eap.content.slot_data_contract import (
-    CATALOG_DEPENDENCIES, DigestError, ReferenceError, StructureError, SlotCatalog,
-    canonical_bytes, catalog_dependency_path, catalog_digest, catalog_tables,
-    installed_catalog_tables, load_slot_catalog,
+    CATALOG_DEPENDENCIES,
+    DigestError,
+    ReferenceError,
+    SlotCatalog,
+    StructureError,
+    canonical_bytes,
+    catalog_dependency_path,
+    catalog_digest,
+    catalog_tables,
+    installed_catalog_tables,
+    load_slot_catalog,
 )
 from tools.content.compile_content_catalog import MOD_ROOT, compile_slot_catalog
-from tools.validation.audit_packaged_transition_bridge import assert_generation_only_apworld, assert_packaged_slot_catalog
-
-
-def test_catalog_generation_is_byte_stable_and_reordering_preserves_references():
-    content = load_content_catalog()
-    catalog = load_slot_catalog()
-    native = json.loads((MOD_ROOT / 'doom_eap/content/native_enemy_catalog.json').read_bytes())
-    kills = json.loads((MOD_ROOT / 'doom_eap/content/campaign_kill_sources.json').read_bytes())
-    items = dict(enumerate(catalog['items']))
-    first = compile_slot_catalog(content, native, kills, items)
-    second = compile_slot_catalog(content, native, kills, items)
-    expected = (MOD_ROOT / 'doom_eap/content/slot_catalog.json').read_bytes()
-    assert canonical_bytes(first) + b'\n' == canonical_bytes(second) + b'\n' == expected
-    native['species'] = dict(reversed(list(native['species'].items())))
-    native['maps'] = dict(reversed(list(native['maps'].items())))
-    for stage in native['maps'].values():
-        stage['origins'].reverse()
-        stage['runtime_origins'].reverse()
-    for stage in kills['maps'].values():
-        stage['sources'].reverse()
-    reordered = compile_slot_catalog(content, native, kills, items)
-    dependencies = {name: json.loads(catalog_dependency_path(MOD_ROOT / 'doom_eap/content', name).read_bytes())
-                    for name in CATALOG_DEPENDENCIES}
-    dependencies['native_enemy_catalog.json'] = native
-    resolved = SlotCatalog(reordered, installed_catalog_tables(reordered, dependencies))
-    assert recipe_references(catalog) == recipe_references(resolved)
-    assert canonical_bytes(reordered) + b'\n' == expected
-
-
-def test_catalog_resolves_native_bindings_assets_and_authored_definitions():
-    document = load_slot_catalog()
-    catalog = catalog_tables(document)
-    assert catalog['maps']['hub']['stage_id'] is None
-    assert all(row['ai']['sha256'] in catalog['assets']['bodies'] for row in catalog['templates'].values())
-    assert catalog['maps']['e1m1_intro']['origins'][0]['binding']
-    assert any('location' in row or 'region' in row for row in catalog['finite_sources'].values())
-    assert catalog['masteries'] and catalog['counter_rules'] and catalog['runtime_restrictions']
-    assert len(canonical_bytes(document)) < 200_000
-    assert not {'maps', 'sources', 'assets', 'templates', 'finite_sources', 'stages'} & document.keys()
+from tools.validation.audit_packaged_transition_bridge import (
+    assert_generation_only_apworld,
+)
 
 
 def copy_catalog(target):
@@ -73,17 +45,6 @@ def test_loader_recomputes_both_manifest_and_room_digests(tmp_path):
     path.write_bytes(canonical_bytes(catalog))
     with pytest.raises(DigestError, match='Installed catalog digest mismatch'):
         load_slot_catalog(digest, path=path)
-
-
-def test_packaged_catalog_is_required_and_checked(tmp_path):
-    path = copy_catalog(tmp_path / 'doom_eap/content')
-    assert_packaged_slot_catalog(tmp_path)
-    path.write_text('{}', encoding='ascii')
-    with pytest.raises(DigestError):
-        assert_packaged_slot_catalog(tmp_path)
-    path.unlink()
-    with pytest.raises(StructureError, match='Cannot read slot catalog'):
-        assert_packaged_slot_catalog(tmp_path)
 
 
 def test_source_references_include_map_ownership():

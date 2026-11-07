@@ -9,8 +9,13 @@ from types import SimpleNamespace
 import pytest
 from test_resource_bank import write_bank
 
-from doom_eap.launcher import campaign_resources
-from doom_eap.launcher import launcher_platform as platform
+from doom_eap.launcher import (
+    campaign_resources,
+    installation_adapters,
+    launcher_injector,
+    launcher_platform,
+    launcher_support,
+)
 
 TARGET = "game/sp/e1m1_intro/e1m1_intro"
 HUB = "game/hub/hub"
@@ -18,61 +23,92 @@ DONOR = "game/dlc2/e5m1_spear/e5m1_spear"
 HORDE = "game/horde/e6m3_mcity_horde/e6m3_mcity_horde"
 
 
-@pytest.fixture
-def installed_room(tmp_path, monkeypatch):
-    from doom_eap.launcher import build_manifest, installation_adapters, resource_bank
-    from doom_eap.runtime.save_decrypt import _aes_gcm_encrypt
-
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: ())
-    monkeypatch.setattr(installation_adapters, "injector_processes", lambda evidence: ())
-    game = tmp_path / "game"
-    base = game / "base"
-    base.mkdir(parents=True)
-    (game / "Mods").mkdir()
-    (game / "DOOMEternalx64vk.exe").write_bytes(b"executable")
-    names = [TARGET + ".resources", HUB + ".resources", "gameresources_patch1.resources",
-             "gameresources_patch2.resources", DONOR + ".resources", HORDE + ".resources"]
-    maps = [TARGET, HUB, "common", DONOR, HORDE]
-    spec = {"files": [{"name": name} for name in names], "maps": [{"name": name} for name in maps],
-            "mapFileRefs": [{"map": m, "file": f} for m, f in ((0, 0), (1, 1), (2, 2), (2, 3), (3, 4), (4, 5))]}
-    (base / "packagemapspec.json").write_text(json.dumps(spec))
-    members = {}
+def _room_map_members(members):
     for runtime, owner in ((TARGET, "e1m1_intro"), (HUB, "hub"), (DONOR, "e5m1_spear")):
         member = f"{owner}/maps/{runtime}.entities"
         members[member] = f"room map {runtime}".encode()
     shell = "gameresources_patch1/generated/decls/devmenuoption/shell.decl"
     members[shell] = b"room shell"
-    for name in campaign_resources.STREAMFILES:
-        members["gameresources_patch2/" + name] = ("room " + name).encode()
+    return shell
+
+
+def _write_room_banks(base, members):
     for runtime, owner in ((TARGET, "e1m1_intro"), (HUB, "hub"), (DONOR, "e5m1_spear")):
         path = base / (runtime + ".resources")
         path.parent.mkdir(parents=True, exist_ok=True)
         member = f"{owner}/maps/{runtime}.entities"
         entries = [("map", member.split("/", 1)[1], members[member], ())]
         if runtime == DONOR:
-            entries.extend([("model", "gui/text", b"font model", ()),
-                            ("cswf", "swf/guientity/generic_text.swf", b"font swf", ())])
+            entries.extend(
+                [("model", "gui/text", b"font model", ()), ("cswf", "swf/guientity/generic_text.swf", b"font swf", ())]
+            )
         write_bank(path, entries)
         path.with_suffix(".meta").write_bytes(b"resource metadata")
+
+
+@pytest.fixture
+def installed_room(tmp_path, monkeypatch):
+    from doom_eap.launcher import build_manifest, installation_adapters, resource_bank
+    from doom_eap.launcher.build_manifest import _aes_gcm_encrypt
+
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(installation_adapters, "injector_processes", lambda evidence: ())
+    game = tmp_path / "game"
+    base = game / "base"
+    base.mkdir(parents=True)
+    (game / "Mods").mkdir()
+    (game / "DOOMEternalx64vk.exe").write_bytes(b"executable")
+    names = [
+        TARGET + ".resources",
+        HUB + ".resources",
+        "gameresources_patch1.resources",
+        "gameresources_patch2.resources",
+        DONOR + ".resources",
+        HORDE + ".resources",
+    ]
+    maps = [TARGET, HUB, "common", DONOR, HORDE]
+    spec = {
+        "files": [{"name": name} for name in names],
+        "maps": [{"name": name} for name in maps],
+        "mapFileRefs": [{"map": m, "file": f} for m, f in ((0, 0), (1, 1), (2, 2), (2, 3), (3, 4), (4, 5))],
+    }
+    (base / "packagemapspec.json").write_text(json.dumps(spec))
+    members = {}
+    shell = _room_map_members(members)
+    for name in campaign_resources.STREAMFILES:
+        members["gameresources_patch2/" + name] = ("room " + name).encode()
+    _write_room_banks(base, members)
     (base / names[-1]).parent.mkdir(parents=True, exist_ok=True)
     write_bank(base / names[-1], [("model", "unused", b"unused", ())])
     write_bank(base / names[2], [("rs_streamfile", shell.split("/", 1)[1], members[shell], ())])
     (base / names[2]).with_suffix(".meta").write_bytes(b"resource metadata")
-    write_bank(base / names[3], [("rs_streamfile", name, members["gameresources_patch2/" + name], ())
-                               for name in campaign_resources.STREAMFILES])
-    mask = struct.pack("<II", 0, len(names)) + b"".join(struct.pack("<QIQ", i + 1, 1, 0xffffffffffffffff)
-                                                       for i in range(len(names)))
+    write_bank(
+        base / names[3],
+        [
+            ("rs_streamfile", name, members["gameresources_patch2/" + name], ())
+            for name in campaign_resources.STREAMFILES
+        ],
+    )
+    mask = struct.pack("<II", 0, len(names)) + b"".join(
+        struct.pack("<QIQ", i + 1, 1, 0xFFFFFFFFFFFFFFFF) for i in range(len(names))
+    )
     write_bank(base / "meta.resources", [("rs_streamfile", "generated/buildgame/container.mask", mask, ())])
     (base / "idRehash.map").write_text("".join(f"{name};{8 + 20 * i}\n" for i, name in enumerate(names)))
     document = {"hash": "sha256", "files": {name: {} for name in (*names, "meta.resources", "packagemapspec.json")}}
     nonce = bytes(12)
-    (base / "build-manifest.bin").write_bytes(nonce + _aes_gcm_encrypt(
-        build_manifest._KEYS[0], nonce, json.dumps(document).encode(), b"build-manifest") + bytes(64))
+    (base / "build-manifest.bin").write_bytes(
+        nonce
+        + _aes_gcm_encrypt(build_manifest._KEYS[0], nonce, json.dumps(document).encode(), b"build-manifest")
+        + bytes(64)
+    )
 
     def rehash(command, *, cwd, **kwargs):
         directory = Path(cwd)
         path = directory / "meta.resources"
-        row = campaign_resources._records(path, {"generated/buildgame/container.mask"})["generated/buildgame/container.mask"]
+        row = campaign_resources._records(path, {"generated/buildgame/container.mask"})[
+            "generated/buildgame/container.mask"
+        ]
         data = bytearray(path.read_bytes())
         for line in (directory / "idRehash.map").read_text().splitlines():
             name, offset = line.rsplit(";", 1)
@@ -96,30 +132,65 @@ def installed_room(tmp_path, monkeypatch):
     return room
 
 
+def _assert_finalized_room_banks(evidence, include_dlc):
+    assert set(evidence) == {"e1m1", "hub", "shell"} | ({"tag"} if include_dlc else set())
+    assert evidence["hub"]["expected_owner"] == HUB + ".resources"
+    assert all(item["status"] == "verified" and not item["failure_reason"] for item in evidence.values())
+
+
 @pytest.mark.parametrize("include_dlc", [False, True])
 def test_finalize_then_verify_with_generated_hub_bank(installed_room, include_dlc):
     game, source = installed_room(include_dlc)
-    staged = platform._stage_mod(source, game)
+    staged = launcher_injector._stage_mod(source, game)
     for _ in range(2):
         result = campaign_resources.enable_campaign_resources(game, staged)
         spec = json.loads((game / "base/packagemapspec.json").read_bytes())
         assert spec["doomEAPEnemyResourceBanks"]["refs"]
         assert result["state"] == "enabled"
-        verified = platform.verify_linux_mod_installation(game, staged)
+        verified = launcher_injector.verify_linux_mod_installation(game, staged)
         evidence = {item["label"]: item for item in verified["required_resources"]}
-        assert set(evidence) == {"e1m1", "hub", "shell"} | ({"tag"} if include_dlc else set())
-        assert evidence["hub"]["expected_owner"] == HUB + ".resources"
-        assert all(item["status"] == "verified" and not item["failure_reason"] for item in evidence.values())
-    checked = subprocess.run([sys.executable, "-S", "-c",
-        "import sys; from pathlib import Path; "
-        "from doom_eap.launcher import campaign_resources, launcher_platform; "
-        "launcher_platform.detect_doom_processes = lambda: (); "
-        "game, mod = map(Path, sys.argv[1:]); "
-        "campaign_resources.enable_campaign_resources(game, mod); "
-        "print(len(launcher_platform.verify_linux_mod_installation(game, mod)['required_resources']))",
-        str(game), str(staged)], cwd=Path(__file__).resolve().parents[1], capture_output=True, text=True)
+        _assert_finalized_room_banks(evidence, include_dlc)
+    checked = subprocess.run(
+        [
+            sys.executable,
+            "-S",
+            "-c",
+            "from doom_eap.launcher import launcher_injector; import sys; from pathlib import Path; from doom_eap.launcher import campaign_resources as campaign_resources; from doom_eap.launcher import launcher_platform; from doom_eap.launcher import launcher_platform; launcher_platform.detect_doom_processes = lambda **kwargs: (); game, mod = map(Path, sys.argv[1:]); campaign_resources.enable_campaign_resources(game, mod); print(len(launcher_injector.verify_linux_mod_installation(game, mod)['required_resources']))",
+            str(game),
+            str(staged),
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+    )
     assert checked.returncode == 0, checked.stderr
     assert checked.stdout.strip() == str(4 if include_dlc else 3)
+
+
+def _assert_restored_original_banks(bank, game, logs):
+    assert bank.read_bytes() == b"cached bank"
+    assert not list(game.glob(".doomeap-injector-*"))
+    assert any("Injector before:" in line for line in logs)
+    assert any("Injector after:" in line for line in logs)
+
+
+def _assert_injector_backup_state(state):
+    assert state["settings_backup_lines"] == 1 and state["backup_files"] == 1
+    assert state["meta_decoded"] is True
+
+
+def _assert_failed_install_preserves_banks(base, held):
+    assert base not in held.parents and held.read_bytes() == b"cached bank"
+
+
+def _assert_registered_room_resources(damage, settings):
+    assert f":HAS_CHECKED_RESOURCES={int(damage == 'valid')}" in settings.read_text()
+    assert ":RESET_BACKUPS=0" in settings.read_text()
+
+
+def _assert_active_injector_holds_banks(mapping):
+    assert "ap_enemy_resources/" not in mapping.read_text()
+    assert "999999" not in mapping.read_text()
 
 
 @pytest.mark.parametrize("damage", ["empty", "missing", "outside", "truncated", "duplicate", "invalid", "valid"])
@@ -149,23 +220,17 @@ def test_injector_preparation_holds_banks_and_repairs_mapping(installed_room, da
     (base / "native.backup").write_bytes(b"backup")
     logs = []
     with pytest.raises(RuntimeError, match="injector failure"):
-        with platform.prepare_injector_resources(game, lambda kind, **payload: logs.append(payload["message"])):
+        with launcher_injector.prepare_injector_resources(game, lambda kind, **payload: logs.append(payload["message"])):
             assert not bank.parent.exists()
             held, = game.glob(".doomeap-injector-*/ap_enemy_resources/cache.resources")
-            assert base not in held.parents and held.read_bytes() == b"cached bank"
+            _assert_failed_install_preserves_banks(base, held)
             if mapping.exists():
-                assert "ap_enemy_resources/" not in mapping.read_text()
-                assert "999999" not in mapping.read_text()
-            assert f":HAS_CHECKED_RESOURCES={int(damage == 'valid')}" in settings.read_text()
-            assert ":RESET_BACKUPS=0" in settings.read_text()
+                _assert_active_injector_holds_banks(mapping)
+            _assert_registered_room_resources(damage, settings)
             raise RuntimeError("injector failure")
-    assert bank.read_bytes() == b"cached bank"
-    assert not list(game.glob(".doomeap-injector-*"))
-    assert any("Injector before:" in line for line in logs)
-    assert any("Injector after:" in line for line in logs)
-    state = platform.injector_state_summary(game)
-    assert state["settings_backup_lines"] == 1 and state["backup_files"] == 1
-    assert state["meta_decoded"] is True
+    _assert_restored_original_banks(bank, game, logs)
+    state = launcher_injector.injector_state_summary(game)
+    _assert_injector_backup_state(state)
 
 
 @pytest.mark.parametrize("system", ["linux", "windows"])
@@ -182,7 +247,7 @@ def test_adapters_prepare_banks_before_invoking_injector(installed_room, monkeyp
         return SimpleNamespace(returncode=0, stdout="full stdout", stderr="full stderr")
 
     if system == "linux":
-        adapter = platform.LinuxModManagerAdapter(SimpleNamespace(version="fixture"),
+        adapter = installation_adapters.LinuxModManagerAdapter(SimpleNamespace(version="fixture"),
             event_sink=lambda kind, **payload: logs.append(payload.get("message", "")))
         monkeypatch.setattr(adapter, "prepare", lambda *a, **kw: game / "injector")
         class Process:
@@ -194,11 +259,11 @@ def test_adapters_prepare_banks_before_invoking_injector(installed_room, monkeyp
                 result = run()
                 return result.stdout, result.stderr
 
-        monkeypatch.setattr(platform.subprocess, "Popen", lambda *a, **kw: Process())
+        monkeypatch.setattr(launcher_platform.subprocess, "Popen", lambda *a, **kw: Process())
     else:
-        adapter = platform.WindowsModInjectorAdapter(None, opener=run,
+        adapter = installation_adapters.WindowsModInjectorAdapter(None, opener=run,
             event_sink=lambda kind, **payload: logs.append(payload.get("message", "")))
-        monkeypatch.setattr(platform, "stage_windows_injector_toolchain", lambda *a, **kw: game / "injector.bat")
+        monkeypatch.setattr(launcher_injector, "stage_windows_injector_toolchain", lambda *a, **kw: game / "injector.bat")
     result = adapter.run(game)
     assert result.state == "applied"
     assert (banks / "cached.resources").read_bytes() == b"cache"
@@ -207,22 +272,22 @@ def test_adapters_prepare_banks_before_invoking_injector(installed_room, monkeyp
 
 
 def crash_injector_hold(game, point):
-    script = """
+    script = """from doom_eap.launcher import launcher_injector;
 import os, sys
 from pathlib import Path
-from doom_eap.launcher import launcher_platform as platform
-platform.detect_doom_processes = lambda: ()
+from doom_eap.launcher import launcher_injector as platform; from doom_eap.launcher import launcher_platform
+launcher_platform.detect_doom_processes = lambda **kwargs: ()
 root, point = Path(sys.argv[1]), sys.argv[2]
 rename = Path.rename
 def interrupted_rename(path, target):
     result = rename(path, target)
     if point == 'moved' and path == root / 'base/ap_enemy_resources':
         os._exit(77)
-    if point == 'restored' and path == root / platform.INJECTOR_HOLD / 'ap_enemy_resources':
+    if point == 'restored' and path == root / launcher_injector.INJECTOR_HOLD / 'ap_enemy_resources':
         os._exit(77)
     return result
 Path.rename = interrupted_rename
-with platform.prepare_injector_resources(root) as hold:
+with launcher_injector.prepare_injector_resources(root) as hold:
     if point in {'injecting', 'restored'}:
         hold.start_injector()
     if point == 'restored':
@@ -247,11 +312,11 @@ def test_injector_hold_recovers_after_process_crash(installed_room, point):
     settings.write_bytes(b":HAS_CHECKED_RESOURCES=1\n:RESET_BACKUPS=0\n")
     originals = {path: path.read_bytes() for path in (bank, mapping, settings)}
     crash_injector_hold(game, point)
-    assert platform.recover_injector_resources(game)
+    assert launcher_injector.recover_injector_resources(game)
     for path, content in originals.items():
         assert path.read_bytes() == (b"post-injector map" if point == "restored" and path == mapping else content)
-    assert not (game / platform.INJECTOR_HOLD).exists()
-    assert not platform.recover_injector_resources(game)
+    assert not (game / launcher_injector.INJECTOR_HOLD).exists()
+    assert not launcher_injector.recover_injector_resources(game)
 
 
 @pytest.mark.parametrize("change", ["injecting", "mapping", "bank", "journal"])
@@ -262,19 +327,19 @@ def test_injector_recovery_preserves_ambiguous_or_changed_files(installed_room, 
     bank.parent.mkdir()
     bank.write_bytes(b"original bank")
     crash_injector_hold(game, "injecting" if change == "injecting" else "prepared")
-    held = game / platform.INJECTOR_HOLD
+    held = game / launcher_injector.INJECTOR_HOLD
     if change != "injecting":
         target = {"mapping": game / "base/idRehash.map", "bank": held / "ap_enemy_resources/cached.resources",
                   "journal": held / "journal.json"}[change]
         target.write_bytes(b"external change")
-    with pytest.raises(platform.InjectorRecoveryRequired):
-        platform.recover_injector_resources(game)
+    with pytest.raises(launcher_injector.InjectorRecoveryRequired):
+        launcher_injector.recover_injector_resources(game)
     assert held.exists()
     if change != "injecting":
         assert target.read_bytes() == b"external change"
     opener, staging = Mock(), Mock()
-    monkeypatch.setattr(platform, "stage_windows_injector_toolchain", staging)
-    adapter = platform.WindowsModInjectorAdapter(None, opener=opener)
+    monkeypatch.setattr(launcher_injector, "stage_windows_injector_toolchain", staging)
+    adapter = installation_adapters.WindowsModInjectorAdapter(None, opener=opener)
     assert adapter.run(game).state == "failed"
     staging.assert_not_called()
     opener.assert_not_called()
@@ -288,7 +353,7 @@ def test_injector_timeout_keeps_output_and_blocks_recovery(installed_room, monke
     bank = game / "base/ap_enemy_resources/cached.resources"
     bank.parent.mkdir()
     bank.write_bytes(b"preserved bank")
-    adapter = platform.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
+    adapter = installation_adapters.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
     monkeypatch.setattr(adapter, "prepare", lambda *a, **kw: game / "injector")
     class Process:
         pid = 123
@@ -300,7 +365,7 @@ def test_injector_timeout_keeps_output_and_blocks_recovery(installed_room, monke
         def wait(self, **kwargs):
             return -1
 
-    monkeypatch.setattr(platform.subprocess, "Popen", lambda *a, **kw: Process())
+    monkeypatch.setattr(launcher_platform.subprocess, "Popen", lambda *a, **kw: Process())
     killed = []
     monkeypatch.setattr(installation_adapters.signal, "SIGKILL", 9, raising=False)
     def kill_group(group, sig):
@@ -317,23 +382,40 @@ def test_injector_timeout_keeps_output_and_blocks_recovery(installed_room, monke
     assert result.details["injector_state"] == "unknown"
     assert ("termination_error" in result.details) is termination_fails
     assert not bank.exists()
-    assert (game / platform.INJECTOR_HOLD / "ap_enemy_resources/cached.resources").read_bytes() == b"preserved bank"
-    with pytest.raises(platform.InjectorRecoveryRequired):
-        platform.recover_injector_resources(game)
+    assert (game / launcher_injector.INJECTOR_HOLD / "ap_enemy_resources/cached.resources").read_bytes() == b"preserved bank"
+    with pytest.raises(launcher_injector.InjectorRecoveryRequired):
+        launcher_injector.recover_injector_resources(game)
 
 
 def test_verify_reports_expected_owner_and_missing_evidence(installed_room):
     game, source = installed_room(True)
-    staged = platform._stage_mod(source, game)
+    staged = launcher_injector._stage_mod(source, game)
     campaign_resources.enable_campaign_resources(game, staged)
     (game / "base" / (HUB + ".meta")).unlink()
-    with pytest.raises(platform.LinuxVerificationError) as failure:
-        platform.verify_linux_mod_installation(game, staged)
+    with pytest.raises(launcher_injector.LinuxVerificationError) as failure:
+        launcher_injector.verify_linux_mod_installation(game, staged)
     details = failure.value.details
     assert details["failure_step"] == "verify" and details["exception_type"] == "LinuxVerificationError"
     hub, = [item for item in details["required_resources"] if item["label"] == "hub"]
     assert hub["expected_owner"] == HUB + ".resources" and hub["failure_reason"] == "missing meta file"
     assert "Traceback" in details["traceback"]
+
+
+def _assert_resource_failure_diagnostics(details, step):
+    assert details["failure_step"] == step and details["exception_type"] == "OSError"
+    assert "forced resource failure" in details["verification_error"] and "Traceback" in details["traceback"]
+    assert {item["label"] for item in details["required_resources"]} == {"hub", "e1m1", "shell"}
+
+
+def _assert_reported_install_failure(logs, step):
+    assert any(step in line for line in logs) and any("OSError" in line for line in logs)
+    assert any("Traceback" in line for line in logs)
+
+
+def _assert_linux_injector_failure(receipt_path, result, step):
+    assert result.state == "failed"
+    assert receipt_path.read_bytes() == b"previous installation"
+    assert step in result.message and "forced resource failure" in result.message
 
 
 @pytest.mark.parametrize("step", ["prepare banks", "register banks", "manifest", "publish", "verify"])
@@ -350,8 +432,8 @@ def test_install_failure_reaches_journal_and_support(installed_room, monkeypatch
 
     game, source = installed_room(False)
     events = []
-    adapter = platform.LinuxModManagerAdapter(None, event_sink=lambda kind, **payload: events.append((kind, payload)))
-    monkeypatch.setattr(adapter, "run", lambda _: platform.AdapterResult(
+    adapter = installation_adapters.LinuxModManagerAdapter(None, event_sink=lambda kind, **payload: events.append((kind, payload)))
+    monkeypatch.setattr(adapter, "run", lambda _: launcher_injector.AdapterResult(
         state="applied", message="injected", stdout="injector stdout", stderr="injector stderr", returncode=0))
 
     def fail(*args, **kwargs):
@@ -362,7 +444,7 @@ def test_install_failure_reaches_journal_and_support(installed_room, monkeypatch
         "register banks": (resource_bank, "register_banks"),
         "manifest": (build_manifest, "register_resource_manifest"),
         "publish": (campaign_resources, "publish_resource_activation"),
-        "verify": (platform, "verify_linux_mod_installation"),
+        "verify": (launcher_injector, "verify_linux_mod_installation"),
     }[step]
     if isinstance(target, str):
         monkeypatch.setattr(target + "." + name, fail)
@@ -383,28 +465,23 @@ def test_install_failure_reaches_journal_and_support(installed_room, monkeypatch
     port = []
     def prepare(journal):
         port.append(journal)
-        platform.stage_room_mod(source, game, receipt_path, manifest_hash="room", journal=journal)
+        launcher_injector.stage_room_mod(source, game, receipt_path, manifest_hash="room", journal=journal)
     actions = InstallationActions(
         prepare=prepare,
         inject=lambda: InstallationOutcome(adapter.run(game)), confirm=lambda: True,
-        finalize=lambda outcome: InstallationOutcome(platform.finalize_mod_installation(game, staged, outcome.adapter, event_sink=sink, journal=port[0])),
-        verify=lambda outcome: InstallationOutcome(platform.verify_mod_installation(game, staged, outcome.adapter, platform_name="linux", event_sink=sink)),
+        finalize=lambda outcome: InstallationOutcome(launcher_injector.finalize_mod_installation(game, staged, outcome.adapter, event_sink=sink, journal=port[0])),
+        verify=lambda outcome: InstallationOutcome(launcher_injector.verify_mod_installation(game, staged, outcome.adapter, platform_name="linux", event_sink=sink)),
         session=lambda journal: None, receipt=lambda outcome: {}, check=lambda: None)
     result = InstallationService().execute(plan, actions).adapter
     journal = plan.journal()
     journal.load()
-    assert result.state == "failed"
-    assert receipt_path.read_bytes() == b"previous installation"
-    assert step in result.message and "forced resource failure" in result.message
+    _assert_linux_injector_failure(receipt_path, result, step)
     details = journal.document["evidence"]["outcome"]["adapter"]["details"]
-    assert details["failure_step"] == step and details["exception_type"] == "OSError"
-    assert "forced resource failure" in details["verification_error"] and "Traceback" in details["traceback"]
-    assert {item["label"] for item in details["required_resources"]} == {"hub", "e1m1", "shell"}
+    _assert_resource_failure_diagnostics(details, step)
     logs = [payload["message"] for kind, payload in events if kind == "log"]
-    assert any(step in line for line in logs) and any("OSError" in line for line in logs)
-    assert any("Traceback" in line for line in logs)
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({"launcher.log": "saved launcher output"}, {}))
-    report = doctor.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
+    _assert_reported_install_failure(logs, step)
+    monkeypatch.setattr(launcher_support, "_support_log_tails", lambda *a, **kw: ({"launcher.log": "saved launcher output"}, {}))
+    report = launcher_support.write_support_bundle(tmp_path / "support.zip", doctor.DoctorReport("test", ()),
         config=config, logs=logs, support_diagnostics={"installation": journal.document},
         injector_output=result.message + "\ninjector stdout\ninjector stderr")
     with zipfile.ZipFile(report) as archive:
@@ -430,23 +507,23 @@ def resource_transaction(installed_room, tmp_path):
     calls = []
 
     def prepare(journal):
-        platform.stage_room_mod(source, game, receipt, manifest_hash='room', journal=journal)
+        launcher_injector.stage_room_mod(source, game, receipt, manifest_hash='room', journal=journal)
 
     def inject():
         calls.append('inject')
-        return InstallationOutcome(platform.AdapterResult('applied', 'injected'))
+        return InstallationOutcome(launcher_injector.AdapterResult('applied', 'injected'))
 
     def finalize(outcome):
         journal = plan.journal()
         journal.load()
-        return InstallationOutcome(platform.finalize_mod_installation(
+        return InstallationOutcome(launcher_injector.finalize_mod_installation(
             game, staged, outcome.adapter, journal=journal))
 
     def session(journal):
         calls.append('session')
 
     actions = InstallationActions(prepare, inject, lambda: True, finalize,
-        lambda outcome: InstallationOutcome(platform.verify_mod_installation(
+        lambda outcome: InstallationOutcome(launcher_injector.verify_mod_installation(
             game, staged, outcome.adapter, platform_name='windows')),
         session, lambda outcome: {'installed': True}, lambda: None)
     return plan, actions, calls
@@ -573,6 +650,12 @@ def test_resource_rollback_restores_metadata_and_removes_new_banks(resource_tran
     assert plan.receipt_path.read_bytes() == b'previous receipt' and calls == ['inject']
 
 
+def _assert_linux_injector_process_options(code, options, output, prompt, result):
+    assert result.state == "failed" and result.returncode == code
+    assert result.stderr == output and result.details["residual_prompt"] == prompt
+    assert options["stdin"] == subprocess.DEVNULL and options["start_new_session"]
+
+
 @pytest.mark.parametrize("output,code,prompt", [
     ("Old Doom Eternal backups detected!\nReset backups now? [y/N]", 1, "old_backups"),
     ("Reset backups now? [y/N]", 1, "reset_backups"),
@@ -582,7 +665,7 @@ def test_resource_rollback_restores_metadata_and_removes_new_banks(resource_tran
 ])
 def test_linux_nonzero_output_explains_residual_prompt(installed_room, monkeypatch, output, code, prompt):
     game, _ = installed_room(False)
-    adapter = platform.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
+    adapter = installation_adapters.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
     options = {}
 
     class Process:
@@ -598,11 +681,9 @@ def test_linux_nonzero_output_explains_residual_prompt(installed_room, monkeypat
         options.update(kwargs)
         return Process()
 
-    monkeypatch.setattr(platform.subprocess, "Popen", opener)
+    monkeypatch.setattr(launcher_platform.subprocess, "Popen", opener)
     result = adapter.run(game, prepared=game / "fake-injector")
-    assert result.state == "failed" and result.returncode == code
-    assert result.stderr == output and result.details["residual_prompt"] == prompt
-    assert options["stdin"] == subprocess.DEVNULL and options["start_new_session"]
+    _assert_linux_injector_process_options(code, options, output, prompt, result)
     if code == 127:
         assert result.details["failure_category"] == "linux_loader_symbol_failure"
         assert "symbol lookup failed" in result.message
@@ -637,10 +718,10 @@ def test_close_requests_stop_without_abandoning_injector(installed_room, monkeyp
             return "", ""
 
     if system == "windows":
-        adapter = platform.WindowsModInjectorAdapter(None, opener=lambda *a: Process())
+        adapter = installation_adapters.WindowsModInjectorAdapter(None, opener=lambda *a: Process())
     else:
-        adapter = platform.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
-        monkeypatch.setattr(platform.subprocess, "Popen", lambda *a, **kw: Process())
+        adapter = installation_adapters.LinuxModManagerAdapter(SimpleNamespace(version="fixture"))
+        monkeypatch.setattr(launcher_platform.subprocess, "Popen", lambda *a, **kw: Process())
     controller = LauncherController.__new__(LauncherController)
     controller.workers = LauncherWorkers(lambda job, error: errors.append(error))
     controller.workflow = Mock()
@@ -668,4 +749,4 @@ def test_close_requests_stop_without_abandoning_injector(installed_room, monkeyp
     assert not errors and results[0].state == "applied"
     assert controller.close() is True
     controller.workflow.session_owner.retire.assert_called_once()
-    assert not (game / platform.INJECTOR_HOLD).exists()
+    assert not (game / launcher_injector.INJECTOR_HOLD).exists()

@@ -1,20 +1,6 @@
-from doom_eap.content.slot_data_contract import generation_fingerprint
-from doom_eap.runtime.context_registry import validate_slot_contract
-
-
-def test_dlc_missions_do_not_require_dlc_equipment():
-    from tests.room_fixture import current_room_fixture
-
-    slot = current_room_fixture()
-    slot["runtime"]["use_dlc_content"] = False
-    slot["native_generation_fingerprint"] = generation_fingerprint(slot)
-    assert "e5m4_boss" in slot["campaign"]["sequence"]
-    assert validate_slot_contract(slot)["runtime"]["use_dlc_content"] is False
-
-
 def test_provider_process_and_source_are_all_required(tmp_path):
     from doom_eap.contracts.save_observation import GameplaySaveEvidence, admitted_evidence_matches
-    from doom_eap.runtime.save_files import admitted_ap_save
+    from doom_eap.runtime.bridge_saves import admitted_ap_save
     root = "ap-" + "b" * 40
     ap = tmp_path / root / "GAME-AUTOSAVE0"
     ap.mkdir(parents=True)

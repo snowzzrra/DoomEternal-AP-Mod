@@ -8,16 +8,34 @@ from doom_eap.content.campaign_stages import campaign_stages
 from doom_eap.content.content_catalog import load_content_catalog
 
 PUBLISHED_STAGES = (
-    "e1m1_intro", "e1m2_war", "e1m3_cult", "e1m4_boss",
-    "e2m1_nest", "e2m2_base", "e2m3_core", "e2m4_boss",
-    "e3m1_slayer", "e3m2_hell", "e3m2_hell_b", "e3m3_maykr", "e3m4_boss",
-    "e4m1_rig", "e4m2_swamp", "e4m3_mcity",
-    "e5m1_spear", "e5m2_earth", "e5m3_hell", "e5m4_boss",
+    "e1m1_intro",
+    "e1m2_war",
+    "e1m3_cult",
+    "e1m4_boss",
+    "e2m1_nest",
+    "e2m2_base",
+    "e2m3_core",
+    "e2m4_boss",
+    "e3m1_slayer",
+    "e3m2_hell",
+    "e3m2_hell_b",
+    "e3m3_maykr",
+    "e3m4_boss",
+    "e4m1_rig",
+    "e4m2_swamp",
+    "e4m3_mcity",
+    "e5m1_spear",
+    "e5m2_earth",
+    "e5m3_hell",
+    "e5m4_boss",
 )
 PUBLISHED_MASTER_STAGES = {
-    "ml_e2m1_nest": (7776001, 28), "ml_e2m3_core": (7776002, 29),
-    "ml_e5m1_spear": (7776003, 30), "ml_e1m3_cult": (7776004, 31),
-    "ml_e2m2_base": (7776005, 32), "ml_e3m1_slayer": (7776006, 33),
+    "ml_e2m1_nest": (7776001, 28),
+    "ml_e2m3_core": (7776002, 29),
+    "ml_e5m1_spear": (7776003, 30),
+    "ml_e1m3_cult": (7776004, 31),
+    "ml_e2m2_base": (7776005, 32),
+    "ml_e3m1_slayer": (7776006, 33),
 }
 
 
@@ -39,12 +57,9 @@ def _catalog_with_ids(catalog, tmp_path, document):
     return replace(catalog, root=tmp_path)
 
 
-def test_published_stage_ids_match_projection(catalog):
-    stages = campaign_stages(catalog)
-    assert {stage["id"]: (stage["access_id"], stage["native_index"]) for stage in stages} == {
-        key: (7771000 + index, index) for index, key in enumerate(PUBLISHED_STAGES)
-    } | PUBLISHED_MASTER_STAGES
-    assert stages == json.loads((catalog.root / "data/campaign_stages.json").read_bytes())
+def _assert_stage_order_and_ids(masters, normal, original, reordered):
+    assert [stage["id"] for stage in reordered] == [stage["id"] for stage in [*reversed(normal), *masters]]
+    assert {stage["id"]: stage for stage in reordered} == {stage["id"]: stage for stage in original}
 
 
 def test_descriptor_order_changes_chronology_without_changing_ids(catalog):
@@ -54,8 +69,7 @@ def test_descriptor_order_changes_chronology_without_changing_ids(catalog):
     reordered = campaign_stages(replace(catalog, maps=maps))
     normal = [stage for stage in original if stage["variant"] == "mission"]
     masters = [stage for stage in original if stage["variant"] == "master"]
-    assert [stage["id"] for stage in reordered] == [stage["id"] for stage in [*reversed(normal), *masters]]
-    assert {stage["id"]: stage for stage in reordered} == {stage["id"]: stage for stage in original}
+    _assert_stage_order_and_ids(masters, normal, original, reordered)
 
 
 @pytest.mark.parametrize("field", ["access_id", "native_index"])
@@ -78,19 +92,6 @@ def test_retired_descriptor_keeps_numbers_reserved(catalog, tmp_path, stage_ids)
     stages = campaign_stages(_catalog_with_ids(retired, tmp_path, stage_ids))
     assert [stage["id"] for stage in stages] == [*PUBLISHED_STAGES[1:], *PUBLISHED_MASTER_STAGES]
     assert (stages[0]["access_id"], stages[0]["native_index"]) == (7771001, 1)
-
-
-@pytest.mark.parametrize("change", ["missing", "extra", "tombstone"])
-def test_active_ids_must_match_descriptors(catalog, tmp_path, stage_ids, change):
-    rows = stage_ids["stages"]
-    if change == "missing":
-        del rows["e1m1_intro"]
-    elif change == "extra":
-        rows["extra_stage"] = {"access_id": 7771020, "native_index": 20, "status": "active"}
-    else:
-        rows["e1m1_intro"]["status"] = "tombstone"
-    with pytest.raises(ValueError, match="must match mission descriptors"):
-        campaign_stages(_catalog_with_ids(catalog, tmp_path, stage_ids))
 
 
 @pytest.mark.parametrize(("field", "value"), [

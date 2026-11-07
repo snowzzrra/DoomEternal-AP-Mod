@@ -1,18 +1,13 @@
 import asyncio
-from copy import deepcopy
 import json
 import logging
-import struct
+from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
 
-from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.client_state_store import ClientStateStore
-from doom_eap.runtime.killsanity import Killsanity
-from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
-
+from doom_eap.runtime.campaign import Killsanity
+from doom_eap.runtime.inventory import ClientStateStore
 
 NAMESPACE = "a" * 64
 MISSION = "game/sp/intro/intro"
@@ -50,13 +45,19 @@ def tracker(session, namespace=NAMESPACE):
     return result
 
 
+def _assert_persisted_kill_cursor(reopened, restored):
+    assert reopened.total == 101 and reopened.cursor == 1
+    assert set(restored["killsanity"]) == {"producer", "counter_abi", "cursor", "total", "source_gaps"}
+
+
 def test_progress_survives_checkpoint_restart_and_atomic_write_failure(tmp_path):
     session = {}
     kills = tracker(session)
     document = {"version": 2, "sessions": {"room": session}}
     store = ClientStateStore(tmp_path / "client-state.json", version=2, migrate=lambda value: (value, False),
                              log_event=lambda *args, **kwargs: None, logger=logging.getLogger("killsanity-test"))
-    persist = lambda: store.commit(document, reason="killsanity-test")
+    def persist():
+        return store.commit(document, reason="killsanity-test")
     first = snapshot(87)
     assert kills.consume(first, persist) == ()
     saved = deepcopy(session)
@@ -77,8 +78,12 @@ def test_progress_survives_checkpoint_restart_and_atomic_write_failure(tmp_path)
     assert reopened.consume(continuation, lambda: None) == ()
     restarted = snapshot(1, producer=["72", "102", "c" * 32, "test-build"])
     reopened.consume(restarted, lambda: None)
-    assert reopened.total == 101 and reopened.cursor == 1
-    assert set(restored["killsanity"]) == {"producer", "counter_abi", "cursor", "total", "source_gaps"}
+    _assert_persisted_kill_cursor(reopened, restored)
+
+
+def _assert_kill_source_gap(caplog, kills):
+    assert kills.total == 1088 and kills.state["source_gaps"] == 2
+    assert "observed kills only" in caplog.text
 
 
 def test_cumulative_recovery_after_long_bridge_absence_and_room_isolation(caplog):
@@ -95,8 +100,7 @@ def test_cumulative_recovery_after_long_bridge_absence_and_room_isolation(caplog
     assert other.total == 1
     kills = tracker(session)
     kills.consume(snapshot(1088, gaps=2), lambda: None)
-    assert kills.total == 1088 and kills.state["source_gaps"] == 2
-    assert "observed kills only" in caplog.text
+    _assert_kill_source_gap(caplog, kills)
     for update in (snapshot(1087, gaps=2), snapshot(1088, gaps=1)):
         with pytest.raises(ValueError, match="backwards"):
             kills.consume(update, lambda: None)

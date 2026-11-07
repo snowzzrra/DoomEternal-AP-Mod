@@ -1,8 +1,6 @@
-"""Exercise async transport against fragmented or interrupted helper output."""
-
 import json
 import sys
-import time
+import threading
 from pathlib import Path
 
 from native_transport_support import Replies, codec, evidence_result, frame
@@ -20,13 +18,20 @@ def main():
         operation = header["operation"]
         with trace.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps({"operation": operation, "body": body.hex()}) + "\n")
+        print(operation, file=sys.stderr, flush=True)
         if operation == 1 and mode == "evidence":
             envelope, _ = codec._decode_type("read_envelope", body, 0)
-            name = {53: "currency_result", 54: "progression_result", 55: "mission_access_result"}[envelope["command_type"]]
+            name = {53: "currency_result", 54: "progression_result", 55: "mission_access_result"}[
+                envelope["command_type"]
+            ]
             result = evidence_result(name)
             if envelope["command_type"] == 53:
-                result["currency"] = codec.decode_variant(53, 1, body[len(codec.encode("read_envelope", envelope)):])[1]["currency"]
-            response_body = codec.encode("scope", replies.scope) + codec.encode(codec.COMMANDS[envelope["command_type"]]["result"], result)
+                result["currency"] = codec.decode_variant(53, 1, body[len(codec.encode("read_envelope", envelope)) :])[
+                    1
+                ]["currency"]
+            response_body = codec.encode("scope", replies.scope) + codec.encode(
+                codec.COMMANDS[envelope["command_type"]]["result"], result
+            )
         else:
             response_body = replies.body(operation, body)
         response = frame(operation, header["correlation_id"], response_body)
@@ -39,11 +44,11 @@ def main():
 
 def corrupt(mode, response):
     if mode == "timeout":
-        time.sleep(10)
+        threading.Event().wait()
     if mode == "partial":
         sys.stdout.buffer.write(response[:17])
         sys.stdout.buffer.flush()
-        time.sleep(10)
+        threading.Event().wait()
     if mode == "correlation":
         return response[:16] + bytes(8) + response[24:]
     if mode == "oversized":

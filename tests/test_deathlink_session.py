@@ -1,12 +1,12 @@
 import asyncio
 import logging
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 
-from doom_eap.runtime import deathlink_session as domain
-from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState
-from doom_eap.runtime.deathlink_publication import DeathLinkPublication, DeathLinkDispatchError
+from doom_eap.runtime import deathlink as domain
+from doom_eap.runtime.deathlink import DeathLinkDispatchError, DeathLinkPublication, DeathLinkReceiver, ReceiveState
 
 
 def setup_session(tmp_path):
@@ -17,7 +17,7 @@ def setup_session(tmp_path):
     owner.bind("room-A", state)
     owner.configure(True)
     class Native:
-        calls = []
+        calls: ClassVar[list] = []
         event_id = 0
         event_hash = None
         def deathlink_request(self, kind, **args):
@@ -34,6 +34,11 @@ def setup_session(tmp_path):
     return owner, state, publication, events
 
 
+def _assert_deduplicated_death(data, event_id, owner, persist, persisted):
+    assert event_id and len(persisted) == 1
+    assert owner.receive(data, persist) is None and len(persisted) == 1
+
+
 def test_receive_history_safe_gate_and_echo_cancellation_preserve_native_claim(tmp_path, monkeypatch):
     monkeypatch.setattr(domain, "time", SimpleNamespace(monotonic=lambda: 10))
     owner, state, publication, events = setup_session(tmp_path)
@@ -45,8 +50,7 @@ def test_receive_history_safe_gate_and_echo_cancellation_preserve_native_claim(t
         persisted.append(dict(state))
 
     event_id = owner.receive(data, persist)
-    assert event_id and len(persisted) == 1
-    assert owner.receive(data, persist) is None and len(persisted) == 1
+    _assert_deduplicated_death(data, event_id, owner, persist, persisted)
     publication._event = owner.active_event
     owner.advance(False, publication)
     assert not list(tmp_path.glob("*.cmd"))
@@ -74,7 +78,7 @@ def test_outbound_completion_after_room_rebind_has_no_new_room_effects(tmp_path,
     async def run():
         owner, _, publication, events = setup_session(tmp_path)
         entered, release = asyncio.Event(), asyncio.Event()
-        calls = []
+        calls: ClassVar[list] = []
 
         async def send(cause):
             calls.append(cause)
@@ -127,6 +131,13 @@ def test_cancel_failure_does_not_stop_later_receives_or_local_deaths(tmp_path, m
     assert owner.receive({"time": 4, "source": "friend"}, lambda: None)
 
 
+def _assert_single_death_delivery(data, event, identities, native, owner):
+    assert owner.active_event is None and event.deliveries == 1
+    assert native.calls.count(2) == 1
+    assert len(set(identities)) == 1
+    assert owner.receive(data, lambda: pytest.fail("duplicate persisted again")) is None
+
+
 @pytest.mark.parametrize("kind", [1, 2])
 def test_budget_refusal_then_success_applies_same_event_once(tmp_path, monkeypatch, kind):
     clock = SimpleNamespace(monotonic=lambda: 10)
@@ -167,10 +178,7 @@ def test_budget_refusal_then_success_applies_same_event_once(tmp_path, monkeypat
     clock.monotonic = lambda: 13
     owner.advance(True, publication)
     owner.advance(True, publication)
-    assert owner.active_event is None and event.deliveries == 1
-    assert native.calls.count(2) == 1
-    assert len(set(identities)) == 1
-    assert owner.receive(data, lambda: pytest.fail("duplicate persisted again")) is None
+    _assert_single_death_delivery(data, event, identities, native, owner)
 
 
 @pytest.mark.parametrize("kind", [1, 2])

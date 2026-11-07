@@ -1,16 +1,15 @@
-"""Real worker ownership and scoped launcher adapter contracts, without game writes."""
-from dataclasses import asdict
 import json
 import queue
 import threading
+from dataclasses import asdict
 from types import SimpleNamespace
 
 import pytest
-
-from doom_eap.launcher.launcher_workers import LauncherWorkers, LauncherWorkCancelled
-from doom_eap.launcher.launcher_interactions import LauncherInteractions
-from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
 from test_install_workflow import _snapshot
+
+from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow, RoomSetupCoordinator
+from doom_eap.launcher.launcher_interactions import LauncherInteractions
+from doom_eap.launcher.launcher_workers import LauncherWorkCancelled, LauncherWorkers
 
 
 def test_setup_room_identity_separates_rooms_and_uses_resolved_fingerprint():
@@ -25,6 +24,11 @@ def test_setup_room_identity_separates_rooms_and_uses_resolved_fingerprint():
     assert RoomSetupCoordinator.room_key(legacy) != RoomSetupCoordinator.room_key({**legacy, "slot_data": {"option": 2}})
 
 
+def _assert_queued_work_serialization(calls, entered, old, workers):
+    assert workers.submit("room", old)
+    assert entered.wait(3)
+    assert not workers.submit("room", old)
+    assert workers.submit("queued", lambda job: calls.append("queued"))
 
 
 def test_serialization_cancelled_queue_and_same_key_replacement():
@@ -39,10 +43,7 @@ def test_serialization_cancelled_queue_and_same_key_replacement():
         calls.append("old")
 
     try:
-        assert workers.submit("room", old)
-        assert entered.wait(3)
-        assert not workers.submit("room", old)
-        assert workers.submit("queued", lambda job: calls.append("queued"))
+        _assert_queued_work_serialization(calls, entered, old, workers)
         workers.invalidate()
         assert not workers.submit("stale-input", lambda job: calls.append("stale-input"), generation=0)
         assert workers.submit("room", lambda job: (calls.append("new"), completed.set()))
@@ -105,6 +106,11 @@ def test_cancelled_problem_report_cannot_publish_preview(tmp_path):
         reporting.report_problem(SimpleNamespace(create_support_bundle=generate), logs=[], job=job)
 
 
+def _assert_scoped_question_answers(answers, cancelled, errors, workers):
+    assert answers == [True] and errors == []
+    assert not workers.accepts(cancelled["launcher_job_generation"])
+
+
 def test_question_kind_scope_and_cancellation():
     events, errors, answers = queue.Queue(), [], []
     workers = LauncherWorkers(lambda job, error: errors.append(error))
@@ -134,8 +140,7 @@ def test_question_kind_scope_and_cancellation():
         interactions.cancel_all()
         assert finished.wait(3)
         interactions.resolve(kind, cancelled["request_id"], True)
-        assert answers == [True] and errors == []
-        assert not workers.accepts(cancelled["launcher_job_generation"])
+        _assert_scoped_question_answers(answers, cancelled, errors, workers)
     finally:
         interactions.cancel_all()
         workers.close(3)
@@ -185,6 +190,12 @@ def room_event(seed="install-seed"):
     }
 
 
+def _assert_cancelled_setup_events(before, done, errors, events, results, workers):
+    assert workers.submit("sentinel", lambda job: done.set())
+    assert done.wait(3)
+    assert events == before and results == [] and errors == []
+
+
 @pytest.mark.parametrize("fail", [False, True])
 def test_retired_setup_cannot_publish_result_or_complete_new_room(tmp_path, fail):
     events, results, errors = [], [], []
@@ -218,14 +229,26 @@ def test_retired_setup_cannot_publish_result_or_complete_new_room(tmp_path, fail
         before = list(events)
         release.set()
         # The sentinel is ordered behind the old operation by the actual worker lane.
-        assert workers.submit("sentinel", lambda job: done.set())
-        assert done.wait(3)
-        assert events == before and results == [] and errors == []
+        _assert_cancelled_setup_events(before, done, errors, events, results, workers)
         assert coordinator.last_event["seed_name"] == "replacement"
         assert coordinator.room_key(first) not in coordinator._completed
     finally:
         release.set()
         workers.close(3)
+
+
+def _assert_deduplicated_setup_submission(coordinator, done, event, results, workers, workflow):
+    assert coordinator.submit(event)
+    assert workers.submit("first-sentinel", lambda job: done.set())
+    assert done.wait(3)
+    assert workflow.calls == 1 and len(results) == 1
+    assert not coordinator.submit(event)
+
+
+def _assert_completed_setup_once(done, errors, events, results, workers, workflow):
+    assert done.wait(3)
+    assert workflow.calls == 2 and len(results) == 2 and errors == []
+    assert all(payload["launcher_job_generation"] == workers.generation for _, payload in events)
 
 
 def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(tmp_path):
@@ -253,22 +276,42 @@ def test_successful_setup_is_deduplicated_and_explicit_retry_remains_available(t
                                        lambda record, generation: results.append((record, generation)), workers, interactions)
     event = room_event()
     try:
-        assert coordinator.submit(event)
-        assert workers.submit("first-sentinel", lambda job: done.set())
-        assert done.wait(3)
-        assert workflow.calls == 1 and len(results) == 1
-        assert not coordinator.submit(event)
+        _assert_deduplicated_setup_submission(coordinator, done, event, results, workers, workflow)
         done.clear()
         assert coordinator.submit(event, force=True)
         assert workers.submit("second-sentinel", lambda job: done.set())
-        assert done.wait(3)
-        assert workflow.calls == 2 and len(results) == 2 and errors == []
-        assert all(payload["launcher_job_generation"] == workers.generation for _, payload in events)
+        _assert_completed_setup_once(done, errors, events, results, workers, workflow)
         coordinator.invalidate()
         assert coordinator.last_event["seed_name"] == event["seed_name"]
         assert not coordinator.start(force=True)
     finally:
         workers.close(3)
+
+
+def _assert_prepared_room_before_client(calls, errors, events):
+    assert calls == ["core", "prepare"] and errors == []
+    assert events[0][0] == "ap_session_status" and events[0][1]["state"] == "prelaunch_ready"
+    assert events[1][0] == "room_install_state" and events[1][1]["state"] == "already_installed"
+
+
+def _assert_room_setup_event_order(calls, errors, events):
+    assert calls == ["core", "prepare"] and errors == []
+    assert len(events) == 1 and events[0][0] == "room_install_state"
+
+
+def _assert_native_session_status(payload):
+    assert payload["state"] == "already_installed" and payload["readiness"] == "blocked"
+    assert payload["readiness_reason"] == "admission fixture blocked"
+    assert payload["failure_domain"] == "campaign_session"
+
+
+def _assert_room_dependency_order(calls, errors, events):
+    assert calls == [] and events == [] and errors == []
+
+
+def _assert_explicit_setup_retry(done, workers):
+    assert workers.submit("sentinel", lambda job: done.set())
+    assert done.wait(3)
 
 
 @pytest.mark.parametrize("fail", [False, True])
@@ -300,51 +343,70 @@ def test_room_readiness_prepares_session_before_starting_native_client(fail, tri
         return owner.status
 
     owner.prepare = prepare
-    workflow = SimpleNamespace(session_owner=owner, install_state=lambda snapshot: SimpleNamespace(
-        state="already_installed", manifest_hash="same-package", staged_mod="room.zip", steam_launch_option="",
-        reason="", readiness="ready", readiness_reason=""))
+    workflow = SimpleNamespace(
+        session_owner=owner,
+        install_state=lambda snapshot: SimpleNamespace(
+            state="already_installed",
+            manifest_hash="same-package",
+            staged_mod="room.zip",
+            steam_launch_option="",
+            reason="",
+            readiness="ready",
+            readiness_reason="",
+        ),
+    )
     workflow.for_job = lambda *args: workflow
     from doom_eap.launcher.launcher_integration import IntegratedLaunchWorkflow
+
     workflow._game_root = IntegratedLaunchWorkflow._game_root
     workflow.ensure_game_link = ensure_game_link
     workflow._config = lambda: runtime
-    controller = SimpleNamespace(workers=workers, config=configuration, workflow=workflow,
-                                 setup=SimpleNamespace(room_key=RoomSetupCoordinator.room_key), interactions=interactions,
-                                 _setup_event=lambda kind, payload: events.append((kind, payload)),
-                                 _ensure_native_client=lambda **kwargs: calls.append("native"))
+    controller = SimpleNamespace(
+        _last_ap_session_status=None,
+        workers=workers,
+        config=configuration,
+        workflow=workflow,
+        setup=SimpleNamespace(room_key=RoomSetupCoordinator.room_key),
+        interactions=interactions,
+        _setup_event=lambda kind, payload: events.append((kind, payload)),
+        _ensure_native_client=lambda **kwargs: calls.append("native"),
+    )
+    controller._stop_native_client = lambda: calls.append("stop_native")
+    controller.emit = lambda *args, **kwargs: None
+    controller._observe_game_lifecycle = lambda running, status: LauncherController._observe_game_lifecycle(
+        controller, running, status
+    )
     try:
         if trigger == "reconnect":
             assert LauncherController._queue_room_readiness(controller, room_event())
         else:
-            from doom_eap.launcher import launcher_controller
-            from doom_eap.runtime import observer_lifecycle
+            from doom_eap.launcher import launcher_controller as launcher_controller
+            from doom_eap.runtime import observers
+
             monkeypatch.setattr(launcher_controller, "os", SimpleNamespace(name="nt"))
             processes = iter((None, (), ()) if trigger == "delayed_exit" else ((), (), ()))
-            monkeypatch.setattr(observer_lifecycle, "windows_game_processes", lambda: next(processes))
+            monkeypatch.setattr(observers, "windows_game_processes", lambda: next(processes))
             owner.observe = lambda processes: {"state": "game_exited", "ready": False}
             controller._lifecycle_lock = threading.Lock()
             controller.setup.current_event = None if trigger == "disconnected_exit" else room_event()
             controller._queue_room_readiness = lambda event: LauncherController._queue_room_readiness(controller, event)
-            controller.emit = lambda *args, **kwargs: None
             iterations = iter((False, False, False, True))
             controller._game_lifecycle_stop = SimpleNamespace(is_set=lambda: next(iterations), wait=lambda _: None)
             controller._game_lifecycle_sample_lock = threading.Lock()
             LauncherController._sample_game_lifecycle(controller)
-        assert workers.submit("sentinel", lambda job: done.set())
-        assert done.wait(3)
+        _assert_explicit_setup_retry(done, workers)
+        if trigger != "reconnect":
+            assert calls.pop(0) == "stop_native"
         if trigger == "disconnected_exit":
-            assert calls == [] and events == [] and errors == []
+            _assert_room_dependency_order(calls, errors, events)
             return
         if fail:
-            assert calls == ["core", "prepare"] and errors == []
-            assert len(events) == 1 and events[0][0] == "room_install_state"
+            _assert_room_setup_event_order(calls, errors, events)
             payload = events[0][1]
-            assert payload["state"] == "already_installed" and payload["readiness"] == "blocked"
-            assert payload["readiness_reason"] == "admission fixture blocked"
-            assert payload["failure_domain"] == "campaign_session"
+            _assert_native_session_status(payload)
         else:
-            assert calls == ["core", "prepare", "native"] and errors == []
-            assert events[0][0] == "ap_session_status" and events[0][1]["state"] == "prelaunch_ready"
-            assert events[1][0] == "room_install_state" and events[1][1]["state"] == "already_installed"
+            _assert_prepared_room_before_client(calls, errors, events)
+            LauncherController._observe_game_lifecycle(controller, True, owner.status)
+            assert calls == ["core", "prepare", "native"]
     finally:
         workers.close(3)

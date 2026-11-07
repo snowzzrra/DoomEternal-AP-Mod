@@ -1,4 +1,3 @@
-"""Exercise feature consumers and the native client against v2 pipes, without DOOM."""
 import os
 import shutil
 import subprocess
@@ -9,12 +8,27 @@ from native_feature_support import FeatureReplies
 from test_native_transport_pipe import PipeServer, process_scope
 from test_native_transport_pipe import relay as relay_fixture
 
-from doom_eap.runtime.campaign_menu import CampaignMenu
-from doom_eap.runtime.weapon_points import SentinelWeaponPoints
-from doom_eap.runtime.inventory import WeaponPointsBlocked
+from doom_eap.runtime.campaign import CampaignMenu
+from doom_eap.runtime.inventory import SentinelWeaponPoints, WeaponPointsBlocked
 
-pytestmark = pytest.mark.skipif(os.name != 'nt', reason='Windows v2 pipe')
+pytestmark = [pytest.mark.integration, pytest.mark.skipif(os.name != 'nt', reason='Windows v2 pipe')]
 relay = relay_fixture
+
+
+def _assert_committed_menu_selection(replies, result):
+    assert result['selected_stage'] == 'hub' and result['committed_revision'] == 1
+    assert [i for i, _, _ in replies.submissions][-2:] == [22, 23]
+    assert replies.submissions[-2][2]['rewards_known'] == 1
+    assert replies.submissions[-1][2] == dict(revision=1, count=1, selected_id=1)
+    assert replies.reference['payload_revision'] == 5
+
+
+def _assert_typed_native_feature_results(link):
+    assert link.admitted_save_root() == 'ap-' + 'b' * 40
+    assert link.deathlink_request(1, enabled=True)['kind'] == 1
+    assert link.deathlink_request(2, event_id=7, event_hash=bytes([1] * 16))['kind'] == 2
+    assert link.publish_ammo_refill(dict(authoritative=True, available=2), connected=True)['refill_balance'] == 2
+    assert link.publish_checked_locations({7770000, 7772055, 7774901}, 10)['revision'] == 10
 
 
 def test_feature_consumers_share_v2_connection_and_ack_results(relay):
@@ -23,11 +37,7 @@ def test_feature_consumers_share_v2_connection_and_ack_results(relay):
     server = PipeServer(replies).start()
     link = SentinelWeaponPoints(Path(relay), scope['pid'], 'a' * 64)
     try:
-        assert link.admitted_save_root() == 'ap-' + 'b' * 40
-        assert link.deathlink_request(1, enabled=True)['kind'] == 1
-        assert link.deathlink_request(2, event_id=7, event_hash=bytes([1] * 16))['kind'] == 2
-        assert link.publish_ammo_refill(dict(authoritative=True, available=2), connected=True)['refill_balance'] == 2
-        assert link.publish_checked_locations({7770000, 7772055, 7774901}, 10)['revision'] == 10
+        _assert_typed_native_feature_results(link)
         published = replies.submissions[-1][2]['checked_locations']
         for location in (7770000, 7772055, 7774901):
             offset = location - 7770000
@@ -37,11 +47,7 @@ def test_feature_consumers_share_v2_connection_and_ack_results(relay):
         assert [i for i, _, _ in replies.submissions] == [41, 41, 37, 45, 51, 52]
         assert replies.operations.count(5) == 6
         result = CampaignMenu().synchronize(link, dict(fortress_phase=0, hub_map='game/hub/hub', rows=[], selected='hub'))
-        assert result['selected_stage'] == 'hub' and result['committed_revision'] == 1
-        assert [i for i, _, _ in replies.submissions][-2:] == [22, 23]
-        assert replies.submissions[-2][2]['rewards_known'] == 1
-        assert replies.submissions[-1][2] == dict(revision=1, count=1, selected_id=1)
-        assert replies.reference['payload_revision'] == 5
+        _assert_committed_menu_selection(replies, result)
         link.namespace = 'b' * 64
         assert link.request(46, 8, {'variable': 2, 'value': '0'})['outcome'] == 1
         assert bytes(replies.reference['namespace_id']) == b'a' * 64
@@ -67,7 +73,7 @@ def test_campaign_requires_revision4_from_hello(relay, missing_command):
         server.join()
 
 
-def test_native_client_uses_v2_and_never_reads_spool(tmp_path, relay):
+def test_native_client_uses_v2_with_spool_present(tmp_path, relay):
     compiler = shutil.which('cl.exe')
     if compiler is None:
         pytest.skip('MSVC environment required')

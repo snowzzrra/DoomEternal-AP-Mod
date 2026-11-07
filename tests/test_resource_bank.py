@@ -1,13 +1,9 @@
 import struct
 
-import pytest
-
-from doom_eap.launcher.resource_bank import ResourceIndex, resource_records, select_resources, write_resource_bank, _u64
+from doom_eap.launcher.resource_bank import ResourceIndex, _u64
 
 
-
-
-def write_bank(path, entries):
+def _bank_names(entries):
     names = list(dict.fromkeys(value for kind, name, payload, types in entries for value in (kind, name)))
     meta_values = list(dict.fromkeys(value for kind, name, payload, types in entries for value in types))
     if meta_values:
@@ -17,6 +13,11 @@ def write_bank(path, entries):
         offsets.append(len(strings))
         strings.extend(name.encode() + b'\0')
     strings = struct.pack('<Q', len(names)) + struct.pack('<' + 'Q' * len(names), *offsets) + strings
+    return meta_values, names, strings
+
+
+def write_bank(path, entries):
+    meta_values, names, strings = _bank_names(entries)
     rows, types, ids, data = bytearray(), bytearray(), bytearray(), bytearray()
     metadata = b''.join(struct.pack('<QQIIQ', names.index('dependency_kind'), names.index(f'value/{value}'),
                                     5, 1, 1234) for value in meta_values)
@@ -52,7 +53,7 @@ def write_bank(path, entries):
 def payloads(path):
     result = []
     with path.open('rb') as source:
-        for key, (_, row, number) in ResourceIndex(path).records:
+        for key, (_, row, _number) in ResourceIndex(path).records:
             source.seek(_u64(row, 56))
             result.append((key, source.read(_u64(row, 64))))
     return result

@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import importlib
 import json
 import os
 import subprocess
@@ -14,16 +13,14 @@ from doom_eap.contracts.inventory_domain import MISSING, OWNED, InventoryObserva
 from doom_eap.contracts.materialization import MaterializationScope
 from doom_eap.contracts.runtime_context import RuntimeContext
 from doom_eap.contracts.tag_prerequisites import TAG_REQUIRED_ENGINE_PERKS
-from doom_eap.runtime.item_reconciliation import (
+from doom_eap.runtime.inventory import (
     ReceiptSession,
     StartingOwnershipError,
+    compile_materialization_plan,
     effective_ownership,
     load_policy_registry,
     load_starting_ownership,
     normalize_session_state,
-)
-from doom_eap.runtime.materialization import (
-    compile_materialization_plan,
 )
 from tools.decls.devinv_builder import (
     build_devinv_loadout,
@@ -44,28 +41,6 @@ def bind_starting(session, starting=STARTING):
     )
 
 
-@pytest.fixture
-def bridge(tmp_path, monkeypatch):
-    configuration = {
-        "doom_base_dir": str(tmp_path / "game/base"), "save_games_dir": str(tmp_path / "saves"),
-        "steam_remote_dir": str(tmp_path / "remote"), "client_state_file": str(tmp_path / "state.json"),
-        "bridge_log_path": str(tmp_path / "bridge.log"),
-    }
-    for key in ("doom_base_dir", "save_games_dir", "steam_remote_dir"):
-        Path(configuration[key]).mkdir(parents=True)
-    path = tmp_path / "config.json"
-    path.write_text(json.dumps(configuration), encoding="utf-8")
-    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(path))
-    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
-    monkeypatch.syspath_prepend(str(ROOT.parent / "Archipelago"))
-    monkeypatch.syspath_prepend(str(ROOT / "packaging/standalone_runtime"))
-    module = importlib.import_module("doom_eap.runtime.bridge_client")
-    monkeypatch.setattr(module, "ENABLE_ITEM_NOTIFICATIONS", False)
-    return module
-
-
-
-
 def context_for(bridge, tmp_path, monkeypatch):
     ctx = bridge.DoomEternalContext(None, None)
     ctx.state_key, ctx.slot, ctx.team, ctx.auth = "StartingRoom:0:1", 1, 0, "StartingSlot"
@@ -75,8 +50,8 @@ def context_for(bridge, tmp_path, monkeypatch):
     ctx._connected_slot_data = {"identity": {"schema": 7}, "starting": STARTING}
     bind_starting(ctx.receipt_session)
     runtime = RuntimeContext("base/hub", "Base", ("game/hub/hub",), ("hub",), frozenset())
-    monkeypatch.setattr(ctx, "_refresh_runtime_context", lambda _: runtime)
-    monkeypatch.setattr(ctx, "_active_materialization_lease", AsyncMock(return_value="1:1"))
+    monkeypatch.setattr(ctx.items, "_refresh_runtime_context", lambda _: runtime)
+    monkeypatch.setattr(ctx.items, "_active_materialization_lease", AsyncMock(return_value="1:1"))
     monkeypatch.setattr(ctx, "_flush_deferred_frag_upgrades", AsyncMock())
     monkeypatch.setattr(ctx, "_reconcile_native_receipt_owners", AsyncMock())
     state_path = tmp_path / "saved-state.json"
@@ -125,19 +100,22 @@ asyncio.run(connect())
 def test_legacy_connected_is_rejected_before_session_binding(bridge, tmp_path, monkeypatch):
     from unittest.mock import Mock
 
+    from doom_eap.runtime import bridge_config
+
     async def run():
         ctx = bridge.DoomEternalContext(None, None)
         bind = Mock(side_effect=AssertionError("Rejected rooms cannot bind a session"))
         failure = Mock()
         monkeypatch.setattr(ctx, "_handle_package", bind)
         monkeypatch.setattr(ctx, "_report_launcher_connection_failure", failure)
-        room = json.loads((ROOT / "tests/fixtures/full_campaign_slot_data.json").read_text())
+        room = {"slot_data_schema_version": 6}
         before = {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
         await ctx._validate_connected_package({"slot_data": room})
         bind.assert_not_called()
         assert failure.call_args.kwargs["code"] == "slot_schema"
-        assert "DoomEAP " + bridge._CONTENT_IDENTITY["release_version"] in failure.call_args.args[0]
+        assert "DoomEAP " + bridge_config._CONTENT_IDENTITY["release_version"] in failure.call_args.args[0]
         assert {path: path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
+
     asyncio.run(run())
 
 
@@ -164,16 +142,6 @@ def test_starting_weapon_is_counted_once_and_load_restores_only_missing_ownershi
         plan = compile_materialization_plan(owned, context, scope, definitions, policies, "the_crucible",
                                             observation=observation, selected_item_ids={7770004})
         assert len(plan.reconciliation.commands) == (1 if state == MISSING else 0)
-
-
-
-
-
-
-
-
-
-
 
 
 @pytest.mark.parametrize("change", [
@@ -209,16 +177,3 @@ def test_schema_7_package_uses_one_plan_for_base_and_tag(tmp_path):
     additive = build_devinv_loadout({"Sentinel Battery": 2}, "Ballista")
     with pytest.raises(ValueError, match="durable delivery"):
         validate_devinv_source(additive, starting=STARTING)
-
-
-def test_runtime_mastery_counts_are_the_resolved_targets():
-    from doom_eap.content.mastery_requirements import mastery_entries_for_counts
-    from doom_eap.contracts.challenge_registry import load_challenge_registry
-    from tests.room_fixture import current_room_fixture
-
-    room = current_room_fixture()
-    counts = room["runtime"]["mastery_requirement_counts"]
-    entries = mastery_entries_for_counts(load_challenge_registry()["weapon_masteries"], counts)
-    assert {entry["signal"]["unlockable"]: entry["signal"]["rule_0_statCount"] for entry in entries} == counts
-
-

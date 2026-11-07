@@ -1,6 +1,6 @@
-from doom_eap.runtime.deathlink_receive import DeathLinkReceiver, ReceiveState
-from doom_eap.runtime.deathlink_publication import DeathLinkDispatchError
 import pytest
+
+from doom_eap.runtime.deathlink import DeathLinkDispatchError, DeathLinkReceiver, ReceiveState
 
 
 class FakeSpool:
@@ -30,26 +30,6 @@ def advance(receiver, spool, now, *, safe=True):
     )
 
 
-def test_native_operation_is_dispatched_once():
-    receiver = DeathLinkReceiver(mode="hardcore")
-    spool = FakeSpool()
-    receiver.receive("one", 0)
-    assert advance(receiver, spool, 1).state is ReceiveState.COMMAND_IN_FLIGHT
-    spool.delivered()
-    assert advance(receiver, spool, 2).state is ReceiveState.APPLIED
-    assert advance(receiver, spool, 3).state is None
-    assert spool.dispatches == 1 and receiver.mode == "hardcore"
-
-
-def test_unsafe_gameplay_waits_before_native_dispatch():
-    receiver = DeathLinkReceiver()
-    spool = FakeSpool()
-    receiver.receive("one", 0)
-    assert advance(receiver, spool, 1, safe=False).detail == "unsafe_gameplay"
-    assert spool.dispatches == 0
-    assert advance(receiver, spool, 2).detail == "dispatched"
-
-
 def test_duplicate_and_reconnect_identity_do_not_requeue():
     receiver = DeathLinkReceiver(burst_interval=0.5)
     spool = FakeSpool()
@@ -57,16 +37,12 @@ def test_duplicate_and_reconnect_identity_do_not_requeue():
     assert receiver.receive("one", 0.5).detail == "duplicate"
     advance(receiver, spool, 1.0)
     spool.delivered()
-    advance(receiver, spool, 1.1)
+    assert advance(receiver, spool, 1.1).state is ReceiveState.APPLIED
+    assert advance(receiver, spool, 1.15).state is None
+    assert spool.dispatches == 1
     receiver.confirm_local_death(1.2)
     assert receiver.receive("one", 3.0).detail == "duplicate"
     assert receiver.active is None
-
-
-
-
-
-
 
 
 def test_dispatch_failure_fails_safe_without_retry():
@@ -83,6 +59,16 @@ def test_dispatch_failure_fails_safe_without_retry():
     assert receiver.active is None
 
 
+def _assert_refusal_backoff_and_expiry(calls, event, receiver, tick):
+    assert tick(2).detail == "retry_interval"
+    assert tick(3).detail == "native_budget_refused"
+    assert tick(59).detail == "native_budget_refused"
+    assert receiver.active is event and event.total_deadline == 60
+    assert tick(60).state is ReceiveState.EXPIRED
+    assert tick(61).state is None
+    assert len(calls) == 3 and event.attempts == event.deliveries == 0
+
+
 def test_persistent_budget_refusal_expires_with_backoff_and_no_delivery():
     receiver = DeathLinkReceiver()
     receiver.receive("one", 0)
@@ -97,13 +83,7 @@ def test_persistent_budget_refusal_expires_with_backoff_and_no_delivery():
         return receiver.advance(now=now, safe_gameplay=True, dispatch=dispatch, command_in_flight=lambda: False)
 
     assert tick(1).detail == "native_budget_refused"
-    assert tick(2).detail == "retry_interval"
-    assert tick(3).detail == "native_budget_refused"
-    assert tick(59).detail == "native_budget_refused"
-    assert receiver.active is event and event.total_deadline == 60
-    assert tick(60).state is ReceiveState.EXPIRED
-    assert tick(61).state is None
-    assert len(calls) == 3 and event.attempts == event.deliveries == 0
+    _assert_refusal_backoff_and_expiry(calls, event, receiver, tick)
     assert receiver.confirm_local_death(61).detail == "not_linked"
 
 

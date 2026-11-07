@@ -14,6 +14,21 @@ from websockets.legacy.server import serve
 from doom_eap.runtime import sentinel_protocol_generated as codec
 
 
+def _identity_conflict(stored, request, reference):
+    return stored is not None and (
+        stored["reference"] != reference
+        or (request["op"] == "submit" and stored["envelope"] != request["envelope"])
+    )
+
+
+def _stored_result(reference, request, stored):
+    if request["op"] == "dispatch_only":
+        stored["result"]["effect"] = "dispatch_only"
+    if request["op"] in ("ack", "expire"):
+        stored["result"] = {"status": "terminal", "retention": "compact"}
+    return {"reference": reference, **stored["result"]}
+
+
 class Core:
     def __init__(self, root, stop):
         self.root, self.stop = root, stop
@@ -43,19 +58,13 @@ class Core:
             return {"status": "instance_changed", "instance": self.instance}
         command_id = decoded["command_id"]
         stored = self.commands.get(command_id)
-        if stored is not None and stored["reference"] != reference:
-            return {"status": "identity_conflict"}
-        if stored is not None and request["op"] == "submit" and stored["envelope"] != request["envelope"]:
+        if _identity_conflict(stored, request, reference):
             return {"status": "identity_conflict"}
         if request["op"] == "submit" and stored is None:
             return await self.execute(request)
         if stored is None:
             return {"status": "absent"}
-        if request["op"] == "dispatch_only":
-            stored["result"]["effect"] = "dispatch_only"
-        if request["op"] in ("ack", "expire"):
-            stored["result"] = {"status": "terminal", "retention": "compact"}
-        return {"reference": reference, **stored["result"]}
+        return _stored_result(reference, request, stored)
 
     async def execute(self, request):
         reference = request["reference"]

@@ -1,17 +1,12 @@
 import asyncio
 import logging
-from copy import deepcopy
 from dataclasses import replace
 
 import pytest
 
 from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.contracts.challenge_registry import load_challenge_registry, validate_challenge_registry
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.save_checks import SaveChecks, SaveCheckReadiness
-from doom_eap.runtime.save_check_observation import SaveCheckBinding, SaveCheckObservations
-from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
-
+from doom_eap.runtime.bridge_checks import CheckPublication, SaveCheckBinding, SaveCheckObservations
+from doom_eap.runtime.bridge_saves import SaveCheckReadiness, SaveChecks, SaveObserver, SaveObserverBaselineStore
 
 SIGNAL = dict(kind="unlockable_record", numUnlockableRules=1, rule_0_statname="kills",
               rule_0_statCount=25, rule_0_statDuration=0, rule_0_satisfied=True, unlockableIsUnlocked=True)

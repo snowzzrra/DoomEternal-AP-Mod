@@ -1,5 +1,5 @@
 from doom_eap.content.vanilla_enemy_profiles import catalog_profile
-from tools.maps.vanilla_enemy_profiles import _script_peak, population_bound, script_replenishment_stops
+from tools.maps.vanilla_enemy_profiles import population_bound
 
 
 def _catalog():

@@ -4,15 +4,20 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from doom_eap.launcher.launcher_session import APSessionOwner
+from doom_eap.launcher.launcher_session import APSessionOwner, CheckpointRecoveryBlockedError
 from tests.test_slot_admission import invalid_room, snapshot_for, tree_bytes
+
+
+def _assert_offline_checkpoint_preservation(checkpoint, save, saved):
+    assert checkpoint in [saved.read(name) for name in saved.namelist()]
+    assert save.read_bytes() in [saved.read(name) for name in saved.namelist()]
 
 
 @pytest.mark.parametrize("damage", [None, "truncated", "extra", "identity", "contract"])
 def test_offline_preservation_does_not_interpret_checkpoint_bytes(tmp_path, request, damage):
     import zipfile
 
-    from doom_eap.runtime.weapon_points import namespace_id
+    from doom_eap.runtime.inventory import namespace_id
 
     snapshot = snapshot_for(request.getfixturevalue("resolved_room")[0])
     generation = snapshot.slot_data["native_generation_fingerprint"]
@@ -44,16 +49,21 @@ def test_offline_preservation_does_not_interpret_checkpoint_bytes(tmp_path, requ
         else:
             archive = owner.backup_local_files(snapshot, config)
             with zipfile.ZipFile(archive) as saved:
-                assert checkpoint in [saved.read(name) for name in saved.namelist()]
-                assert save.read_bytes() in [saved.read(name) for name in saved.namelist()]
+                _assert_offline_checkpoint_preservation(checkpoint, save, saved)
             assert not (owner.state_dir / "ap-session-descriptor.txt").exists()
             assert owner.status.get("ready") is not True
     assert tree_bytes(directory) == before
     assert save.read_bytes() == b"interrupted native bytes"
 
 
+def _assert_isolated_session_copy(saved):
+    assert b"native checkpoint" in [saved.read(name) for name in saved.namelist()]
+    assert json.loads(saved.read("client_state.json"))["sessions"] == {
+        "fixture:0:1:" + "a" * 64: {"processed_items": 7}}
+
+
 def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
-    from doom_eap.runtime.weapon_points import namespace_id
+    from doom_eap.runtime.inventory import namespace_id
     owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
     snapshot = SimpleNamespace(seed_name="fixture", team=0, slot=1,
         slot_data={"native_generation_fingerprint": "a" * 64, "runtime": {"difficulty": {"engine": 0}}})
@@ -81,12 +91,16 @@ def test_offline_inspection_and_local_copy_preserve_sources(tmp_path):
         archive = owner.backup_local_files(snapshot, config)
     import zipfile
     with zipfile.ZipFile(archive) as saved:
-        assert b"native checkpoint" in [saved.read(name) for name in saved.namelist()]
-        assert json.loads(saved.read("client_state.json"))["sessions"] == {
-            "fixture:0:1:" + "a" * 64: {"processed_items": 7}}
+        _assert_isolated_session_copy(saved)
     assert all(path.read_bytes() == contents for path, contents in before.items())
     (directory / "campaign.contract").write_bytes(b"invalid metadata")
     assert owner.inspect_campaign(snapshot, config)["status"] == "metadata_invalid"
+
+
+def _assert_backup_timestamp_and_options(datetime, diagnostic, missing, timezone):
+    assert datetime.fromisoformat(diagnostic["at_utc"]).tzinfo == timezone.utc
+    assert "FileNotFoundError" in diagnostic["traceback"] and "RuntimeError" in diagnostic["traceback"]
+    assert repr(missing.filename) in diagnostic["traceback"]
 
 
 def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
@@ -121,15 +135,11 @@ def test_preparation_failure_is_diagnosable_campaign_error(tmp_path):
     for key, value in expected.items():
         assert diagnostic[key] == value
     from datetime import datetime, timezone
-    assert datetime.fromisoformat(diagnostic["at_utc"]).tzinfo == timezone.utc
-    assert "FileNotFoundError" in diagnostic["traceback"] and "RuntimeError" in diagnostic["traceback"]
-    assert repr(missing.filename) in diagnostic["traceback"]
+    _assert_backup_timestamp_and_options(datetime, diagnostic, missing, timezone)
     support = _preparation_failure_summary(tmp_path)
     assert support["source"] == "last_preparation_failure"
     assert "fixture-user" not in json.dumps(support)
     assert "game.details" in json.dumps(support)
-
-
 
 
 def test_proton_supervisor_preserves_structured_preparation_failure(tmp_path):
@@ -177,6 +187,27 @@ def test_support_condump_uses_workflow_session_owner(tmp_path):
     assert owner.observe.call_count >= 2 and controller._condump_pending is None
 
 
+def _assert_preserved_receipt_sessions(foreign, key, original, pending, saved, sources):
+    assert saved["sessions"][key]["processed_items"] == 0
+    assert saved["sessions"]["other-world:0:1"] == original["sessions"]["other-world:0:1"]
+    assert all(not source.exists() for source in sources) and not pending.exists()
+    assert foreign.read_bytes() == b"other room"
+
+
+def _assert_restart_archive(backup, original):
+    assert backup.testzip() is None and json.loads(backup.read("client_state.json")) == original
+    assert json.loads(backup.read("room.json"))["seed"] == "same-world"
+    assert sum(backup.read(name) == b"old campaign" for name in backup.namelist()) == 3
+
+
+def _assert_restart_campaign_metadata(original, pending, sources, state_file):
+    assert json.loads(state_file.read_text()) == original
+    assert all((source / "fixture").read_bytes() == b"old campaign" for source in sources) and pending.exists()
+
+
+def _assert_preserved_goal_and_other_rooms(goal, marker, old_backup, owner, snapshot):
+    assert not goal.exists() and not marker.exists()
+    assert not old_backup.exists() and owner.list_backups(snapshot) == []
 
 
 @pytest.mark.parametrize("owner_delivery", [False, True])
@@ -187,8 +218,7 @@ def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeyp
     from pathlib import Path
 
     from doom_eap.contracts.command_publication import queue_session_namespace
-    from doom_eap.runtime.client_state_store import ClientStateStore
-    from doom_eap.runtime.weapon_points import namespace_id
+    from doom_eap.runtime.inventory import ClientStateStore, namespace_id
 
     snapshot = SimpleNamespace(seed_name="same-world", team=0, slot=1,
                                slot_data={"native_generation_fingerprint": "a" * 64})
@@ -199,8 +229,7 @@ def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeyp
               "steam_remote_dir": str(tmp_path / "Steam/userdata/123/782330/remote"),
               "save_games_dir": str(tmp_path / "saved/base"),
               "client_state_file": str(tmp_path / "client_state.json")}
-    from doom_eap.runtime.ledger import Authority, Ledger, NetworkReceipt, RoomKey
-    from doom_eap.runtime.ledger_records import SaveEpochState
+    from doom_eap.runtime.ledger import Authority, Ledger, NetworkReceipt, RoomKey, SaveEpochState
     room = RoomKey(snapshot.seed_name, 0, 1, "a" * 64)
     ledger_path = tmp_path / "delivery.sqlite3"
     if owner_delivery:
@@ -251,8 +280,7 @@ def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeyp
         patching.setattr(ClientStateStore, "commit", fail_after_publish)
         with pytest.raises(OSError, match="publication fixture"):
             owner.restart_campaign(snapshot, config)
-    assert json.loads(state_file.read_text()) == original
-    assert all((source / "fixture").read_bytes() == b"old campaign" for source in sources) and pending.exists()
+    _assert_restart_campaign_metadata(original, pending, sources, state_file)
     if owner_delivery:
         async def aborted():
             ledger = await Ledger.open(ledger_path, read_only=True)
@@ -262,16 +290,10 @@ def test_same_world_restart_backs_up_and_preserves_other_rooms(tmp_path, monkeyp
         asyncio.run(aborted())
     archive = owner.restart_campaign(snapshot, config)
     with zipfile.ZipFile(archive) as backup:
-        assert backup.testzip() is None and json.loads(backup.read("client_state.json")) == original
-        assert json.loads(backup.read("room.json"))["seed"] == "same-world"
-        assert sum(backup.read(name) == b"old campaign" for name in backup.namelist()) == 3
+        _assert_restart_archive(backup, original)
     saved = json.loads(state_file.read_text())
-    assert saved["sessions"][key]["processed_items"] == 0
-    assert saved["sessions"]["other-world:0:1"] == original["sessions"]["other-world:0:1"]
-    assert all(not source.exists() for source in sources) and not pending.exists()
-    assert foreign.read_bytes() == b"other room"
-    assert not goal.exists() and not marker.exists()
-    assert not old_backup.exists() and owner.list_backups(snapshot) == []
+    _assert_preserved_receipt_sessions(foreign, key, original, pending, saved, sources)
+    _assert_preserved_goal_and_other_rooms(goal, marker, old_backup, owner, snapshot)
     if owner_delivery:
         async def inspect():
             ledger = await Ledger.open(ledger_path, read_only=True)
@@ -321,7 +343,143 @@ def test_admission_identity_and_unknown_exit_preserve_owner(tmp_path):
     assert not owner._control_bytes or not (tmp_path / "sentinel-prelaunch.txt").exists()
 
 
+def _assert_retained_orphan_save(checkpoint, client_state, orphan, receipt_bytes):
+    assert orphan.read_bytes() == b"retained native payload"
+    assert checkpoint.read_bytes() == b"retained checkpoint"
+    assert client_state.read_bytes() == receipt_bytes
+
+
+def _assert_native_restart_archive(archive, config, owner, snapshot, steam):
+    assert archive.is_file() and steam.poll() is None
+    assert owner.prepare(snapshot, config)["intent"] == "create"
+
+
+def _assert_restarted_native_namespace(_campaign_native_root, data, first, namespace, owner, steam):
+    assert owner.namespace == namespace and _campaign_native_root(data / "campaigns", namespace) != first
+    assert steam.poll() is None
+
+
+def _assert_idempotent_prelaunch_receipts(client_state, config, owner, prepared, receipt_bytes, snapshot):
+    assert owner.prepare(snapshot, config) == prepared
+    assert client_state.read_bytes() == receipt_bytes
+
+
+def _assert_prelaunch_intent_and_receipts(client_state, config, owner, receipt_bytes, snapshot):
+    assert owner.prepare(snapshot, config)["intent"] == "create"
+    assert client_state.read_bytes() == receipt_bytes
+
+
+def _assert_retained_native_save_directory(client_state, native_save, receipt_bytes):
+    assert native_save.is_dir() and client_state.read_bytes() == receipt_bytes
+
+
+def _write_receipt_history(Path, config, generation, receipt_origin):
+    from doom_eap.runtime.inventory import (
+        default_session_state,
+        observe_received_items,
+        project_receipt_history,
+        record_processed_receipt,
+    )
+    receipts = (
+        []
+        if receipt_origin == "empty"
+        else [SimpleNamespace(item=item, location=-2, player=0, flags=0) for item in (7770900, 7770011)]
+    )
+    if receipt_origin == "multiworld":
+        receipts += [
+            SimpleNamespace(item=item, location=7770300 + i, player=2, flags=0)
+            for i, item in enumerate((7770904, 7770025, 7770903))
+        ]
+    session = default_session_state()
+    boundary = len(receipts) - 1 if receipt_origin == "multiworld" else len(receipts)
+    for receipt in receipts[:boundary]:
+        record_processed_receipt(session, receipt)
+    session["processed_items"] = boundary
+    project_receipt_history(session, receipts, boundary, observe_received_items(receipts, boundary))
+    client_state = Path(config["client_state_file"])
+    client_state.write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "sessions": {
+                    "sala-Ã¡:0:1:" + generation: session,
+                    "other-room:0:1": default_session_state(),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    receipt_bytes = client_state.read_bytes()
+    return client_state, receipt_bytes
+
+
+def _assert_refused_campaign_metadata(checkpoint, client_state, config, contract, owner, receipt_bytes, snapshot):
+    for records in ((contract,), (checkpoint,), (contract, checkpoint)):
+        for record in records:
+            record.write_bytes(b"existing campaign metadata")
+        refusal = (
+            "identity or immutable options differ"
+            if contract in records
+            else "metadata and native saves disagree"
+        )
+        with pytest.raises(RuntimeError, match=refusal):
+            owner.prepare(snapshot, config)
+        assert client_state.read_bytes() == receipt_bytes
+        for record in records:
+            assert record.read_bytes() == b"existing campaign metadata"
+            record.unlink()
+
+
+def _selected_core_runtime(os):
+    selected = os.environ.get("SENTINEL_CORE_RUNTIME")
+    if os.name != "nt" or not selected:
+        pytest.skip("requires an explicitly selected Windows Core distribution")
+    return selected
+
+
+def _write_original_saves(originals):
+    for path, content in originals.items():
+        path.write_bytes(content)
+
+
+def _assert_original_saves(originals):
+    for path, content in originals.items():
+        assert path.read_bytes() == content
+
+
+def _assert_native_save_refusal(client_state, config, native, owner, receipt_bytes, snapshot):
+    native_save = native / "GAME-AUTOSAVE0"
+    native_save.mkdir()
+    with pytest.raises(RuntimeError, match="metadata and native saves disagree"):
+        owner.prepare(snapshot, config)
+    _assert_retained_native_save_directory(client_state, native_save, receipt_bytes)
+    native_save.rmdir()
+
+
+def _assert_orphan_save_refusal(checkpoint, client_state, config, contract, generation, namespace, native, owner, receipt_bytes, snapshot):
+    orphan = native / "save.fixture"
+    orphan.write_bytes(b"retained native payload")
+    contract.write_text(
+        f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={generation}\n"
+        "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=1\nslot=AUTOSAVE0\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    checkpoint.write_bytes(b"retained checkpoint")
+    with pytest.raises(CheckpointRecoveryBlockedError, match="invalid"):
+        owner.prepare(snapshot, config)
+    _assert_retained_orphan_save(checkpoint, client_state, orphan, receipt_bytes)
+    for retained in (orphan, contract, checkpoint):
+        retained.unlink()
+
+
+def _create_campaign_directories(data, game, local, remote, state):
+    for folder in (game / "base", data, state, local, remote):
+        folder.mkdir(parents=True, exist_ok=True)
+
+
 @pytest.mark.parametrize("receipt_origin", ("empty", "starting", "multiworld"))
+@pytest.mark.integration
 def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
     import ctypes
     import os
@@ -330,15 +488,11 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
     import tempfile
     from pathlib import Path
 
-    from doom_eap.launcher.launcher_platform import DependencyManager, detect_doom_processes, install_meathook
+    from doom_eap.launcher.launcher_injector import DependencyManager, install_meathook
 
-    selected = os.environ.get("SENTINEL_CORE_RUNTIME")
-    if os.name != "nt" or not selected:
-        pytest.skip("requires an explicitly selected Windows Core distribution")
-    if any(process['name'].casefold() == 'doometernalx64vk.exe' for process in detect_doom_processes()):
-        pytest.skip("requires DOOM closed for the distribution's vanilla protection helper")
+    selected = _selected_core_runtime(os)
     monkeypatch.setattr("doom_eap.launcher.launcher_session.windows_game_processes", lambda: ())
-    monkeypatch.setattr("doom_eap.launcher.launcher_platform.detect_doom_processes", lambda: ())
+    monkeypatch.setattr("doom_eap.launcher.launcher_platform._running_processes", lambda: ())
     runtime = Path(selected).resolve()
     with tempfile.TemporaryDirectory(prefix="ap-") as temporary:
         expanded = ctypes.create_unicode_buffer(32768)
@@ -348,70 +502,58 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
         game, data, state = root / "game", root / "data", root / "state"
         local = root / "Saved Games/id Software/DOOMEternal/base"
         remote = root / "Steam/userdata/1/782330/remote"
-        for folder in (game / "base", data, state, local, remote):
-            folder.mkdir(parents=True, exist_ok=True)
+        _create_campaign_directories(data, game, local, remote, state)
         (game / "DOOMEternalx64vk.exe").write_bytes(b"MZ-private-fixture")
-        originals = {local / "GAME-AUTOSAVE0": b"local-original",
-                     remote / "GAME-AUTOSAVE0": b"steam-original"}
-        for path, content in originals.items():
-            path.write_bytes(content)
-        installed = install_meathook(game, DependencyManager(state / "deps"), state_dir=state,
-                                    consent=lambda _: True, local_artifact=runtime / "distribution.json")
+        originals = {local / "GAME-AUTOSAVE0": b"local-original", remote / "GAME-AUTOSAVE0": b"steam-original"}
+        _write_original_saves(originals)
+        installed = install_meathook(
+            game,
+            DependencyManager(state / "deps"),
+            state_dir=state,
+            consent=lambda _: True,
+            local_artifact=runtime / "distribution.json",
+        )
         assert installed.state == "installed"
         from tests.room_fixture import current_room_fixture
 
         slot_data = current_room_fixture()
         from doom_eap.content.slot_data_contract import generation_fingerprint
+
         slot_data["runtime"]["difficulty"]["engine"] = 1
         slot_data["starting"] = {"items": [[7770011, 1], [7770900, 1]], "weapon_item_id": 7770900}
         slot_data["native_generation_fingerprint"] = generation_fingerprint(slot_data)
         generation = slot_data["native_generation_fingerprint"]
         snapshot = SimpleNamespace(seed_name="sala-Ã¡", team=0, slot=1, slot_data=slot_data)
         owner = APSessionOwner(root, data, state)
-        config = {"game_root": str(game), "save_games_dir": str(local),
-                  "client_state_file": str(data / "client_state.json"),
-                  "steam_remote_dir": str(remote), "core_runtime_manifest": str(runtime / "distribution.json")}
-        from doom_eap.runtime.item_reconciliation import (
-            default_session_state,
-            observe_received_items,
-            project_receipt_history,
-            record_processed_receipt,
-        )
-        receipts = [] if receipt_origin == "empty" else [
-            SimpleNamespace(item=item, location=-2, player=0, flags=0) for item in (7770900, 7770011)
-        ]
-        if receipt_origin == "multiworld":
-            receipts += [SimpleNamespace(item=item, location=7770300 + i, player=2, flags=0)
-                         for i, item in enumerate((7770904, 7770025, 7770903))]
-        session = default_session_state()
-        boundary = len(receipts) - 1 if receipt_origin == "multiworld" else len(receipts)
-        for receipt in receipts[:boundary]:
-            record_processed_receipt(session, receipt)
-        session["processed_items"] = boundary
-        project_receipt_history(session, receipts, boundary, observe_received_items(receipts, boundary))
-        client_state = Path(config["client_state_file"])
-        client_state.write_text(json.dumps({"version": 2, "sessions": {
-            "sala-Ã¡:0:1:" + generation: session, "other-room:0:1": default_session_state(),
-        }}), encoding="utf-8")
-        receipt_bytes = client_state.read_bytes()
+        config = {
+            "game_root": str(game),
+            "save_games_dir": str(local),
+            "client_state_file": str(data / "client_state.json"),
+            "steam_remote_dir": str(remote),
+            "core_runtime_manifest": str(runtime / "distribution.json"),
+        }
+        client_state, receipt_bytes = _write_receipt_history(Path, config, generation, receipt_origin)
         system = Path(os.environ["SystemRoot"]) / "System32"
         shutil.copyfile(system / "cmd.exe", root / "steam.exe")
-        steam = subprocess.Popen([str(root / "steam.exe"), "/d", "/q", "/c", str(system / "more.com")],
-                                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                 creationflags=subprocess.CREATE_NO_WINDOW)
+        steam = subprocess.Popen(
+            [str(root / "steam.exe"), "/d", "/q", "/c", str(system / "more.com")],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
         try:
             assert steam.poll() is None
             prepared = owner.prepare(snapshot, config)
             assert prepared["state"] == "prelaunch_ready"
             lease = (game / "sentinel-prelaunch.txt").read_bytes()
-            assert owner.prepare(snapshot, config) == prepared
-            assert client_state.read_bytes() == receipt_bytes
+            _assert_idempotent_prelaunch_receipts(client_state, config, owner, prepared, receipt_bytes, snapshot)
             assert (game / "sentinel-prelaunch.txt").read_bytes() == lease
             descriptor = (state / "ap-session-descriptor.txt").read_text(encoding="utf-8")
             assert "seed_hex=" + snapshot.seed_name.encode("utf-8").hex() + "\n" in descriptor
-            for path, content in originals.items():
-                assert path.read_bytes() == content
+            _assert_original_saves(originals)
             from doom_eap.launcher.launcher_session import _campaign_native_root
+
             first = _campaign_native_root(data / "campaigns", owner.namespace)
             namespace = owner.namespace
             assert first != "ap-" + namespace[:40]
@@ -421,62 +563,34 @@ def test_core_prepares_launcher_session(monkeypatch, receipt_origin):
             native.mkdir()
             (native / f"sentinel-owner-{namespace}.txt").write_text(
                 f"sentinel-native-session-v1\nnamespace_id={namespace}\nseed_hex={snapshot.seed_name.encode('utf-8').hex()}\n"
-                f"team=0\nslot=1\ngeneration_fingerprint={generation}\nprovenance=synthetic-fixture\n", encoding="utf-8", newline="\n")
-            assert owner.prepare(snapshot, config)["intent"] == "create"
-            assert client_state.read_bytes() == receipt_bytes
+                f"team=0\nslot=1\ngeneration_fingerprint={generation}\nprovenance=synthetic-fixture\n",
+                encoding="utf-8",
+                newline="\n",
+            )
+            _assert_prelaunch_intent_and_receipts(client_state, config, owner, receipt_bytes, snapshot)
             assert _campaign_native_root(data / "campaigns", namespace) == first
             owner.retire()
             contract = data / "campaigns" / namespace / "campaign.contract"
             checkpoint = contract.with_name("campaign.checkpoint")
-            for records in ((contract,), (checkpoint,), (contract, checkpoint)):
-                for record in records:
-                    record.write_bytes(b"existing campaign metadata")
-                refusal = "identity or immutable options differ" if len(records) == 2 else "metadata and native saves disagree"
-                with pytest.raises(RuntimeError, match=refusal):
-                    owner.prepare(snapshot, config)
-                assert client_state.read_bytes() == receipt_bytes
-                for record in records:
-                    assert record.read_bytes() == b"existing campaign metadata"
-                    record.unlink()
-            native_save = native / "GAME-AUTOSAVE0"
-            native_save.mkdir()
-            with pytest.raises(RuntimeError, match="metadata and native saves disagree"):
-                owner.prepare(snapshot, config)
-            assert native_save.is_dir() and client_state.read_bytes() == receipt_bytes
-            native_save.rmdir()
-            orphan = native / "save.fixture"
-            orphan.write_bytes(b"retained native payload")
-            contract.write_text(
-                f"sentinel-campaign-v2\nnamespace={namespace}\ngeneration={generation}\n"
-                "provenance=synthetic-fixture\ncampaign=unified\nstarting_stage=hub\ndifficulty=1\nslot=AUTOSAVE0\n",
-                encoding="utf-8", newline="\n",
-            )
-            checkpoint.write_bytes(b"retained checkpoint")
-            with pytest.raises(RuntimeError, match="native campaign is missing"):
-                owner.prepare(snapshot, config)
-            assert orphan.read_bytes() == b"retained native payload"
-            assert checkpoint.read_bytes() == b"retained checkpoint"
-            assert client_state.read_bytes() == receipt_bytes
-            for retained in (orphan, contract, checkpoint):
-                retained.unlink()
+            _assert_refused_campaign_metadata(checkpoint, client_state, config, contract, owner, receipt_bytes, snapshot)
+            _assert_native_save_refusal(client_state, config, native, owner, receipt_bytes, snapshot)
+            _assert_orphan_save_refusal(checkpoint, client_state, config, contract, generation, namespace, native, owner, receipt_bytes, snapshot)
             config["doom_base_dir"] = str(game / "base")
             archive = owner.restart_campaign(snapshot, config)
-            assert archive.is_file() and steam.poll() is None
-            assert owner.prepare(snapshot, config)["intent"] == "create"
-            assert owner.namespace == namespace and _campaign_native_root(data / "campaigns", namespace) != first
-            assert steam.poll() is None
+            _assert_native_restart_archive(archive, config, owner, snapshot, steam)
+            _assert_restarted_native_namespace(_campaign_native_root, data, first, namespace, owner, steam)
         finally:
             owner.retire()
             steam.communicate(b"", timeout=5)
         assert not (game / "sentinel-prelaunch.txt").exists()
 
 
-@pytest.mark.parametrize("fault", ["structure", "digest", "size", "reference", "battery"])
+@pytest.mark.parametrize("fault", ["schema", "structure", "digest", "size", "reference", "battery"])
 def test_resolved_session_rejects_before_preparation(resolved_room, tmp_path, fault):
     from copy import deepcopy
     from dataclasses import replace
 
-    from doom_eap.runtime.context_registry import SlotAdmissionError
+    from doom_eap.runtime.observers import SlotAdmissionError
 
     data, catalog = resolved_room
     snapshot = snapshot_for(data)
@@ -488,25 +602,3 @@ def test_resolved_session_rejects_before_preparation(resolved_room, tmp_path, fa
         owner.prepare(snapshot, {})
     owner._prepare.assert_not_called()
     assert tree_bytes(tmp_path) == before
-
-
-def test_resolved_session_accepts_before_preparation(resolved_room, tmp_path):
-    data, _ = resolved_room
-    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
-    owner._prepare = Mock(return_value={"state": "fixture"})
-    snapshot = snapshot_for(data)
-    assert owner.prepare(snapshot, {}) == {"state": "fixture"}
-    owner._prepare.assert_called_once()
-
-
-def test_session_schema_rejection_preserves_tree(resolved_room, tmp_path):
-    from pathlib import Path
-
-    from doom_eap.runtime.context_registry import SlotAdmissionError
-
-    legacy = json.loads((Path(__file__).parent / "fixtures/full_campaign_slot_data.json").read_text())
-    owner = APSessionOwner(tmp_path / "client", tmp_path / "data", tmp_path / "state")
-    with pytest.raises(SlotAdmissionError) as caught:
-        owner.prepare(SimpleNamespace(slot_data=legacy), {})
-    assert caught.value.code == "slot_schema"
-    assert tree_bytes(tmp_path) == {}

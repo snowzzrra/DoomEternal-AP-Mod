@@ -7,9 +7,9 @@
   },
   "resource_version": "v0.8.0",
   "resource_sha256": {
-    "base_mod.zip": "003ad9a277097c5075eb5df2c5329226611cebbc8c77fdfa955c84f539c7d0a8",
+    "base_mod.zip": "74cc6b7ab53b8d9f1c9acb792f26395a529709255e4eba10e8f9bc363da29af7",
     "room_payloads.zip": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
-    "room_payload_manifest.json": "132b1c9480b516002c700d34ef4a037fb3f882a4f7bd7e0bf54e5c4518bdfb5b"
+    "room_payload_manifest.json": "66b56881a8f5eaf9315adbd6919459180db2ea08c4fe1f1bf963d146357bfd01"
   },
   "valid_cases": [
     {

@@ -2,7 +2,15 @@ import logging
 from pathlib import Path
 
 from doom_eap.contracts.save_observation import PrimarySaveSelection
-from doom_eap.runtime.death_observation import DeathObservation
+from doom_eap.runtime.deathlink import DeathObservation
+
+
+def _assert_death_token_and_carryover(event, observe):
+    assert event == "DLC1-AUTOSAVE0:game_duration.dat:4:deaths=1"
+    assert observe(4, True, "load-2") is None
+    assert observe(5, True, "load-3") is None
+    assert observe(6, True, "load-3") is not None
+    assert observe(7, True, "load-3", "GAME-AUTOSAVE0") is None
 
 
 def test_checkpoint_baseline_token_and_single_respawn_carryover_remain_distinct():
@@ -18,11 +26,7 @@ def test_checkpoint_baseline_token_and_single_respawn_carryover_remain_distinct(
     assert observe(2, True, "load-2") is None
     assert observe(3, False, "load-2") is None
     event = observe(4, True, "load-2")
-    assert event == "DLC1-AUTOSAVE0:game_duration.dat:4:deaths=1"
-    assert observe(4, True, "load-2") is None
-    assert observe(5, True, "load-3") is None
-    assert observe(6, True, "load-3") is not None
-    assert observe(7, True, "load-3", "GAME-AUTOSAVE0") is None
+    _assert_death_token_and_carryover(event, observe)
     snapshot = owner.checkpoints
     observe(8, False, "load-3")
     assert snapshot["DLC1-AUTOSAVE0"] is True

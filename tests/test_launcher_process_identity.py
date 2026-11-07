@@ -26,12 +26,15 @@ def process(path):
     return dict(pid=123, created=456, path=str(path))
 
 
-def test_matching_file_alias_keeps_full_admission_checks(owner, tmp_path):
-    alias = tmp_path / 'alias.exe'
-    os.link(owner._game_exe, alias)
-    assert owner.observe((process(alias),))['state'] == 'admitted'
+@pytest.mark.parametrize("hardlink", [False, True])
+def test_matching_file_alias_keeps_full_admission_checks(owner, tmp_path, hardlink):
+    executable = owner._game_exe
+    if hardlink:
+        executable = tmp_path / "alias.exe"
+        os.link(owner._game_exe, executable)
+    assert owner.observe((process(executable),))["state"] == "admitted"
     owner._probe.assert_called_once()
-    assert owner._process == (123, 456) and owner._instance == 'instance-fixture'
+    assert owner._process == (123, 456) and owner._instance == "instance-fixture"
 
 
 @pytest.mark.parametrize('case', ['copy', 'missing', 'multiple', 'unknown'])
@@ -78,10 +81,6 @@ def test_process_replacement_requires_new_session(owner, identity):
     diagnostic = json.loads((owner.state_dir / 'session_admission_failure.json').read_text())
     assert diagnostic['expected_process'] == list(identity)
     assert diagnostic['state'] == 'process_changed'
-
-
-def test_exact_path_preserves_existing_windows_behavior(owner):
-    assert owner.observe((process(owner._game_exe),))['state'] == 'admitted'
 
 
 def test_process_diagnostics_are_bounded(owner):

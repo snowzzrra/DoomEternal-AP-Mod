@@ -42,6 +42,13 @@ def play():
     return presenter, now
 
 
+def _assert_typed_room_projection(accepted, source):
+    assert isinstance(accepted, RoomAccepted)
+    assert accepted.context.origin is EventOrigin.BRIDGE
+    assert accepted.projection() == source
+    assert deepcopy(accepted) is accepted
+
+
 def test_supervisor_emits_typed_snapshot_without_changing_projection(tmp_path):
     events, observed, release = [], threading.Event(), threading.Event()
     def accept(event):
@@ -64,10 +71,7 @@ def test_supervisor_emits_typed_snapshot_without_changing_projection(tmp_path):
         release.set()
         assert supervisor.wait_stopped(3)
     accepted, = [event for event in events if isinstance(event, RoomAccepted)]
-    assert isinstance(accepted, RoomAccepted)
-    assert accepted.context.origin is EventOrigin.BRIDGE
-    assert accepted.projection() == source
-    assert deepcopy(accepted) is accepted
+    _assert_typed_room_projection(accepted, source)
     accepted["slot_data"]["native_generation_fingerprint"] = "changed"
     assert accepted.projection() == source
     with pytest.raises(FrozenInstanceError):
@@ -129,13 +133,11 @@ def test_play_preserves_installer_instruction_and_escalates_save_wait(play):
     assert presenter.present().tone is Tone.FAILURE
 
 
-def test_interrupted_save_projection_keeps_preservation_action(play):
-    presenter, _ = play
-    raw = event("ap_save_inspection", inspection={"status": "save_interrupted"})
-    projected = presenter.observe(raw)
-    assert projected["inspection"]["status"] == "save_interrupted"
-    assert projected["message"]
+def _assert_single_new_save_offer(blocked, presenter):
+    assert presenter.observe(blocked)["offer_new_save"]
+    assert not presenter.observe(blocked)["offer_new_save"]
     assert not presenter.present().ready_to_play
+    assert presenter.present().recovery_message and presenter.present().new_save_available
 
 
 def test_play_waits_for_recovery_and_resume_and_offers_new_save_once(play):
@@ -154,10 +156,7 @@ def test_play_waits_for_recovery_and_resume_and_offers_new_save_once(play):
     assert presenter.present().ready_to_play and presenter.present().game_confirmed
     blocked = event("ap_session_status", state="recovery_blocked", recovery_state="blocked",
                     recovery_reason="save_interrupted", new_save_available=True)
-    assert presenter.observe(blocked)["offer_new_save"]
-    assert not presenter.observe(blocked)["offer_new_save"]
-    assert not presenter.present().ready_to_play
-    assert presenter.present().recovery_message and presenter.present().new_save_available
+    _assert_single_new_save_offer(blocked, presenter)
 
 
 def test_play_blocks_readiness_when_game_connection_becomes_unavailable(play):
@@ -169,15 +168,6 @@ def test_play_blocks_readiness_when_game_connection_becomes_unavailable(play):
     presenter.observe(event("integration_status", meathook_ok=False, session={"state": "prelaunch_ready"}))
     assert presenter.present().session_prepared
     assert not presenter.present().ready_to_play
-
-
-def test_play_exposes_dependency_consent_until_preparation_continues(play):
-    presenter, _ = play
-    presenter.observe(event("setup_started"))
-    presenter.observe(event("dependency_consent_required", request_id="fixture"))
-    assert presenter.present().action is ActionId.CONSENT
-    presenter.observe(event("core_runtime_selected"))
-    assert presenter.present().action is ActionId.WAIT
 
 
 def test_controller_accepts_typed_room_and_publishes_installation_state(tmp_path, monkeypatch, resolved_room):

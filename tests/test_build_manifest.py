@@ -1,6 +1,6 @@
 import pytest
 
-from doom_eap.runtime.save_decrypt import _aes_gcm_decrypt, _aes_gcm_encrypt
+from doom_eap.launcher.build_manifest import _aes_gcm_decrypt, _aes_gcm_encrypt
 
 
 def test_aes_gcm_matches_nist_vector_and_rejects_corrupted_data():

@@ -9,8 +9,7 @@ import pytest
 from doom_eap.launcher.items import ItemsQuery, LedgerAvailability
 from doom_eap.launcher.launcher_supervisor import LedgerReadAdapter
 from doom_eap.launcher.presenters.items_presenter import ItemsPresenter
-from doom_eap.runtime.delivery import DeliveryCoordinator
-from doom_eap.runtime.delivery_control import handle_delivery_control
+from doom_eap.runtime.delivery import DeliveryCoordinator, handle_delivery_control
 from doom_eap.runtime.ledger import (
     Authority,
     CommandState,
@@ -55,8 +54,7 @@ def test_capabilities_before_coordinator_or_during_transport_failure_are_unavail
 
 def test_items_recovers_unpublished_ammo_with_same_operation_and_revision(owner, tmp_path):
     from doom_eap.launcher.events import adapt_event
-    from doom_eap.runtime.ammo import LedgerAmmoRefill
-    from doom_eap.runtime.ammo_refill import AmmoCommandScope
+    from doom_eap.runtime.ammo import AmmoCommandScope, LedgerAmmoRefill
     from doom_eap.runtime.ledger import AmmoKind, AmmoState
 
     class Storage:
@@ -121,6 +119,11 @@ def test_expected_marker_reports_a_missing_owner_ledger_before_the_first_ui_read
 def test_local_uncertainty_uses_the_same_scoped_two_step_resolution_without_an_ap_index(owner, tmp_path, action):
     from doom_eap.launcher.events import adapt_event
 
+    async def _assert_uncertain_local_resolution(action, delivery, original):
+        assert original.state is CommandState.EFFECT_UNKNOWN and original.plan.receipt_index is None
+        assert len(await delivery.ledger.commands(delivery.binding.room, tuple(CommandState), None, 10)) == (2 if action is ResolutionAction.TRY_AGAIN else 1)
+
+
     async def exercise(delivery, transport):
         transport.effect = 2
         source = EffectSource("starting", SourceKind.STARTING_GRANT, "starting:health", b"local acquisition")
@@ -149,8 +152,7 @@ def test_local_uncertainty_uses_the_same_scoped_two_step_resolution_without_an_a
         await handle_delivery_control(delivery, control, lambda kind, **data: emitted.append(data))
         assert all(event["ok"] for event in emitted)
         original = await delivery.ledger.command(delivery.binding.room, "grant")
-        assert original.state is CommandState.EFFECT_UNKNOWN and original.plan.receipt_index is None
-        assert len(await delivery.ledger.commands(delivery.binding.room, tuple(CommandState), None, 10)) == (2 if action is ResolutionAction.TRY_AGAIN else 1)
+        await _assert_uncertain_local_resolution(action, delivery, original)
     owner(exercise)
 
 
@@ -188,6 +190,17 @@ def test_items_view_labels_payment_recovery_and_requires_confirmation(ui):
 
 
 def test_newest_pages_pin_watermark_and_poll_old_rows_without_crossing_rooms(tmp_path):
+    def _assert_paginated_old_updates(presenter):
+        assert len(presenter.model.rows) == 153
+        assert presenter.model.rows[-1].reason == "map_changed"
+        assert all(row.item != 123 for row in presenter.model.rows)
+
+
+    def _assert_offline_item_actions(presenter):
+        assert [row.ap_index for row in presenter.model.rows] == list(range(149, 85, -1))
+        assert not presenter.actions()
+
+
     async def exercise():
         path = tmp_path / "delivery.sqlite3"
         ledger = await Ledger.create(path)
@@ -201,8 +214,7 @@ def test_newest_pages_pin_watermark_and_poll_old_rows_without_crossing_rooms(tmp
             presenter.activate(ROOM, online=True)
             first = await reader.read(presenter.query(), online=True)
             presenter.observe(first)
-            assert [row.ap_index for row in presenter.model.rows] == list(range(149, 85, -1))
-            assert not presenter.actions()
+            _assert_offline_item_actions(presenter)
             await ledger.ingest(binding, 150, (receipt(99),) * 3)
             await ledger.apply(binding, (), (ReceiptDecision(0, ReceiptState.DEFERRED, "map_changed", b""),), ())
             while presenter.model.more:
@@ -212,9 +224,7 @@ def test_newest_pages_pin_watermark_and_poll_old_rows_without_crossing_rooms(tmp
                 presenter.observe(page)
             assert len(presenter.model.rows) == 150
             presenter.observe(await reader.read(presenter.query(), online=True))
-            assert len(presenter.model.rows) == 153
-            assert presenter.model.rows[-1].reason == "map_changed"
-            assert all(row.item != 123 for row in presenter.model.rows)
+            _assert_paginated_old_updates(presenter)
             stale = await reader.read(presenter.query(), online=True)
             presenter.activate(other.room, online=False)
             query = presenter.query()
@@ -340,15 +350,59 @@ def test_blocked_filter_finds_old_items_and_observes_their_resolution(tmp_path):
 
 @pytest.mark.parametrize("action", list(ResolutionAction))
 def test_resolution_requires_owner_room_revision_and_keeps_player_evidence(owner, tmp_path, action):
+    def _assert_sent_command_confirmation(sent):
+        assert sent[0].status.value == "waiting" and sent[0].reason_code.value == "confirmation"
+
+
+    def _assert_single_resolution_request(presenter, request):
+        assert request is not None and presenter.confirm() is None
+
+
+    def _assert_successful_resolution_reply(emitted, presenter, request):
+        assert emitted[-1]["ok"]
+        assert presenter.resolution_result(request.room, request.request_id, ok=True)
+
+
+    def _assert_offline_resolution_actions(presenter, transport):
+        assert not presenter.actions()
+        assert len(transport.effects) == 1
+
+
+    def _assert_replacement_command_identity(commands, original):
+        assert len(commands) == 2 and original.replacement_id is not None
+
+
+    async def _assert_resolution_rejections(action, chosen, delivery, emit, emitted, request):
+        control = {
+            "type": "item_resolution",
+            "request_id": request.request_id,
+            "room": asdict(request.room),
+            "command_id": chosen.command_id,
+            "expected_revision": chosen.expected_revision,
+            "action": action.value,
+        }
+        await handle_delivery_control(DeliveryCoordinator(), control, emit)
+        assert not emitted[-1]["ok"]
+        await handle_delivery_control(delivery, {**control, "room": asdict(replace(request.room, seed="other"))}, emit)
+        assert not emitted[-1]["ok"]
+        await handle_delivery_control(delivery, {**control, "expected_revision": chosen.expected_revision + 99}, emit)
+        assert not emitted[-1]["ok"]
+        return control
+
+
+    async def _assert_planned_execution(delivery):
+        planned = await delivery.ledger.items(delivery.binding.room, -1, 1)
+        assert planned[0].reason_code.value == "execution"
+
+
     async def exercise(delivery, transport):
         transport.effect = 2
         await delivery.plan((command(delivery.context),))
-        planned = await delivery.ledger.items(delivery.binding.room, -1, 1)
-        assert planned[0].reason_code.value == "execution"
+        await _assert_planned_execution(delivery)
         await delivery.prepare("grant", b"a" * 64)
         await delivery.send("grant")
         sent = await delivery.ledger.items(delivery.binding.room, -1, 1)
-        assert sent[0].status.value == "waiting" and sent[0].reason_code.value == "confirmation"
+        _assert_sent_command_confirmation(sent)
         await delivery.recover("grant")
         presenter = ItemsPresenter()
         presenter.activate(delivery.binding.room, online=True)
@@ -367,24 +421,10 @@ def test_resolution_requires_owner_room_revision_and_keeps_player_evidence(owner
         chosen = next(entry for entry in presenter.actions(0) if entry.kind is action)
         presenter.select_action(chosen)
         request = presenter.confirm()
-        assert request is not None and presenter.confirm() is None
-        control = {
-            "type": "item_resolution",
-            "request_id": request.request_id,
-            "room": asdict(request.room),
-            "command_id": chosen.command_id,
-            "expected_revision": chosen.expected_revision,
-            "action": action.value,
-        }
-        await handle_delivery_control(DeliveryCoordinator(), control, emit)
-        assert not emitted[-1]["ok"]
-        await handle_delivery_control(delivery, {**control, "room": asdict(replace(request.room, seed="other"))}, emit)
-        assert not emitted[-1]["ok"]
-        await handle_delivery_control(delivery, {**control, "expected_revision": chosen.expected_revision + 99}, emit)
-        assert not emitted[-1]["ok"]
+        _assert_single_resolution_request(presenter, request)
+        control = await _assert_resolution_rejections(action, chosen, delivery, emit, emitted, request)
         await handle_delivery_control(delivery, control, emit)
-        assert emitted[-1]["ok"]
-        assert presenter.resolution_result(request.room, request.request_id, ok=True)
+        _assert_successful_resolution_reply(emitted, presenter, request)
         await handle_delivery_control(delivery, control, emit)
         assert emitted[-1]["ok"]
         original = await delivery.ledger.command(request.room, chosen.command_id)
@@ -395,12 +435,17 @@ def test_resolution_requires_owner_room_revision_and_keeps_player_evidence(owner
             assert presenter.model.rows[0].resolution is Resolution.ACCEPTED_BY_PLAYER
         else:
             commands = await delivery.ledger.commands(request.room, tuple(CommandState), None, 256)
-            assert len(commands) == 2 and original.replacement_id is not None
+            _assert_replacement_command_identity(commands, original)
         presenter.activate(request.room, online=False)
-        assert not presenter.actions()
-        assert len(transport.effects) == 1
+        _assert_offline_resolution_actions(presenter, transport)
 
     owner(exercise)
+
+
+def _assert_visible_setup_progress(ui):
+    assert ui.session_setup_detail.isVisible()
+    assert all(label.isVisible() for label in ui.play_view.milestones)
+    assert ui.play_view.rect().contains(ui.play_view.tabs.geometry())
 
 
 def test_play_keyboard_navigation_settings_and_progress_fit_window(ui):
@@ -422,9 +467,7 @@ def test_play_keyboard_navigation_settings_and_progress_fit_window(ui):
     QTest.keyClick(ui, Qt.Key.Key_P, Qt.KeyboardModifier.AltModifier)
     assert ui.pages.currentWidget() is ui.play_view
     dispatch_window(ui, {"type": "injector_started"})
-    assert ui.session_setup_detail.isVisible()
-    assert all(label.isVisible() for label in ui.play_view.milestones)
-    assert ui.play_view.rect().contains(ui.play_view.tabs.geometry())
+    _assert_visible_setup_progress(ui)
     option = 'env DOOM_AP_PATH="fixture path" %command%'
     dispatch_window(
         ui, {"type": "setup_ready", "adapter_state": "applied", "steam_launch_option": option, "meathook_ok": True}
@@ -437,6 +480,11 @@ def test_play_keyboard_navigation_settings_and_progress_fit_window(ui):
 @pytest.mark.parametrize("kind", list(ResolutionAction))
 def test_items_confirmation_uses_selected_ap_identity_and_disables_double_click(ui, owner, tmp_path, monkeypatch, kind):
     from PySide6.QtWidgets import QApplication, QMessageBox
+
+    def _assert_selected_item_resolution(delivery, kind, page, request):
+        assert request.room == delivery.binding.room
+        assert request.action == next(action for action in page.page[0].actions if action.kind is kind)
+
 
     async def exercise(delivery, transport):
         transport.effect = 2
@@ -475,8 +523,7 @@ def test_items_confirmation_uses_selected_ap_identity_and_disables_double_click(
             view.row_confirm[index][0].click()
         ui.controller.resolve_item.assert_called_once()
         request = ui.controller.resolve_item.call_args.args[0]
-        assert request.room == delivery.binding.room
-        assert request.action == next(action for action in page.page[0].actions if action.kind is kind)
+        _assert_selected_item_resolution(delivery, kind, page, request)
         presenter.activate(replace(request.room, seed="other"), online=False)
         view.render()
         assert not view.row_actions
@@ -488,11 +535,17 @@ def test_items_confirmation_uses_selected_ap_identity_and_disables_double_click(
     owner(exercise)
 
 
+def _assert_hidden_delivered_items(delivered, presenter, view, waiting):
+    assert not presenter.status(delivered)
+    assert presenter.status(waiting)
+    assert view.blocked.isHidden()
+
+
 def test_items_hide_delivered_status_and_filter_without_attention(ui):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QLabel
 
-    from doom_eap.runtime.ledger_records import ItemReason, ItemRow, ItemStatus
+    from doom_eap.runtime.ledger import ItemReason, ItemRow, ItemStatus
 
     presenter, view = ui.items_presenter, ui.items_view
     presenter.activate(ROOM, online=True)
@@ -500,9 +553,7 @@ def test_items_hide_delivered_status_and_filter_without_attention(ui):
     waiting = replace(delivered, ap_index=1, status=ItemStatus.WAITING)
     presenter.model = replace(presenter.model, rows=(delivered, waiting))
     view.render()
-    assert not presenter.status(delivered)
-    assert presenter.status(waiting)
-    assert view.blocked.isHidden()
+    _assert_hidden_delivered_items(delivered, presenter, view, waiting)
     marked = replace(delivered, resolution=Resolution.ACCEPTED_BY_PLAYER)
     assert presenter.status(marked)
     blocked = replace(waiting, status=ItemStatus.BLOCKED, reason_code=ItemReason.EFFECT_UNKNOWN)
@@ -522,7 +573,7 @@ def test_save_copy_contains_consistent_ledger_and_owner_reset_preserves_sources(
     from types import SimpleNamespace
 
     from doom_eap.launcher.launcher_session import APSessionOwner
-    from doom_eap.runtime.weapon_points import namespace_id
+    from doom_eap.runtime.inventory import namespace_id
 
     snapshot = SimpleNamespace(
         seed_name=ROOM.seed,

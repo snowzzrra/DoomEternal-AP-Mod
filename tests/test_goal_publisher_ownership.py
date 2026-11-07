@@ -9,9 +9,9 @@ import pytest
 from doom_eap.contracts.check_observation import CheckObservation
 from doom_eap.contracts.publisher_contracts import PublisherContract
 from doom_eap.contracts.save_observation import PrimarySaveSelection
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.goal_progress import GoalProgress
-from doom_eap.runtime.publisher_dispatch import PublisherDispatch
+from doom_eap.runtime.bridge_checks import CheckPublication
+from doom_eap.runtime.campaign import GoalProgress
+from doom_eap.runtime.observers import PublisherDispatch
 
 
 def owners():
@@ -32,6 +32,16 @@ def owners():
 
 
 def test_submitted_check_is_not_acknowledged_and_endpoint_fact_does_not_send_goal():
+    async def _assert_acknowledged_goal_publisher(acknowledged, acknowledgements, goals, messages, publication):
+        assert acknowledgements["test"]["0"] == {"strategy": "location_check", "location_id": 1}
+        assert not goals.sent and len(messages) == 1
+        assert await goals.evaluate("confirmed endpoint", frozenset({1}), acknowledged, publication)
+        assert messages[-1] == {"cmd": "StatusUpdate", "status": 30}
+        assert goals.sent
+        assert await goals.evaluate("duplicate", frozenset({1}), acknowledged, publication)
+        assert len(messages) == 2
+
+
     async def run():
         goals, publishers, contract, facts, acknowledgements = owners()
         messages, submitted = [], set()
@@ -48,13 +58,7 @@ def test_submitted_check_is_not_acknowledged_and_endpoint_fact_does_not_send_goa
         acknowledged = replace(facts, checked=frozenset({1}), submitted=frozenset({1}))
         publishers.observe_protocol(acknowledged)
         assert await publishers.execute(contract, "event", "source", publication, lambda: None)
-        assert acknowledgements["test"]["0"] == {"strategy": "location_check", "location_id": 1}
-        assert not goals.sent and len(messages) == 1
-        assert await goals.evaluate("confirmed endpoint", frozenset({1}), acknowledged, publication)
-        assert messages[-1] == {"cmd": "StatusUpdate", "status": 30}
-        assert goals.sent
-        assert await goals.evaluate("duplicate", frozenset({1}), acknowledged, publication)
-        assert len(messages) == 2
+        await _assert_acknowledged_goal_publisher(acknowledged, acknowledgements, goals, messages, publication)
 
     asyncio.run(run())
 

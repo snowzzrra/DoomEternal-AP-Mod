@@ -44,6 +44,16 @@ def bank_order(spec, map_index):
         (row for row in spec["mapFileRefs"] if row["map"] == map_index), key=lambda row: row["file"], reverse=True)]
 
 
+def _assert_restored_resource_map(base, before):
+    assert before == {path: path.read_bytes() for path in base.rglob('*') if path.is_file()}
+
+
+def _assert_donor_bank_priority(bank, original, projected, report):
+    assert bank_order(projected, 0) == ["base.resources", "shared.resources", bank]
+    assert bank_order(projected, 1) == bank_order(original, 1)
+    assert report["maps"][TARGET] == [bank]
+
+
 @pytest.mark.parametrize('family', ['recipes', 'compatibility_recipes', 'counter_recipes'])
 def test_native_donor_closure_keeps_destination_priority_and_restores_between_rooms(bank_room, family):
     base, original, plan = bank_room
@@ -53,12 +63,10 @@ def test_native_donor_closure_keeps_destination_priority_and_restores_between_ro
         stage[family] = stage['recipes']
         stage['recipes'] = [{'bodies': [{'species': 'zombie', 'ai': {'map_key': 'e1m1_intro'}}]}]
     updates, report = prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')
-    assert before == {path: path.read_bytes() for path in base.rglob('*') if path.is_file()}
+    _assert_restored_resource_map(base, before)
     projected = json.loads(updates["packagemapspec.json"])
     bank, = report['consolidated']
-    assert bank_order(projected, 0) == ["base.resources", "shared.resources", bank]
-    assert bank_order(projected, 1) == bank_order(original, 1)
-    assert report["maps"][TARGET] == [bank]
+    _assert_donor_bank_priority(bank, original, projected, report)
     (base / "packagemapspec.json").write_bytes(updates["packagemapspec.json"])
     assert prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')[0] == {}
     reordered = {**projected, "mapFileRefs": list(reversed(projected["mapFileRefs"]))}
@@ -67,8 +75,6 @@ def test_native_donor_closure_keeps_destination_priority_and_restores_between_ro
     normalized = json.loads(restored["packagemapspec.json"])
     assert normalized["files"] == original["files"] and normalized["maps"] == original["maps"]
     assert sorted(normalized["mapFileRefs"], key=lambda ref: (ref["map"], ref["file"])) == original["mapFileRefs"]
-
-
 
 
 @pytest.mark.parametrize("damage", ["missing", "traversal", "ownership"])
@@ -88,8 +94,6 @@ def test_native_resource_preparation_refuses_missing_banks_or_external_changes(b
     with pytest.raises(ValueError):
         prepare_native_resource_banks(base, plan, ROOTS, staging=base.parent / 'staging')
     assert (base / "packagemapspec.json").read_bytes() == before
-
-
 
 
 @pytest.mark.parametrize('after', [False, True])

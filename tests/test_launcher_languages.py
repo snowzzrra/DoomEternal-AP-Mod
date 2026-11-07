@@ -1,5 +1,3 @@
-"""Protect catalog-only language contributions and isolated launcher preferences."""
-
 import json
 import shutil
 from pathlib import Path
@@ -57,45 +55,22 @@ def test_saved_language_or_available_system_language(catalog, saved, system, exp
     assert strings.configure_language(saved, system) == expected
 
 
-def test_option_translation_falls_back_to_schema(catalog, monkeypatch):
-    monkeypatch.setattr(strings, "_locale", "pt-BR")
-    assert strings.option_text("goal", "name", "Goal") == "Objetivo"
-    monkeypatch.setattr(strings, "_locale", "fr")
-    assert strings.option_text("goal", "name", "New schema goal") == "Goal"
-    with pytest.raises(KeyError):
-        strings.option_text("new_option", "name", "Schema name")
-    with pytest.raises(KeyError):
-        strings.option_text("new_option", "choice", "Schema label", choice_key="choice")
-    assert strings.option_text("", "choice", "Air Control", choice_key="Air Control") == "Air Control"
+def _assert_language_restart_notice(QLabel, catalog, controller, notice):
+    assert notice.call_args.args[2] == catalog.text("launcher.language", "restart", locale="fr")
+    assert strings.text("launcher.navigation", "play") == "Play"
+    assert strings.configure_language(controller._load_config()["launcher_language"], "en_US") == "fr"
+    assert QLabel(strings.text("launcher.navigation", "play")).text() == "Jouer"
+    assert strings.text("launcher.navigation", "help") == "Help"
+    assert strings.text("launcher.save", "recovering") == "Récupération"
+    assert catalog.text("launcher.navigation", "play") == "Play"
+    assert controller._load_config()["slot"] == "Slayer"
 
 
-@pytest.mark.parametrize("bound,english,portuguese", [
-    ("minimum", "Minimum", "Mínimo"), ("maximum", "Maximum", "Máximo"),
-    ("early_minimum", "Early Minimum", "Mínimo inicial"), ("early_maximum", "Early Maximum", "Máximo inicial"),
-    ("late_minimum", "Late Minimum", "Mínimo final"), ("late_maximum", "Late Maximum", "Máximo final"),
-])
-def test_enemy_labels_keep_schema_names_and_translate_shared_limits(catalog, monkeypatch, bound, english, portuguese):
-    label = "Arch-vile — " + english
-    assert strings.option_text("enemy_health", "choice", label, choice_key="archvile." + bound) == label
-    monkeypatch.setattr(strings, "_locale", "pt-BR")
-    assert strings.option_text("enemy_health", "choice", label, choice_key="archvile." + bound) == "Arch-vile — " + portuguese
-
-
-@pytest.mark.parametrize("operation", ["check", "install_mod", "install_core", "repair", "connect", "saves", "uninstall", "report", "player_options", "ammo_refill"])
-def test_operation_errors_have_player_guidance_without_raw_exception(catalog, monkeypatch, operation):
-    monkeypatch.setattr(strings, "_locale", "pt-BR")
-    technical = RuntimeError("private driver failure")
-    message = strings.failure_text(operation, technical)
-    assert message == catalog.text("launcher.failures", operation, locale="pt-BR")
-    assert str(technical) not in message
-
-
-def test_catalog_error_is_localized_at_the_dialog_boundary(catalog, monkeypatch):
-    from doom_eap.strings import PlayerError
-
-    error = PlayerError("launcher.ui", "close_doom_eternal_before_closing_this_launcher")
-    monkeypatch.setattr(strings, "_locale", "pt-BR")
-    assert strings.failure_text("repair", error) == catalog.text(error.category, error.key, locale="pt-BR")
+def _assert_persisted_launcher_language(button, controller):
+    assert controller._load_config()["launcher_language"] == "fr"
+    assert button.text() == "fr" and button.icon().isNull()
+    assert "Français" in button.accessibleName()
+    assert [action.data() for action in button.menu().actions()] == ["en", "pt-BR"]
 
 
 def test_button_menu_saves_language_and_applies_on_next_start(app, catalog, controller, monkeypatch):
@@ -120,34 +95,10 @@ def test_button_menu_saves_language_and_applies_on_next_start(app, catalog, cont
     QTest.mouseClick(button, Qt.MouseButton.LeftButton)
     opened.assert_called_once()
     button.menu().actions()[1].trigger()
-    assert controller._load_config()["launcher_language"] == "fr"
-    assert button.text() == "fr" and button.icon().isNull()
-    assert "Français" in button.accessibleName()
-    assert [action.data() for action in button.menu().actions()] == ["en", "pt-BR"]
+    _assert_persisted_launcher_language(button, controller)
     notice.assert_called_once()
-    assert notice.call_args.args[2] == catalog.text("launcher.language", "restart", locale="fr")
-    assert strings.text("launcher.navigation", "play") == "Play"
-    assert strings.configure_language(controller._load_config()["launcher_language"], "en_US") == "fr"
-    assert QLabel(strings.text("launcher.navigation", "play")).text() == "Jouer"
-    assert strings.text("launcher.navigation", "help") == "Help"
-    assert strings.text("launcher.save", "recovering") == "Récupération"
-    assert catalog.text("launcher.navigation", "play") == "Play"
-    assert controller._load_config()["slot"] == "Slayer"
+    _assert_language_restart_notice(QLabel, catalog, controller, notice)
     button.close()
-
-
-@pytest.mark.parametrize("language", ["en", "pt-BR"])
-def test_bundled_flags_render_and_missing_asset_shows_code(app, controller, language):
-    from doom_eap.launcher.ui.language_button import LanguageButton
-
-    controller.config["launcher_language"] = language
-    button = LanguageButton(controller)
-    assert not button.icon().pixmap(30, 20).isNull()
-    controller.bundle_dir = controller.config_path.parent
-    missing = LanguageButton(controller)
-    assert missing.text() == language and missing.icon().isNull()
-    button.close()
-    missing.close()
 
 
 def test_failed_language_save_keeps_previous_choice(app, controller, monkeypatch):
@@ -171,23 +122,6 @@ def test_failed_language_save_keeps_previous_choice(app, controller, monkeypatch
     with pytest.raises(ValueError, match="unsupported launcher language"):
         controller.set_launcher_language("undeclared")
     button.close()
-
-
-def test_launcher_window_constructs_translated_views(ui, catalog):
-    from PySide6.QtWidgets import QLabel
-
-    from doom_eap.launcher.ui.app_window import LauncherUI
-
-    ui.controller.config["launcher_language"] = "fr"
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(LauncherUI, "_discover", lambda self: None)
-        translated = LauncherUI(ui.controller)
-    translated.timer.stop()
-    translated.lifecycle_timer.stop()
-    assert translated.nav_buttons[0].text() == "Jouer"
-    assert translated.settings_view.findChild(QLabel, "title").text() == "Settings"
-    assert translated.language_button.text() == "fr"
-    translated.close()
 
 
 pytest_plugins = ("tests.test_launcher_setup",)

@@ -13,20 +13,28 @@ from doom_eap.content import enemy_plan, native_enemy_plan, native_enemy_safety
 from doom_eap.content.enemy_options import normalize_enemy_options
 from doom_eap.content.recipe_codec import decode_recipes, encode_recipes
 from doom_eap.content.slot_data_contract import (
-    LimitSet, Population, catalog_tables, load_slot_catalog, validate_slot_data,
+    LimitSet,
+    Population,
+    catalog_tables,
+    load_slot_catalog,
+    validate_slot_data,
 )
 from doom_eap.launcher.launcher_core import RoomCompiler, RoomSnapshot, SeedManifest
-from doom_eap.runtime import context_registry as registry
+from doom_eap.runtime import observers as registry
+from tests.room_fixture import sample_slot, sign_slot
 from tests.test_cross_repo_acceptance import (
-    COMPACT, ENEMIES, ap_source, compiler, generated, scratch, without_authoring_maps,
+    COMPACT,
+    ENEMIES,
+    without_authoring_maps,
 )
-from tests.test_slot_data_contract import sample_slot, sign_slot
 from tools.maps.native_recipe_materializer import (
-    RecipeMaterializationError, expand_resolved_native_recipes, materialize_resolved_timers,
+    RecipeMaterializationError,
+    expand_resolved_native_recipes,
+    materialize_resolved_timers,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-KEY = 'e1m3_cult'
+KEY = "e1m3_cult"
 
 
 def installed_slot(catalog, recipes, stages):
@@ -120,14 +128,28 @@ def with_body_limits(resolved_input):
 def test_each_body_keeps_its_own_limit_set(resolved_input):
     data, catalog, row, limits = with_body_limits(resolved_input)
     plan = expand_resolved_native_recipes(validate_slot_data(data, catalog), catalog)
-    recipe = next(recipe for recipe in plan['maps'][KEY]['recipes']
-                  if recipe['id'] == catalog_tables(catalog)['sources'][row.source_ref]['source_id'])
-    first, second = recipe['bodies'][:2]
-    assert first['special_limits'] == dict(marauder=1, archvile=2, spirit=3, combined_special=4)
-    assert first['population_limits'] == dict(scope=123, maximum=8, heavy=3, superheavy=2, pressure=8,
-        mixed=0, strict=True, counter=None, species=dict(limits.population.species_caps))
-    assert first['definition'] != second['definition']
-    assert second['special_limits'] == dict(zip(('marauder', 'archvile', 'spirit', 'combined_special'), row.bodies[1].limits.special))
+    recipe = next(
+        recipe
+        for recipe in plan["maps"][KEY]["recipes"]
+        if recipe["id"] == catalog_tables(catalog)["sources"][row.source_ref]["source_id"]
+    )
+    first, second = recipe["bodies"][:2]
+    assert first["special_limits"] == dict(marauder=1, archvile=2, spirit=3, combined_special=4)
+    assert first["population_limits"] == dict(
+        scope=123,
+        maximum=8,
+        heavy=3,
+        superheavy=2,
+        pressure=8,
+        mixed=0,
+        strict=True,
+        counter=None,
+        species=dict(limits.population.species_caps),
+    )
+    assert first["definition"] != second["definition"]
+    assert second["special_limits"] == dict(
+        zip(("marauder", "archvile", "spirit", "combined_special"), row.bodies[1].limits.special, strict=False)
+    )
 
 
 @pytest.mark.parametrize('enabled', [True, False])

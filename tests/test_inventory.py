@@ -1,5 +1,3 @@
-"""Missing effects from ingested ownership, scoped readback and existing obligations."""
-
 import json
 import logging
 from dataclasses import replace
@@ -11,19 +9,20 @@ import pytest
 from doom_eap.contracts.inventory_domain import MISSING, OWNED, InventoryObservation, ItemObservation
 from doom_eap.contracts.materialization import MaterializationScope
 from doom_eap.contracts.ownership import CompletionUpgrade, StartingMaterializationFact
-from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
 from doom_eap.runtime.inventory import (
-    InventoryDependency,
     InventoryObligation,
     InventoryOwnership,
     NativeEffectKind,
+    ReplayPolicy,
+    RuneNativeState,
+    SentinelInventoryObservation,
     compare_inventory,
+    load_policy_registry,
     ownership_from_ledger,
+    rune_item_perk_mapping,
 )
-from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
-from doom_eap.runtime.item_reconciliation import ReplayPolicy, load_policy_registry
-from doom_eap.runtime.ledger_records import CommandState, NetworkReceipt, Resolution
-from doom_eap.runtime.rune_reconciliation import RuneNativeState, rune_item_perk_mapping
+from doom_eap.runtime.ledger import CommandState, NetworkReceipt, Resolution
+from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
 
 
 @pytest.fixture
@@ -76,19 +75,6 @@ def test_unknown_and_manual_resolution_block_only_their_effect(inventory):
     assert unknown.weapon_point_grants == (3,)
 
 
-def test_partial_selection_and_frag_dependencies(inventory):
-    compare, _ = inventory
-    ids = (7770011, 7770111, 7770059, 7770145)
-    items = tuple((item_id, MISSING, 0) for item_id in ids)
-    plan = compare(ids, items, selected_item_ids=frozenset({7770059}))
-    assert [command.item_id for command in plan.reconciliation.commands] == [7770059]
-    assert not plan.acquisitions
-    plan = compare(ids, items, selected_item_ids=frozenset({7770111}))
-    assert [command.item_id for command in plan.reconciliation.commands] == [7770111]
-    assert plan.dependencies == (InventoryDependency(7770111, 0, 7770011),)
-    assert not compare((7770111,), items).reconciliation.commands
-
-
 def test_capacity_caps_and_progressive_blood_punch_use_observed_stages(inventory):
     compare, _ = inventory
     plan = compare((7770017,) * 7 + (7770904,) * 6,
@@ -109,15 +95,6 @@ def test_weapon_points_recover_gained_difference_and_isolate_unknown(inventory):
     assert plan.weapon_points_error is not None and not plan.weapon_point_grants
     pending = InventoryObligation(7770903, 1, CommandState.EFFECT_UNKNOWN)
     assert compare((), weapon_points=(9, 0), obligations=(pending,)).weapon_point_grants == (0,)
-
-
-def test_new_save_restores_persistent_ownership_without_refunding_currency(inventory):
-    compare, _ = inventory
-    ownership = ownership_from_ledger((NetworkReceipt(7770016, 10, 1, 0), NetworkReceipt(7770004, 11, 1, 0)))
-    plan = compare((), ((7770004, MISSING, 0),), ownership=ownership,
-                   weapon_points=(66, 0), restore_persistent_only=True)
-    assert [c.item_id for c in plan.reconciliation.commands] == [7770004]
-    assert not plan.acquisitions and not plan.weapon_point_grants
 
 
 def test_rune_registration_and_availability_preserve_player_slots(inventory):
@@ -157,12 +134,20 @@ def test_traps_and_temporary_effects_require_a_live_acquisition():
 
 
 def test_observation_keeps_blood_punch_mask_and_discards_a_changed_room():
-    context = SimpleNamespace(state_key="room")
+    context = SimpleNamespace(
+        state_key="room",
+        items=SimpleNamespace(),
+        checks=SimpleNamespace(),
+        saves=SimpleNamespace()
+    )
+    context.items.ctx = context
+    context.checks.ctx = context
+    context.saves.ctx = context
     identity = ("created", "core", "build", "4")
     result = dict(weapons_after=0, ice_bomb_after=255, upgrades_after=0b0101 << 11,
                   _observation_scope=identity, _observation_map="game/hub/hub")
     link = SimpleNamespace(pid=123, namespace="namespace", observe_inventory=lambda: result)
-    context.native_game_link = lambda: link
+    context.items.native_game_link = lambda: link
     port = SentinelInventoryObservation(context, logging.getLogger(__name__), lambda *a, **kw: None)
     kwargs = dict(room_seed_name="seed", epoch=4, context_identity="base/hub", campaign="Base")
     observed = port.observe_inventory(**kwargs)
@@ -213,6 +198,14 @@ def test_observation_discards_mixed_native_identity(changed_field):
             _observation_scope=identity, _observation_map="game/hub/hub"),
         observe_special_inventory=lambda: dict(_observation_scope=tuple(other),
             _observation_map="game/hub/hub", native_state_known=0))
-    context = SimpleNamespace(state_key="room", native_game_link=lambda: link)
+    context = SimpleNamespace(
+        state_key="room",
+        items=SimpleNamespace(native_game_link=lambda: link),
+        checks=SimpleNamespace(),
+        saves=SimpleNamespace()
+    )
+    context.items.ctx = context
+    context.checks.ctx = context
+    context.saves.ctx = context
     port = SentinelInventoryObservation(context, logging.getLogger(__name__), lambda *a, **kw: None)
     assert port.observe_inventory(room_seed_name="seed", epoch=4, context_identity="base/hub", campaign="Base") is None

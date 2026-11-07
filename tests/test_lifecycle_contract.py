@@ -1,8 +1,8 @@
-"""The lifecycle domain imports and runs without registry/configuration discovery."""
+"""Lifecycle decisions use supplied context evidence."""
 
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 
 def test_lifecycle_is_independent_of_registry_discovery():
@@ -10,9 +10,9 @@ def test_lifecycle_is_independent_of_registry_discovery():
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
+from doom_eap.runtime.observers import RuntimeLifecycle
+from doom_eap.contracts.runtime_context import RuntimeContext, canonical_map_name
 with patch.object(Path, "read_text", side_effect=AssertionError("unexpected discovery")):
-    from doom_eap.runtime.lifecycle import RuntimeLifecycle
-    from doom_eap.contracts.runtime_context import RuntimeContext, canonical_map_name
     lifecycle = RuntimeLifecycle()
     context = RuntimeContext("base", "Base", ("game/hub/hub",), ("hub",), frozenset())
     assert lifecycle.bind_context(context) == ("Unknown", "Base")

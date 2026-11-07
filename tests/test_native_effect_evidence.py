@@ -39,24 +39,22 @@ from doom_eap.contracts.inventory_domain import (
     SuitStage,
 )
 from doom_eap.contracts.materialization import MaterializationScope
-from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
 from doom_eap.runtime.inventory import (
     InventoryObligation,
     InventoryOwnership,
+    SentinelInventoryObservation,
     compare_inventory,
     currency_delta,
-    effect_confirmed,
-    ownership_from_ledger,
-)
-from doom_eap.runtime.inventory_observation import (
-    SentinelInventoryObservation,
     currency_grant_result,
     currency_observation,
+    effect_confirmed,
+    load_policy_registry,
     mission_access_observation,
+    ownership_from_ledger,
     progression_observation,
 )
-from doom_eap.runtime.item_reconciliation import load_policy_registry
 from doom_eap.runtime.ledger import CommandState, Conflict, NetworkReceipt
+from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
 
 owner = delivery_support.owner
 inventory = inventory_support.inventory
@@ -368,6 +366,19 @@ def test_retained_result_proves_original_key_after_map_change(owner):
     owner(check)
 
 
+def _assert_decoded_progression(progression):
+    assert progression.suit == PerkStages(63, 45)
+    assert progression.slayer_key_quantity == 2
+    assert progression.meat_hook is EffectProof.PRESENT
+    assert not progression.masteries
+
+
+def _assert_wire_round_trip(data, item):
+    assert len(data) == item["size"]
+    assert hashlib.sha256(data).hexdigest() == item["sha256"]
+    assert codec.encode(item["type"], codec.decode(item["type"], data)) == data
+
+
 def test_shared_wire_results_round_trip_and_keep_proof_limits():
     for item in currency_payloads():
         data = bytes.fromhex(item["hex"])
@@ -378,14 +389,9 @@ def test_shared_wire_results_round_trip_and_keep_proof_limits():
     for item in evidence_fixtures().values():
         if item["type"] in codec.TYPES:
             data = bytes.fromhex(item["hex"])
-            assert len(data) == item["size"]
-            assert hashlib.sha256(data).hexdigest() == item["sha256"]
-            assert codec.encode(item["type"], codec.decode(item["type"], data)) == data
+            _assert_wire_round_trip(data, item)
     progression = progression_observation(evidence_result("progression_result"))
-    assert progression.suit == PerkStages(63, 45)
-    assert progression.slayer_key_quantity == 2
-    assert progression.meat_hook is EffectProof.PRESENT
-    assert not progression.masteries
+    _assert_decoded_progression(progression)
     mission = mission_access_observation(evidence_result("mission_access_result"))
     assert effect_confirmed(EffectExpectation(b"ref", mission.menu_scope,
                             MissionAccess(mission.revision, mission.stage_id, mission.map_name)), mission)
@@ -421,6 +427,14 @@ def wire_for_scope(result, scope):
 @pytest.mark.parametrize("amount", [1, 2])
 @pytest.mark.parametrize("capability", [False, True])
 def test_battery_selects_one_route_and_persists_wire_proof_before_ack(owner, amount, capability):
+    def _assert_battery_effect_plan(capability, plan):
+        assert plan.kind == ("currencies" if capability else "command")
+
+
+    def _assert_confirmed_battery_evidence(capability, row):
+        assert row.state is (CommandState.CONFIRMED if capability else CommandState.EFFECT_UNKNOWN)
+
+
     async def check(delivery, transport):
         scope = delivery._evidence_scope(delivery.context, b"a" * 64)
         baseline = wire_for_scope(evidence_result("currency_result"), scope)
@@ -437,7 +451,7 @@ def test_battery_selects_one_route_and_persists_wire_proof_before_ack(owner, amo
                            {"entity": "ap_rpc_v3_7770016"}))
         await delivery.plan_battery(fallback, amount, b"a" * 64)
         plan = (await delivery.ledger.command(delivery.binding.room, "grant")).plan
-        assert plan.kind == ("currencies" if capability else "command")
+        _assert_battery_effect_plan(capability, plan)
         if capability:
             assert codec.decode_variant(53, 1, plan.payload) == (1, dict(currency=4, amount=amount, expected_gained=7))
         prepared = await delivery.prepare("grant", b"a" * 64)
@@ -454,7 +468,7 @@ def test_battery_selects_one_route_and_persists_wire_proof_before_ack(owner, amo
         transport.commands[prepared.reference] = replace(transport.commands[prepared.reference], result=result)
         await delivery.recover("grant")
         row = await delivery.ledger.command(delivery.binding.room, "grant")
-        assert row.state is (CommandState.CONFIRMED if capability else CommandState.EFFECT_UNKNOWN)
+        _assert_confirmed_battery_evidence(capability, row)
         if capability:
             assert json.loads(row.result)["expectation"]["reference"] == prepared.reference.hex()
         assert "ack" not in transport.calls
@@ -498,47 +512,58 @@ def test_coordinator_collects_shared_progression_and_mission_evidence(owner, fam
     owner(check)
 
 
+def _assert_collected_progression_and_currencies(changed, observation, reads):
+    assert observation.progression.suit == PerkStages(63, 45)
+    assert observation.get_state(7770083) == "owned"
+    assert set(observation.currencies.values) == set(Currency)
+    assert observation.currencies.values[Currency.SENTINEL_BATTERY].balance == (None if changed == "invalid" else 0)
+    assert reads == [54, 53, 53, 53, 53]
+
+
+async def _collect_crossed_snapshot(changed):
+    progression = evidence_result("progression_result")
+    scope = progression_observation(progression).after_scope
+    context = SimpleNamespace(state_key="room")
+    result = dict(weapons_after=0, ice_bomb_after=255,
+                  _observation_scope=(str(scope.process_created), scope.core_instance, "build", str(scope.generation)),
+                  _observation_map=scope.map_name, _observation_save_binding=scope.save_binding)
+    link = SimpleNamespace(pid=scope.pid, namespace=scope.namespace, observe_inventory=lambda: result)
+    reads = []
+    observe = _native_observer(changed, context, progression, reads)
+    port = SentinelInventoryObservation(context, logging.getLogger(__name__), lambda *args, **kwargs: None)
+    observation = await port.observe_native(SimpleNamespace(observe=observe), scope.namespace.encode(), bytes(16),
+                                           room_seed_name="seed", epoch=1, context_identity="base/hub",
+                                           campaign="Base", link=link)
+    if changed in ("generation", "room"):
+        assert observation is None
+        return
+    if changed == "legacy":
+        assert observation.progression is None and observation.currencies is None
+        return
+    _assert_collected_progression_and_currencies(changed, observation, reads)
+
+
+def _native_observer(changed, context, progression, reads):
+    async def observe(command_type, namespace, binding, **payload):
+        reads.append(command_type)
+        if changed == "legacy":
+            return None
+        if command_type == 54:
+            return progression
+        currency = evidence_result("currency_result")
+        currency.update(currency=payload["currency"], balance_after=0)
+        if changed == "generation":
+            currency["after_scope"]["process"]["lifecycle_generation"] += 1
+        if changed == "room":
+            context.state_key = "another-room"
+        if changed == "invalid":
+            currency["flags"] = 0
+        return currency
+    return observe
+
+
 @pytest.mark.parametrize("changed", [None, "generation", "room", "invalid", "legacy"])
 def test_async_collection_keeps_wire_values_and_rejects_crossed_snapshots(changed):
-    async def check():
-        progression = evidence_result("progression_result")
-        scope = progression_observation(progression).after_scope
-        context = SimpleNamespace(state_key="room")
-        result = dict(weapons_after=0, ice_bomb_after=255,
-                      _observation_scope=(str(scope.process_created), scope.core_instance, "build", str(scope.generation)),
-                      _observation_map=scope.map_name, _observation_save_binding=scope.save_binding)
-        link = SimpleNamespace(pid=scope.pid, namespace=scope.namespace, observe_inventory=lambda: result)
-        reads = []
 
-        async def observe(command_type, namespace, binding, **payload):
-            reads.append(command_type)
-            if changed == "legacy":
-                return None
-            if command_type == 54:
-                return progression
-            currency = evidence_result("currency_result")
-            currency.update(currency=payload["currency"], balance_after=0)
-            if changed == "generation":
-                currency["after_scope"]["process"]["lifecycle_generation"] += 1
-            if changed == "room":
-                context.state_key = "another-room"
-            if changed == "invalid":
-                currency["flags"] = 0
-            return currency
 
-        port = SentinelInventoryObservation(context, logging.getLogger(__name__), lambda *args, **kwargs: None)
-        observation = await port.observe_native(SimpleNamespace(observe=observe), scope.namespace.encode(), bytes(16),
-                                               room_seed_name="seed", epoch=1, context_identity="base/hub",
-                                               campaign="Base", link=link)
-        if changed in ("generation", "room"):
-            assert observation is None
-            return
-        if changed == "legacy":
-            assert observation.progression is None and observation.currencies is None
-            return
-        assert observation.progression.suit == PerkStages(63, 45)
-        assert observation.get_state(7770083) == "owned"
-        assert set(observation.currencies.values) == set(Currency)
-        assert observation.currencies.values[Currency.SENTINEL_BATTERY].balance == (None if changed == "invalid" else 0)
-        assert reads == [54, 53, 53, 53, 53]
-    asyncio.run(check())
+    asyncio.run(_collect_crossed_snapshot(changed))

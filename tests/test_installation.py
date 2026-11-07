@@ -3,6 +3,7 @@ from dataclasses import replace
 
 import pytest
 
+from doom_eap.launcher import launcher_injector, launcher_platform
 from doom_eap.launcher import launcher_platform as platform
 from doom_eap.launcher.install_journal import InstallationRecoveryRequired, InstallJournal, InstallPhase, file_digest
 from doom_eap.launcher.installation import (
@@ -19,7 +20,8 @@ def installation(tmp_path, monkeypatch):
     from doom_eap.launcher import installation_adapters
 
     monkeypatch.setattr(installation_adapters, "_read_processes", lambda: ())
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: ())
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: ())
     root = tmp_path / "game"
     (root / "base").mkdir(parents=True)
     (root / "Mods").mkdir()
@@ -52,11 +54,11 @@ def installation(tmp_path, monkeypatch):
     calls = []
 
     def prepare(journal):
-        platform.stage_room_mod(generated, root, receipt, manifest_hash="room", journal=journal)
+        launcher_injector.stage_room_mod(generated, root, receipt, manifest_hash="room", journal=journal)
 
     def inject():
         calls.append("inject")
-        return InstallationOutcome(platform.AdapterResult("applied", "installed", returncode=0))
+        return InstallationOutcome(launcher_injector.AdapterResult("applied", "installed", returncode=0))
 
     def session(journal):
         calls.append("session")
@@ -154,6 +156,14 @@ def test_completed_installation_resumes_interrupted_cleanup(installation, monkey
     assert calls == ["inject", "session"]
 
 
+def _assert_rollback_preserves_sources(bank, calls, injected, originals, owned, untouched):
+    assert {path: path.read_bytes() for path in owned} == originals
+    assert not bank.exists()
+    assert untouched.stat().st_size == 128 * 1024 * 1024
+    assert all(path.read_bytes() == b'injector changed it' for path in injected)
+    assert calls == ['inject', 'session']
+
+
 def test_rollback_restores_launcher_writes_without_copying_injector_files(installation, monkeypatch):
     from doom_eap.launcher import install_journal
 
@@ -212,11 +222,7 @@ def test_rollback_restores_launcher_writes_without_copying_injector_files(instal
     journal.load()
     assert {entry['path'] for entry in journal.document['files']} == {str(path) for path in [*owned[:-1], bank]}
     journal.rollback()
-    assert {path: path.read_bytes() for path in owned} == originals
-    assert not bank.exists()
-    assert untouched.stat().st_size == 128 * 1024 * 1024
-    assert all(path.read_bytes() == b'injector changed it' for path in injected)
-    assert calls == ['inject', 'session']
+    _assert_rollback_preserves_sources(bank, calls, injected, originals, owned, untouched)
 
 
 def test_late_confirmation_and_repeated_click_do_not_reinject(installation):
@@ -225,7 +231,7 @@ def test_late_confirmation_and_repeated_click_do_not_reinject(installation):
     def inject():
         calls.append("inject")
         return InstallationOutcome(
-            platform.AdapterResult(
+            launcher_injector.AdapterResult(
                 "applied", "installed", returncode=0, details={"installation_mode": "windows_injector_assisted"}
             )
         )
@@ -274,7 +280,7 @@ def test_preparation_failure_restores_core_and_staging(installation, tmp_path):
     fixture(core)
 
     def prepare(journal):
-        platform.install_meathook(
+        launcher_injector.install_meathook(
             plan.game_root,
             None,
             state_dir=plan.state_dir,
@@ -320,7 +326,8 @@ def workflow_installation(tmp_path, monkeypatch):
     from tests.test_core_distribution import fixture
     from tests.test_install_workflow import _snapshot
 
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: ())
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: ())
     monkeypatch.setattr(installation_adapters, "_read_processes", lambda: ())
     game = tmp_path / "game"
     (game / "base").mkdir(parents=True)
@@ -356,16 +363,16 @@ def workflow_installation(tmp_path, monkeypatch):
     monkeypatch.setattr(integration, "RoomCompiler", Compiler)
     tools = tmp_path / "tools"
     tools.mkdir()
-    for name in (*platform.WINDOWS_INJECTOR_REQUIRED_MEMBERS, "InjectorShell"):
+    for name in (*launcher_injector.WINDOWS_INJECTOR_REQUIRED_MEMBERS, "InjectorShell"):
         path = tools / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"test injector")
 
     def acquire(manager, spec, **kwargs):
-        executable = tools / ("EternalModInjector.bat" if spec is platform.WINDOWS_MOD_INJECTOR else "InjectorShell")
-        return platform.InstalledDependency(spec.name, spec.version, "a" * 64, "fixture", str(tools), str(executable))
+        executable = tools / ("EternalModInjector.bat" if spec is launcher_injector.WINDOWS_MOD_INJECTOR else "InjectorShell")
+        return launcher_injector.InstalledDependency(spec.name, spec.version, "a" * 64, "fixture", str(tools), str(executable))
 
-    monkeypatch.setattr(platform.DependencyManager, "acquire", acquire)
+    monkeypatch.setattr(launcher_injector.DependencyManager, "acquire", acquire)
     calls = []
 
     def run(*args, **kwargs):
@@ -386,12 +393,12 @@ def workflow_installation(tmp_path, monkeypatch):
         def communicate(self, **kwargs):
             return "output", ""
 
-    monkeypatch.setattr(platform.subprocess, "run", run)
-    monkeypatch.setattr(platform.subprocess, "Popen", Process)
+    monkeypatch.setattr(launcher_platform.subprocess, "run", run)
+    monkeypatch.setattr(launcher_platform.subprocess, "Popen", Process)
     monkeypatch.setattr(integration, "finalize_mod_installation", lambda root, staged, result, **kw: result)
 
     def verified(root, staged, result, **kwargs):
-        return platform.AdapterResult(
+        return launcher_injector.AdapterResult(
             "applied",
             result.message,
             command=result.command,
@@ -409,13 +416,19 @@ def workflow_installation(tmp_path, monkeypatch):
     from doom_eap.launcher import campaign_resources
 
     monkeypatch.setattr(campaign_resources, "installed_resource_fingerprints", lambda root: {"resource": "digest"})
-    monkeypatch.setattr(platform, "verify_linux_mod_installation", lambda *a, **kw: {"state": "verified"})
-    monkeypatch.setattr(integration, "verify_linux_mod_installation", platform.verify_linux_mod_installation)
+    monkeypatch.setattr(launcher_injector, "verify_linux_mod_installation", lambda *a, **kw: {"state": "verified"})
+    monkeypatch.setattr(integration, "verify_linux_mod_installation", launcher_injector.verify_linux_mod_installation)
     snapshot = _snapshot()
     config = state / "config.json"
     config.write_text(json.dumps({"doom_base_dir": str(game / "base")}))
     owner = Mock()
     return integration, game, app, state, config, snapshot, owner, calls
+
+
+def _assert_completed_install_transaction(calls, journal, record, state):
+    assert journal.phase is InstallPhase.COMPLETE
+    assert json.loads((state / "launcher_setup.json").read_text())["transaction_id"] == record.transaction_id
+    assert calls == ["inject"]
 
 
 @pytest.mark.parametrize("system", ["windows", "linux"])
@@ -436,9 +449,7 @@ def test_workflow_runs_complete_transaction_and_reuses_installation(workflow_ins
     assert record.adapter_state == "applied"
     journal = InstallJournal(game, (state / "launcher_setup.json", app / "ap_config.json"))
     journal.load()
-    assert journal.phase is InstallPhase.COMPLETE
-    assert json.loads((state / "launcher_setup.json").read_text())["transaction_id"] == record.transaction_id
-    assert calls == ["inject"]
+    _assert_completed_install_transaction(calls, journal, record, state)
     if system == "linux":
         finished = next(payload for kind, payload in events if kind == "injector_finished")
         assert finished["stdout"] == "output"
@@ -446,6 +457,11 @@ def test_workflow_runs_complete_transaction_and_reuses_installation(workflow_ins
     workflow.execute(snapshot)
     assert calls == ["inject"]
     assert owner.prepare.call_count == 2
+
+
+def _assert_injector_wait_preserves_files(app, before, calls, game, owner, state):
+    assert before == {path: file_digest(path) for root in (game, app, state) for path in root.rglob("*") if path.is_file()}
+    assert not calls and not owner.prepare.called
 
 
 @pytest.mark.parametrize("process", ["injector", "child", "inspection_error"])
@@ -487,8 +503,7 @@ def test_workflow_waits_for_injector_before_recovering_prepared_installation(
     monkeypatch.setattr(installation_adapters, "_read_processes", processes)
     with pytest.raises(InstallationRecoveryRequired):
         workflow.execute(snapshot)
-    assert before == {path: file_digest(path) for root in (game, app, state) for path in root.rglob("*") if path.is_file()}
-    assert not calls and not owner.prepare.called
+    _assert_injector_wait_preserves_files(app, before, calls, game, owner, state)
     monkeypatch.setattr(installation_adapters, "_read_processes", lambda: ())
     assert workflow.execute(snapshot).adapter_state == "applied"
     assert injected.read_bytes() == b"injector changed it"
@@ -561,7 +576,7 @@ def test_restart_during_core_replacement(installation, monkeypatch, tmp_path, na
     fixture(core)
 
     def prepare(journal):
-        platform.install_meathook(
+        launcher_injector.install_meathook(
             plan.game_root,
             None,
             state_dir=plan.state_dir,
@@ -585,7 +600,7 @@ def test_restart_during_core_replacement(installation, monkeypatch, tmp_path, na
     if another_profile:
         plan = replace(plan, state_dir=tmp_path / "another-profile")
     InstallationService().execute(plan, replace(actions, prepare=prepare))
-    assert platform.probe_meathook(plan.game_root).ok
+    assert launcher_injector.probe_meathook(plan.game_root).ok
     assert calls.count("inject") == 1
     assert not (plan.game_root / "sentinel-core-update.txt").exists()
 
@@ -612,7 +627,7 @@ def test_interrupted_injector_requires_retry_after_processes_stop(installation, 
 
     def inject():
         calls.append("inject")
-        with platform.prepare_injector_resources(plan.game_root) as hold:
+        with launcher_injector.prepare_injector_resources(plan.game_root) as hold:
             hold.start_injector()
             raise SystemExit("launcher exited")
 
@@ -630,9 +645,9 @@ def test_interrupted_injector_requires_retry_after_processes_stop(installation, 
         InstallationService().execute(plan, actions, retry=True)
     assert not banks.exists() and calls == ['inject']
     with pytest.raises(InstallationRecoveryRequired):
-        platform.install_meathook(plan.game_root, None, consent=lambda _: False)
+        launcher_injector.install_meathook(plan.game_root, None, consent=lambda _: False)
     with pytest.raises(InstallationRecoveryRequired):
-        platform.stage_room_mod(plan.generated, plan.game_root, plan.receipt_path, manifest_hash="room")
+        launcher_injector.stage_room_mod(plan.generated, plan.game_root, plan.receipt_path, manifest_hash="room")
     before = plan.config_path.read_bytes()
     with pytest.raises(InstallationRecoveryRequired):
         LaunchWorkflow.write_client_config(
@@ -653,7 +668,7 @@ def test_explicit_retry_runs_only_a_finished_failed_injector(installation):
 
     def failed():
         calls.append("failed")
-        return InstallationOutcome(platform.AdapterResult("failed", "injector failed", returncode=1))
+        return InstallationOutcome(launcher_injector.AdapterResult("failed", "injector failed", returncode=1))
 
     InstallationService().execute(plan, replace(actions, inject=failed))
     InstallationService().execute(plan, replace(actions, inject=failed))
@@ -748,6 +763,14 @@ def test_same_name_replacement_does_not_claim_an_unplanned_removal(installation)
     assert not calls
 
 
+def _assert_unknown_injector_requires_reinstall(owner, pending, state):
+    assert pending.adapter_state == "manual_install_required"
+    assert pending.adapter_details['injector_state'] == 'unknown'
+    assert 'INSTALL AGAIN' in pending.adapter_message
+    assert not (state / "launcher_setup.json").exists()
+    assert not owner.prepare.called
+
+
 def test_workflow_blocks_unknown_injector_result_until_reinstallation(workflow_installation, monkeypatch):
     from doom_eap.launcher import installation_adapters
 
@@ -762,8 +785,8 @@ def test_workflow_blocks_unknown_injector_result_until_reinstallation(workflow_i
         def wait(self):
             raise SystemExit("launcher exited")
 
-    opener = platform.subprocess.Popen
-    monkeypatch.setattr(platform.subprocess, "Popen", Process)
+    opener = launcher_platform.subprocess.Popen
+    monkeypatch.setattr(launcher_platform.subprocess, "Popen", Process)
     workflow = integration.IntegratedLaunchWorkflow(
         app,
         state,
@@ -794,14 +817,10 @@ def test_workflow_blocks_unknown_injector_result_until_reinstallation(workflow_i
     assert calls == ['inject'] and not owner.prepare.called
     monkeypatch.setattr(installation_adapters, 'injector_processes', lambda evidence: ())
     pending = restarted.execute(snapshot)
-    assert pending.adapter_state == "manual_install_required"
-    assert pending.adapter_details['injector_state'] == 'unknown'
-    assert 'INSTALL AGAIN' in pending.adapter_message
-    assert not (state / "launcher_setup.json").exists()
-    assert not owner.prepare.called
+    _assert_unknown_injector_requires_reinstall(owner, pending, state)
     with pytest.raises(InstallationRecoveryRequired):
         restarted.confirm_manual_installation(snapshot, transaction_id=pending.transaction_id)
-    monkeypatch.setattr(platform.subprocess, "Popen", opener)
+    monkeypatch.setattr(launcher_platform.subprocess, "Popen", opener)
     confirmed = restarted.execute(snapshot, retry_injector=True)
     assert confirmed.adapter_state == "applied"
     assert calls == ["inject", "inject"]
@@ -848,7 +867,7 @@ def test_game_start_blocks_rollback_until_a_safe_restart(installation, monkeypat
     def prepare(journal):
         journal.replace(target, b"new core", operation="test_publish")
         monkeypatch.setattr(
-            platform, "detect_doom_processes", lambda: ({"name": "doometernalx64vk.exe", "pid": "123"},)
+            platform, "detect_doom_processes", lambda **kwargs: ({"name": "doometernalx64vk.exe", "pid": "123"},)
         )
         raise OSError("game started")
 
@@ -859,7 +878,8 @@ def test_game_start_blocks_rollback_until_a_safe_restart(installation, monkeypat
     journal.load()
     assert journal.phase is InstallPhase.RECOVERY_REQUIRED
     assert plan.receipt_path.read_bytes() == b"previous receipt"
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: ())
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: ())
     InstallationService().execute(plan, actions)
     assert not target.exists()
     assert calls == ["inject", "session"]
@@ -890,7 +910,6 @@ def test_injector_start_blocks_failure_rollback_until_a_safe_restart(installatio
     InstallationService().execute(plan, actions)
     assert not target.exists()
     assert calls == ["inject", "session"]
-
 
 
 @pytest.mark.parametrize("windows", [False, True])

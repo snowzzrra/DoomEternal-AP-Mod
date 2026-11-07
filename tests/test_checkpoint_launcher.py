@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from doom_eap.launcher.launcher_session import APSessionOwner, CheckpointRecoveryBlockedError
-from doom_eap.runtime.weapon_points import namespace_id
+from doom_eap.runtime.inventory import namespace_id
 
 
 @pytest.fixture
@@ -76,6 +76,12 @@ def campaign(tmp_path, monkeypatch):
     return SimpleNamespace(owner=owner, snapshot=snapshot, config=config, plan=plan, payload=payload, observe=observe, game=game)
 
 
+def _assert_awaiting_recovery(case, status):
+    assert status["state"] == "awaiting_recovery" and not status["ready"]
+    assert status["intent"] == "resume"
+    assert status["recovery_id"] == case.plan["recovery_id"]
+
+
 @pytest.mark.parametrize("result", ["interrupted_save_recovered", "previous_checkpoint_restored"])
 @pytest.mark.parametrize("checkpoint_state,recovery_state,number", [
     ("save_interrupted", "none", 2), ("receipt_ready", "none", 1), ("confirmed", "recovering", 2),
@@ -85,9 +91,7 @@ def test_recovery_preserves_then_waits_for_verified_resume(campaign, result, che
     case.plan.update(checkpoint_state=checkpoint_state, recovery_state=recovery_state, checkpoint=number,
                      recovery_id="preserved-transaction")
     status = case.owner.prepare(case.snapshot, case.config)
-    assert status["state"] == "awaiting_recovery" and not status["ready"]
-    assert status["intent"] == "resume"
-    assert status["recovery_id"] == case.plan["recovery_id"]
+    _assert_awaiting_recovery(case, status)
     with zipfile.ZipFile(status["preservation_path"]) as archive:
         assert case.payload.read_bytes() in [archive.read(name) for name in archive.namelist()]
     assert case.owner.prepare(case.snapshot, case.config) == status

@@ -4,8 +4,22 @@ import pytest
 import yaml
 
 from doom_eap.content.options_foundation import (
-    default_option_values, dump_player_yaml, load_options_schema, load_player_yaml,
+    default_option_values,
+    dump_player_yaml,
+    load_options_schema,
+    load_player_yaml,
 )
+
+
+def _assert_exported_common_settings(exported, imported):
+    assert exported["DOOM Eternal"]["enemy_speed"] == imported["enemy_speed"]
+    assert exported["description"] == "Personal settings"
+    assert exported["DOOM Eternal"]["accessibility"] == "minimal"
+    assert exported["DOOM Eternal"]["start_hints"] == ["Ballista"]
+    assert exported["DOOM Eternal"]["local_items"] == ["Ammo Refill"]
+    assert exported["DOOM Eternal"]["non_local_items"] == ["Ballista"]
+    assert exported["DOOM Eternal"]["start_inventory"] == {"Progressive Blood Punch": 4}
+    assert exported["DOOM Eternal"]["campaign_difficulty"] == "nightmare"
 
 
 def test_import_edit_export_preserves_common_settings(tmp_path):
@@ -25,14 +39,7 @@ def test_import_edit_export_preserves_common_settings(tmp_path):
     imported["enemy_speed"] = {"minimum": 150, "maximum": 150}
     exported_yaml = dump_player_yaml(schema, name, imported, imported=original)
     exported = yaml.safe_load(exported_yaml)
-    assert exported["DOOM Eternal"]["enemy_speed"] == imported["enemy_speed"]
-    assert exported["description"] == "Personal settings"
-    assert exported["DOOM Eternal"]["accessibility"] == "minimal"
-    assert exported["DOOM Eternal"]["start_hints"] == ["Ballista"]
-    assert exported["DOOM Eternal"]["local_items"] == ["Ammo Refill"]
-    assert exported["DOOM Eternal"]["non_local_items"] == ["Ballista"]
-    assert exported["DOOM Eternal"]["start_inventory"] == {"Progressive Blood Punch": 4}
-    assert exported["DOOM Eternal"]["campaign_difficulty"] == "nightmare"
+    _assert_exported_common_settings(exported, imported)
     source.write_text(yaml.safe_dump(exported), encoding="utf-8")
     assert load_player_yaml(source, schema)[1] == imported
     imported["non_local_items"] = imported["local_items"]

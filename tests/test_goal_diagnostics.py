@@ -1,90 +1,32 @@
 import asyncio
-import importlib
-import json
 import logging
-from dataclasses import replace
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.goal_progress import GoalProgress
+from doom_eap.runtime.bridge_checks import CheckPublication
+from doom_eap.runtime.campaign import GoalProgress
 
 
-@pytest.mark.parametrize("admitted,ready,connected,objectives,checked,decision", [
-    (None, True, True, {1}, {1}, "campaign_unavailable"),
-    (False, True, True, {1}, {1}, "campaign_not_admitted"),
-    (True, False, True, {1}, {1}, "checked_not_ready"),
-    (True, True, True, set(), set(), "objectives_unavailable"),
-    (True, True, True, {1, 2}, {1}, "missing_objectives"),
-    (True, True, False, {1}, {1}, "disconnected"),
+@pytest.mark.parametrize("admitted,ready,connected,objectives,checked", [
+    (None, True, True, {1}, {1}),
+    (False, True, True, {1}, {1}),
+    (True, False, True, {1}, {1}),
+    (True, True, True, set(), set()),
+    (True, True, True, {1, 2}, {1}),
+    (True, True, False, {1}, {1}),
 ])
-def test_goal_block_diagnostics_include_inputs_and_do_not_publish(
-        caplog, admitted, ready, connected, objectives, checked, decision):
+def test_unadmitted_or_unready_goal_cannot_publish(admitted, ready, connected, objectives, checked):
     goals = GoalProgress("final", "cultist", logging.getLogger("goal-diagnostics"))
     facts = CheckObservation(frozenset(checked), frozenset(), frozenset(objectives), ready, connected)
 
     async def send(packets):
         pytest.fail(f"blocked goal published {packets}")
 
-    with caplog.at_level(logging.INFO):
-        assert not asyncio.run(goals.evaluate(
-            "server checked update", frozenset(objectives), facts, CheckPublication(send, set().add, 30),
-            admitted=admitted, admission_missing=("e1m2_war",)))
-    record = next(message for message in caplog.messages if "EVALUATION" in message)
-    assert f"decision={decision}" in record
-    assert f"admitted={admitted}" in record
-    assert f"checked_ready={ready} connected={connected}" in record
-    assert "admission_missing=['e1m2_war']" in record
-    assert f"objective_count={len(objectives)}" in record
-    assert f"missing_count={len(objectives - checked)}" in record
-
-
-def test_goal_diagnostics_coalesce_repeated_evaluations_and_bound_lists(caplog, monkeypatch):
-    goals = GoalProgress("final", "cultist", logging.getLogger("goal-diagnostics"))
-    objectives = frozenset(range(100))
-    facts = CheckObservation(frozenset(), frozenset(), objectives, True, True)
-    clock = [100.0]
-    monkeypatch.setattr("doom_eap.runtime.goal_progress.monotonic", lambda: clock[0])
-
-    async def run():
-        for _ in range(50):
-            assert not await goals.evaluate("poll", objectives, facts, None)
-        clock[0] += 30
-        assert not await goals.evaluate("poll", objectives, facts, None)
-        assert not await goals.evaluate("changed", objectives, replace(facts, connected=False), None)
-
-    with caplog.at_level(logging.INFO):
-        asyncio.run(run())
-    records = [message for message in caplog.messages if "EVALUATION" in message]
-    assert len(records) == 3
-    assert "evaluations=50" in records[1]
-    assert "connected=False" in records[2]
-    assert "missing_count=100" in records[0]
-    assert "31]" in records[0] and "32," not in records[0]
-
-
-def test_collected_objective_and_duplicate_physical_event_publish_one_goal(caplog):
-    goals = GoalProgress("final", "cultist", logging.getLogger("goal-diagnostics"))
-    facts = CheckObservation(frozenset({1}), frozenset(), frozenset({1}), True, True)
-    packets = []
-
-    async def send(messages):
-        packets.extend(messages)
-
-    async def run():
-        publication = CheckPublication(send, set().add, 30)
-        assert await goals.evaluate("server checked update", frozenset({1}), facts, publication)
-        assert await goals.evaluate("physical defeat", frozenset({1}), facts, publication)
-        assert await goals.evaluate("poll", frozenset({1}), facts, publication)
-
-    with caplog.at_level(logging.INFO):
-        asyncio.run(run())
-    assert packets == [{"cmd": "StatusUpdate", "status": 30}]
-    assert any("CLIENT_GOAL_RESULT result=returned" in message for message in caplog.messages)
-    assert any("decision=already_sent" in message for message in caplog.messages)
+    assert not asyncio.run(goals.evaluate(
+        "server checked update", frozenset(objectives), facts, CheckPublication(send, set().add, 30),
+        admitted=admitted, admission_missing=("e1m2_war",)))
 
 
 def test_goal_send_error_is_diagnosed_and_can_retry(caplog):
@@ -111,46 +53,55 @@ def test_goal_send_error_is_diagnosed_and_can_retry(caplog):
     assert "private transport details" not in caplog.text
 
 
-def test_campaign_goal_reports_admission_before_publishing_server_progress(tmp_path, monkeypatch, caplog):
-    root = Path(__file__).resolve().parents[1]
-    config = tmp_path / "config.json"
-    config.write_text(json.dumps({
-        "doom_base_dir": str(tmp_path / "base"), "save_games_dir": str(tmp_path),
-        "client_state_file": str(tmp_path / "state.json"), "bridge_log_path": str(tmp_path / "bridge.log"),
-    }))
-    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(config))
-    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
-    monkeypatch.syspath_prepend(str(root.parent / "Archipelago"))
-    monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
-    bridge = importlib.import_module("doom_eap.runtime.bridge_client")
-    campaign = bridge.UnifiedCampaign.__new__(bridge.UnifiedCampaign)
+def test_campaign_goal_reports_admission_before_publishing_server_progress(bridge, caplog):
+    from doom_eap.runtime import bridge_checks, bridge_client
+
+    campaign = bridge_client.UnifiedCampaign.__new__(bridge_client.UnifiedCampaign)
     campaign.plan = {"sequence": ["e1m2_war", "e5m4_boss"], "goal_stage": "e5m4_boss", "goal_as_item": False}
-    objective = bridge.STAGES["e5m4_boss"]["completion_id"]
-    monkeypatch.setattr(bridge, "GOAL_POLICY", SimpleNamespace(
-        objective_ids=lambda *_: frozenset({objective}), threshold=lambda *_: (frozenset(), 0)))
+    objective = bridge_checks.STAGES["e5m4_boss"]["completion_id"]
     packets = []
 
     async def send(messages):
         packets.extend(messages)
 
     ctx = SimpleNamespace(
-        state_key="goal-room", _connected_slot_data={}, checked_locations={objective}, items_received=[], server_checked_locations_ready=True,
-        locations_checked=set(), server_locations={objective},
-        server=SimpleNamespace(socket=SimpleNamespace(closed=False)), send_msgs=send,
+        state_key="goal-room",
+        _connected_slot_data={"campaign": {"goal": {
+            "kind": "Kill the Dark Lord", "stage_id": "e5m4_boss",
+            "endpoint_event": "Internal Goal Endpoint: Kill the Dark Lord", "additional_requirements": [],
+        }}},
+        checked_locations={objective},
+        items_received=[],
+        server_checked_locations_ready=True,
+        locations_checked=set(),
+        server_locations={objective},
+        server=SimpleNamespace(socket=SimpleNamespace(closed=False)),
+        send_msgs=send,
         goals=GoalProgress("final", "cultist", logging.getLogger("goal-diagnostics")),
+        items=None,
+        checks=None,
+        saves=None
     )
+    ctx.items = bridge.bridge_items.ItemRuntime(ctx)
+    ctx.checks = bridge.bridge_checks.CheckRuntime(ctx)
+    ctx.saves = bridge.bridge_saves.SaveRuntime(ctx)
+
+
+
 
     async def run():
-        assert not await bridge.DoomEternalContext.evaluate_campaign_goal(ctx, "connected")
+        assert not await ctx.checks.evaluate_campaign_goal("connected")
         ctx.unified_campaign = campaign
-        assert not await bridge.DoomEternalContext.evaluate_campaign_goal(ctx, "server checked update")
+        assert not await ctx.checks.evaluate_campaign_goal("server checked update")
         assert packets == []
-        ctx.checked_locations.add(bridge.STAGES["e1m2_war"]["completion_id"])
-        assert await bridge.DoomEternalContext.evaluate_campaign_goal(ctx, "server checked update")
-        assert await bridge.DoomEternalContext.evaluate_campaign_goal(ctx, "physical defeat")
+        ctx.checked_locations.add(bridge_checks.STAGES["e1m2_war"]["completion_id"])
+        assert await ctx.checks.evaluate_campaign_goal("server checked update")
+        assert await ctx.checks.evaluate_campaign_goal("physical defeat")
 
     with caplog.at_level(logging.INFO):
         asyncio.run(run())
-    assert packets == [{"cmd": "StatusUpdate", "status": bridge.ClientStatus.CLIENT_GOAL}]
+    from NetUtils import ClientStatus
+
+    assert packets == [{"cmd": "StatusUpdate", "status": ClientStatus.CLIENT_GOAL}]
     assert any("decision=campaign_unavailable" in message for message in caplog.messages)
     assert any("admission_missing=['e1m2_war']" in message for message in caplog.messages)

@@ -15,10 +15,16 @@ def test_translated_editor_exports_identical_yaml(ui, tmp_path, monkeypatch):
     from doom_eap.strings import load_catalog
 
     values = ui.player_view._option_values()
-    values.update(goal="kill_the_icon_of_sin", mission_count="all", use_dlc_content=False,
-                  additional_victory_requirements=["Complete All Included Missions"],
-                  enemy_preset="custom", enemy_health={"imp.minimum": 50, "imp.maximum": 100},
-                  filler_weights={"Ammo Refill": 0, "Full Heal": 17}, start_inventory={"Air Control": 2})
+    values.update(
+        goal="kill_the_icon_of_sin",
+        mission_count="all",
+        use_dlc_content=False,
+        additional_victory_requirements=["Complete All Included Missions"],
+        enemy_preset="custom",
+        enemy_health={"imp.minimum": 50, "imp.maximum": 100},
+        filler_weights={"Ammo Refill": 0, "Full Heal": 17},
+        start_inventory={"Air Control": 1},
+    )
     monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
     monkeypatch.setattr(QMessageBox, "critical", lambda parent, title, message: pytest.fail(message))
     ui.controller.save_player_options.side_effect = lambda *args, **kwargs: LauncherController.save_player_options(
@@ -42,12 +48,22 @@ def test_translated_editor_exports_identical_yaml(ui, tmp_path, monkeypatch):
         assert goal.currentData() == values["goal"]
         assert goal.currentText() == load_catalog().text("options", "goal.choice.kill_the_icon_of_sin", locale=locale)
         assert editor.effective_config_values["goal"].text() == goal.currentText()
-        assert editor.option_rows["goal"].findChildren(QLabel)[0].text() == load_catalog().text("options", "goal.name", locale=locale)
+        assert editor.option_rows["goal"].findChildren(QLabel)[0].text() == load_catalog().text(
+            "options", "goal.name", locale=locale
+        )
         assert editor._option_values() == values
         editor.close()
         editor.deleteLater()
     assert exports[0] == exports[1]
     assert default_names[0] == default_names[1]
+
+
+def _assert_exported_player_options(document, exported, original, source):
+    assert exported["name"] == "Edited" and exported["description"] == "Personal settings"
+    assert exported["DOOM Eternal"]["start_hints"] == ["Ballista"]
+    assert exported["DOOM Eternal"]["filler_weights"] == document["DOOM Eternal"]["filler_weights"]
+    assert exported["DOOM Eternal"]["start_inventory"] == {"Air Control": 1}
+    assert source.read_bytes() == original
 
 
 def test_mounted_player_editor_import_edit_export_preserves_yaml(ui, tmp_path, monkeypatch):
@@ -58,7 +74,7 @@ def test_mounted_player_editor_import_edit_export_preserves_yaml(ui, tmp_path, m
     document["description"] = "Personal settings"
     document["DOOM Eternal"]["start_hints"] = ["Ballista"]
     document["DOOM Eternal"]["filler_weights"] = {"Ammo Refill": 0, "Full Heal": 17}
-    document["DOOM Eternal"]["start_inventory"] = {"Air Control": 2}
+    document["DOOM Eternal"]["start_inventory"] = {"Air Control": 1}
     source = tmp_path / "source.yaml"
     source.write_text(yaml.safe_dump(document), encoding="utf-8")
     original = source.read_bytes()
@@ -87,12 +103,13 @@ def test_mounted_player_editor_import_edit_export_preserves_yaml(ui, tmp_path, m
         QApplication.processEvents()
     editor.save_button.click()
     exported = yaml.safe_load(destination.read_text(encoding="utf-8"))
-    assert exported["name"] == "Edited" and exported["description"] == "Personal settings"
-    assert exported["DOOM Eternal"]["start_hints"] == ["Ballista"]
-    assert exported["DOOM Eternal"]["filler_weights"] == document["DOOM Eternal"]["filler_weights"]
-    assert exported["DOOM Eternal"]["start_inventory"] == {"Air Control": 2}
-    assert source.read_bytes() == original
+    _assert_exported_player_options(document, exported, original, source)
     ui.controller.prepare_setup.assert_not_called()
+
+
+def _assert_option_reflow_values(editor, expected, requirements, states):
+    assert editor._option_values() == expected
+    assert [(check.isChecked(), check.isEnabled()) for _, check in requirements.checks] == states
 
 
 def test_option_reflow_preserves_explicit_zero_auto_and_goal_dependencies(ui):
@@ -119,7 +136,6 @@ def test_option_reflow_preserves_explicit_zero_auto_and_goal_dependencies(ui):
     for width in (900, 1280, 1600, 900):
         ui.resize(width, 720)
         QApplication.processEvents()
-        assert editor._option_values() == expected
-        assert [(check.isChecked(), check.isEnabled()) for _, check in requirements.checks] == states
+        _assert_option_reflow_values(editor, expected, requirements, states)
     filler.fields["Ammo Refill"].setValue(-1)
     assert filler.value() == {"Full Heal": 17}

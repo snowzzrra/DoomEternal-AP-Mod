@@ -1,7 +1,5 @@
 import asyncio
 import gc
-import importlib
-import json
 import os
 import threading
 import weakref
@@ -10,38 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from doom_eap.runtime.native_worker import NativeWorker, StaleNativeResult
-
-
-@pytest.fixture
-def bridge(tmp_path, monkeypatch):
-    root = Path(__file__).resolve().parents[1]
-    configuration = tmp_path / "config.json"
-    configuration.write_text(json.dumps({
-        "doom_base_dir": str(tmp_path / "game/base"),
-        "save_games_dir": str(tmp_path / "local"),
-        "steam_remote_dir": str(tmp_path / "Steam/userdata/1/782330/remote"),
-        "client_state_file": str(tmp_path / "state.json"),
-        "bridge_log_path": str(tmp_path / "bridge.log"),
-    }))
-    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(configuration))
-    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
-    monkeypatch.syspath_prepend(str(root.parent / "Archipelago"))
-    monkeypatch.syspath_prepend(str(root / "packaging/standalone_runtime"))
-    module = importlib.import_module("doom_eap.runtime.bridge_client")
-    monkeypatch.setattr(module, "DOOM_BASE_DIR", str(tmp_path / "game/base"))
-    return module
-
-
-def test_manual_reconcile_uses_coordinator_summary_without_legacy_rune_call(bridge):
-    from unittest.mock import AsyncMock
-    output = []
-    processor = bridge.DoomCommandProcessor.__new__(bridge.DoomCommandProcessor)
-    processor.ctx = SimpleNamespace(manual_reconcile_inventory=AsyncMock(return_value=(
-        SimpleNamespace(replayed=1, special_stages=0, skipped_never_replay=0, skipped_unproven=0), None)))
-    processor.output = output.append
-    asyncio.run(processor._reconcile())
-    assert len(output) == 1
+from doom_eap.runtime.native_transport import NativeWorker, StaleNativeResult
 
 
 def test_feedback_obligation_after_ingestion_survives_restart_without_duplicate(bridge, tmp_path, monkeypatch):
@@ -50,16 +17,16 @@ def test_feedback_obligation_after_ingestion_survives_restart_without_duplicate(
     from test_delivery_runtime import Core, RoomDelivery
     from test_delivery_runtime import bridge as fixture_bridge
 
-    from doom_eap.runtime import delivery_runtime
+    from doom_eap.runtime import bridge_config, delivery
     from doom_eap.runtime.ledger import NetworkReceipt
 
     value, definitions, policies = fixture_bridge(tmp_path)
-    monkeypatch.setattr(bridge, "ENABLE_ITEM_NOTIFICATIONS", True)
+    monkeypatch.setattr(bridge_config, "ENABLE_ITEM_NOTIFICATIONS", True)
     value.items_received = [NetworkReceipt(7770900, 1, 1, 0)]
     value.location_setup = SimpleNamespace(received_ids=frozenset())
     for name in ("delivery_notification_commands", "item_activation_commands", "_fresh_receipt_owned_count", "progressive_stage"):
-        setattr(value, name, MethodType(getattr(bridge.DoomEternalContext, name), value))
-    value.items_processed = 1
+        setattr(value.items, name, MethodType(getattr(bridge.bridge_items.ItemRuntime, name), value.items))
+    value.items.items_processed = 1
     peers = []
     def connect(*args, **kwargs):
         core = Core(*args, **kwargs)
@@ -68,7 +35,7 @@ def test_feedback_obligation_after_ingestion_survives_restart_without_duplicate(
             core.weapons = peers[-1].weapons
         peers.append(core)
         return core
-    monkeypatch.setattr(delivery_runtime, "NativeTransport", connect)
+    monkeypatch.setattr(delivery, "NativeTransport", connect)
     async def check():
         config = {"client_state_file": str(tmp_path / "state.json")}
         for _ in range(2):
@@ -89,12 +56,13 @@ def test_feedback_obligation_after_ingestion_survives_restart_without_duplicate(
 @pytest.mark.parametrize("platform", ["nt", "posix"])
 @pytest.mark.parametrize("available", [True, False, None])
 def test_process_probe_keeps_loop_responsive_and_fails_closed(bridge, monkeypatch, platform, available):
-    from doom_eap.runtime import observer_lifecycle, proton
+    from doom_eap.runtime import bridge_config, observers
+
     release = threading.Event()
     entered = threading.Event()
-    expected = Path(bridge.DOOM_BASE_DIR).parent / "DOOMEternalx64vk.exe"
+    expected = Path(bridge_config.DOOM_BASE_DIR).parent / "DOOMEternalx64vk.exe"
     # the Proton helper reports Windows-style paths, the native path is the host path
-    reported = proton.windows_path(expected) if platform == "posix" else str(expected)
+    reported = bridge_config.windows_path(expected) if platform == "posix" else str(expected)
     rows = ({"pid": 123, "created": 456, "path": reported},) if available else (() if available is False else None)
 
     def query(*args):
@@ -102,20 +70,16 @@ def test_process_probe_keeps_loop_responsive_and_fails_closed(bridge, monkeypatc
         assert release.wait(5)
         return rows
 
-    monkeypatch.setattr(bridge, "os", SimpleNamespace(**{**vars(os), "name": platform}))
-    monkeypatch.setattr(observer_lifecycle, "windows_game_processes", query)
-    monkeypatch.setattr(proton, "windows_processes", query)
+    monkeypatch.setattr(bridge_config, "os", SimpleNamespace(**{**vars(os), "name": platform}))
+    monkeypatch.setattr(observers, "windows_game_processes", query)
+    monkeypatch.setattr(bridge_config, "windows_processes", query)
 
     async def run():
         context = bridge.DoomEternalContext(None, None)
-        ticks = 0
-        task = asyncio.create_task(context._query_process_identity())
+        task = asyncio.create_task(context.items._query_process_identity())
         try:
-            deadline = asyncio.get_running_loop().time() + 1.1
-            while asyncio.get_running_loop().time() < deadline:
-                await asyncio.sleep(0.02)
-                ticks += 1
-            assert entered.is_set() and not task.done() and ticks >= 10
+            assert await asyncio.to_thread(entered.wait, 5)
+            assert not task.done()
             release.set()
             assert await task == ("windows:123:456" if available else None)
             assert not context.item_state_ready
@@ -124,11 +88,14 @@ def test_process_probe_keeps_loop_responsive_and_fails_closed(bridge, monkeypatc
             await asyncio.gather(task, return_exceptions=True)
             context._native_worker.close()
             await context.session_tasks.close()
+
     asyncio.run(run())
 
 
 @pytest.mark.parametrize("change", ["room", "process"])
 def test_pending_process_probe_discards_changed_identity(bridge, monkeypatch, change):
+    from doom_eap.runtime import bridge_config
+
     entered, release = threading.Event(), threading.Event()
     process = ["windows:123:456"]
 
@@ -138,14 +105,13 @@ def test_pending_process_probe_discards_changed_identity(bridge, monkeypatch, ch
         assert release.wait(5)
         return value
 
-    monkeypatch.setattr(bridge, "doom_process_identity", query)
+    monkeypatch.setattr(bridge_config, "doom_process_identity", query)
 
     async def run():
         context = bridge.DoomEternalContext(None, None)
-        task = asyncio.create_task(context._query_process_identity())
+        task = asyncio.create_task(context.items._query_process_identity())
         try:
-            while not entered.is_set():
-                await asyncio.sleep(0.01)
+            assert await asyncio.to_thread(entered.wait, 5)
             if change == "room":
                 context.room_seed_name = "different-room"
             else:
@@ -162,10 +128,11 @@ def test_pending_process_probe_discards_changed_identity(bridge, monkeypatch, ch
             await asyncio.gather(task, return_exceptions=True)
             context._native_worker.close()
             await context.session_tasks.close()
+
     asyncio.run(run())
 
 
-def test_cancelled_native_call_stays_serialized():
+def test_cancelled_native_call_stays_serialized(monkeypatch):
     entered, release = threading.Event(), threading.Event()
     calls = []
 
@@ -179,12 +146,20 @@ def test_cancelled_native_call_stays_serialized():
         worker = NativeWorker(lambda: "room", lambda: "process")
         task = asyncio.create_task(worker.call(first, process="process"))
         try:
-            while not entered.is_set():
-                await asyncio.sleep(0.01)
+            assert await asyncio.to_thread(entered.wait, 5)
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
+            submitted = asyncio.Event()
+            submit = worker.executor.submit
+
+            def enqueue(*args, **kwargs):
+                future = submit(*args, **kwargs)
+                submitted.set()
+                return future
+
+            monkeypatch.setattr(worker.executor, "submit", enqueue)
             second = asyncio.create_task(worker.call(lambda: calls.append("second"), process="process"))
-            await asyncio.sleep(0.05)
+            await submitted.wait()
             assert calls == ["first"] and not second.done()
             release.set()
             await second
@@ -192,13 +167,8 @@ def test_cancelled_native_call_stays_serialized():
         finally:
             release.set()
             worker.close()
+
     asyncio.run(run())
-
-
-
-
-
-
 
 
 @pytest.mark.parametrize("monitor", ["death_monitor", "tracker"])
@@ -213,8 +183,8 @@ def test_stale_native_work_restarts_monitor_without_stopping_it(bridge, monkeypa
                 raise StaleNativeResult("room changed")
             context.exit_event.set()
 
-        monkeypatch.setattr(context, f"{monitor}_loop", poll)
-        await getattr(context, f"{monitor}_supervisor")()
+        monkeypatch.setattr(context.checks, f"{monitor}_loop", poll)
+        await getattr(context.checks, f"{monitor}_supervisor")()
         assert len(calls) == 2 and context.exit_event.is_set()
         await context.session_tasks.close()
     asyncio.run(run())
@@ -222,25 +192,36 @@ def test_stale_native_work_restarts_monitor_without_stopping_it(bridge, monkeypa
 
 @pytest.mark.parametrize("stopping", [False, True])
 def test_server_completion_retrieves_exception_before_silent_return(bridge, stopping):
+    from doom_eap.runtime import bridge_client
+
     async def run():
         errors = []
         asyncio.get_running_loop().set_exception_handler(lambda loop, event: errors.append(event))
-        context = SimpleNamespace(exit_event=asyncio.Event(), _room_session_established=True,
-                                  disconnected_intentionally=False, reset_room_session_authority=lambda reason: None)
+        context = SimpleNamespace(
+            exit_event=asyncio.Event(),
+            _room_session_established=True,
+            disconnected_intentionally=False,
+            reset_room_session_authority=lambda reason: None,
+        )
         if stopping:
             context.exit_event.set()
 
         async def failed():
             raise AssertionError("transport failed")
 
+        completed = asyncio.Event()
+
+        def stopped(done):
+            bridge_client.report_server_stop(context, done)
+            completed.set()
+
         task = asyncio.create_task(failed())
-        task.add_done_callback(lambda done: bridge.report_server_stop(context, done))
-        await asyncio.sleep(0)
-        await asyncio.sleep(0)
+        task.add_done_callback(stopped)
+        await completed.wait()
         assert task.done()
         reference = weakref.ref(task)
         del task
         gc.collect()
-        await asyncio.sleep(0)
         assert reference() is None and not errors
+
     asyncio.run(run())

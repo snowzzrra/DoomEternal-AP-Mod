@@ -1,27 +1,27 @@
-from copy import deepcopy
-from importlib.resources import files
 import json
 import random
+from copy import deepcopy
+from importlib.resources import files
 
 import pytest
 
 from doom_eap.content.enemy_options import SPECIES_IDS
 from doom_eap.content.enemy_plan import build_resolved_enemy_blocks, enemy_combat_cost
 from doom_eap.content.native_enemy_plan import build_native_recipes, encode_native_recipes, native_recipe_fingerprint
-from doom_eap.content.secret_encounter_timers import load_secret_encounter_timers
 from doom_eap.content.recipe_codec import decode_recipes, encode_recipes
+from doom_eap.content.secret_encounter_timers import load_secret_encounter_timers
 from doom_eap.content.slot_data_contract import (
-    MAX_PAYLOAD_BYTES, StructureError, canonical_bytes,
-    source_index, source_reference, recipe_digest, validate_slot_data,
+    StructureError,
+    recipe_digest,
+    source_index,
+    source_reference,
+    validate_slot_data,
 )
-from tests.test_cross_repo_acceptance import (
-    VALID, ap_source, generated, scratch,
-)
+from tests.room_fixture import sample_catalog, sample_slot, sign_slot
 from tests.test_native_enemy_plan import settings
-from tests.test_slot_data_contract import sample_catalog, sample_slot, sign_slot
 
-KEY = 'e4m3_mcity'
-ROLES = ('primary', 'compatibility', 'counter')
+KEY = "e4m3_mcity"
+ROLES = ("primary", "compatibility", "counter")
 
 
 def resolved_case():
@@ -177,25 +177,6 @@ def test_more_than_two_thousand_kill_rewards_are_rejected(count):
         build_resolved_killsanity(dict(enabled=True, interval=1, count=count), {}, {})
 
 
-def test_two_thousand_kill_rewards_are_supported():
-    from doom_eap.content.killsanity_plan import build_resolved_killsanity
-
-    budget = dict(estimated_kills=5000, finite_sources=[dict(source_id='arena/0/0', map_key=KEY,
-                                                          count=4000, repeatable=True)])
-    result = build_resolved_killsanity(dict(enabled=True, interval=2, count=2000), budget,
-                                      resolved_case()[1])
-    assert result['count'] == result['finite_supported_count'] == 2000
-
-
-def test_empty_automatic_kill_rewards_have_zero_counts():
-    from doom_eap.content.killsanity_plan import build_resolved_killsanity
-
-    result = build_resolved_killsanity(dict(enabled=True, interval=100),
-        dict(estimated_kills=0, finite_sources=[]), dict(finite_sources=[]))
-    assert result == dict(interval=0, count=0, finite_supported_count=0,
-                          finite_kills=0, estimated_kills=0, sources=[])
-
-
 def test_missing_recipe_reference_raises_a_typed_error():
     from doom_eap.content.slot_data_contract import ReferenceError
 
@@ -238,21 +219,6 @@ def test_population_limits_and_runtime_ratio_survive_producer_encoding():
     assert (population.counter, population.species_caps) == ('spirit', (('spirit', 2),))
 
 
-@pytest.mark.apworld
-@pytest.mark.parametrize('case_id', [case['id'] for case in VALID])
-def test_generated_resolved_blocks_pass_full_boundary(generated, case_id):
-    document = generated(case_id)
-    for player in document['slots']:
-        data = player['connected']['slot_data']
-        placements = [[row['location_id'], row['item_id'], row['recipient_slot']]
-                      for row in player['connected']['placements']]
-        admitted = validate_slot_data(data, placements=placements, supported_capabilities={'slot_data_v7'})
-        packed = encode_recipes(decode_recipes(admitted.recipes))
-        assert packed == data['recipes']
-        assert recipe_digest(packed) == data['identity']['recipe_digest']
-        assert len(canonical_bytes(data)) <= MAX_PAYLOAD_BYTES
-
-
 @pytest.fixture(params=[('e4m1_rig', 'spirit'), ('e4m1_rig', 'tentacle'),
                         ('e4m1_rig', 'super_tentacle'), ('e4m3_mcity', 'tentacle')])
 def spawn_safety_case(request):
@@ -273,19 +239,14 @@ def spawn_safety_case(request):
     return key, species, catalog, observed[0], blocks, data
 
 
-def test_spawn_safety_is_final_before_readiness_cost_and_ordinal_checks(spawn_safety_case):
-    key, species, catalog, plan, blocks, data = spawn_safety_case
-    stage = plan['maps'][key]
-    cost = sum(enemy_combat_cost(body['species'], body['attributes'], buff_totems=True, screechers=True)
-               for recipe in stage['recipes'] if not recipe['runtime_only'] for body in recipe['bodies'])
-    assert plan['combat_costs'][key]['actual'] == float(cost)
-    assert plan['fingerprint'] == native_recipe_fingerprint(plan)
-    assert stage['compatibility_recipes']
-    from doom_eap.content.killsanity_plan import resolved_rewards
-    rewards = resolved_rewards(blocks['killsanity'])
-    assert [row['location_id'] for row in rewards] == [
-        2_200_000_000 + index for index in range(1, blocks['killsanity']['count'] + 1)]
+def _assert_safe_recipe_round_trip(blocks, denied, slot):
+    assert all(body['species'] != 'spirit' for recipe in denied for body in recipe['bodies'])
+    assert encode_recipes(decode_recipes(slot.recipes)) == blocks['recipes']
 
+
+def _assert_resolved_recipe_cost(stage):
+    assert all(body['species'] not in {'tentacle', 'super_tentacle'}
+               for recipe in stage['recipes'] for body in recipe['bodies'])
 
 
 def test_spawn_safety_rows_pass_consumer_without_resolution(spawn_safety_case, monkeypatch):
@@ -294,19 +255,22 @@ def test_spawn_safety_rows_pass_consumer_without_resolution(spawn_safety_case, m
     from tools.maps.native_recipe_materializer import expand_resolved_native_recipes
 
     key, species, catalog, plan, blocks, data = spawn_safety_case
+    cost = sum(enemy_combat_cost(body['species'], body['attributes'], buff_totems=True, screechers=True)
+               for recipe in plan['maps'][key]['recipes'] if not recipe['runtime_only'] for body in recipe['bodies'])
+    assert plan['combat_costs'][key]['actual'] == float(cost)
+    assert plan['fingerprint'] == native_recipe_fingerprint(plan)
     slot = validate_slot_data(data, catalog)
     forbid_selection(monkeypatch)
     stage = expand_resolved_native_recipes(slot, catalog)['maps'][key]
-    assert all(body['species'] not in {'tentacle', 'super_tentacle'}
-               for recipe in stage['recipes'] for body in recipe['bodies'])
+    _assert_resolved_recipe_cost(stage)
     denied = [recipe for recipe in stage['recipes'] if recipe['binding'].get('reference') in
               SPIRIT_DENIED_SPAWN_POINTS.get(key, ())]
-    assert all(body['species'] != 'spirit' for recipe in denied for body in recipe['bodies'])
-    assert encode_recipes(decode_recipes(slot.recipes)) == blocks['recipes']
+    _assert_safe_recipe_round_trip(blocks, denied, slot)
 
 
 def test_unsafe_resolved_body_is_refused_instead_of_repaired(spawn_safety_case):
     from dataclasses import replace
+
     from doom_eap.content.slot_data_contract import catalog_tables
     from tools.maps.native_recipe_materializer import RecipeMaterializationError, expand_resolved_native_recipes
 

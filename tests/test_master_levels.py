@@ -12,8 +12,7 @@ from doom_eap.contracts.challenge_registry import load_challenge_registry
 from doom_eap.contracts.check_observation import CheckObservation
 from doom_eap.contracts.publisher_contracts import map_publishers_for_owner
 from doom_eap.runtime import sentinel_protocol_generated as codec
-from doom_eap.runtime.mission_presentation import MissionPresentations
-from doom_eap.runtime.unified_campaign import UnifiedCampaign
+from doom_eap.runtime.campaign import MissionPresentations, UnifiedCampaign
 from tools.maps.ap_map_generator import (
     _spawn_position_from_block,
     find_entity_block_bounds,
@@ -21,6 +20,11 @@ from tools.maps.ap_map_generator import (
     generate_map,
 )
 from tools.maps.mission_complete_map_patcher import _patch_declared_terminal_text
+
+
+def _assert_independent_master_completion(master, normal, snapshot):
+    assert normal["map"] == master["map"] and normal["variant"] != master["variant"]
+    assert master["completed"] and not normal["completed"] and snapshot["fortress_phase"] == 0
 
 
 @pytest.mark.parametrize("mode", ["Vanilla Order", "Random Mission Order", "Mission Access as Items"])
@@ -41,15 +45,15 @@ def test_master_navigation_and_completions_are_independent_on_the_same_map(mode,
     snapshot = runtime.snapshot({completion}, [SimpleNamespace(item=access)])
     normal, master = (next(row for row in snapshot["rows"] if row["stage"] == key)
                       for key in (physical, stage))
-    assert normal["map"] == master["map"] and normal["variant"] != master["variant"]
-    assert master["completed"] and not normal["completed"] and snapshot["fortress_phase"] == 0
+    _assert_independent_master_completion(master, normal, snapshot)
     runtime.select(master["stage"], snapshot)
     assert runtime.navigation["selected"] == stage
 
 
-def test_master_compiler_keeps_checks_and_terminal_separate_from_normal_mission(tmp_path):
+@pytest.mark.integration
+def test_master_compiler_keeps_checks_and_terminal_separate_from_normal_mission(tmp_path, frozen_map):
     output, manifest = tmp_path / "map.entities", tmp_path / "manifest.json"
-    generate_map(ROOT / "vanillamaps/e3m1_slayer.map", output,
+    generate_map(frozen_map("e3m1_slayer"), output,
                  ROOT / "content/maps/e3m1_slayer/locations.json", manifest, {}, enable_notifications=False)
     text = output.read_text(encoding="utf-8")
     stage = load_master_levels(ROOT)["ml_e3m1_slayer"]
@@ -105,6 +109,13 @@ def _assert_arena_layers(text, stage):
             assert layer in text[slice(*find_entity_block_bounds(text, arena_check_name(arena)))]
 
 
+def _assert_separate_master_pickups(facts, master, model, normal):
+    assert normal.runtime_map == master.runtime_map and master.total == 16
+    assert model.pickups["e2m1_nest"].isdisjoint(model.pickups["ml_e2m1_nest"])
+    assert model.encounter_snapshot("e5m1_spear", revealed=True, facts=facts, placements={}, pending=set())
+    assert not model.encounter_snapshot("ml_e5m1_spear", revealed=True, facts=facts, placements={}, pending=set())
+
+
 def test_master_menu_totals_and_challenges_do_not_mix_with_normal_mission():
     registry = load_challenge_registry()
     stages = load_master_levels(ROOT)
@@ -119,18 +130,16 @@ def test_master_menu_totals_and_challenges_do_not_mix_with_normal_mission():
     facts = CheckObservation(frozenset(), frozenset(), all_locations, True, True)
     normal = model.snapshot("room", "generation", "e2m1_nest", revealed=True, facts=facts, pending=set())
     master = model.snapshot("room", "generation", "ml_e2m1_nest", revealed=True, facts=facts, pending=set())
-    assert normal.runtime_map == master.runtime_map and master.total == 16
-    assert model.pickups["e2m1_nest"].isdisjoint(model.pickups["ml_e2m1_nest"])
-    assert model.encounter_snapshot("e5m1_spear", revealed=True, facts=facts, placements={}, pending=set())
-    assert not model.encounter_snapshot("ml_e5m1_spear", revealed=True, facts=facts, placements={}, pending=set())
+    _assert_separate_master_pickups(facts, master, model, normal)
 
 
-def test_arc_master_shell_terminal_publishes_completion_and_returns_to_fortress():
+@pytest.mark.integration
+def test_arc_master_shell_terminal_publishes_completion_and_returns_to_fortress(frozen_map):
     from tools.maps.unified_campaign import project_stage_return
 
     stage = load_master_levels(ROOT)["ml_e2m2_base"]
     catalog = load_content_catalog(ROOT)
-    source = (ROOT / "vanillamaps/e2m2_base.map").read_text(encoding="utf-8")
+    source = frozen_map("e2m2_base").read_text(encoding="utf-8")
     publishers = map_publishers_for_owner(catalog.publishers, stage["map_key"], stage["completion_owner"])
     publisher, = publishers
     assert publisher.effects[0]["location_id"] == stage["completion_id"]

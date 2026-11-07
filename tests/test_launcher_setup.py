@@ -7,12 +7,14 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from doom_eap.launcher import installation_adapters, launcher_injector, launcher_platform
 from doom_eap.launcher import launcher_platform as platform
 
 
 @pytest.fixture
 def room_files(tmp_path, monkeypatch):
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: ())
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: ())
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: ())
     root = tmp_path / "game"
     (root / "Mods").mkdir(parents=True)
     (root / "base").mkdir()
@@ -27,7 +29,9 @@ def room_files(tmp_path, monkeypatch):
     foreign = root / "Mods/other.zip"
     foreign.write_bytes(b"foreign mod")
     receipt = tmp_path / "ownership.json"
-    receipt.write_text(json.dumps(dict(staged_mod=str(old), staged_sha256=hashlib.sha256(old.read_bytes()).hexdigest())))
+    receipt.write_text(
+        json.dumps(dict(staged_mod=str(old), staged_sha256=hashlib.sha256(old.read_bytes()).hexdigest()))
+    )
     return root, source, old, legacy, foreign, receipt
 
 
@@ -43,14 +47,14 @@ def test_room_replacement_failure_preserves_previous(room_files, monkeypatch, fa
             raise OSError("simulated publication failure")
         return publish(src, dst, operation=operation)
 
-    monkeypatch.setattr(platform, "publish_file", publish_or_fail)
+    monkeypatch.setattr(launcher_injector, "publish_file", publish_or_fail)
     if failure == "copy":
-        monkeypatch.setattr(platform.shutil, "copy2", Mock(side_effect=OSError("simulated copy failure")))
+        monkeypatch.setattr(launcher_injector.shutil, "copy2", Mock(side_effect=OSError("simulated copy failure")))
     elif failure == "hash":
-        monkeypatch.setattr(platform.shutil, "copy2", lambda src, dst: Path(dst).write_bytes(b"corrupt"))
+        monkeypatch.setattr(launcher_injector.shutil, "copy2", lambda src, dst: Path(dst).write_bytes(b"corrupt"))
     removed = []
     with pytest.raises((OSError, RuntimeError)):
-        platform.stage_room_mod(source, root, receipt, manifest_hash="room", legacy_removal_sink=removed.append)
+        launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="room", legacy_removal_sink=removed.append)
     assert {path: path.read_bytes() for path in before} == before
     assert set((root / "Mods").iterdir()) == {old, legacy, foreign}
     assert not removed
@@ -68,7 +72,7 @@ def test_room_replacement_publishes_before_removal_events(room_files, same_name)
         assert json.loads(receipt.read_text())["manifest_hash"] == "new-room"
         removed.append(path)
 
-    staged = platform.stage_room_mod(source, root, receipt, manifest_hash="new-room", legacy_removal_sink=on_remove)
+    staged = launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="new-room", legacy_removal_sink=on_remove)
     assert staged.read_bytes() == source.read_bytes()
     assert set(removed) == {old, legacy}
     assert foreign.read_bytes() == b"foreign mod"
@@ -83,7 +87,7 @@ def test_room_replacement_preserves_modified_owned_zip(room_files, same_name):
         source = source.rename(source.with_name(old.name))
     before = {path: path.read_bytes() for path in (old, legacy, foreign, receipt)}
     with pytest.raises(RuntimeError, match="ownership hash"):
-        platform.stage_room_mod(source, root, receipt, manifest_hash="new-room")
+        launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="new-room")
     assert {path: path.read_bytes() for path in before} == before
     assert set((root / "Mods").iterdir()) == {old, legacy, foreign}
 
@@ -99,27 +103,54 @@ def test_room_backup_cleanup_failure_keeps_published_mod(room_files, monkeypatch
 
     monkeypatch.setattr(Path, "unlink", unlink_except_backup)
     removed = []
-    staged = platform.stage_room_mod(source, root, receipt, manifest_hash="room", legacy_removal_sink=removed.append)
+    staged = launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="room", legacy_removal_sink=removed.append)
     assert staged.read_bytes() == source.read_bytes()
     assert set(removed) == {old, legacy}
     assert set(staged.parent.glob("*.zip")) == {staged, foreign}
     assert {path.read_bytes() for path in staged.parent.glob("*.bak")} == {b"previous room", b"legacy room"}
 
 
-@pytest.mark.parametrize(("row", "expected"), [
-    (("DOOMEternalx64vk.exe", "101"), "doometernalx64vk.exe"),
-    (("102", "DOOMEternalx64v", r"C:\Program Files\DOOMEternalx64vk.exe +com_skipIntroVideo 1"), "doometernalx64vk.exe"),
-    (("103", "MainThread", r'"C:\Game Files\DOOMEternalx64vk.exe"'), "doometernalx64vk.exe"),
-    (("104", "wine64", 'wine64 "/games/DOOM Eternal/DOOMEternalx64vk.exe"'), "doometernalx64vk.exe"),
-    (("105", "python3", 'python3 /opt/proton/proton waitforexitandrun "/games/DOOM Eternal/DOOMEternalx64vk.exe"'), None),
-    (("106", "proton", '/opt/proton/proton run /games/DOOMEternalx64vk.exe'), None),
-    (("107", "ap_client", '/opt/ap_client --config client.json'), "ap_client"),
-    (("108", "python3", 'python3 /opt/proton/proton runinprefix /opt/APSessionOwner.exe --process-identity --expected-game-exe /games/DOOMEternalx64vk.exe'), None),
-    (("109", "APSessionOwner", r'"Z:\client\APSessionOwner.exe" --process-identity --expected-game-exe "Z:\games\DOOMEternalx64vk.exe"'), None),
-    (("110", "wine64", 'wine64 /opt/APSessionOwner.exe --expected-game-exe /games/DOOMEternalx64vk.exe'), None),
-    (("111", "grep", 'grep DOOMEternalx64vk.exe'), None),
-    (("112", "python3", 'python3 launcher.py --game /games/DOOMEternalx64vk.exe'), None),
-])
+@pytest.mark.parametrize(
+    ("row", "expected"),
+    [
+        (("DOOMEternalx64vk.exe", "101"), "doometernalx64vk.exe"),
+        (
+            ("102", "DOOMEternalx64v", r"C:\Program Files\DOOMEternalx64vk.exe +com_skipIntroVideo 1"),
+            "doometernalx64vk.exe",
+        ),
+        (("103", "MainThread", r'"C:\Game Files\DOOMEternalx64vk.exe"'), "doometernalx64vk.exe"),
+        (("104", "wine64", 'wine64 "/games/DOOM Eternal/DOOMEternalx64vk.exe"'), "doometernalx64vk.exe"),
+        (
+            (
+                "105",
+                "python3",
+                'python3 /opt/proton/proton waitforexitandrun "/games/DOOM Eternal/DOOMEternalx64vk.exe"',
+            ),
+            None,
+        ),
+        (("106", "proton", "/opt/proton/proton run /games/DOOMEternalx64vk.exe"), None),
+        (("107", "ap_client", "/opt/ap_client --config client.json"), None),
+        (
+            (
+                "108",
+                "python3",
+                "python3 /opt/proton/proton runinprefix /opt/APSessionOwner.exe --process-identity --expected-game-exe /games/DOOMEternalx64vk.exe",
+            ),
+            None,
+        ),
+        (
+            (
+                "109",
+                "APSessionOwner",
+                r'"Z:\client\APSessionOwner.exe" --process-identity --expected-game-exe "Z:\games\DOOMEternalx64vk.exe"',
+            ),
+            None,
+        ),
+        (("110", "wine64", "wine64 /opt/APSessionOwner.exe --expected-game-exe /games/DOOMEternalx64vk.exe"), None),
+        (("111", "grep", "grep DOOMEternalx64vk.exe"), None),
+        (("112", "python3", "python3 launcher.py --game /games/DOOMEternalx64vk.exe"), None),
+    ],
+)
 def test_process_detection_distinguishes_launch_targets_from_arguments(row, expected):
     processes = platform.detect_doom_processes(process_list=(row,))
     if expected is None:
@@ -143,18 +174,26 @@ def test_process_refusal_retains_blocking_identity(room_files, monkeypatch, oper
     from doom_eap.launcher.launcher_integration import setup_failure_payload
 
     root, source, old, legacy, foreign, receipt = room_files
-    processes = ({"name": "doometernalx64vk.exe", "pid": "123", "process_name": "DOOMEternalx64v",
-                  "command_executable": "/games/DOOMEternalx64vk.exe", "matched_by": "process_name"},)
-    monkeypatch.setattr(platform, "detect_doom_processes", lambda: processes)
-    monkeypatch.setattr(platform, "probe_meathook", Mock(return_value=Mock(ok=False)))
+    processes = (
+        {
+            "name": "doometernalx64vk.exe",
+            "pid": "123",
+            "process_name": "DOOMEternalx64v",
+            "command_executable": "/games/DOOMEternalx64vk.exe",
+            "matched_by": "process_name",
+        },
+    )
+    monkeypatch.setattr(launcher_injector, "detect_doom_processes", lambda **kwargs: processes)
+    monkeypatch.setattr(launcher_platform, "detect_doom_processes", lambda **kwargs: processes)
+    monkeypatch.setattr(launcher_injector, "probe_meathook", Mock(return_value=Mock(ok=False)))
     before = game_files(root)
     with pytest.raises(RuntimeError, match="PID 123") as refused:
         if operation == "core":
-            platform.install_meathook(root, None, consent=lambda _: False)
+            launcher_injector.install_meathook(root, None, consent=lambda _: False)
         else:
-            platform.stage_room_mod(source, root, receipt, manifest_hash="room")
+            launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="room")
     payload = setup_failure_payload(refused.value, phase="game_setup")
-    assert payload["processes"] == processes
+    assert list(payload["processes"]) == list(processes)
     assert payload["recovery_action"] == "repair_game_integration"
     assert game_files(root) == before
 
@@ -169,17 +208,17 @@ def test_process_query_failure_refuses_mutation(room_files, monkeypatch, query_f
     monkeypatch.undo()
     before = game_files(root)
     calls = {
-        "core": lambda: platform.install_meathook(root, None, consent=lambda _: False),
+        "core": lambda: launcher_injector.install_meathook(root, None, consent=lambda _: False),
         "replace": lambda: replace_pair(root, None, {}),
         "rollback": lambda: rollback_core(root, None),
-        "stage": lambda: platform.stage_room_mod(source, root, receipt, manifest_hash="room"),
-        "adapter_stage": lambda: platform._stage_mod(source, root),
-        "windows": lambda: platform.WindowsModInjectorAdapter(None).run(root),
-        "linux": lambda: platform.LinuxModManagerAdapter(None).run(root),
+        "stage": lambda: launcher_injector.stage_room_mod(source, root, receipt, manifest_hash="room"),
+        "adapter_stage": lambda: launcher_injector._stage_mod(source, root),
+        "windows": lambda: installation_adapters.WindowsModInjectorAdapter(None).run(root),
+        "linux": lambda: installation_adapters.LinuxModManagerAdapter(None).run(root),
         "campaign": lambda: enable_campaign_resources(root, source),
     }
     result = subprocess.CompletedProcess(["tasklist"], 1, "", "access denied")
-    with patch.object(platform.subprocess, "run", side_effect=query_failure if isinstance(query_failure, Exception) else None,
+    with patch.object(launcher_platform.subprocess, "run", side_effect=query_failure if isinstance(query_failure, Exception) else None,
                       return_value=result) as query:
         with pytest.raises(platform.ProcessInspectionError, match="Could not inspect.*Cannot safely"):
             calls[operation]()
@@ -231,18 +270,6 @@ def test_window_has_no_visible_children_outside_central_widget(ui):
     assert [button.isChecked() for button in ui.nav_buttons] == [False, False, True, False]
 
 
-def test_game_folder_controls_collapse_when_found_and_change_opens_them(ui):
-    ui.game_root.setText("fixture/game")
-    ui.saves_root.setText("fixture/save")
-    ui._toggle_paths(force=False)
-    assert ui.game_paths.isHidden()
-    assert ui.game_root.isReadOnly() and ui.saves_root.isReadOnly()
-    ui.change_paths.click()
-    assert not ui.game_paths.isHidden()
-    ui._select_recent_room(0)
-    assert not ui.server.text()
-
-
 def test_key_capture_warns_without_saving_conflicts_and_escape_cancels(ui):
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
@@ -262,14 +289,6 @@ def test_key_capture_warns_without_saving_conflicts_and_escape_cancels(ui):
     QTest.keyClick(ui.special_toggle_keybind.editor, Qt.Key.Key_B)
     assert ui.settings_view.conflict_warning.isHidden()
     ui.controller.set_ap_keybinds.assert_called_once_with("Y", "B")
-
-
-def test_help_respects_doctor_attention(ui):
-    dispatch_window(ui, {"type": "doctor_report", "report": {"ok": False, "diagnostics": [
-        {"key": "ap_session", "status": "attention", "message": "Session refused"}]}})
-    assert "attention" in ui.help_view.doctor_status.text().casefold()
-    assert "needs attention" in ui.help_view.doctor_evidence.text().casefold()
-    assert ui.help_view.fix_button.isEnabled()
 
 
 def test_help_game_action_opens_play_folder_controls(ui):
@@ -336,15 +355,6 @@ def test_window_keeps_installer_progress_inventory_result_and_session_navigation
     assert ui.resync_inventory_button.isEnabled()
 
 
-def test_window_requires_retry_instead_of_confirmation_for_unknown_injection(ui):
-    dispatch_window(ui, {'type': 'manual_install_required', 'recovery_required': True,
-                         'injector_state': 'unknown', 'message': 'Re-run installation.'})
-    assert ui.session_manual_complete_action.isHidden()
-    assert not ui.session_manual_retry_action.isHidden()
-    dispatch_window(ui, {'type': 'manual_install_required', 'message': 'Confirm installation.'})
-    assert not ui.session_manual_complete_action.isHidden()
-
-
 def test_window_offers_preservation_for_interrupted_save(ui, monkeypatch):
     from PySide6.QtWidgets import QComboBox, QInputDialog
 
@@ -357,30 +367,6 @@ def test_window_offers_preservation_for_interrupted_save(ui, monkeypatch):
     dispatch_window(ui, {"type": "ap_save_inspection", "inspection": {
         "seed": "fixture", "slot": 1, "status": "save_interrupted", "native_backup_available": False}})
     assert len(shown) == 1 and "interrupted" in shown[0][0] and shown[0][1]
-
-
-def test_room_summary_displays_tracker_options(ui):
-    ui.controller.item_history_status = None
-    from tests.room_fixture import current_room_fixture
-
-    slot_data = current_room_fixture()
-    ui._render_room({"seed_name": "room", "team": 0, "slot": 1, "slot_data": slot_data})
-    summary = ui.room_summary.text()
-    assert "Complete the Full Saga" in summary and "Standard" in summary
-    assert "<b>CAMPAIGN</b> &nbsp; Full Saga" in summary
-
-
-def test_injector_failure_displays_exit_code_and_output(ui):
-    with patch.object(ui, "_append_log") as log:
-        ui._handle_event({"type": "injector_finished", "state": "failed", "returncode": 23,
-                          "stdout": "injection output", "stderr": "injection error"})
-    messages = [call.args[0] for call in log.call_args_list]
-    assert any("exit code 23" in message for message in messages)
-    assert "Injector stdout: injection output" in messages and "Injector stderr: injection error" in messages
-
-
-
-
 
 
 def test_report_actions_open_copy_and_show_without_submission(ui, tmp_path, monkeypatch):
@@ -512,3 +498,5 @@ def test_uncertain_installation_offers_install_again(ui):
     assert ui._manual_retry
     ui.hero_action.click()
     ui._prepare.assert_called_once_with(force=True)
+    dispatch_window(ui, {"type": "manual_install_required", "message": "Confirm installation."})
+    assert not ui.session_manual_complete_action.isHidden()

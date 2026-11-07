@@ -23,6 +23,13 @@ def settings(**options):
         **options})
 
 
+def _assert_auto_density_emissions(recipes):
+    assert all(r['physical_count'] >= r['logical_count'] for r in recipes)
+    assert sum(r['physical_count'] for r in recipes) == 6
+    assert recipes[0]['maximum_emissions'] == recipes[0]['physical_count'] * 2
+    assert recipes[1]['maximum_emissions'] == recipes[1]['physical_count']
+
+
 def test_auto_density_preserves_requests_and_frozen_revisions():
     source = catalog()
     first = source['maps']['base']['origins'][0]
@@ -31,10 +38,7 @@ def test_auto_density_preserves_requests_and_frozen_revisions():
     options = settings(enemy_density=150, enemy_weights={name: int(name == 'stone_imp') for name in SPECIES_IDS})
     plan = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source)
     recipes = plan['maps']['base']['recipes']
-    assert all(r['physical_count'] >= r['logical_count'] for r in recipes)
-    assert sum(r['physical_count'] for r in recipes) == 6
-    assert recipes[0]['maximum_emissions'] == recipes[0]['physical_count'] * 2
-    assert recipes[1]['maximum_emissions'] == recipes[1]['physical_count']
+    _assert_auto_density_emissions(recipes)
     frozen = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=7)
     assert [r['physical_count'] for r in frozen['maps']['base']['recipes']] == [5, 2]
     legacy = build_native_recipes(options, {'sequence': ['base']}, seed=7, catalog=source, revision=1)

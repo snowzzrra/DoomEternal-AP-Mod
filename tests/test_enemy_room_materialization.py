@@ -14,11 +14,13 @@ from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
 from tools.release.room_payloads import map_physical_option_keys
 
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.integration
 TARGET = "e1m1_intro_patch3/maps/game/sp/e1m1_intro/e1m1_intro.entities"
+
 
 def options_for_plan(plan):
     from doom_eap.content.slot_data_contract import load_slot_catalog
-    from tests.test_slot_data_contract import sign_slot
+    from tests.room_fixture import sign_slot
 
     catalog = load_slot_catalog()
     from tests.room_fixture import current_room_fixture
@@ -27,15 +29,6 @@ def options_for_plan(plan):
     data["runtime"]["checks"]["arena_checks"] = 0
     data["recipes"] = encode_native_recipes(plan, catalog, active_maps=[*data["campaign"]["sequence"], "hub"])
     return sign_slot(data, catalog)
-
-
-def test_resolved_room_requests_native_donor_maps():
-    from doom_eap.launcher.campaign_resources import room_enemy_plan
-    from doom_eap.launcher.native_enemy_resources import native_resource_maps
-
-    plan = build_native_recipes(normalize_enemy_options({}), {"sequence": ["e1m1_intro"]}, seed=73822)
-    requested = native_resource_maps(room_enemy_plan(options_for_plan(plan)))
-    assert requested and requested == native_resource_maps(plan)
 
 
 def cold_case(tmp_path, monkeypatch):
@@ -89,6 +82,38 @@ def base_files(compiler):
         return {name: archive.read(name) for name in archive.namelist()}
 
 
+def _assert_donor_asset_closure(model, pairs):
+    assert len(pairs) == len(set(pairs))
+    assert ("md6Def", model) in pairs
+    assert ("binarymd6def", model) in pairs
+    assert any(kind == "baseModel" and "demonic_troops" in name for kind, name in pairs)
+    assert any(kind == "skeleton" and "demonic_troops" in name for kind, name in pairs)
+
+
+def _assert_donor_map_resources(pairs, roots):
+    assert any(kind == "anim" and "demonic_troops" in name for kind, name in pairs)
+    assert any(kind == "image" and "demonic_troops" in name for kind, name in pairs)
+    assert ("damage", "damage/ai/demonic_trooper/melee") in pairs
+    assert all(name in roots["game/sp/e1m1_intro/e1m1_intro"] for _, name in pairs)
+
+
+def _assert_native_spawn_request(assembled, call, recipe):
+    assert call["eventDef"] == "spawnSingleAI"
+    assert call["args"]["item[1]"]["entity"] == "ap_v070_request_r" + recipe["origin"]
+    assert not any(name.startswith("gameresources_patch3/generated/decls/actorpopulation/ap_v070/") for name in assembled)
+
+
+def _assert_recipe_metadata(entity_records, plan, records, text):
+    header = records["ap_v070_recipe_plan"]["edit"]["spawnEditableShared"]["groupName"]
+    count = int(header.split("|")[1], 16)
+    chunks = []
+    for index in range(count):
+        start, end = find_entity_block_bounds(text, f"ap_v070_recipe_plan_{index}")
+        chunks.append(next(entity_records(text[start:end]))["edit"]["spawnEditableShared"]["groupName"])
+    from doom_eap.content.native_enemy_plan import native_recipe_metadata
+    assert "".join(chunks) == native_recipe_metadata(plan, "e1m1_intro")
+
+
 def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow(tmp_path, monkeypatch):
     from dataclasses import replace
 
@@ -111,15 +136,8 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
     assets = json.loads(assembled[assets_path])
     assert assets["layers"] == retained["layers"]
     pairs = [(entry["mapResourceType"], entry["name"]) for entry in assets["assets"]]
-    assert len(pairs) == len(set(pairs))
-    assert ("md6Def", model) in pairs
-    assert ("binarymd6def", model) in pairs
-    assert any(kind == "baseModel" and "demonic_troops" in name for kind, name in pairs)
-    assert any(kind == "skeleton" and "demonic_troops" in name for kind, name in pairs)
-    assert any(kind == "anim" and "demonic_troops" in name for kind, name in pairs)
-    assert any(kind == "image" and "demonic_troops" in name for kind, name in pairs)
-    assert ("damage", "damage/ai/demonic_trooper/melee") in pairs
-    assert all(name in roots["game/sp/e1m1_intro/e1m1_intro"] for _, name in pairs)
+    _assert_donor_asset_closure(model, pairs)
+    _assert_donor_map_resources(pairs, roots)
     assert not any("/imp_stone/" in name for _, name in pairs)
     text = assembled[TARGET].decode()
     names = ["ap_v070_recipe_plan", "subway_encounter_manager_subway_hall"]
@@ -127,21 +145,12 @@ def test_cold_room_compiles_native_recipes_without_reconstructing_encounter_flow
     for name in names:
         start, end = find_entity_block_bounds(text, name)
         records[name] = next(entity_records(text[start:end]))
-    header = records["ap_v070_recipe_plan"]["edit"]["spawnEditableShared"]["groupName"]
-    count = int(header.split("|")[1], 16)
-    chunks = []
-    for index in range(count):
-        start, end = find_entity_block_bounds(text, f"ap_v070_recipe_plan_{index}")
-        chunks.append(next(entity_records(text[start:end]))["edit"]["spawnEditableShared"]["groupName"])
-    from doom_eap.content.native_enemy_plan import native_recipe_metadata
-    assert "".join(chunks) == native_recipe_metadata(plan, "e1m1_intro")
+    _assert_recipe_metadata(entity_records, plan, records, text)
     recipe = next(row for row in plan["maps"]["e1m1_intro"]["recipes"]
                   if native_event_identity(row) == "subway_encounter_manager_subway_hall/0/0")
     events = records[recipe["binding"]["entity"]]["edit"]["encounterComponent"]["entityEvents"]["item[0]"]["events"]
     call = list_items(events)[0]["eventCall"]
-    assert call["eventDef"] == "spawnSingleAI"
-    assert call["args"]["item[1]"]["entity"] == "ap_v070_request_r" + recipe["origin"]
-    assert not any(name.startswith("gameresources_patch3/generated/decls/actorpopulation/ap_v070/") for name in assembled)
+    _assert_native_spawn_request(assembled, call, recipe)
     replay = base_files(compiler)
     replay[assets_path] = json.dumps(retained).encode()
     compiler._apply_enemy_plan(replay, manifest)

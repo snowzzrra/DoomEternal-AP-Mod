@@ -25,6 +25,18 @@ def storage(peer):
     return json.loads((peer.root / "ap-storage.json").read_text())
 
 
+def _assert_uncertain_refill(operation, peer, status):
+    assert operation["state"] == "unknown"
+    assert status["ammo_reserved"] == 1 and status["ammo_consumed"] == 0
+    assert peer.action("ammo_deliver")["blocked"]
+    assert peer.effects() == []
+
+
+def _assert_committed_refill(identifier, status):
+    assert status["ammo_operations"][0]["id"] == identifier
+    assert status["ammo_consumed"] == 1 and status["ammo_reserved"] == 0
+
+
 @pytest.mark.parametrize("failure", ["refused", "lost", "foreign", "duplicate"])
 def test_refill_requires_correlated_debit_and_recovers_the_same_operation(peer, failure):
     peer.start()
@@ -34,18 +46,14 @@ def test_refill_requires_correlated_debit_and_recovers_the_same_operation(peer, 
     identifier = operation["id"]
     assert peer.effects() == []
     if failure != "duplicate":
-        assert operation["state"] == "unknown"
-        assert status["ammo_reserved"] == 1 and status["ammo_consumed"] == 0
-        assert peer.action("ammo_deliver")["blocked"]
-        assert peer.effects() == []
+        _assert_uncertain_refill(operation, peer, status)
     fault(peer, "")
     status = peer.action("ammo_recover")
     if failure == "refused":
         assert status["ammo_operations"][0]["state"] == "unknown"
         status = peer.action("ammo_retry", operation_id=identifier,
                              revision=status["ammo_operations"][0]["revision"])
-    assert status["ammo_operations"][0]["id"] == identifier
-    assert status["ammo_consumed"] == 1 and status["ammo_reserved"] == 0
+    _assert_committed_refill(identifier, status)
     peer.action("ammo_deliver")
     peer.action("ammo_recover")
     peer.action("ammo_deliver")
@@ -53,6 +61,11 @@ def test_refill_requires_correlated_debit_and_recovers_the_same_operation(peer, 
     values = storage(peer)
     assert values["doom_eap:DeliveryRoomA:ammo_refill_consumed"] == 1
     assert sum("ammo/ops/" in key for key in values) == 1
+
+
+def _assert_recovered_refill(operation, status):
+    assert status["ammo_consumed"] == 1 and status["ammo_reserved"] == 0
+    assert status["ammo_operations"][0]["id"] == operation["id"]
 
 
 @pytest.mark.parametrize("point", ["ammo_reservation:after", "ammo_total:before",
@@ -70,8 +83,7 @@ def test_restart_between_reservation_operation_total_and_commit_never_debits_twi
         assert peer.action("ammo_deliver")["blocked"]
         status = peer.action("ammo_retry", operation_id=operation["id"],
                              revision=status["ammo_operations"][0]["revision"])
-    assert status["ammo_consumed"] == 1 and status["ammo_reserved"] == 0
-    assert status["ammo_operations"][0]["id"] == operation["id"]
+    _assert_recovered_refill(operation, status)
     peer.action("ammo_deliver")
     peer.action("ammo_recover")
     peer.action("ammo_deliver")
@@ -123,6 +135,12 @@ def test_overflow_is_absolute_and_restart_does_not_restore_spent_charges(peer):
     assert storage(peer)["doom_eap:DeliveryRoomA:ammo_refill_discarded"] == 3
 
 
+def _assert_paid_refill_retry(peer):
+    assert len(peer.effects()) == 2
+    assert sum("ammo/ops/" in key for key in storage(peer)) == 1
+    assert storage(peer)["doom_eap:DeliveryRoomA:ammo_refill_consumed"] == 1
+
+
 def test_uncertain_effect_requires_explicit_retry_and_reuses_the_paid_operation(peer):
     peer.start()
     status = peer.action("ammo")
@@ -143,9 +161,7 @@ def test_uncertain_effect_requires_explicit_retry_and_reuses_the_paid_operation(
     assert status["ammo_operations"] == [operation]
     assert status["ammo_consumed"] == 1
     peer.action("ammo_deliver")
-    assert len(peer.effects()) == 2
-    assert sum("ammo/ops/" in key for key in storage(peer)) == 1
-    assert storage(peer)["doom_eap:DeliveryRoomA:ammo_refill_consumed"] == 1
+    _assert_paid_refill_retry(peer)
 
 
 def test_server_totals_cannot_be_reused_as_a_new_debit(peer):

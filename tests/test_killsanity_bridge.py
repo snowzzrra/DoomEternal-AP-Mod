@@ -1,36 +1,13 @@
 import asyncio
-import importlib
-import io
-import json
 import logging
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
 from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.killsanity import Killsanity
-
-
-@pytest.fixture
-def bridge(tmp_path, monkeypatch):
-    game, saves = tmp_path / "game/base", tmp_path / "local"
-    game.mkdir(parents=True)
-    saves.mkdir()
-    config = tmp_path / "config.json"
-    config.write_text(json.dumps({"doom_base_dir": str(game), "save_games_dir": str(saves),
-                                  "client_state_file": str(tmp_path / "state.json"),
-                                  "bridge_log_path": str(tmp_path / "bridge.log")}), encoding="utf-8")
-    monkeypatch.setenv("DOOM_AP_CONFIG_FILE", str(config))
-    monkeypatch.setenv("DOOM_AP_APPLICATION_DIR", str(tmp_path))
-    root = Path(__file__).resolve().parents[2]
-    monkeypatch.syspath_prepend(str(root / "Archipelago"))
-    monkeypatch.syspath_prepend(str(root / "DoomEternal-AP-Mod" / "packaging" / "standalone_runtime"))
-    return importlib.import_module("doom_eap.runtime.bridge_client")
-
-
+from doom_eap.runtime.bridge_checks import CheckPublication
+from doom_eap.runtime.campaign import Killsanity
 
 
 @pytest.mark.parametrize('phase', ['observe', 'present'])
@@ -62,17 +39,29 @@ def test_late_observation_or_presentation_cannot_publish_after_rebind(bridge, ph
         sent.extend(messages)
 
     ctx = SimpleNamespace(
-        killsanity=kills, item_state_ready=True, state_key='room', session_state=session,
-        _native_game_link_async=AsyncMock(return_value=SimpleNamespace(
-            namespace=namespace, observe_combat=observe, publish_combat_progress=present)),
+        killsanity=kills,
+        item_state_ready=True,
+        state_key='room',
+        session_state=session,
         persist_session_state=lambda: committed.append(kills.total),
-        check_observation=lambda: CheckObservation(frozenset(), frozenset(), frozenset({1}), True, True),
-        check_publication=lambda: CheckPublication(send, lambda location: None, 30),
+        items=None,
+        checks=None,
+        saves=None
     )
+    ctx.items = bridge.bridge_items.ItemRuntime(ctx)
+    ctx.items._native_game_link_async = AsyncMock(return_value=SimpleNamespace(
+            namespace=namespace, observe_combat=observe, publish_combat_progress=present))
+    ctx.checks = bridge.bridge_checks.CheckRuntime(ctx)
+    ctx.checks.check_observation = lambda: CheckObservation(frozenset(), frozenset(), frozenset({1}), True, True)
+    ctx.checks.check_publication = lambda: CheckPublication(send, lambda location: None, 30)
+    ctx.saves = bridge.bridge_saves.SaveRuntime(ctx)
+
+
+
     async def native_call(link, method, *args):
         return await asyncio.to_thread(getattr(link, method), *args)
-    ctx._native_call = native_call
-    asyncio.run(bridge.DoomEternalContext.check_killsanity(ctx, True))
+    ctx.items._native_call = native_call
+    asyncio.run(ctx.checks.check_killsanity(True))
     assert sent == []
     assert committed == ([100] if phase == 'present' else [])
     assert session.get('killsanity', {}).get('total', 0) == (100 if phase == 'present' else 0)

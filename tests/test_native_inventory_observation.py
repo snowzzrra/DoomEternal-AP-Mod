@@ -1,12 +1,12 @@
 import pytest
 
-from doom_eap.runtime.weapon_points import SentinelWeaponPoints, WeaponPointsBlocked
+from doom_eap.runtime.inventory import SentinelWeaponPoints, WeaponPointsBlocked
 
 
 def test_native_worker_request_and_close_work_without_asyncio_runner(tmp_path, monkeypatch):
     import asyncio
 
-    import doom_eap.runtime.weapon_points as module
+    import doom_eap.runtime.inventory as module
 
     monkeypatch.delattr(asyncio, "Runner", raising=False)
     closed = []
@@ -28,7 +28,7 @@ def test_native_worker_request_and_close_work_without_asyncio_runner(tmp_path, m
 def test_probe_diagnostics_preserve_first_error_and_aggregate_sampling(tmp_path, monkeypatch):
     import json
 
-    import doom_eap.runtime.weapon_points as module
+    import doom_eap.runtime.inventory as module
     now = [1.0]
     monkeypatch.setattr(module.time, "monotonic", lambda: now[0])
     emitted = []

@@ -14,7 +14,7 @@ from doom_eap.runtime.delivery import classify
 from doom_eap.runtime.ledger import CommandState
 from doom_eap.runtime.native_transport import NativeTransport, ProtocolError, WireError
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows pipe and MSVC relay")
+pytestmark = [pytest.mark.integration, pytest.mark.skipif(os.name != "nt", reason="Windows pipe and MSVC relay")]
 ROOT = Path(__file__).resolve().parents[1]
 
 

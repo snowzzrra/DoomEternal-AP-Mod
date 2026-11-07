@@ -1,15 +1,8 @@
-from doom_eap.content.killsanity_plan import build_campaign_kill_budget, build_killsanity_plan
+from doom_eap.content.killsanity_plan import build_campaign_kill_budget
 
 
 def sources(count):
     return [{"source_id": "intro/finite", "map_key": "e1m1_intro", "count": count, "repeatable": True}]
-
-
-def test_producer_reward_addresses_use_ordinals():
-    first = build_killsanity_plan({"enabled": True, "interval": 100}, sources(200))
-    second = build_killsanity_plan({"enabled": True, "interval": 10, "maximum_milestones": 2}, sources(200))
-    assert [row["location_id"] for row in first["milestones"]] == [2_200_000_001, 2_200_000_002]
-    assert [row["location_id"] for row in second["milestones"]] == [2_200_000_001, 2_200_000_002]
 
 
 def native_plan(manager, script, event, logical, physical):

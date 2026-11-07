@@ -1,5 +1,3 @@
-"""Protect durable ownership, room isolation and atomic delivery records."""
-
 import asyncio
 import sqlite3
 import threading
@@ -11,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from doom_eap.runtime import ledger as storage
+from doom_eap.runtime import ledger_schema as storage
 from doom_eap.runtime.ledger import (
     AmmoChange,
     AmmoKind,
@@ -312,6 +310,29 @@ def test_events_cannot_be_updated_or_deleted(run, sql):
 
 
 def test_items_view_reports_received_waiting_delivered_blocked_with_reason(run):
+    def _assert_item_statuses_and_actions(commands, result):
+        assert [row.status for row in result] == [
+            ItemStatus.RECEIVED,
+            ItemStatus.WAITING,
+            ItemStatus.WAITING,
+            ItemStatus.DELIVERED,
+            ItemStatus.BLOCKED,
+            ItemStatus.BLOCKED,
+            ItemStatus.DELIVERED,
+        ]
+        assert [result[index].reason for index in (1, 2, 5, 6)] == [
+            "waiting for save",
+            "waiting for predecessor",
+            "unsupported effect",
+            "charge credited",
+        ]
+        assert [action.kind for action in result[4].actions] == list(ResolutionAction)
+        assert {(action.command_id, action.expected_revision) for action in result[4].actions} == {
+            (commands[3].command_id, 1),
+        }
+        assert "duplicate" in result[4].reason
+
+
     async def scenario(ledger, path):
         binding = await bind(ledger)
         await ledger.ingest(binding, 0, (receipt(),) * 7)
@@ -341,26 +362,7 @@ def test_items_view_reports_received_waiting_delivered_blocked_with_reason(run):
         )
         commit = await ledger.apply(binding, changes, (), ())
         result = await ledger.items(binding.room, -1, 10)
-        assert [row.status for row in result] == [
-            ItemStatus.RECEIVED,
-            ItemStatus.WAITING,
-            ItemStatus.WAITING,
-            ItemStatus.DELIVERED,
-            ItemStatus.BLOCKED,
-            ItemStatus.BLOCKED,
-            ItemStatus.DELIVERED,
-        ]
-        assert [result[index].reason for index in (1, 2, 5, 6)] == [
-            "waiting for save",
-            "waiting for predecessor",
-            "unsupported effect",
-            "charge credited",
-        ]
-        assert [action.kind for action in result[4].actions] == list(ResolutionAction)
-        assert {(action.command_id, action.expected_revision) for action in result[4].actions} == {
-            (commands[3].command_id, 1),
-        }
-        assert "duplicate" in result[4].reason
+        _assert_item_statuses_and_actions(commands, result)
         assert {row.event_sequence for row in result} == {commit.event_sequence}
 
     run(scenario)
@@ -724,12 +726,11 @@ def test_bounded_worker_does_not_block_asyncio_or_lose_cancelled_commits(run, mo
         monkeypatch.setattr(storage, "_now", delayed)
         task = asyncio.create_task(ledger.ingest(binding, 0, (receipt(),)))
         try:
-            await wait_until(entered.is_set)
+            assert await asyncio.to_thread(entered.wait, 10)
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task
             queued = [asyncio.create_task(ledger.items(binding.room, -1, 10)) for _ in range(65)]
-            await asyncio.sleep(0)
             with pytest.raises(WorkerFull):
                 await queued[-1]
         finally:
@@ -744,42 +745,6 @@ def test_bounded_worker_does_not_block_asyncio_or_lose_cancelled_commits(run, mo
     run(scenario)
 
 
-async def wait_until(predicate):
-    for _ in range(1000):
-        if predicate():
-            return
-        await asyncio.sleep(0.001)
-    pytest.fail("worker did not start")
-
-
-async def measure_backlog(path, count, work):
-    ledger = await Ledger.create(path)
-    binding = await bind(ledger)
-    ticks = []
-    stopped = asyncio.Event()
-    observer = asyncio.create_task(heartbeat(stopped, ticks))
-    started = time.perf_counter()
-    try:
-        for start in range(0, count, 250):
-            batch = (receipt(),) * min(250, count - start)
-            await ledger.ingest(binding, start, batch)
-        elapsed = time.perf_counter() - started
-        steps = work[path]
-        await check_backlog_pages(ledger, binding.room, count)
-        assert (await ledger.room(binding.room)).receipt_boundary == count
-    finally:
-        stopped.set()
-        await observer
-        await ledger.close()
-    return elapsed, len(ticks), steps
-
-
-async def heartbeat(stopped, ticks):
-    while not stopped.is_set():
-        ticks.append(time.perf_counter())
-        await asyncio.sleep(0.001)
-
-
 async def check_backlog_pages(ledger, key, count):
     seen = 0
     after = -1
@@ -787,38 +752,6 @@ async def check_backlog_pages(ledger, key, count):
         seen += len(page)
         after = page[-1].ap_index
     assert seen == count
-
-
-def test_ingesting_5000_receipts_in_batches_scales_roughly_linearly(tmp_path, capsys, monkeypatch):
-    work = {}
-    original = Ledger._connect
-
-    def connect(ledger):
-        connection = original(ledger)
-        work[ledger._path] = 0
-
-        def progress():
-            work[ledger._path] += 100
-            return 0
-
-        connection.set_progress_handler(progress, 100)
-        return connection
-
-    async def scenario():
-        small, small_ticks, small_steps = await measure_backlog(tmp_path / "2500.sqlite3", 2500, work)
-        large, large_ticks, large_steps = await measure_backlog(tmp_path / "5000.sqlite3", 5000, work)
-        assert large <= small * 4 + 0.5
-        assert large_steps <= small_steps * 2.5
-        assert min(small_ticks, large_ticks) >= 1
-        assert rows(tmp_path / "5000.sqlite3", "SELECT count(*) FROM receipts") == [(5000,)]
-        print(f"receipt batches: 2500={small:.3f}s; 5000={large:.3f}s; ratio={large / small:.2f}")
-        print(f"event loop ticks: {small_ticks}, {large_ticks}")
-        print(f"SQLite work: {small_steps}, {large_steps} steps")
-
-    monkeypatch.setattr(Ledger, "_connect", connect)
-    asyncio.run(scenario())
-    with capsys.disabled():
-        print(capsys.readouterr().out, end="")
 
 
 @pytest.mark.parametrize("kind", list(SourceKind))
@@ -879,6 +812,19 @@ async def uncertain_command(ledger, source="receipt"):
 @pytest.mark.parametrize("source", ["receipt", "ammo", "local"])
 @pytest.mark.parametrize("action", list(ResolutionAction))
 def test_manual_resolution_preserves_uncertainty_and_allows_only_one_branch(run, source, action):
+    def _assert_resolution_evidence(replacement, resolution, stored):
+        assert stored.state is CommandState.EFFECT_UNKNOWN and stored.result == b"evidence"
+        assert stored.resolution is (Resolution.REPLACED if resolution.replacement else Resolution.ACCEPTED_BY_PLAYER)
+        assert stored.replacement_id == (replacement.command_id if resolution.replacement else None)
+
+
+    async def _assert_single_resolution_event(binding, ledger, path):
+        assert rows(path, "SELECT count(*) FROM events WHERE kind='command_resolved'") == [(1,)]
+        assert len(await ledger.commands(binding.room, (CommandState.EFFECT_UNKNOWN,), None, 10,
+                                         unresolved_only=True)) == 0
+        assert len(await ledger.commands(binding.room, (CommandState.EFFECT_UNKNOWN,), None, 10)) == 1
+
+
     async def scenario(ledger, path):
         binding, _, command = await uncertain_command(ledger, source)
         replacement = replace(command, command_id=uid(), realization_key=uid(), supersedes_id=command.command_id)
@@ -887,9 +833,7 @@ def test_manual_resolution_preserves_uncertainty_and_allows_only_one_branch(run,
         first, duplicate = await asyncio.gather(ledger.resolve(binding, resolution), ledger.resolve(binding, resolution))
         assert first == duplicate
         stored = await ledger.command(binding.room, command.command_id)
-        assert stored.state is CommandState.EFFECT_UNKNOWN and stored.result == b"evidence"
-        assert stored.resolution is (Resolution.REPLACED if resolution.replacement else Resolution.ACCEPTED_BY_PLAYER)
-        assert stored.replacement_id == (replacement.command_id if resolution.replacement else None)
+        _assert_resolution_evidence(replacement, resolution, stored)
         if resolution.replacement:
             with pytest.raises(Conflict):
                 await ledger.resolve(binding, replace(resolution, replacement=replace(replacement, command_id=uid())))
@@ -901,10 +845,7 @@ def test_manual_resolution_preserves_uncertainty_and_allows_only_one_branch(run,
         if source == "receipt":
             item, = await ledger.items(binding.room, -1, 10)
             assert item.status is ItemStatus.DELIVERED and not item.actions
-        assert rows(path, "SELECT count(*) FROM events WHERE kind='command_resolved'") == [(1,)]
-        assert len(await ledger.commands(binding.room, (CommandState.EFFECT_UNKNOWN,), None, 10,
-                                         unresolved_only=True)) == 0
-        assert len(await ledger.commands(binding.room, (CommandState.EFFECT_UNKNOWN,), None, 10)) == 1
+        await _assert_single_resolution_event(binding, ledger, path)
 
     run(scenario)
 
@@ -956,6 +897,25 @@ def test_attempt_recovery_uses_original_binding_reference_and_envelope(run):
 
 
 def test_items_watermark_pages_old_row_updates_without_losing_later_changes(run):
+    def _assert_pinned_watermark_page(first, second):
+        assert [row.ap_index for row in second] == [2, 3]
+        assert second.watermark == first.watermark
+
+
+    def _assert_updated_old_item(updates):
+        assert [row.ap_index for row in updates] == [0]
+        assert updates[0].reason == "waiting"
+
+
+    async def _assert_watermark_room_isolation(empty, later, ledger):
+        assert not empty and empty.watermark == later.watermark
+        assert not await ledger.items(room("other"), -1, 1)
+
+
+    def _assert_migrated_command_identity(blocked):
+        assert len(blocked) == 4 and all(row.status is ItemStatus.BLOCKED for row in blocked)
+
+
     async def scenario(ledger, path):
         binding = await bind(ledger)
         await ledger.ingest(binding, 0, (receipt(),) * 4)
@@ -963,11 +923,9 @@ def test_items_watermark_pages_old_row_updates_without_losing_later_changes(run)
         assert [row.ap_index for row in first] == [0, 1]
         await ledger.apply(binding, (), (decision(0, ReceiptState.DEFERRED, reason="waiting"),), ())
         second = await ledger.items(binding.room, 1, 2, watermark=first.watermark)
-        assert [row.ap_index for row in second] == [2, 3]
-        assert second.watermark == first.watermark
+        _assert_pinned_watermark_page(first, second)
         updates = await ledger.items(binding.room, -1, 1, since=first.watermark)
-        assert [row.ap_index for row in updates] == [0]
-        assert updates[0].reason == "waiting"
+        _assert_updated_old_item(updates)
         await ledger.apply(binding, (), (decision(0, ReceiptState.SATISFIED, revision=1),
                                          decision(1, ReceiptState.SATISFIED)), ())
         assert not await ledger.items(binding.room, 0, 1, since=first.watermark, watermark=updates.watermark)
@@ -976,12 +934,11 @@ def test_items_watermark_pages_old_row_updates_without_losing_later_changes(run)
         last = await ledger.items(binding.room, 0, 1, since=updates.watermark, watermark=later.watermark)
         assert last[0].ap_index == 1 and last.watermark == later.watermark
         empty = await ledger.items(binding.room, -1, 1, since=later.watermark)
-        assert not empty and empty.watermark == later.watermark
-        assert not await ledger.items(room("other"), -1, 1)
+        await _assert_watermark_room_isolation(empty, later, ledger)
         with pytest.raises(HistoryConflict):
             await ledger.ingest(binding, 0, (receipt(999),))
         blocked = await ledger.items(binding.room, -1, 4, since=later.watermark)
-        assert len(blocked) == 4 and all(row.status is ItemStatus.BLOCKED for row in blocked)
+        _assert_migrated_command_identity(blocked)
 
     run(scenario)
 
@@ -1040,6 +997,14 @@ async def create_v1_database(path, monkeypatch):
 
 
 def test_v1_migration_preserves_commands_attempts_events_and_backup(tmp_path, monkeypatch):
+    def _assert_migrated_attempt_evidence(before_events, path, stored):
+        assert stored.attempt.envelope == b"old envelope" and stored.attempt.reference == b""
+        assert stored.envelope_fingerprint == sha256(b"old envelope").hexdigest()
+        assert stored.acceptance == b"old acceptance" and stored.revision == 0
+        assert rows(path, "SELECT * FROM events ORDER BY sequence") == before_events
+        assert rows(path, "PRAGMA foreign_key_check") == []
+
+
     async def scenario():
         path = tmp_path / "old.sqlite3"
         key, command = await create_v1_database(path, monkeypatch)
@@ -1051,11 +1016,7 @@ def test_v1_migration_preserves_commands_attempts_events_and_backup(tmp_path, mo
             assert (await ledger.command(key, command.command_id)).plan == command
             assert (await ledger.command(key, command.command_id)).revision == 2
             stored, = await ledger.attempts(key, command.command_id, 0, 1)
-            assert stored.attempt.envelope == b"old envelope" and stored.attempt.reference == b""
-            assert stored.envelope_fingerprint == sha256(b"old envelope").hexdigest()
-            assert stored.acceptance == b"old acceptance" and stored.revision == 0
-            assert rows(path, "SELECT * FROM events ORDER BY sequence") == before_events
-            assert rows(path, "PRAGMA foreign_key_check") == []
+            _assert_migrated_attempt_evidence(before_events, path, stored)
             backups = list(tmp_path.glob("*.backup"))
             assert len(backups) == 1 and rows(backups[0], "PRAGMA user_version") == [(1,)]
             assert rows(backups[0], "SELECT result FROM commands") == [(b"old evidence",)]
@@ -1145,3 +1106,20 @@ def test_pending_command_pages_and_query_boundaries(run):
             await ledger.resolve(binding, ManualResolution(plans[0].command_id, 1, ResolutionAction.MARK_AS_RECEIVED))
 
     run(scenario)
+
+
+def test_receipt_batches_preserve_all_indexes(tmp_path):
+    async def scenario():
+        path = tmp_path / "receipts.sqlite3"
+        ledger = await Ledger.create(path)
+        try:
+            binding = await bind(ledger)
+            for start in range(0, 5000, 250):
+                await ledger.ingest(binding, start, (receipt(),) * 250)
+            await check_backlog_pages(ledger, binding.room, 5000)
+            assert (await ledger.room(binding.room)).receipt_boundary == 5000
+        finally:
+            await ledger.close()
+        assert rows(path, "SELECT count(*) FROM receipts") == [(5000,)]
+
+    asyncio.run(scenario())

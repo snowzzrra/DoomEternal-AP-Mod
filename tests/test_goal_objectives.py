@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 
 from doom_eap.contracts.check_observation import CheckObservation
 from doom_eap.contracts.goal_policy import GoalPolicy
-from doom_eap.runtime.goal_progress import GoalProgress
+from doom_eap.runtime.campaign import GoalProgress
 
 
 def test_resolved_goal_uses_active_dlc_missions_without_dlc_equipment():

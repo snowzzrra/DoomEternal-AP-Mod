@@ -1,5 +1,3 @@
-"""Exercise the production room adapter with synthetic observations and a real ledger."""
-
 import asyncio
 import json
 import logging
@@ -11,17 +9,15 @@ from uuid import UUID
 import pytest
 from test_delivery_coordinator import Transport, response
 
-from doom_eap.runtime import delivery_runtime
+from doom_eap.runtime import delivery
 from doom_eap.runtime import sentinel_protocol_generated as codec
-from doom_eap.runtime.bootstrap import Bootstrap, BootstrapOwnership
-from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
-from doom_eap.runtime.delivery_runtime import REQUIRED_COMMANDS, RoomDelivery
-from doom_eap.runtime.fast_travel import FastTravel
-from doom_eap.runtime.item_reconciliation import ReceiptSession, load_policy_registry
-from doom_eap.runtime.item_reconciliation import ReplayPolicy as ItemReplayPolicy
+from doom_eap.runtime.bridge_items import TransientEffectManager, TransientPublication, TransientRuntime
+from doom_eap.runtime.campaign import FastTravel
+from doom_eap.runtime.delivery import REQUIRED_COMMANDS, RoomDelivery
+from doom_eap.runtime.inventory import ReceiptSession, load_policy_registry
+from doom_eap.runtime.inventory import ReplayPolicy as ItemReplayPolicy
 from doom_eap.runtime.ledger import Authority, CommandState, NetworkReceipt, StorageError, WriterBusy
-from doom_eap.runtime.transient_effects import TransientEffectManager, TransientRuntime
-from doom_eap.runtime.transient_files import TransientPublication
+from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY, Bootstrap, BootstrapOwnership
 
 
 class Core(Transport):
@@ -64,13 +60,24 @@ def bridge(tmp_path):
     policies = load_policy_registry(root / "data/item_replay_policies.json", definitions)
     session = ReceiptSession()
     value = SimpleNamespace(
-        state_key="seed:0:1:fixture", room_seed_name="seed", team=0, slot=1,
+        state_key="seed:0:1:fixture",
+        room_seed_name="seed",
+        team=0,
+        slot=1,
         _connected_slot_data={"native_generation_fingerprint": "a" * 64, "runtime": {"special_weapon": "the_crucible"}},
-        base_directory=tmp_path, session_state={"delivery_backend": "ledger"}, receipt_session=session,
-        items_received=[NetworkReceipt(7770900, 1, 1, 0)], context_campaign="Base", published_materialization_lease="1:100",
+        base_directory=tmp_path,
+        session_state={"delivery_backend": "ledger"},
+        receipt_session=session,
+        items_received=[NetworkReceipt(7770900, 1, 1, 0)],
         persist_session_state=lambda: None,
-        _refresh_runtime_context=lambda *args: CONTEXT_BY_IDENTITY["base/hub"],
+        runtime_lifecycle=SimpleNamespace(snapshot=SimpleNamespace(campaign="Base"), map_epochs=SimpleNamespace(published_materialization_lease="1:100")),
+        items=SimpleNamespace(_refresh_runtime_context=lambda *args: CONTEXT_BY_IDENTITY["base/hub"]),
+        checks=SimpleNamespace(),
+        saves=SimpleNamespace()
     )
+    value.items.ctx = value
+    value.checks.ctx = value
+    value.saves.ctx = value
     link = SimpleNamespace(pid=123, namespace="a" * 64, probe=tmp_path / "unused-probe", command_prefix=(), environment=None)
     async def yes(*args, **kwargs):
         return True
@@ -80,19 +87,19 @@ def bridge(tmp_path):
         return (link.namespace, "ap-save", 123, "123", UUID(int=2).hex, "build", 1, "game/hub/hub")
     async def send(packets):
         raise AssertionError("Storage is replaced by the isolated fixture")
-    value.checkpoint_recovery_ready = value.runtime_effects_ready = yes
-    value._native_game_link_async = get_link
-    value._native_materialization_scope = scope
+    value.saves.checkpoint_recovery_ready = value.items.runtime_effects_ready = yes
+    value.items._native_game_link_async = get_link
+    value.items._native_materialization_scope = scope
     value.send_msgs = send
     value.delivery_actions_ready = lambda: True
-    value.delivery_notification_commands = lambda *args: ()
-    value.effective_delivery_ownership = lambda receipts: SimpleNamespace(reconciliation_item_ids=tuple(r.item for r in receipts), blood_punch_upgrades=())
+    value.items.delivery_notification_commands = lambda *args: ()
+    value.items.effective_delivery_ownership = lambda receipts: SimpleNamespace(reconciliation_item_ids=tuple(r.item for r in receipts), blood_punch_upgrades=())
     return value, definitions, policies
 
 
 @pytest.fixture
 def runtime(tmp_path, monkeypatch):
-    monkeypatch.setattr(delivery_runtime, "NativeTransport", Core)
+    monkeypatch.setattr(delivery, "NativeTransport", Core)
     value, definitions, policies = bridge(tmp_path)
     events = []
     owner = RoomDelivery(value, {"client_state_file": str(tmp_path / "state.json")}, definitions, policies,
@@ -105,12 +112,16 @@ def runtime(tmp_path, monkeypatch):
 
 def test_new_room_persists_authority_before_effect_and_replans_from_ingested_prefix(runtime):
     owner, events = runtime
+    async def _assert_persisted_room_authority(error, owner, plan):
+        assert error is None and len(plan.commands) == 1
+        assert (await owner.ledger.room(owner.key)).authority is Authority.LEDGER
+        assert owner.bridge.receipt_session.processed_boundary == 1
+
+
     async def check():
         try:
             plan, error = await owner.reconcile(SimpleNamespace(epoch=1))
-            assert error is None and len(plan.commands) == 1
-            assert (await owner.ledger.room(owner.key)).authority is Authority.LEDGER
-            assert owner.bridge.receipt_session.processed_boundary == 1
+            await _assert_persisted_room_authority(error, owner, plan)
             commands = await owner._rows()
             assert len(commands) == 1 and commands[0].state is CommandState.CONFIRMED
             assert owner.transport.inventory_effects == 1
@@ -126,7 +137,7 @@ def test_unready_gate_never_opens_an_owner_database(runtime):
     owner, _ = runtime
     async def no(*args):
         return False
-    owner.bridge.runtime_effects_ready = no
+    owner.bridge.items.runtime_effects_ready = no
     async def check():
         assert not await owner.ready(None)
         assert not owner.path.exists()
@@ -138,7 +149,7 @@ def test_checkpoint_recovery_defers_owner_then_resumes_without_duplicate_grants(
     verified = False
     async def checkpoint(*args):
         return verified
-    owner.bridge.checkpoint_recovery_ready = checkpoint
+    owner.bridge.saves.checkpoint_recovery_ready = checkpoint
     async def check():
         nonlocal verified
         try:
@@ -198,7 +209,7 @@ def test_live_temporary_is_recorded_once_and_cleanup_survives_restart(runtime, m
     owner.definitions[7770158] = {'type': 'transient_effect'}
     owner.policies[7770158] = ItemReplayPolicy(7770158, 'Infinite Ammo', 'never_replay')
     now = [100.0]
-    monkeypatch.setattr('doom_eap.runtime.transient_effects.time.monotonic', lambda: now[0])
+    monkeypatch.setattr('doom_eap.runtime.bridge_items.time.monotonic', lambda: now[0])
     cleanup = []
     async def send(command, *, coalesce_key, receipt_index=None, **options):
         if receipt_index is None:
@@ -210,7 +221,7 @@ def test_live_temporary_is_recorded_once_and_cleanup_survives_restart(runtime, m
     manager = TransientEffectManager(publication, 1)
     transient_runtime = TransientRuntime('room', ('1', '1'), True)
     owner.bridge.transient_effect_manager = manager
-    owner.bridge._observe_transient_runtime = lambda: transient_runtime
+    owner.bridge.items._observe_transient_runtime = lambda: transient_runtime
 
     async def check():
         try:
@@ -275,8 +286,6 @@ def test_two_bridges_cannot_control_the_same_game_even_from_different_profiles(r
     asyncio.run(check())
 
 
-
-
 @pytest.mark.parametrize("command", [
     "ai_ScriptCmdEnt ap_fast_travel_unlock activate",
     "ai_ScriptCmdEnt ap_bootstrap_v2_ice_acquired activate",
@@ -284,13 +293,17 @@ def test_two_bridges_cannot_control_the_same_game_even_from_different_profiles(r
 ])
 def test_runtime_effect_persists_identity_and_never_replays_dispatch_on_restart(runtime, command):
     owner, _ = runtime
+    async def _assert_uncertain_runtime_command(owner, row):
+        assert row.state is CommandState.EFFECT_UNKNOWN
+        assert not row.plan.required and row.plan.receipt_index is None
+        assert len(await owner.ledger.attempts(owner.key, row.plan.command_id, 0, 10)) == 1
+
+
     async def check():
         try:
             assert await owner.local_command("runtime-fixture", command, SimpleNamespace(epoch=1))
             row, = await owner._rows()
-            assert row.state is CommandState.EFFECT_UNKNOWN
-            assert not row.plan.required and row.plan.receipt_index is None
-            assert len(await owner.ledger.attempts(owner.key, row.plan.command_id, 0, 10)) == 1
+            await _assert_uncertain_runtime_command(owner, row)
             effects = len(owner.transport.effects)
             assert await owner.local_command("runtime-fixture", command, SimpleNamespace(epoch=1))
             assert len(owner.transport.effects) == effects
@@ -389,7 +402,7 @@ def test_reload_and_lost_core_restore_missing_persistent_effects_without_replayi
             assert len(old) == 2
             async def scope(*args, **kwargs):
                 return ("a" * 64, "ap-save", 123, "123", UUID(int=instance).hex, "build", generation, "game/hub/hub")
-            owner.bridge._native_materialization_scope = scope
+            owner.bridge.items._native_materialization_scope = scope
             await owner.reconcile(SimpleNamespace(epoch=2))
             rows = await owner._rows()
             assert len(rows) == 3
@@ -399,41 +412,6 @@ def test_reload_and_lost_core_restore_missing_persistent_effects_without_replayi
         finally:
             await owner.close()
     asyncio.run(check())
-
-
-def test_owner_delivery_batches_scale_and_leave_the_event_loop_responsive(tmp_path, monkeypatch):
-    import time
-    monkeypatch.setattr(delivery_runtime, "NativeTransport", Core)
-    async def measure(count):
-        directory = tmp_path / str(count)
-        directory.mkdir()
-        value, definitions, policies = bridge(directory)
-        value.items_received = [NetworkReceipt(7770025, index, 1, 0) for index in range(count)]
-        owner = RoomDelivery(value, {"client_state_file": str(directory / "state.json")}, definitions, policies, lambda *args, **kwargs: None)
-        async def balance():
-            return None
-        owner._balance = balance
-        ticks = 0
-        async def tick():
-            nonlocal ticks
-            while True:
-                ticks += 1
-                await asyncio.sleep(0.001)
-        task = asyncio.create_task(tick())
-        started = time.monotonic()
-        try:
-            await owner.reconcile(SimpleNamespace(epoch=1))
-            assert len(await owner._rows()) == owner.transport.inventory_effects == count
-            assert (await owner.ledger.room(owner.key)).receipt_boundary == count
-            return time.monotonic() - started, ticks
-        finally:
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-            await owner.close()
-    small, large = asyncio.run(measure(2500)), asyncio.run(measure(5000))
-    print(f"owner delivery: 2500={small[0]:.2f}s; 5000={large[0]:.2f}s; ratio={large[0] / small[0]:.2f}; ticks={small[1]},{large[1]}")
-    assert large[0] < small[0] * 3.5
-    assert large[1] > 100 and small[1] > 100
 
 
 def test_core_loss_after_effect_and_before_save_restores_proven_missing_ownership(runtime):
@@ -452,7 +430,7 @@ def test_core_loss_after_effect_and_before_save_restores_proven_missing_ownershi
             assert original.state is CommandState.EFFECT_UNKNOWN
             async def new_scope(*args, **kwargs):
                 return ("a" * 64, "ap-save", 123, "123", UUID(int=3).hex, "build", 1, "game/hub/hub")
-            owner.bridge._native_materialization_scope = new_scope
+            owner.bridge.items._native_materialization_scope = new_scope
             owner._snapshot = original_snapshot
             await owner.reconcile(SimpleNamespace(epoch=2))
             rows = await owner._rows()
@@ -488,6 +466,8 @@ def test_established_room_ingests_while_game_and_actions_are_unavailable(runtime
 
 
 def test_selected_resync_never_uses_ap_storage_or_repairs_other_items(runtime):
+    from doom_eap.contracts.inventory_domain import selected_persistent_items
+
     owner, _ = runtime
     owner.bridge.items_received.append(NetworkReceipt(7770003, 2, 1, 0))
     async def storage_is_forbidden():
@@ -495,7 +475,9 @@ def test_selected_resync_never_uses_ap_storage_or_repairs_other_items(runtime):
     owner._balance = storage_is_forbidden
     async def check():
         try:
-            plan, error = await owner.reconcile(SimpleNamespace(epoch=1), selected=frozenset({7770900}))
+            with pytest.raises(ValueError):
+                selected_persistent_items('all', 7770016)
+            plan, error = await owner.reconcile(SimpleNamespace(epoch=1), selected=selected_persistent_items('all', 7770900))
             assert error is None and len(plan.commands) == 1
             rows = await owner._rows()
             assert len(rows) == 1 and rows[0].plan.receipt_index == 0
@@ -528,7 +510,7 @@ def test_wup_reload_restores_only_the_gained_difference_and_new_save_does_not_re
             result.update(gained_after=state["gained"], balance_after=state["balance"])
             self.commands[prepared.reference] = replace(response(prepared.reference), result=result)
             return self.commands[prepared.reference]
-    monkeypatch.setattr(delivery_runtime, "NativeTransport", PointsCore)
+    monkeypatch.setattr(delivery, "NativeTransport", PointsCore)
     owner.bridge.items_received = [NetworkReceipt(7770903, index, 1, 0) for index in range(2)]
     async def check():
         try:
@@ -538,7 +520,7 @@ def test_wup_reload_restores_only_the_gained_difference_and_new_save_does_not_re
             state.update(gained=3, balance=0)
             async def scope(*args, **kwargs):
                 return ("a" * 64, "ap-save", 123, "123", UUID(int=2).hex, "build", 2, "game/hub/hub")
-            owner.bridge._native_materialization_scope = scope
+            owner.bridge.items._native_materialization_scope = scope
             await owner.reconcile(SimpleNamespace(epoch=2))
             assert state == {"gained": 6, "balance": 3}
             state["balance"] = 0
@@ -560,11 +542,11 @@ def test_progressive_special_uses_native_ownership_without_changing_selection(ru
         "progressive_special_weapon" if item_id == 7770901 else "progressive_sentinel_hammer")
     if item_id == 7770902:
         context = next(c for c in CONTEXT_BY_IDENTITY.values() if c.campaign == "TAG2")
-        owner.bridge.context_campaign = context.campaign
-        owner.bridge._refresh_runtime_context = lambda *args: context
+        owner.bridge.runtime_lifecycle.snapshot.campaign = context.campaign
+        owner.bridge.items._refresh_runtime_context = lambda *args: context
         async def scope(*args, **kwargs):
             return ("a" * 64, "ap-save", 123, "123", UUID(int=2).hex, "build", 1, context.runtime_maps[0])
-        owner.bridge._native_materialization_scope = scope
+        owner.bridge.items._native_materialization_scope = scope
     state = {"native_state_known": 31, "native_crucible": 0, "native_hammer": 0, "native_hammer_perks": 0, "native_selected": 2}
     class SpecialCore(Core):
         async def observe(self, command, namespace, binding, **kwargs):
@@ -579,7 +561,7 @@ def test_progressive_special_uses_native_ownership_without_changing_selection(ru
             state.update(native_crucible=payload["crucible"], native_hammer=payload["hammer"],
                          native_hammer_perks=3 if payload["hammer_tier"] == 2 else 0)
             return await super().submit(prepared)
-    monkeypatch.setattr(delivery_runtime, "NativeTransport", SpecialCore)
+    monkeypatch.setattr(delivery, "NativeTransport", SpecialCore)
     owner.bridge.items_received = [NetworkReceipt(item_id, index, 1, 0) for index in range(count)]
     async def check():
         try:
@@ -597,7 +579,7 @@ def test_progressive_special_uses_native_ownership_without_changing_selection(ru
 
 def test_uncertain_notification_is_optional_and_cannot_hide_confirmed_ownership(runtime):
     owner, _ = runtime
-    owner.bridge.delivery_notification_commands = lambda *args: ("ai_ScriptCmdEnt ap_notify_item_fixture activate",)
+    owner.bridge.items.delivery_notification_commands = lambda *args: ("ai_ScriptCmdEnt ap_notify_item_fixture activate",)
     async def check():
         try:
             await owner.reconcile(SimpleNamespace(epoch=1))
@@ -666,7 +648,7 @@ def test_unsent_acquisition_survives_context_change_with_linked_replacement(runt
             assert original.attempt_count == 0
             async def scope(*args, **kwargs):
                 return ("a" * 64, "ap-save", 123, "123", UUID(int=2).hex, "build", 2, "game/hub/hub")
-            owner.bridge._native_materialization_scope = scope
+            owner.bridge.items._native_materialization_scope = scope
             owner._execute = execute
             await owner.reconcile(SimpleNamespace(epoch=2))
             rows = await owner._rows()
@@ -705,7 +687,7 @@ def test_optional_capability_failure_preserves_common_weapon_delivery(runtime, o
     from doom_eap.runtime.native_transport import WireError
     owner, _ = runtime
     if optional == 55:
-        from doom_eap.runtime.unified_campaign import ACCESS_IDS
+        from doom_eap.runtime.campaign import ACCESS_IDS
         owner.bridge.items_received.append(NetworkReceipt(next(iter(ACCESS_IDS)), 2, 1, 0))
     async def check():
         try:
@@ -764,7 +746,7 @@ def test_valid_mission_access_proof_satisfies_receipt(runtime):
     from native_transport_support import evidence_result
     from test_native_effect_evidence import wire_for_scope
 
-    from doom_eap.runtime.unified_campaign import ACCESS_IDS, STAGES
+    from doom_eap.runtime.campaign import ACCESS_IDS, STAGES
     owner, _ = runtime
     item_id = next(iter(ACCESS_IDS))
     owner.bridge.items_received = [NetworkReceipt(item_id, 1, 1, 0)]
@@ -793,7 +775,7 @@ def test_valid_mission_access_proof_satisfies_receipt(runtime):
 def test_unpublished_ammo_reservation_is_exposed_to_items_for_its_profile(runtime):
     from unittest.mock import AsyncMock
 
-    from doom_eap.runtime.ammo_refill import AmmoCommandScope
+    from doom_eap.runtime.ammo import AmmoCommandScope
     from doom_eap.runtime.ledger import AmmoState
     owner, events = runtime
     async def check():

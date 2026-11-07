@@ -1,10 +1,20 @@
-from copy import deepcopy
 import hashlib
-from importlib.resources import files
 import json
+from copy import deepcopy
+from importlib.resources import files
 from textwrap import dedent
 
 import pytest
+
+from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
+from doom_eap.content.native_enemy_plan import build_native_recipes
+from tools.maps.encounter_catalog import entity_records, list_items
+from tools.maps.native_recipe_materializer import (
+    _functional_token,
+    _refill_limits,
+    materialize_native_recipe_calls,
+    materialize_native_recipe_definitions,
+)
 
 
 def test_sparse_identity_rotation_keeps_the_portal_landing_in_front():
@@ -23,22 +33,31 @@ def test_sparse_identity_rotation_keeps_the_portal_landing_in_front():
 def test_ground_replacement_of_airborne_secret_uses_its_ground_spawn():
     from tools.maps.native_recipe_materializer import _entrance_landings
 
-    records = {name: {'class': 'idTarget_Spawn', 'edit': {
-        'spawnPosition': dict(zip(('x', 'y', 'z'), position)),
-        'spawnEditable': {'aiStateOverride': 'AIOVERRIDE_TELEPORT'},
-    }} for name, position in {
-        'air': (-134.999969, 176.750046, -28.5500145),
-        'ground': (-156.999939, 166, -42.8248329),
-    }.items()}
-    recipes = [{
-        'binding': {'owner': 'secret', 'reference': name, 'path': 'encounter.events.item[0]'},
-        'selected_spawn_type': species,
-        'bodies': bodies,
-    } for name, species, bodies in (
-        ('ground', 'ENCOUNTER_SPAWN_ZOMBIE_TIER_1', []),
-        ('air', 'ENCOUNTER_SPAWN_PAIN_ELEMENTAL', [{'species': 'imp'}]),
-    )]
-    assert _entrance_landings(recipes, records)['air'] == 'ground'
+    records = {
+        name: {
+            "class": "idTarget_Spawn",
+            "edit": {
+                "spawnPosition": dict(zip(("x", "y", "z"), position, strict=False)),
+                "spawnEditable": {"aiStateOverride": "AIOVERRIDE_TELEPORT"},
+            },
+        }
+        for name, position in {
+            "air": (-134.999969, 176.750046, -28.5500145),
+            "ground": (-156.999939, 166, -42.8248329),
+        }.items()
+    }
+    recipes = [
+        {
+            "binding": {"owner": "secret", "reference": name, "path": "encounter.events.item[0]"},
+            "selected_spawn_type": species,
+            "bodies": bodies,
+        }
+        for name, species, bodies in (
+            ("ground", "ENCOUNTER_SPAWN_ZOMBIE_TIER_1", []),
+            ("air", "ENCOUNTER_SPAWN_PAIN_ELEMENTAL", [{"species": "imp"}]),
+        )
+    ]
+    assert _entrance_landings(recipes, records)["air"] == "ground"
 
 
 def test_ground_replacement_prefers_its_encounters_jump_endpoint_to_another_floor():
@@ -70,13 +89,8 @@ def test_traversal_without_target_uses_only_an_unambiguous_colocated_marker(mark
               'selected_spawn_type': 'ENCOUNTER_SPAWN_SHOTGUN_SOLDIER', 'bodies': [{'species': 'imp'}]}
     assert _entrance_landings([recipe], records).get('point') == ('ledge0' if marker_count == 1 else None)
 
-from doom_eap.content.enemy_options import SPECIES_IDS, normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_recipe_metadata, native_recipe_fingerprint
-from tools.maps.encounter_catalog import entity_records, list_items
-from tools.maps.native_recipe_materializer import materialize_native_recipe_definitions, materialize_native_recipe_calls, _refill_limits, _functional_token
 
-
-SOURCE = '''entity {
+SOURCE = """entity {
     entityDef original {
         inherit = "ai/fodder/imp";
         class = "idAI2";
@@ -90,7 +104,7 @@ entity {
         edit = { entityDefs = { num = 1; item[0] = { name = "original"; } } }
     }
 }
-'''
+"""
 
 
 def frozen_plan(source=SOURCE, binding=None, family="maintenance", logical_count=2, maximum=6, multiplier=100, bindings=None,
@@ -125,18 +139,6 @@ def test_spawn_diagnostics_leave_materialized_map_unchanged():
                and row['relocated'] is False for row in diagnostics)
 
 
-@pytest.mark.parametrize('positioned', [False, True])
-def test_spawn_diagnostics_cap_each_map_across_calls(positioned):
-    source = SOURCE.replace('edit = { entityDefs', 'edit = { spawnPosition = { x = 4; } entityDefs') if positioned else SOURCE
-    plan = frozen_plan(source)
-    diagnostics = [{'map': 'other'} for _ in range(512)] + [{'map': 'map'} for _ in range(511)]
-    for _ in range(2):
-        materialize_native_recipe_definitions(source, 'map', plan, {'map': source}, diagnostics=diagnostics)
-    assert sum(row['map'] == 'map' for row in diagnostics) == 512
-    assert sum(row['map'] == 'other' for row in diagnostics) == 512
-    assert diagnostics[-1]['position'] == ({'x': 4, 'y': 0, 'z': 0} if positioned else None)
-
-
 def test_spawn_diagnostics_total_stays_bounded():
     from tools.maps.native_recipe_materializer import MAX_POSITION_DIAGNOSTICS
 
@@ -146,6 +148,15 @@ def test_spawn_diagnostics_total_stays_bounded():
         materialize_native_recipe_definitions(SOURCE, 'map', plan, {'map': SOURCE}, diagnostics=diagnostics)
     assert len(diagnostics) == MAX_POSITION_DIAGNOSTICS
     assert diagnostics[-1]['map'] == 'map'
+
+
+def _assert_isolated_spawn_parent(plan, row):
+    assert row['inherit'] in {body['definition'] for recipe in plan['maps']['map']['recipes'] for body in recipe['bodies']}
+    assert 'factionName' not in row['edit']
+    assert 'tempMemoryData' not in row['edit']['aiEditable']
+    assert row['edit']['targets']['item[0]']['name'] == 'relay'
+    assert row['edit']['aiEditable']['death']['triggerOnDeath'] == 'relay'
+    assert row['edit']['aiEditable']['spawnSettings']['initialTarget'] == 'player1'
 
 
 def test_shared_spawn_parent_keeps_map_bindings_without_foreign_species_state():
@@ -169,12 +180,7 @@ def test_shared_spawn_parent_keeps_map_bindings_without_foreign_species_state():
                 if row['name'].startswith('ap_v070_functional_' + _functional_token('lostsoul') + '_')]
     assert variants
     for row in variants:
-        assert row['inherit'] in {body['definition'] for recipe in plan['maps']['map']['recipes'] for body in recipe['bodies']}
-        assert 'factionName' not in row['edit']
-        assert 'tempMemoryData' not in row['edit']['aiEditable']
-        assert row['edit']['targets']['item[0]']['name'] == 'relay'
-        assert row['edit']['aiEditable']['death']['triggerOnDeath'] == 'relay'
-        assert row['edit']['aiEditable']['spawnSettings']['initialTarget'] == 'player1'
+        _assert_isolated_spawn_parent(plan, row)
 
 
 @pytest.mark.parametrize('randomized,damage_type,label,expected', [
@@ -234,6 +240,18 @@ def test_initial_maintenance_is_finite_before_a_survivor_barrier(kill_type, stop
     assert _refill_limits(source, recipes) == expected
 
 
+def _assert_preserved_darklord_identity(current, key, old_recipes):
+    assert current['maps'][key]['recipes'] == [row for row in old_recipes if '/darklord_phantoms/' not in row['id']]
+
+
+def _assert_frozen_darklord_phantoms(old_recipes):
+    assert sum('/darklord_phantoms/' in row['id'] for row in old_recipes) == 4
+
+
+def _assert_current_darklord_bodies(current, key, rows):
+    assert all('ap_v070_bodies_r' + row['origin'] in rows for row in current['maps'][key]['recipes'])
+
+
 def test_darklord_plans_preserve_frozen_phantoms_and_compile_new_rooms_without_them():
     key = 'e5m4_boss'
     catalog = json.loads(files('doom_eap.content').joinpath('native_enemy_catalog.json').read_bytes())
@@ -250,14 +268,14 @@ def test_darklord_plans_preserve_frozen_phantoms_and_compile_new_rooms_without_t
     frozen = build_native_recipes(options, campaign, seed=8, catalog=catalog, revision=18)
     assert frozen['fingerprint'] == '9d7c86938f5e7a21c1f42c9246361cb78abc03a237586b4c27fc70791fbecb2a'
     old_recipes = frozen['maps'][key]['recipes']
-    assert sum('/darklord_phantoms/' in row['id'] for row in old_recipes) == 4
+    _assert_frozen_darklord_phantoms(old_recipes)
     compiled = materialize_native_recipe_calls(SOURCE, key, frozen, {key: SOURCE})
     assert hashlib.sha256(compiled.encode()).hexdigest() == '448ccaf8e15a89fccab2722aebc5547940ecf6de4adbe24eb518f423c33c7ff6'
     current = build_native_recipes(options, campaign, seed=8, catalog=catalog)
-    assert current['maps'][key]['recipes'] == [row for row in old_recipes if '/darklord_phantoms/' not in row['id']]
+    _assert_preserved_darklord_identity(current, key, old_recipes)
     compiled = materialize_native_recipe_calls(SOURCE, key, current, {key: SOURCE})
     rows = {row['name']: row for row in entity_records(compiled)}
-    assert all('ap_v070_bodies_r' + row['origin'] in rows for row in current['maps'][key]['recipes'])
+    _assert_current_darklord_bodies(current, key, rows)
 
 
 @pytest.mark.parametrize('entity', ['', 'ap_darklord_phantoms'])

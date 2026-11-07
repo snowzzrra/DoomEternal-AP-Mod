@@ -12,6 +12,7 @@ import pytest
 
 from doom_eap.launcher import launcher_doctor as doctor
 from doom_eap.launcher import launcher_reporting as reporting
+from doom_eap.launcher import launcher_support
 from doom_eap.launcher import sentinel_diagnostics as sentinel
 from doom_eap.launcher.launcher_controller import LauncherController
 from tests.test_core_distribution import fixture as core_distribution_fixture
@@ -31,22 +32,34 @@ def isolated_crash_paths(tmp_path, monkeypatch):
         HKEY_CURRENT_USER=1, HKEY_LOCAL_MACHINE=2, OpenKey=unavailable_key, OpenKeyEx=unavailable_key))
 
 
-def test_encounter_console_keeps_middle_context_with_size_and_secret_bounds(tmp_path):
-    source = tmp_path / "console.txt"
-    source.write_bytes(b"startup\n" + b"noise\n" * 160000 +
-                       b"before-event\nSECRET encounter failed password=console-canary\nafter-event\n" +
-                       b"noise\n" * 180000 + b"current-tail\n")
-    text, metadata = doctor._encounter_console(source)
+def _assert_bounded_redacted_console(metadata, text):
     assert "before-event" in text and "after-event" in text
     assert "SECRET encounter failed" in text and "console-canary" not in text
     assert "startup" in text and "current-tail" in text
     assert metadata["truncation"] == "encounter_window"
     assert metadata["omitted_bytes"] > 0
-    assert len(text.encode("utf-8")) <= doctor.SUPPORT_LOG_MAX_BYTES
+    assert len(text.encode("utf-8")) <= launcher_support.SUPPORT_LOG_MAX_BYTES
+
+
+def test_encounter_console_keeps_middle_context_with_size_and_secret_bounds(tmp_path):
+    source = tmp_path / "console.txt"
+    source.write_bytes(b"startup\n" + b"noise\n" * 160000 +
+                       b"before-event\nSECRET encounter failed password=console-canary\nafter-event\n" +
+                       b"noise\n" * 180000 + b"current-tail\n")
+    text, metadata = launcher_support._encounter_console(source)
+    _assert_bounded_redacted_console(metadata, text)
     source.write_bytes(b"startup\nSECRET encounter reset\n" + b"password=" +
                        b"fragment-canary" * 150000 + b"\ncurrent-tail\n")
-    text, metadata = doctor._encounter_console(source)
+    text, metadata = launcher_support._encounter_console(source)
     assert "fragment-canary" not in text and "SECRET encounter reset" in text and "current-tail" in text
+
+
+def _assert_ledger_delivery_diagnostics(files, queue, result, uncertain):
+    assert result["status"] == "available" and result["authority"] == "ledger"
+    assert result["counts"]["blocked" if uncertain else "delivered"] == 1
+    assert doctor._delivery_verdict(result) is (not uncertain)
+    assert all(name not in json.dumps(result) for name in files)
+    assert {name: (queue / name).read_text() for name in files} == files
 
 
 @pytest.mark.parametrize("uncertain", [False, True])
@@ -69,11 +82,7 @@ def test_delivery_diagnostics_reads_ledger_and_ignores_old_spool(tmp_path, owner
         (queue / name).write_text(content)
     result = doctor._delivery_diagnostics({}, live={"delivery_ledger": {
         "path": str(tmp_path / "delivery.sqlite3"), "room": room}})
-    assert result["status"] == "available" and result["authority"] == "ledger"
-    assert result["counts"]["blocked" if uncertain else "delivered"] == 1
-    assert doctor._delivery_verdict(result) is (not uncertain)
-    assert all(name not in json.dumps(result) for name in files)
-    assert {name: (queue / name).read_text() for name in files} == files
+    _assert_ledger_delivery_diagnostics(files, queue, result, uncertain)
 
 
 def test_crash_evidence_only_reads_small_reports_and_lists_dumps(tmp_path, monkeypatch):
@@ -98,8 +107,8 @@ def test_crash_evidence_only_reads_small_reports_and_lists_dumps(tmp_path, monke
         QueryValueEx=lambda *args: (str(custom), 1)))
     monkeypatch.setenv("LOCALAPPDATA", str(local))
     monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "program"))
-    monkeypatch.setattr(doctor, "os", SimpleNamespace(name="nt", environ=doctor.os.environ, path=doctor.os.path))
-    result = doctor._windows_crash_evidence()
+    monkeypatch.setattr(launcher_support, "os", SimpleNamespace(name="nt", environ=doctor.os.environ, path=doctor.os.path))
+    result = launcher_support._windows_crash_evidence()
     assert result["reports"][0]["fault_module_name"] == "game.dll"
     assert result["reports"][0]["exception_code"] == "c0000005"
     assert result["dumps"][0]["size"] == len(b"dump-canary")
@@ -113,21 +122,67 @@ def test_bundle_includes_sanitized_compiled_positions(tmp_path, monkeypatch):
     positions = [{"map": name, "source": "point_" + "x" * 150,
                   "position": {"x": 1, "y": 2, "z": 3}, "relocated": True}
                  for name in ("map_a", "map_b", "map_c") for _ in range(512)]
-    assert len(json.dumps(positions).encode()) > doctor.SUPPORT_DIAGNOSTIC_MAX_BYTES
+    assert len(json.dumps(positions).encode()) > launcher_support.SUPPORT_DIAGNOSTIC_MAX_BYTES
     with zipfile.ZipFile(room, "w") as archive:
         archive.writestr("enemy_spawn_diagnostics.json", json.dumps({
             "positions": positions,
             "password": "report-canary"}))
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({}, {}))
+    monkeypatch.setattr(launcher_support, "_support_log_tails", lambda *a, **kw: ({}, {}))
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
     monkeypatch.setenv("PROGRAMDATA", str(tmp_path / "program"))
-    result = doctor.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
+    result = launcher_support.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
         config={}, support_diagnostics={"room_install_receipt": {"staged_mod": str(room)}})
     with zipfile.ZipFile(result) as archive:
         report = json.loads(archive.read("compiled_spawn_positions.json"))
         assert report["report"]["positions"][0]["relocated"] is True
         assert report["report"]["positions"] == positions
         assert b"report-canary" not in archive.read("compiled_spawn_positions.json")
+
+
+def _assert_redacted_support_summary(archive, summary):
+    assert "FAIL Core installed and compatible" in summary
+    assert "FAIL Item delivery: ledger=available" in summary and "'blocked': 2" in summary
+    assert "core_runtime | Update refused" in summary
+    assert "Room seed: test-room | Slot: 2" in summary and "Core 1.0.0" in summary
+    assert "full stdout and stderr" in summary
+    assert len(archive.read("logs/qconsole.log")) <= launcher_support.SUPPORT_LOG_MAX_BYTES
+    assert archive.read("install/injector.log").startswith(b"stdout:\n" + b"old-output\n" * 10000)
+
+
+def _assert_incompatible_install_inventory(install):
+    assert install["manifest"]["parses"] is True
+    assert install["manifest"]["document"]["version"] == "1.0.0"
+    assert install["structure"]["status"] == "valid"
+    assert install["ownership"]["status"] == "owned"
+    assert install["compatibility"]["status"] == "incompatible"
+
+
+def _assert_saved_report_preview(preview, tmp_path):
+    assert "Core 1.0.0" in preview.payload["diagnostics"]
+    assert not preview.submitted
+    assert json.loads((tmp_path / "draft.json").read_text())["submitted"] is False
+
+
+def _assert_foreign_proxy_inventory(dlls, install, mod):
+    assert dlls["version.dll"]["sha256"] == hashlib.sha256(b"another proxy").hexdigest()
+    assert dlls["XINPUT1_3.dll"]["size"] == len(b"foreign proxy")
+    assert install["mods"] == [{"name": "room.zip", "status": "available", "size": mod.stat().st_size,
+                                "sha256": hashlib.sha256(mod.read_bytes()).hexdigest()}]
+
+
+def _assert_included_native_history(archive, native):
+    assert native["status"] == "available"
+    assert "darklord/71-123.darklord.log" in archive.namelist()
+
+
+def _assert_no_private_keys(value):
+    if isinstance(value, dict):
+        assert all(not key.casefold().endswith("private") for key in value)
+        for child in value.values():
+            _assert_no_private_keys(child)
+    elif isinstance(value, list):
+        for child in value:
+            _assert_no_private_keys(child)
 
 
 @pytest.mark.parametrize("proton", [False, True])
@@ -161,7 +216,7 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
         (directory / ("71-123" + suffix)).write_text(json.dumps(record))
     (directory / "71-123.darklord.log").write_text('AP_DARKLORD event=summary token=token-canary\n')
     history = sentinel.collect(config, session)
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({}, {}))
+    monkeypatch.setattr(launcher_support, "_support_log_tails", lambda *a, **kw: ({}, {}))
     paths = SimpleNamespace(state_dir=tmp_path / "state", data_dir=tmp_path / "data")
     live = {"ap_session": session, "native_diagnostics": history,
             "native_helper_startup": {"state": "failed", "ownership_private": "helper-canary"}}
@@ -181,67 +236,47 @@ def test_bundle_keeps_incompatible_install_history_and_removes_secrets(tmp_path,
     controller._setup_event("injector_finished", {"state": "applied", "stdout": "old-output\n" * 10000,
                             "stderr": 'ERROR token=token-canary\n' + json.dumps({"ownership_private": "injector-canary"})})
     assert controller._injector_output.startswith("stdout:\n" + "old-output\n" * 10000)
-    result = doctor.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
+    result = launcher_support.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
         config=config, support_diagnostics=support, injector_output=controller._injector_output,
         logs=['2026-10-27T14:31:00Z WARNING ' + json.dumps({"nested": {"ownership_private": "log-canary"}}),
               'ownership_private={"handle": "assignment-canary"}'],
         last_setup_failure={"failure_domain": "core_runtime", "message": "Update refused"})
     with zipfile.ZipFile(result) as archive:
         install = json.loads(archive.read("install.json"))
-        assert install["manifest"]["parses"] is True
-        assert install["manifest"]["document"]["version"] == "1.0.0"
-        assert install["structure"]["status"] == "valid"
-        assert install["ownership"]["status"] == "owned"
-        assert install["compatibility"]["status"] == "incompatible"
+        _assert_incompatible_install_inventory(install)
         dlls = {item["name"]: item for item in install["dlls"]}
-        assert dlls["version.dll"]["sha256"] == hashlib.sha256(b"another proxy").hexdigest()
-        assert dlls["XINPUT1_3.dll"]["size"] == len(b"foreign proxy")
-        assert install["mods"] == [{"name": "room.zip", "status": "available", "size": mod.stat().st_size,
-                                    "sha256": hashlib.sha256(mod.read_bytes()).hexdigest()}]
+        _assert_foreign_proxy_inventory(dlls, install, mod)
         summary = archive.read("summary.txt").decode()
-        assert "FAIL Core installed and compatible" in summary
-        assert "FAIL Item delivery: ledger=available" in summary and "'blocked': 2" in summary
-        assert "core_runtime | Update refused" in summary
-        assert "Room seed: test-room | Slot: 2" in summary and "Core 1.0.0" in summary
-        assert "full stdout and stderr" in summary
-        assert len(archive.read("logs/qconsole.log")) <= doctor.SUPPORT_LOG_MAX_BYTES
-        assert archive.read("install/injector.log").startswith(b"stdout:\n" + b"old-output\n" * 10000)
+        _assert_redacted_support_summary(archive, summary)
         native = json.loads(archive.read("native_startup.json"))
-        assert native["status"] == "available"
-        assert "darklord/71-123.darklord.log" in archive.namelist()
+        _assert_included_native_history(archive, native)
         for suffix in (".jsonl.previous", ".jsonl", ".latest.json"):
             assert b"sentinel-startup-v1" in archive.read("sentinel/71-123" + suffix)
         for name in archive.namelist():
             content = archive.read(name)
             assert b"-canary" not in content, name
             if name.endswith(".json"):
-                def check_keys(value):
-                    if isinstance(value, dict):
-                        assert all(not key.casefold().endswith("private") for key in value)
-                        for child in value.values():
-                            check_keys(child)
-                    elif isinstance(value, list):
-                        for child in value:
-                            check_keys(child)
-                check_keys(json.loads(content))
+                _assert_no_private_keys(json.loads(content))
     preview = reporting.report_problem(SimpleNamespace(create_support_bundle=lambda *a, **kw: result),
                                        logs=[], draft_path=tmp_path / "draft.json")
-    assert "Core 1.0.0" in preview.payload["diagnostics"]
-    assert not preview.submitted
-    assert json.loads((tmp_path / "draft.json").read_text())["submitted"] is False
+    _assert_saved_report_preview(preview, tmp_path)
+
+
+def _assert_bundle_budget_omissions(summary):
+    assert "truncated" in summary and "omitted" in summary and "10 MiB bundle budget" in summary
+    assert "summary.txt" in summary and "doctor.json" in summary and "install.json" in summary
 
 
 def test_bundle_budget_lists_omissions_and_truncations(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw:
+    monkeypatch.setattr(launcher_support, "_support_log_tails", lambda *a, **kw:
                         ({f"log-{index}.log": "x" * (1024 * 1024) for index in range(12)}, {}))
-    result = doctor.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()))
+    result = launcher_support.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()))
     with zipfile.ZipFile(result) as archive:
-        assert sum(item.file_size for item in archive.infolist()) < doctor.SUPPORT_BUNDLE_MAX_BYTES
-        assert result.stat().st_size < doctor.SUPPORT_BUNDLE_MAX_BYTES
+        assert sum(item.file_size for item in archive.infolist()) < launcher_support.SUPPORT_BUNDLE_MAX_BYTES
+        assert result.stat().st_size < launcher_support.SUPPORT_BUNDLE_MAX_BYTES
         summary = archive.read("summary.txt").decode()
-        assert "truncated" in summary and "omitted" in summary and "10 MiB bundle budget" in summary
-        assert "summary.txt" in summary and "doctor.json" in summary and "install.json" in summary
+        _assert_bundle_budget_omissions(summary)
 
 
 def test_issue_url_prefills_summary_or_copies_full_report_under_budget():
@@ -260,8 +295,16 @@ def test_issue_url_prefills_summary_or_copies_full_report_under_budget():
     assert "password-canary" not in clipboard
 
 
+def _assert_bounded_session_timeline(result):
+    assert result["status"] == "available" and result["truncated"]
+    assert len(result["events"]) == 128
+    assert [row["sequence"] for row in result["events"]] == sorted(row["sequence"] for row in result["events"])
+    assert {row["kind"] for row in result["events"]} == {"support_event"}
+    assert "canary" not in json.dumps(result)
+
+
 def test_support_timeline_is_bounded_scoped_and_excludes_payloads(tmp_path, owner):
-    from doom_eap.launcher.support_evidence import ledger_timeline
+    from doom_eap.launcher.launcher_support import ledger_timeline
     from doom_eap.runtime.ledger import Authority, Observation, RoomKey
 
     metadata = {"path": str(tmp_path / "delivery.sqlite3")}
@@ -277,17 +320,19 @@ def test_support_timeline_is_bounded_scoped_and_excludes_payloads(tmp_path, owne
 
     owner(check)
     result = ledger_timeline(metadata)
-    assert result["status"] == "available" and result["truncated"]
-    assert len(result["events"]) == 128
-    assert [row["sequence"] for row in result["events"]] == sorted(row["sequence"] for row in result["events"])
-    assert {row["kind"] for row in result["events"]} == {"support_event"}
-    assert "canary" not in json.dumps(result)
+    _assert_bounded_session_timeline(result)
     assert ledger_timeline({**metadata, "path": str(tmp_path / "absent.sqlite3")})["status"] == "missing"
     assert not (tmp_path / "absent.sqlite3").exists()
 
 
+def _assert_redacted_install_evidence(evidence):
+    assert evidence["phase"] == "ROLLED_BACK" and evidence["failure"]["code"] == "verify_failed"
+    assert evidence["timings"][0]["elapsed_seconds"] == 10
+    assert "canary" not in json.dumps(evidence)
+
+
 def test_support_evidence_allowlist_and_injector_share_budget(tmp_path, monkeypatch):
-    monkeypatch.setattr(doctor, "_support_log_tails", lambda *a, **kw: ({}, {}))
+    monkeypatch.setattr(launcher_support, "_support_log_tails", lambda *a, **kw: ({}, {}))
     game = tmp_path / "game"
     (game / "base").mkdir(parents=True)
     executable = game / "DOOMEternalx64vk.exe"
@@ -305,16 +350,14 @@ def test_support_evidence_allowlist_and_injector_share_budget(tmp_path, monkeypa
         {"correlation": {"build_matches": True, "namespace_matches": False},
          "campaign": {"checkpoint_generation": 999}},
     ]}
-    result = doctor.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
+    result = launcher_support.write_support_bundle(tmp_path / "report.zip", doctor.DoctorReport("test", ()),
         config={"game_root": str(game)}, support_diagnostics=support,
         injector_output="bounded injector output\n" * 600000)
     with zipfile.ZipFile(result) as archive:
-        assert sum(row.file_size for row in archive.infolist()) < doctor.SUPPORT_BUNDLE_MAX_BYTES
-        assert result.stat().st_size < doctor.SUPPORT_BUNDLE_MAX_BYTES
+        assert sum(row.file_size for row in archive.infolist()) < launcher_support.SUPPORT_BUNDLE_MAX_BYTES
+        assert result.stat().st_size < launcher_support.SUPPORT_BUNDLE_MAX_BYTES
         evidence = json.loads(archive.read("installation_journal.json"))
-        assert evidence["phase"] == "ROLLED_BACK" and evidence["failure"]["code"] == "verify_failed"
-        assert evidence["timings"][0]["elapsed_seconds"] == 10
-        assert "canary" not in json.dumps(evidence)
+        _assert_redacted_install_evidence(evidence)
         checkpoint = json.loads(archive.read("checkpoint_generations.json"))
         assert checkpoint["checkpoint"] == 12 and checkpoint["native_generation"] == 4
         assert checkpoint["native"] == [{"generation_before": 3, "generation_after": 4, "checkpoint_generation": 4}]

@@ -1,5 +1,3 @@
-"""Protect stable command recovery through the public asynchronous transport API."""
-
 import asyncio
 import json
 import os
@@ -92,18 +90,23 @@ def test_timeout_requires_explicit_reconnect_and_query(tmp_path, mode):
     asyncio.run(run())
 
 
-def test_task_cancellation_closes_inflight_connection_without_native_ack(tmp_path):
+def test_task_cancellation_closes_inflight_connection_without_native_ack(tmp_path, monkeypatch):
+    spawn = asyncio.create_subprocess_exec
+
+    async def spawn_with_signal(*args, **kwargs):
+        kwargs["stderr"] = asyncio.subprocess.PIPE
+        return await spawn(*args, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_with_signal)
+
     async def run():
         transport, trace = link(tmp_path, "timeout")
         try:
             await transport.connect()
+            signals = transport._process.stderr
+            assert (await signals.readline()).strip() == b"6"
             task = asyncio.create_task(transport.query(fixtures()["terminal_query"][32:]))
-            for _ in range(200):
-                if len(trace.read_text().splitlines()) == 2:
-                    break
-                await asyncio.sleep(0.01)
-            else:
-                pytest.fail("Query did not reach the helper")
+            assert (await signals.readline()).strip() == b"3"
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task

@@ -9,8 +9,7 @@ import pytest
 from native_transport_support import command_response
 
 from doom_eap.runtime import sentinel_protocol_generated as codec
-from doom_eap.runtime.ammo import LedgerAmmoRefill
-from doom_eap.runtime.ammo_adapters import AmmoStorage
+from doom_eap.runtime.ammo import AmmoStorage, LedgerAmmoRefill
 from doom_eap.runtime.delivery import DeliveryCoordinator, DeliveryMode
 from doom_eap.runtime.inventory import InventoryOwnership
 from doom_eap.runtime.ledger import (

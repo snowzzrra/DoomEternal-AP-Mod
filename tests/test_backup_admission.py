@@ -1,5 +1,4 @@
 import json
-import importlib.util
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,10 +9,20 @@ import pytest
 from doom_eap.launcher.launcher_session import APSessionOwner
 
 
+def _assert_protective_backup(local, originals, result, steam):
+    assert result['result'] == 'protective_backup_ready'
+    assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
+
+
+def _assert_stopped_game_sources(local, originals, steam):
+    assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
+
+
 @pytest.mark.skipif(os.name != 'nt', reason='Native backup helper requires Windows')
+@pytest.mark.integration
 def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypatch):
-    import importlib
     import asyncio
+    import importlib
 
     root = Path(__file__).resolve().parents[1]
     helper_path = Path(os.environ.get('SENTINEL_CORE_SOURCE', root.parent / 'Sentinel-Core')) / 'tools/prepare_vanilla_backup.py'
@@ -36,12 +45,22 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
     monkeypatch.syspath_prepend(str(Path(os.environ.get('ARCHIPELAGO_SOURCE', root.parent / 'Archipelago'))))
     monkeypatch.syspath_prepend(str(root / 'packaging/standalone_runtime'))
     bridge = importlib.import_module('doom_eap.runtime.bridge_client')
-    monkeypatch.setattr(bridge, 'INV_DUMP_DIR', str(local))
-    monkeypatch.setattr(bridge, 'doom_process_identity', lambda: None)
-    context = SimpleNamespace(get_ap_state_key=lambda: 'new-room',
-        _query_process_identity=AsyncMock(return_value=None),
-        quarantine_unbound_physical_events=Mock(side_effect=AssertionError('quarantine while stopped')))
-    context.check_and_update_event_session = lambda: bridge.DoomEternalContext.check_and_update_event_session(context)
+    from doom_eap.runtime import bridge_client, bridge_config
+    monkeypatch.setattr(bridge_config, 'INV_DUMP_DIR', str(local))
+    monkeypatch.setattr(bridge_config, 'doom_process_identity', lambda: None)
+    context = SimpleNamespace(
+        get_ap_state_key=lambda: 'new-room',
+        items=None,
+        checks=None,
+        saves=None
+    )
+    context.items = bridge.bridge_items.ItemRuntime(context)
+    context.items._query_process_identity = AsyncMock(return_value=None)
+    context.items.quarantine_unbound_physical_events = Mock(side_effect=AssertionError('quarantine while stopped'))
+    context.checks = bridge.bridge_checks.CheckRuntime(context)
+    context.saves = bridge.bridge_saves.SaveRuntime(context)
+
+
     spec = importlib.util.spec_from_file_location('backup_review', helper_path)
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
@@ -51,8 +70,8 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
 
     def connected_poll(*args, **kwargs):
         copied = copy_file(*args, **kwargs)
-        assert asyncio.run(context.check_and_update_event_session()) is False
-        asyncio.run(bridge.DoomEternalContext.flush_check_event_files(context))
+        assert asyncio.run(context.items.check_and_update_event_session()) is False
+        asyncio.run(context.checks.flush_check_event_files())
         return copied
 
     monkeypatch.setattr(helper, 'copy_file', connected_poll)
@@ -62,26 +81,39 @@ def test_connected_bridge_does_not_mutate_stopped_game_backup(tmp_path, monkeypa
         run_backup_parent=None, reference_directory=None,
         slot_data_revision="0.7.0",
         mod_contract_revision=2))
-    assert result['result'] == 'protective_backup_ready'
-    assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
+    _assert_protective_backup(local, originals, result, steam)
     for name in ('tracker_loop', 'death_monitor_loop'):
-        stopped = SimpleNamespace(exit_event=asyncio.Event(), item_state_ready=True,
-            prime_death_baseline=AsyncMock(), _query_process_identity=AsyncMock(return_value=None),
-            reset_transient_effects=Mock(), invalidate_map_identity=Mock(),
-            check_rpc_autopause=AsyncMock(), queue_received_deathlink=AsyncMock(), check_killsanity=AsyncMock())
+        stopped = SimpleNamespace(
+            exit_event=asyncio.Event(),
+            item_state_ready=True,
+            items=None,
+            checks=None,
+            saves=None
+        )
+        stopped.items = bridge.bridge_items.ItemRuntime(stopped)
+        stopped.items._query_process_identity = AsyncMock(return_value=None)
+        stopped.items.reset_transient_effects = Mock()
+        stopped.checks = bridge.bridge_checks.CheckRuntime(stopped)
+        stopped.checks.prime_death_baseline = AsyncMock()
+        stopped.checks.invalidate_map_identity = Mock()
+        stopped.checks.check_rpc_autopause = AsyncMock()
+        stopped.checks.queue_received_deathlink = AsyncMock()
+        stopped.checks.check_killsanity = AsyncMock()
+        stopped.saves = bridge.bridge_saves.SaveRuntime(stopped)
 
-        async def stop_after_poll(_delay):
+
+        async def stop_after_poll(_delay, stopped=stopped):
             stopped.exit_event.set()
 
         with monkeypatch.context() as loop_patch:
-            loop_patch.setattr(bridge.asyncio, 'sleep', stop_after_poll)
-            asyncio.run(getattr(bridge.DoomEternalContext, name)(stopped))
-    assert originals == {str(path): path.read_bytes() for source in (steam, local) for path in source.rglob('*') if path.is_file()}
-    monkeypatch.setattr(bridge, 'doom_process_identity', lambda: 'windows:42:99')
-    context._query_process_identity.return_value = 'windows:42:99'
-    context.quarantine_unbound_physical_events = Mock()
-    assert asyncio.run(context.check_and_update_event_session()) is True
-    context.quarantine_unbound_physical_events.assert_called_once_with(old_state_key='old-room', new_state_key='new-room', reason='session_changed')
+            loop_patch.setattr(bridge_client.asyncio, 'sleep', stop_after_poll)
+            asyncio.run(getattr(stopped.checks, name)())
+    _assert_stopped_game_sources(local, originals, steam)
+    monkeypatch.setattr(bridge_config, 'doom_process_identity', lambda: 'windows:42:99')
+    context.items._query_process_identity.return_value = 'windows:42:99'
+    context.items.quarantine_unbound_physical_events = Mock()
+    assert asyncio.run(context.items.check_and_update_event_session()) is True
+    context.items.quarantine_unbound_physical_events.assert_called_once_with(old_state_key='old-room', new_state_key='new-room', reason='session_changed')
     assert json.loads((local / 'ap_event_session.json').read_text())['ap_state_key'] == 'new-room'
 
 

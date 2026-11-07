@@ -13,6 +13,17 @@ def signal(event, **fields):
     print("DELIVERY\t" + json.dumps({"event": event, **fields}), flush=True)
 
 
+def _apply_operations(packet, value):
+    for operation in packet["operations"]:
+        if operation["operation"] == "add":
+            value += operation["value"]
+        elif operation["operation"] == "max":
+            value = max(value, operation["value"])
+        else:
+            raise ValueError(operation)
+    return value
+
+
 class Server:
     def __init__(self, root):
         self.path = root / "ap-storage.json"
@@ -53,13 +64,7 @@ class Server:
             return {"cmd": "SetReply", "key": key, "value": None}
         old = self.values.get(key, packet["default"])
         value = old
-        for operation in packet["operations"]:
-            if operation["operation"] == "add":
-                value += operation["value"]
-            elif operation["operation"] == "max":
-                value = max(value, operation["value"])
-            else:
-                raise ValueError(operation)
+        value = _apply_operations(packet, value)
         self.values[key] = value
         self.save()
         if any(operation["operation"] == "add" for operation in packet["operations"]):

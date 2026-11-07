@@ -7,6 +7,9 @@ import unittest
 import zipfile
 from pathlib import Path
 
+import pytest
+
+from doom_eap.contracts.challenge_registry import load_challenge_registry
 from scripts.release.assemble_ci_artifact import (
     assemble_platform_release,
     audit_final_zip,
@@ -16,12 +19,27 @@ from scripts.release.assemble_ci_artifact import (
     validate_room_resources,
     write_deterministic_zip,
 )
-from tools.release.release_manifest import MANIFEST_FILENAME
-from doom_eap.contracts.challenge_registry import load_challenge_registry
 from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
+from tools.release.release_manifest import MANIFEST_FILENAME
 from tools.validation.release_layout import ROOM_COMPILER_RESOURCE_FILES
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.integration
+
+
+def _write_handoff_checksums(corrupt_hash, target_dir):
+    lines = []
+    for root, _, files in os.walk(target_dir):
+        for f in sorted(files):
+            if f in {"SHA256SUMS.txt", "BUILD-MANIFEST.json"}:
+                continue
+            fp = Path(root) / f
+            rel = fp.relative_to(target_dir).as_posix()
+            digest = sha256_file(fp)
+            if corrupt_hash:
+                digest = "0" * 64
+            lines.append(f"{digest}  {rel}")
+    (target_dir / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def create_fake_handoff(
@@ -102,18 +120,7 @@ def create_fake_handoff(
     (target_dir / "BUILD-MANIFEST.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     # sha256sums.txt
-    lines = []
-    for root, _, files in os.walk(target_dir):
-        for f in sorted(files):
-            if f in {"SHA256SUMS.txt", "BUILD-MANIFEST.json"}:
-                continue
-            fp = Path(root) / f
-            rel = fp.relative_to(target_dir).as_posix()
-            digest = sha256_file(fp)
-            if corrupt_hash:
-                digest = "0" * 64
-            lines.append(f"{digest}  {rel}")
-    (target_dir / "SHA256SUMS.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _write_handoff_checksums(corrupt_hash, target_dir)
 
     return target_dir
 
@@ -279,20 +286,11 @@ class TestAssembleCIArtifact(unittest.TestCase):
                 self.assertIn(f"DoomEternalArchipelago/{res}", names)
 
 
-
-
-
-
-
     def test_checksum_mismatch_rejected(self):
         create_fake_handoff(self.handoff_dir, corrupt_hash=True)
         with self.assertRaises(ValueError) as ctx:
             validate_handoff_structure(self.handoff_dir)
         self.assertIn("Checksum mismatch", str(ctx.exception))
-
-
-
-
 
 
     def test_parity_mismatch_rejected(self):
@@ -308,8 +306,6 @@ class TestAssembleCIArtifact(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             audit_platform_parity(lin_stage, win_stage)
         self.assertIn("Byte mismatch in shared file doometernal.apworld", str(ctx.exception))
-
-
 
 
 if __name__ == "__main__":

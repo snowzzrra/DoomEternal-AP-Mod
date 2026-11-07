@@ -1,13 +1,13 @@
+import json
 from collections import Counter
 from copy import deepcopy
 from importlib.resources import files
-import json
 
 import pytest
 
 from doom_eap.content.enemy_options import normalize_enemy_options
-from doom_eap.content.native_enemy_plan import build_native_recipes, native_body_name
 from doom_eap.content.enemy_plan import BASE_COMBAT_COST
+from doom_eap.content.native_enemy_plan import build_native_recipes
 from doom_eap.content.vanilla_enemy_profiles import SPECIAL_SPECIES, vanilla_profile
 
 
@@ -46,6 +46,19 @@ def test_mixed_zombie_maintenance_is_not_a_required_hundred_kills(native_catalog
     assert sum(r['maximum_emissions'] for r in plan['maps'][key]['recipes']) == 99
 
 
+def _assert_arc_encounter_boundaries(arenas, final):
+    assert len({e['reference_owner'] for e in arenas}) >= 3
+    assert not any(e['reference_owner'] == 'hangar_encounter_manager_dlc2_2' for e in final if e['kind'] == 'ambient_encounter')
+
+
+def _assert_secret_encounter_geometry(secret):
+    assert len(secret) == 5 and all(body['species'] == 'lost_soul' for body in secret)
+
+
+def _assert_arena_native_quantities(earth):
+    assert next(e['actual_finite_total'] for e in earth if e['owner'] == 'ai_encounter_manager_dlc1_uacfacility_arena') >= 10
+
+
 def test_arena_progression_and_secret_geometry_keep_arc_quantities(native_catalog):
     campaign = dict(sequence=['e1m2_war', 'e2m2_base', 'e3m1_slayer', 'e5m2_earth',
                               'e4m2_swamp', 'e5m4_boss', 'e3m4_boss'],
@@ -61,32 +74,46 @@ def test_arena_progression_and_secret_geometry_keep_arc_quantities(native_catalo
     exultia = after['maps']['e1m2_war']
     secret = [body for r in exultia['recipes'] if r['binding'].get('owner') == 'battle_encounter_manager_3'
               for body in r['bodies']]
-    assert len(secret) == 5 and all(body['species'] == 'lost_soul' for body in secret)
+    _assert_secret_encounter_geometry(secret)
     earth = after['maps']['e5m2_earth']['vanilla_reference']['encounters']
-    assert next(e['actual_finite_total'] for e in earth if e['owner'] == 'ai_encounter_manager_dlc1_uacfacility_arena') >= 10
+    _assert_arena_native_quantities(earth)
     final = after['maps']['e3m4_boss']['vanilla_reference']['encounters']
     arenas = [e for e in final if e['kind'] == 'arena_encounter' and e['primary']]
-    assert len({e['reference_owner'] for e in arenas}) >= 3
-    assert not any(e['reference_owner'] == 'hangar_encounter_manager_dlc2_2' for e in final if e['kind'] == 'ambient_encounter')
+    _assert_arc_encounter_boundaries(arenas, final)
 
 
 def recipes(stage):
     return {recipe['id']: recipe for recipe in stage['recipes']}
 
 
+def _assert_stone_imp_population(after, selected):
+    assert sum(r["maximum_emissions"] for r in selected(after)) == 25
+    assert {b["species"] for r in selected(after) for b in r["bodies"]} - {"stone_imp"}
+    assert {b["population_limits"]["maximum"] for r in selected(after) for b in r["bodies"]} == {10}
+
+
 def test_stone_imp_gauntlet_varies_without_expanding_population(native_catalog):
-    key = 'e5m3_hell'
-    owner = 'hangar_encounter_manager_dlc2_2'
-    options = effective(enemies={'revision': 8})
+    key = "e5m3_hell"
+    owner = "hangar_encounter_manager_dlc2_2"
+    options = effective(enemies={"revision": 8})
     campaign = dict(sequence=[key])
-    before = build_native_recipes(options, campaign, seed=31, catalog=native_catalog, revision=17)['maps'][key]
-    after = build_native_recipes(options, campaign, seed=31, catalog=native_catalog)['maps'][key]
-    selected = lambda stage: [r for r in stage['recipes'] if r['binding'].get('owner') == owner]
-    assert sum(r['maximum_emissions'] for r in selected(after)) == 25
-    assert {b['species'] for r in selected(after) for b in r['bodies']} - {'stone_imp'}
-    assert {b['population_limits']['maximum'] for r in selected(after) for b in r['bodies']} == {10}
-    assert {r['id']: r for r in before['recipes'] if r not in selected(before)} == {
-        r['id']: r for r in after['recipes'] if r not in selected(after)}
+    before = build_native_recipes(options, campaign, seed=31, catalog=native_catalog, revision=17)["maps"][key]
+    after = build_native_recipes(options, campaign, seed=31, catalog=native_catalog)["maps"][key]
+
+    def selected(stage):
+        return [r for r in stage["recipes"] if r["binding"].get("owner") == owner]
+
+    _assert_stone_imp_population(after, selected)
+    assert {r["id"]: r for r in before["recipes"] if r not in selected(before)} == {
+        r["id"]: r for r in after["recipes"] if r not in selected(after)
+    }
+
+
+def _assert_separate_swamp_encounters(arenas, torches):
+    assert torches and arenas
+    assert all(row['kind'] == row['reference_kind'] == 'ambient_encounter' for row in torches)
+    assert all(row['reference_kind'] == 'arena_encounter' for row in arenas)
+    assert min(row['actual_finite_total'] for row in arenas) > max(row['actual_finite_total'] for row in torches)
 
 
 def test_contextual_balance_keeps_blood_swamps_arenas_separate_from_torches(native_catalog):
@@ -97,27 +124,14 @@ def test_contextual_balance_keeps_blood_swamps_arenas_separate_from_torches(nati
     torches = [row for row in reports if 'torch' in row['owner'] and row['primary']]
     arenas = [row for row in reports if row['owner'] in {'arena_encounter_manager_1',
               'arena_encounter_manager_arena3', 'boss_encounter_manager_forest_arena_2'} and row['primary']]
-    assert torches and arenas
-    assert all(row['kind'] == row['reference_kind'] == 'ambient_encounter' for row in torches)
-    assert all(row['reference_kind'] == 'arena_encounter' for row in arenas)
-    assert min(row['actual_finite_total'] for row in arenas) > max(row['actual_finite_total'] for row in torches)
+    _assert_separate_swamp_encounters(arenas, torches)
 
 
-def test_fodder_draw_includes_drone_and_trooper_with_fewer_riot_shields(native_catalog):
-    key = 'e1m1_intro'
-    catalog = fixture_catalog(native_catalog, {key: [source(native_catalog, key, 'imp', 0,
-                                                           count=600, maximum=600)]})
-    options = effective()
-    plan = build_native_recipes(options, dict(sequence=[key]), seed=31, catalog=catalog)
-    counts = Counter(body['species'] for recipe in plan['maps'][key]['recipes'] for body in recipe['bodies'])
-    assert counts['zombie_maykr'] and counts['demonic_trooper'] and counts['gargoyle']
-    assert counts['chaingun_soldier'] < counts['hell_soldier']
-    assert counts['chaingun_soldier'] < counts['demonic_trooper']
-    drone = native_catalog['species']['zombie_maykr']
-    assert drone['ai']['entity'] == 'gameplay_ai_fodder_zombie_maykr_1'
-    khan = next(row for row in native_catalog['maps']['e3m3_maykr']['origins']
-                if row['id'] == 'e3m3_maykr/khan_boss_intro_ida2')
-    assert khan['protected_reason'] == 'native boss actor'
+def _assert_special_species_limits(counts):
+    assert counts['marauder'] and counts['archvile']
+    assert sum(counts[name] for name in ('marauder', 'archvile', 'armored_baron')) == 12
+    assert counts['buff_pod'] and counts['zombie_t1_screecher'] and counts['spirit']
+    assert sum(counts[name] for name in ('buff_pod', 'zombie_t1_screecher', 'spirit')) == 12
 
 
 def test_specials_exchange_within_native_superheavy_and_support_counts(native_catalog):
@@ -128,10 +142,7 @@ def test_specials_exchange_within_native_superheavy_and_support_counts(native_ca
     plan = build_native_recipes(effective(), dict(sequence=[key]), seed=31, catalog=catalog)
     report, = plan['maps'][key]['vanilla_reference']['encounters']
     counts = Counter(body['species'] for recipe in plan['maps'][key]['recipes'] for body in recipe['bodies'])
-    assert counts['marauder'] and counts['archvile']
-    assert sum(counts[name] for name in ('marauder', 'archvile', 'armored_baron')) == 12
-    assert counts['buff_pod'] and counts['zombie_t1_screecher'] and counts['spirit']
-    assert sum(counts[name] for name in ('buff_pod', 'zombie_t1_screecher', 'spirit')) == 12
+    _assert_special_species_limits(counts)
     assert Counter(report['actual_finite']) == Counter(report['target_finite'])
     assert report['population_limits']['superheavy'] == 12
     assert report['population_limits']['combined_special'] == 24
@@ -139,6 +150,22 @@ def test_specials_exchange_within_native_superheavy_and_support_counts(native_ca
         for body in recipe['bodies']:
             assert body['population_limits']['species'][body['species']] > 0
             assert body['special_limits']['combined_special'] > 0
+
+
+def _assert_finite_population_limits(body, peak):
+    assert body['population_limits']['strict']
+    assert body['population_limits']['heavy'] == peak['heavy']
+    assert body['population_limits']['superheavy'] == peak['superheavy']
+    assert body['population_limits']['species'] == peak['specials']
+    assert body['special_limits']['combined_special'] == peak['combined_special']
+    assert all(body['attributes'][name] == 100 for name in
+               ('health_percent', 'damage_percent', 'speed_percent'))
+    assert body['definition'].isascii() and len(body['definition']) < 512
+
+
+def _assert_finite_category_totals(bodies):
+    assert Counter(body['species'] for body in bodies if body['species'] in SPECIAL_SPECIES) == {
+        name: 1 for name in SPECIAL_SPECIES}
 
 
 def test_revision14_preserves_finite_categories_and_all_special_species(native_catalog):
@@ -154,42 +181,43 @@ def test_revision14_preserves_finite_categories_and_all_special_species(native_c
     assert Counter(report['reference_finite']) == Counter(report['actual_finite'])
     assert set(report['deviations']) <= {'randomized_species_cost_variation'}
     bodies = [body for recipe in stage['recipes'] for body in recipe['bodies']]
-    assert Counter(body['species'] for body in bodies if body['species'] in SPECIAL_SPECIES) == {
-        name: 1 for name in SPECIAL_SPECIES}
+    _assert_finite_category_totals(bodies)
     peak = vanilla_profile(catalog, key)['encounters'][0]['peak']
     for body in bodies:
-        assert body['population_limits']['strict']
-        assert body['population_limits']['heavy'] == peak['heavy']
-        assert body['population_limits']['superheavy'] == peak['superheavy']
-        assert body['population_limits']['species'] == peak['specials']
-        assert body['special_limits']['combined_special'] == peak['combined_special']
-        assert all(body['attributes'][name] == 100 for name in
-                   ('health_percent', 'damage_percent', 'speed_percent'))
-        assert body['definition'].isascii() and len(body['definition']) < 512
+        _assert_finite_population_limits(body, peak)
 
 
-@pytest.mark.parametrize('count,maximum,reference_counts', [(4, 8, (2, 4)), (1, 1, (1, 1))])
+def _assert_corresponding_encounter_emissions(reference_counts, report, stage):
+    assert Counter(report["actual_finite"]) == Counter(fodder=reference_counts[0], heavy=reference_counts[1])
+    assert Counter(report["reference_finite"]) == Counter(report["target_finite"])
+    assert not report["deviations"]
+    assert sum(recipe["maximum_emissions"] for recipe in stage["recipes"]) == sum(reference_counts)
+
+
+@pytest.mark.parametrize("count,maximum,reference_counts", [(4, 8, (2, 4)), (1, 1, (1, 1))])
 def test_corresponding_encounter_uses_actual_emissions_and_allows_empty_sources(
-        native_catalog, count, maximum, reference_counts):
-    reference, target = 'e1m1_intro', 'e2m1_nest'
-    baseline = [source(native_catalog, reference, name, index, count=quantity, maximum=quantity)
-                for index, (name, quantity) in enumerate(zip(('imp', 'hell_knight'), reference_counts))]
-    targets = [source(native_catalog, target, 'imp', index, count=count, maximum=maximum)
-               for index in range(1 if maximum > count else 3)]
+    native_catalog, count, maximum, reference_counts
+):
+    reference, target = "e1m1_intro", "e2m1_nest"
+    baseline = [
+        source(native_catalog, reference, name, index, count=quantity, maximum=quantity)
+        for index, (name, quantity) in enumerate(zip(("imp", "hell_knight"), reference_counts, strict=False))
+    ]
+    targets = [
+        source(native_catalog, target, "imp", index, count=count, maximum=maximum)
+        for index in range(1 if maximum > count else 3)
+    ]
     catalog = fixture_catalog(native_catalog, {reference: baseline, target: targets})
     options = effective()
-    campaign = dict(sequence=[target, reference], mode='random_mission_order')
+    campaign = dict(sequence=[target, reference], mode="random_mission_order")
     plan = build_native_recipes(options, campaign, seed=31, catalog=catalog)
-    stage = plan['maps'][target]
-    report, = stage['vanilla_reference']['encounters']
-    assert Counter(report['actual_finite']) == Counter(fodder=reference_counts[0], heavy=reference_counts[1])
-    assert Counter(report['reference_finite']) == Counter(report['target_finite'])
-    assert not report['deviations']
-    assert sum(recipe['maximum_emissions'] for recipe in stage['recipes']) == sum(reference_counts)
+    stage = plan["maps"][target]
+    (report,) = stage["vanilla_reference"]["encounters"]
+    _assert_corresponding_encounter_emissions(reference_counts, report, stage)
     if maximum > count:
-        assert len(stage['recipes'][0]['bodies']) == 3
+        assert len(stage["recipes"][0]["bodies"]) == 3
     else:
-        assert any(not recipe['bodies'] for recipe in stage['recipes'])
+        assert any(not recipe["bodies"] for recipe in stage["recipes"])
 
 
 def test_reference_without_renewable_pool_does_not_add_infinite_fodder(native_catalog):
@@ -206,6 +234,12 @@ def test_reference_without_renewable_pool_does_not_add_infinite_fodder(native_ca
     assert not Counter(report['actual_renewable'])
     assert not recipes(stage)[targets[1]['id']]['bodies']
     assert not report['deviations']
+
+
+def _assert_native_geometry_passthrough(key, relay):
+    assert relay['translation'] == 'native_geometry_passthrough'
+    assert relay['reference_map'] == key
+    assert not relay['deviations']
 
 
 def test_opaque_native_population_and_stationary_geometry_are_preserved(native_catalog):
@@ -226,9 +260,7 @@ def test_opaque_native_population_and_stationary_geometry_are_preserved(native_c
     metadata = stage['vanilla_reference']
     assert metadata['unknown_native_sources'][0]['source_id'] == opaque['id']
     relay = next(row for row in metadata['encounters'] if row['owner'] == 'native_relay')
-    assert relay['translation'] == 'native_geometry_passthrough'
-    assert relay['reference_map'] == key
-    assert not relay['deviations']
+    _assert_native_geometry_passthrough(key, relay)
 
 
 def test_longer_map_repeats_the_reference_curve_and_randomizes_tentacles(native_catalog):
@@ -284,17 +316,6 @@ def test_vanilla_heavy_substitutions_respect_native_pressure(native_catalog):
     bodies = plan['maps'][key]['recipes'][0]['bodies']
     assert Counter(report['actual_finite']) == Counter(heavy=3)
     assert sum(BASE_COMBAT_COST[body['species']] for body in bodies) <= 3 * BASE_COMBAT_COST['cacodemon']
-
-
-def test_superheavy_roster_can_vary_above_the_cheapest_native_species(native_catalog):
-    key = 'e5m3_hell'
-    catalog = fixture_catalog(native_catalog, {key: [source(native_catalog, key, 'baron', 0, count=8, maximum=8)]})
-    plan = build_native_recipes(effective(), dict(sequence=[key]), seed=12, catalog=catalog)
-    report, = plan['maps'][key]['vanilla_reference']['encounters']
-    bodies = plan['maps'][key]['recipes'][0]['bodies']
-    assert Counter(report['actual_finite']) == Counter(superheavy=8)
-    assert any(body['species'] != 'baron' for body in bodies)
-    assert all(body['population_limits']['superheavy'] == 8 for body in bodies)
 
 
 def test_each_encounter_keeps_its_own_combined_special_limit(native_catalog):

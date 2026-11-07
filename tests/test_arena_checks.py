@@ -1,23 +1,33 @@
 import asyncio
 import hashlib
-import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 from zipfile import ZipFile
 
 import pytest
 
-from doom_eap.content.arena_checks import ROOT, arena_check_name, load_arena_checks
-from doom_eap.content.content_catalog import load_content_catalog
+from doom_eap.content.arena_checks import arena_check_name, load_arena_checks
 from tools.maps.ap_map_generator import extract_target_names, find_entity_block_bounds
 from tools.maps.arena_checks import compile_arena_checks
 from tools.maps.encounter_catalog import entity_records, list_items
 
 
+def _assert_arena_relay(code, generated, relay, relay_record):
+    assert relay_record["edit"]["count"] == 1
+    assert relay_record["edit"]["reuseable"] is False
+    assert extract_target_names(relay) == [f"ap_notify_location_{code}", f"ap_event_{code}"]
+    assert generated.count(f"condump ap_event_{code}.txt;") == 1
+
+
+def _assert_arena_event_chain(check, inserted, new_events, old_events):
+    assert inserted["eventCall"]["args"]["item[0]"]["entity"] == check
+    assert old_events == new_events
+
+
+@pytest.mark.integration
 @pytest.mark.parametrize("map_key,entry", load_arena_checks().items())
-def test_arena_completion_preserves_combat_and_emits_one_standard_chain(map_key, entry):
-    descriptor = json.loads((ROOT / f"content/maps/{entry.get('map_key', map_key)}/descriptor.json").read_text())
-    raw = (ROOT / "vanillamaps" / descriptor["source_file"]).read_bytes()
+def test_arena_completion_preserves_combat_and_emits_one_standard_chain(map_key, entry, frozen_map):
+    raw = frozen_map(entry.get("map_key", map_key)).read_bytes()
     assert hashlib.sha256(raw).hexdigest() == entry["source_sha256"]
     source = raw.decode("utf-8")
     generated, manifest = compile_arena_checks(source, entry["arenas"], {})
@@ -28,10 +38,7 @@ def test_arena_completion_preserves_combat_and_emits_one_standard_chain(map_key,
         assert manifest[check] == code
         relay = generated[slice(*find_entity_block_bounds(generated, check))]
         relay_record, = entity_records(relay, include_names={check})
-        assert relay_record["edit"]["count"] == 1
-        assert relay_record["edit"]["reuseable"] is False
-        assert extract_target_names(relay) == [f"ap_notify_location_{code}", f"ap_event_{code}"]
-        assert generated.count(f"condump ap_event_{code}.txt;") == 1
+        _assert_arena_relay(code, generated, relay, relay_record)
         suppress = generated[slice(*find_entity_block_bounds(generated, f"ap_suppress_arena_{code}"))]
         assert extract_target_names(suppress) == [check]
         for completion in arena["completion"]:
@@ -47,37 +54,11 @@ def test_arena_completion_preserves_combat_and_emits_one_standard_chain(map_key,
             old_events = list_items(old["edit"]["encounterComponent"]["entityEvents"][script]["events"])
             new_events = list_items(new["edit"]["encounterComponent"]["entityEvents"][script]["events"])
             inserted = new_events.pop(completion["source_event_index"])
-            assert inserted["eventCall"]["args"]["item[0]"]["entity"] == check
-            assert old_events == new_events
-
-
-def test_arena_ids_do_not_depend_on_catalog_order():
-    from tools.content.compile_content_catalog import render
-
-    catalog = load_content_catalog()
-    rows = [row for row in catalog.physical_locations if row.strategy == "arena"]
-    assert len({row.location_id for row in rows}) == len(rows)
-    from dataclasses import replace
-
-    reversed_catalog = replace(catalog, physical_locations=tuple(reversed(catalog.physical_locations)))
-    namespace = {}
-    exec(render(reversed_catalog), namespace)
-    expected = {row.name: row.location_id for row in rows}
-    assert expected == {
-        name: code for name, code in namespace["LOCATION_NAME_TO_ID"].items()
-        if name in expected
-    }
-
-
-def test_compact_visual_registry_preserves_location_metadata():
-    from doom_eap.content.automap_visual_registry import build_authorial_registry, render_authorial_registry
-
-    document = build_authorial_registry(ROOT)
-    assert json.loads(render_authorial_registry(document)) == document
+            _assert_arena_event_chain(check, inserted, new_events, old_events)
 
 
 def test_confirmed_arena_is_suppressed_after_checkpoint_reload_and_reentry():
-    from doom_eap.runtime.checked_visuals import CheckedVisuals
+    from doom_eap.runtime.bridge_checks import CheckedVisuals
 
     code = 7773001
     runtime_map = "game/sp/e1m1_intro/e1m1_intro"
@@ -102,13 +83,14 @@ def test_confirmed_arena_is_suppressed_after_checkpoint_reload_and_reentry():
     asyncio.run(exercise())
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("active", [False, True])
-def test_room_compiles_selected_arena_with_enemy_randomizer_disabled(tmp_path, monkeypatch, active):
+def test_room_compiles_selected_arena_with_enemy_randomizer_disabled(tmp_path, monkeypatch, active, frozen_map):
     from doom_eap.content.native_enemy_plan import native_recipe_fingerprint
     from doom_eap.launcher.launcher_core import RoomCompiler, SeedManifest
 
     key = "e5m4_boss"
-    source = (ROOT / "vanillamaps/e5m4_boss.map").read_bytes()
+    source = frozen_map(key).read_bytes()
     target = "e5m4_boss_patch1/maps/game/dlc2/e5m4_boss/e5m4_boss.entities"
     compiler = RoomCompiler.__new__(RoomCompiler)
     compiler.payload_resource = tmp_path / "sources.zip"

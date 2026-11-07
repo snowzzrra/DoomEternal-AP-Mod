@@ -1,8 +1,8 @@
 """Temporary effects expire, combine and reset through the asynchronous transport port."""
 import asyncio
 
-from doom_eap.runtime import transient_effects
-from doom_eap.runtime.transient_effects import TransientEffectManager, TransientRuntime
+from doom_eap.runtime import bridge_items
+from doom_eap.runtime.bridge_items import TransientEffectManager, TransientRuntime
 
 
 class Publication:
@@ -20,16 +20,20 @@ class Publication:
 
 def test_duration_stacks_and_expiry_cleans_each_policy(monkeypatch):
     now = [100.0]
-    monkeypatch.setattr(transient_effects.time, 'monotonic', lambda: now[0])
+    monkeypatch.setattr(bridge_items.time, 'monotonic', lambda: now[0])
     publication = Publication()
     manager = TransientEffectManager(publication, 1)
     runtime = TransientRuntime('room', ('1', '1'), True)
-    async def check():
-        assert (await manager.apply_receipt(7770156, runtime, receipt_index=0))[0]
-        now[0] += 1
+    async def _assert_stacked_effect_duration(manager, publication, runtime):
         assert (await manager.apply_receipt(7770156, runtime, receipt_index=0))[0]
         assert (await manager.apply_receipt(7770159, runtime, receipt_index=1))[0]
         assert publication.commands[-3] == ('g_damageScaleAllToAI 1.05', 1)
+
+
+    async def check():
+        assert (await manager.apply_receipt(7770156, runtime, receipt_index=0))[0]
+        now[0] += 1
+        await _assert_stacked_effect_duration(manager, publication, runtime)
         now[0] += 12
         assert await manager.tick(runtime)
         assert publication.commands[-3] == ('g_damageScaleAllToAI 1.50', None)

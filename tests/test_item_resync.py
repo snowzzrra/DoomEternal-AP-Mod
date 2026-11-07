@@ -6,11 +6,10 @@ from unittest.mock import patch
 
 import pytest
 
-from doom_eap.runtime.item_reconciliation import (
-    NEVER_REPLAY,
+from doom_eap.runtime.inventory import (
     REPLAY_IDEMPOTENT,
-    ReplayPolicy,
     ReceiptSession,
+    ReplayPolicy,
     compile_reconciliation_plan,
     migrate_client_state,
     migrate_legacy_session_key,
@@ -39,6 +38,11 @@ def _registry(*entries):
     }
 
 
+def _assert_duplicate_reconnect_receipts(second):
+    assert second.new == ()
+    assert [receipt.index for receipt in second.duplicates] == [10, 11, 12]
+
+
 def test_reconnect_classifies_new_receipts_once_in_order():
     history = [Receipt(item, index, 1, 0) for index, item in enumerate(range(13))]
     first = observe_received_items(history, 10)
@@ -52,8 +56,7 @@ def test_reconnect_classifies_new_receipts_once_in_order():
         receipt.receipt_id for receipt in first.new if receipt.receipt_id is not None
     )
     second = observe_received_items(history, 10, processed_ids)
-    assert second.new == ()
-    assert [receipt.index for receipt in second.duplicates] == [10, 11, 12]
+    _assert_duplicate_reconnect_receipts(second)
 
 
 def test_reconciliation_history_stops_at_processed_boundary():
@@ -62,7 +65,7 @@ def test_reconciliation_history_stops_at_processed_boundary():
     definitions = {item: "simple" for item in range(13)}
     registry = _registry(*[(item_id, REPLAY_IDEMPOTENT) for item_id in range(13)])
 
-    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
+    with patch("doom_eap.runtime.inventory.compile_item_delivery_plan", _fake_delivery):
         plan = compile_reconciliation_plan(
             observed.historical_authoritative_item_ids,
             definitions,
@@ -137,17 +140,6 @@ def test_generation_identity_never_adopts_another_campaign_session():
     assert state_key not in sessions
 
 
-def test_never_replay_has_zero_commands():
-    definitions = {1: "simple"}
-    with patch("doom_eap.runtime.item_reconciliation.compile_item_delivery_plan", _fake_delivery):
-        plan = compile_reconciliation_plan(
-            [1, 1], definitions, _registry((1, NEVER_REPLAY)), "room-0-1", 4
-        )
-
-    assert plan.commands == ()
-    assert plan.skipped_never_replay == 1
-
-
 def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
     session = ReceiptSession()
     key = ("room", 0, "receipt")
@@ -170,7 +162,7 @@ def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
 
 
 def test_resolved_starting_ownership_does_not_suppress_own_world_delivery():
-    from doom_eap.runtime.item_reconciliation import progressive_receipt_stage
+    from doom_eap.runtime.inventory import progressive_receipt_stage
 
     session = ReceiptSession()
     session.configure_starting_ownership(

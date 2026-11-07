@@ -8,6 +8,24 @@ import pytest
 from doom_eap.contracts.core_distribution import ABI, REQUIRED, verify_runtime
 
 
+def _runtime_artifact_role(name):
+    role = "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name.endswith(".exe") else "core"
+    return role
+
+
+def _write_runtime_members(archive, artifacts, bootstrap_build_id, build_id, pe, root):
+    for name in sorted(REQUIRED):
+        data = bytes(pe) if name.endswith((".dll", ".exe")) else b"Model fixture notice\n"
+        if name in {"sentinel_core.dll", "msimg32.dll"}:
+            data += ((bootstrap_build_id or build_id) if name == "msimg32.dll" else build_id).encode() + b"\0"
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        archive.writestr(name, data)
+        role = _runtime_artifact_role(name)
+        artifacts.append({"path": name, "role": role, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+
+
 def fixture(root, *, build_id="b" * 64, bootstrap_build_id=None):
     pe = bytearray(128)
     pe[:2] = b"MZ"
@@ -16,16 +34,7 @@ def fixture(root, *, build_id="b" * 64, bootstrap_build_id=None):
     struct.pack_into("<H", pe, 68, 0x8664)
     artifacts = []
     with zipfile.ZipFile(root / "sentinel-runtime.zip", "w") as archive:
-        for name in sorted(REQUIRED):
-            data = bytes(pe) if name.endswith((".dll", ".exe")) else b"Model fixture notice\n"
-            if name in {"sentinel_core.dll", "msimg32.dll"}:
-                data += ((bootstrap_build_id or build_id) if name == "msimg32.dll" else build_id).encode() + b"\0"
-            target = root / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(data)
-            archive.writestr(name, data)
-            role = "notice" if name.startswith("notices/") else "bootstrap" if name == "msimg32.dll" else "probe" if name.endswith(".exe") else "core"
-            artifacts.append({"path": name, "role": role, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        _write_runtime_members(archive, artifacts, bootstrap_build_id, build_id, pe, root)
     data = (root / "sentinel-runtime.zip").read_bytes()
     artifacts.append({"path": "sentinel-runtime.zip", "role": "runtime_zip", "size": len(data), "sha256": hashlib.sha256(data).hexdigest()})
     document = {"schema": 1, "product": "sentinel-core", "version": "2.0.0-rc-1", "base_version": "2.0.0",
@@ -64,9 +73,6 @@ def test_matched_inventory_distributions(tmp_path, monkeypatch, base, inventory_
     assert accepted["abi"]["inventory"] == inventory_abi
 
 
-
-
-
 @pytest.mark.parametrize("base,inventory_abi", [("2.0.0", 3), ("2.0.0", 9), ("2.0.1", 99)])
 def test_mismatched_inventory_distribution_is_refused(tmp_path, base, inventory_abi):
     manifest = fixture(tmp_path)
@@ -85,8 +91,6 @@ def test_runtime_rejects_incompatible_core_versions(tmp_path, base, suffix):
     (tmp_path / "distribution.json").write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="Incompatible runtime"):
         verify_runtime(tmp_path / "distribution.json")
-
-
 
 
 @pytest.mark.parametrize("name,version", [("combat", 1), ("combat_presentation", 2),

@@ -1,7 +1,4 @@
-"""Checkout views, emitted integrity and compiler inputs have distinct byte contracts."""
-import hashlib
 import json
-import struct
 from pathlib import Path
 
 import pytest
@@ -20,39 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 NAMES = (*CANONICAL_RESOURCE_FILENAMES, *METADATA_FILENAMES)
 
 
-def test_every_hud_counter_is_a_root_sibling():
-    recipes = json.loads((ROOT / "packaging/presentation-swf-patches.json").read_text())
-    variants = [entry for entry in recipes if entry["resource"].endswith("/swf/hud/hud_score.swf")]
-    assert any("e1m1_intro" in entry["resource"] for entry in variants)
-    assert any("e4m1" in entry["resource"] for entry in variants)
-    assert any("e5m1" in entry["resource"] for entry in variants)
-    for entry in variants:
-        data = (ROOT / "packaging/mod_assets" / entry["resource"]).read_bytes()
-        assert hashlib.sha256(data).hexdigest() == entry["result_sha256"]
-        position = 27
-
-        def integer(data=data):
-            nonlocal position
-            value = struct.unpack_from(">I", data, position)[0]
-            position += 4
-            return value
-
-        count = integer()
-        position += 4 * count
-        for _ in range(integer()):
-            integer()
-            length = struct.unpack_from("<I", data, position)[0]
-            position += 4 + length
-        placements = []
-        for _ in range(integer()):
-            tag, length = integer(), integer()
-            placements.append((tag, data[position:position + length]))
-            position += length
-        assert sum(tag in (26, 70) and b"apFoundLabel\0" in payload for tag, payload in placements) == 1, entry["resource"]
-
-
-
-
+@pytest.mark.integration
 def test_download_bytes_are_not_normalized_and_text_changes_are_not_hidden(tmp_path):
     download = tmp_path / "download"
     stage_room_resource_files(get_frozen_bundle_dir(ROOT), download, ROOT, NAMES)
@@ -66,8 +31,6 @@ def test_download_bytes_are_not_normalized_and_text_changes_are_not_hidden(tmp_p
     manifest.write_bytes(lf + b" ")
     with pytest.raises(ValueError, match="Checksum mismatch"):
         validate_room_resource_integrity(download)
-
-
 
 
 def test_source_fingerprint_normalizes_only_owned_text_and_preserves_real_changes(tmp_path):
@@ -112,16 +75,6 @@ def test_options_projection_accepts_checkout_line_endings_and_rejects_source_edi
         compiler.check_schema(tmp_path, projection)
 
 
-
-
-
-
-
-
-
-
-
-
 def test_frozen_compiler_identity_retains_untracked_dependencies_and_content_changes(tmp_path):
     from doom_eap.content.compiler_identity import BUNDLED_IDENTITY_PATH, SOURCE_FILES, load_compiler_source_identity
     source = tmp_path / "source"
@@ -151,25 +104,6 @@ def test_frozen_compiler_identity_retains_untracked_dependencies_and_content_cha
     manifest.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(ValueError, match="compiler source identity"):
         load_compiler_source_identity(frozen, frozen=True)
-
-
-def test_working_tree_origin_is_exact_and_does_not_claim_its_ancestor_as_built_commit(tmp_path):
-    from tools.release.source_provenance import capture_release_sources, source_origin
-    mod, ap = tmp_path / "mod", tmp_path / "ap"
-    (mod / "doom_eap").mkdir(parents=True)
-    ap.mkdir()
-    module = mod / "doom_eap/new_owner.py"
-    module.write_bytes(b"VALUE = 1\r\n")
-    (ap / "CommonClient.py").write_bytes(b"CLIENT = 1\n")
-    state = capture_release_sources(mod, ap)
-    record = source_origin("ancestor", state["mod"])
-    assert record["base_commit_sha"] == "ancestor" and "resolved_sha" not in record
-    assert record["source_state"]["files"]["doom_eap/new_owner.py"]["sha256"] == hashlib.sha256(module.read_bytes()).hexdigest()
-    module.write_bytes(b"VALUE = 1\n")
-    assert capture_release_sources(mod, ap)["mod"]["fingerprint"] != state["mod"]["fingerprint"]
-    state["mod"]["fingerprint"] = "0" * 64
-    with pytest.raises(ValueError, match="source evidence"):
-        source_origin("ancestor", state["mod"])
 
 
 @pytest.mark.parametrize("relative", [

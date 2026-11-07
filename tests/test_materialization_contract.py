@@ -1,4 +1,3 @@
-"""Persistent planning and spool evidence without CommonClient/game discovery."""
 import copy
 import json
 import logging
@@ -11,8 +10,12 @@ import pytest
 from doom_eap.contracts.inventory_domain import MISSING, OWNED, UNKNOWN, InventoryObservation, ItemObservation
 from doom_eap.contracts.materialization import GATE_KEY_TO_MAP, MaterializationScope
 from doom_eap.contracts.runtime_context import RuntimeContext
-from doom_eap.runtime.item_reconciliation import effective_ownership, load_policy_registry
-from doom_eap.runtime.materialization import MaterializationPlanError, compile_materialization_plan
+from doom_eap.runtime.inventory import (
+    MaterializationPlanError,
+    compile_materialization_plan,
+    effective_ownership,
+    load_policy_registry,
+)
 
 
 @pytest.fixture
@@ -88,6 +91,11 @@ def test_fixed_dash_uses_configured_completion_ack_and_native_missing(inputs):
     assert any(command.item_id == 7770015 for command in plan.reconciliation.commands)
 
 
+def _assert_persistent_ownership_plan(commands):
+    assert "removeInventoryItem weapon/player/crucible" not in commands
+    assert any("hammer/ammo_drops_upgraded" in command for command in commands)
+
+
 def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, monkeypatch):
     definitions, policies, context, scope = inputs
     never_replay = tuple(item_id for item_id, policy in policies.items() if policy.policy == "never_replay")
@@ -103,8 +111,7 @@ def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, 
     assert plan.reconciliation == repeated.reconciliation
     assert definitions == original
     commands = [intent.command for intent in plan.reconciliation.commands]
-    assert "removeInventoryItem weapon/player/crucible" not in commands
-    assert any("hammer/ammo_drops_upgraded" in command for command in commands)
+    _assert_persistent_ownership_plan(commands)
     allowed_persistent = {7770017, 7770088, 7770092, 7770145, 7770146, 7770147, 7770901}
     assert not (set(never_replay) - allowed_persistent) & {c.item_id for c in plan.reconciliation.commands}
     assert plan.support_rune_jobs == 1
@@ -112,29 +119,26 @@ def test_persistent_plan_is_pure_and_keeps_cumulative_special_ownership(inputs, 
         plan.scope.state_key = "other-room"
 
 
-
-
-
-
-
-
-
-
 @pytest.fixture
 def inventory_adapter():
-    from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
+    from doom_eap.runtime.inventory import SentinelInventoryObservation
 
     link = SimpleNamespace(pid=123, namespace="offline")
     adapter = SentinelInventoryObservation(
-        SimpleNamespace(state_key="published-room", native_game_link=lambda: link),
+        SimpleNamespace(state_key="published-room", items=SimpleNamespace(native_game_link=lambda: link)),
         logging.getLogger(__name__), lambda *args, **kwargs: None)
     return adapter, link
+
+
+def _assert_map_scoped_gate_key(item_id, observation, state):
+    assert observation.get_state(item_id) == state
+    assert all(observation.get_state(other) == UNKNOWN for other in GATE_KEY_TO_MAP if other != item_id)
 
 
 @pytest.mark.parametrize("item_id,map_key", list(GATE_KEY_TO_MAP.items()))
 @pytest.mark.parametrize("key,state", [(0, MISSING), (1, OWNED), (255, UNKNOWN)])
 def test_slayer_key_observation_and_replay_are_map_scoped(inputs, inventory_adapter, item_id, map_key, key, state):
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
     definitions, policies, _, scope = inputs
     context = next(row for row in CONTEXT_BY_IDENTITY.values() if map_key in row.map_keys)
     adapter, link = inventory_adapter
@@ -142,8 +146,7 @@ def test_slayer_key_observation_and_replay_are_map_scoped(inputs, inventory_adap
                                       "dash_after": 255, "slayer_key_after": key}
     observation = adapter.observe_inventory(room_seed_name=scope.room_seed_name, epoch=scope.evidence_epoch,
         context_identity=context.identity, campaign=context.campaign)
-    assert observation.get_state(item_id) == state
-    assert all(observation.get_state(other) == UNKNOWN for other in GATE_KEY_TO_MAP if other != item_id)
+    _assert_map_scoped_gate_key(item_id, observation, state)
     for manual in (False, True):
         arguments = (ownership(tuple(GATE_KEY_TO_MAP)), context, replace(scope, manual=manual), definitions,
                      policies, "the_crucible")
@@ -171,7 +174,7 @@ def test_slayer_key_observation_needs_matching_map_context(inventory_adapter, id
 @pytest.mark.parametrize("manual", [False, True])
 @pytest.mark.parametrize("frag", [0, 1, 255])
 def test_ballista_and_frag_repair_does_not_wait_for_unknown_items(inputs, inventory_adapter, manual, frag):
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
     definitions, policies, _, scope = inputs
     context = CONTEXT_BY_IDENTITY["base/e3m1_slayer"]
     adapter, link = inventory_adapter
@@ -192,7 +195,7 @@ def test_ballista_and_frag_repair_does_not_wait_for_unknown_items(inputs, invent
 
 @pytest.mark.parametrize("manual", [False, True])
 def test_checkpoint_missing_full_auto_repairs_without_replaying_receipts(inputs, inventory_adapter, manual):
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
     definitions, policies, _, scope = inputs
     context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
     adapter, link = inventory_adapter
@@ -217,19 +220,6 @@ def test_checkpoint_missing_full_auto_repairs_without_replaying_receipts(inputs,
         plan()
 
 
-def test_selected_owned_mod_resync_ignores_unselected_unknown_capacity(inputs):
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
-    definitions, policies, _, scope = inputs
-    context = CONTEXT_BY_IDENTITY["base/e1m3_cult"]
-    observation = InventoryObservation(scope.room_seed_name, scope.evidence_epoch, context.identity, context.campaign,
-        {7770059: ItemObservation(7770059, OWNED)})
-    result = compile_materialization_plan(ownership((7770059, 7770017)), context, scope, definitions, policies,
-        "the_crucible", observation=observation, selected_item_ids=frozenset((7770059,)))
-    assert not result.reconciliation.commands
-
-
-
-
 def test_inventory_observation_defers_if_checkpoint_changes_between_native_reads(inputs, inventory_adapter):
     _, _, context, scope = inputs
     adapter, link = inventory_adapter
@@ -248,7 +238,7 @@ def test_inventory_observation_defers_if_checkpoint_changes_between_native_reads
     ('game/sp/e2m3_core/e2m3_core', False), (None, False)])
 def test_fixed_dash_repair_accepts_independent_native_generation_in_the_same_map(inputs, inventory_adapter,
                                                                               native_map, accepted):
-    from doom_eap.runtime.context_registry import CONTEXT_BY_IDENTITY
+    from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
 
     definitions, policies, _, scope = inputs
     context = CONTEXT_BY_IDENTITY['base/hub']

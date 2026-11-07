@@ -55,6 +55,11 @@ def finish_v2_script(peer):
     peer.action("ack")
 
 
+def _assert_barrier_committed_identity(after, before):
+    assert [row.plan for row in after[1]] == [row.plan for row in before[1]]
+    assert after[2] == before[2]
+
+
 @pytest.mark.parametrize("point,stage", [
     (f"{name}:{side}", stage)
     for name, stage in (("ingestion", 0), ("plan", 1), ("preparation", 2),
@@ -82,8 +87,7 @@ def test_v2_barriers_preserve_committed_identity(v2_scenario, point, stage):
     peer.kill_bridge()
     peer.start()
     after = ledger_snapshot(peer)
-    assert [row.plan for row in after[1]] == [row.plan for row in before[1]]
-    assert after[2] == before[2]
+    _assert_barrier_committed_identity(after, before)
     finish_v2_script(peer)
     _, commands, _ = ledger_snapshot(peer)
     assert len(commands) == 1 and commands[0].state is CommandState.CONFIRMED
@@ -199,6 +203,12 @@ def test_owner_dispatch_without_readback_is_visible_after_boundary(v2_scenario):
     assert len(peer.effects()) == 1
 
 
+def _assert_resolution_after_restart(original, peer, stored):
+    assert stored.state is CommandState.EFFECT_UNKNOWN and stored.result == original.result
+    assert stored.revision == original.revision + 1
+    assert peer.effects() == [original.plan.command_id]
+
+
 @pytest.mark.parametrize("point", ["resolution:before", "resolution:after"])
 @pytest.mark.parametrize("action", ["try_again", "mark_as_received"])
 def test_owner_resolution_survives_kill_and_duplicate_confirmation(v2_scenario, point, action):
@@ -222,9 +232,7 @@ def test_owner_resolution_survives_kill_and_duplicate_confirmation(v2_scenario, 
     rows = ledger_snapshot(peer)[1]
     assert len(rows) == (2 if action == "try_again" else 1)
     stored, = [row for row in rows if row.plan.command_id == original.plan.command_id]
-    assert stored.state is CommandState.EFFECT_UNKNOWN and stored.result == original.result
-    assert stored.revision == original.revision + 1
-    assert peer.effects() == [original.plan.command_id]
+    _assert_resolution_after_restart(original, peer, stored)
 
 
 def restart_publication(peer, point, item, commands):

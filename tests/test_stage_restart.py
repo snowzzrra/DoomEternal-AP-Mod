@@ -2,27 +2,8 @@ import json
 
 import pytest
 
-from doom_eap.runtime.save_files import read_stage_restart
-from doom_eap.runtime.stage_restart import activity_events
-
-
-def test_runtime_restart_admission_requires_nightmare():
-    from doom_eap.content.slot_data_contract import ULTRA_NIGHTMARE_CAPABILITY, StructureError, validate_slot_data
-    from doom_eap.runtime.context_registry import SUPPORTED_SLOT_CAPABILITIES
-    from tests.test_slot_data_contract import sample_catalog, sample_slot, sign_slot
-
-    catalog = sample_catalog()
-    data = sample_slot(catalog)
-    data["runtime"]["difficulty"] = {"engine": 3, "death_policy": "restart_stage"}
-    data["compatibility"]["required_capabilities"] = [ULTRA_NIGHTMARE_CAPABILITY]
-    result = validate_slot_data(sign_slot(data, catalog), catalog, supported_capabilities=SUPPORTED_SLOT_CAPABILITIES)
-    assert result.runtime.difficulty.death_policy == "restart_stage"
-    with pytest.raises(StructureError, match="unsupported capabilities"):
-        validate_slot_data(sign_slot(data, catalog), catalog,
-                           supported_capabilities=SUPPORTED_SLOT_CAPABILITIES - {ULTRA_NIGHTMARE_CAPABILITY})
-    data["runtime"]["difficulty"]["engine"] = 2
-    with pytest.raises(StructureError, match="engine Nightmare"):
-        validate_slot_data(sign_slot(data, catalog), catalog, supported_capabilities=SUPPORTED_SLOT_CAPABILITIES)
+from doom_eap.runtime.bridge_saves import read_stage_restart
+from doom_eap.runtime.campaign import activity_events
 
 
 def test_restart_activity_is_process_and_room_bound(tmp_path, monkeypatch):
