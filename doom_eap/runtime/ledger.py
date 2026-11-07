@@ -1,7 +1,3 @@
-"""Asynchronous Ledger operations and read-model helpers.
-Re-exports the public ledger record types.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -9,82 +5,417 @@ import os
 import queue
 import sqlite3
 import threading
+from collections.abc import Sequence
 from concurrent.futures import Future
-from dataclasses import fields
+from dataclasses import dataclass, fields
+from enum import Enum
 from hashlib import sha256
 from pathlib import Path
-
-from .ledger_records import (
-    AmmoChange,
-    AmmoOperation,
-    AmmoOperationRow,
-    AmmoState,
-    AmmoTotals,
-    Attempt,
-    AttemptChange,
-    AttemptRow,
-    Authority,
-    Binding,
-    CheckChange,
-    CommandChange,
-    CommandPlan,
-    CommandRow,
-    CommandState,
-    Commit,
-    Conflict,
-    Context,
-    EffectSource,
-    HistoryConflict,
-    InvalidRecord,
-    ItemAction,
-    ItemPage,
-    ItemReason,
-    ItemRow,
-    ItemStatus,
-    LedgerClosed,
-    LedgerError,
-    ManualResolution,
-    NetworkReceipt,
-    Observation,
-    ReceiptDecision,
-    ReceiptState,
-    ReplayPolicy,
-    Resolution,
-    ResolutionAction,
-    RevisionConflict,
-    Room,
-    RoomKey,
-    SaveEpoch,
-    SaveEpochState,
-    StaleBinding,
-    StorageError,
-    WorkerFull,
-)
-from .ledger_records import AmmoKind as AmmoKind
-from .ledger_records import CheckState as CheckState
-from .ledger_records import SchemaError as SchemaError
-from .ledger_records import SourceKind as SourceKind
-from .ledger_records import WriterBusy as WriterBusy
-from .ledger_schema import (
-    _COMMAND_FIELDS,
-    _ROOM_COLUMNS,
-    _ROOM_WHERE,
-    _configure,
-    _migrate,
-    _now,
-    _room_values,
-    _schema_version,
-    _validate,
-    _writer_lock,
-)
-from .ledger_schema import (
-    _MIGRATIONS as _MIGRATIONS,
-)
 
 _SUPERSEDED_COMMAND = """EXISTS (SELECT 1 FROM commands replacement
     WHERE replacement.supersedes_id=c.command_id AND
     (c.state IN ('stale','rejected') OR (c.replay='idempotent'
      AND replacement.context_id<>c.context_id AND replacement.effect_key=c.effect_key)))"""
+
+
+class LedgerError(Exception):
+    """The ledger could not complete an operation."""
+
+
+class InvalidRecord(LedgerError):
+    pass
+
+
+class StorageError(LedgerError):
+    pass
+
+
+class SchemaError(StorageError):
+    pass
+
+
+class WriterBusy(StorageError):
+    pass
+
+
+class Conflict(LedgerError):
+    pass
+
+
+class StaleBinding(Conflict):
+    pass
+
+
+class RevisionConflict(Conflict):
+    pass
+
+
+class HistoryConflict(Conflict):
+    pass
+
+
+class LedgerClosed(LedgerError):
+    pass
+
+
+class WorkerFull(LedgerError):
+    pass
+
+
+class CommandState(str, Enum):
+    PLANNED = "planned"
+    DEFERRED = "deferred"
+    QUEUED = "queued"
+    DISPATCHED = "dispatched"
+    CONFIRMED = "confirmed"
+    STALE = "stale"
+    REJECTED = "rejected"
+    EFFECT_UNKNOWN = "effect_unknown"
+
+
+class ReceiptState(str, Enum):
+    RECEIVED = "received"
+    DEFERRED = "deferred"
+    PLANNED = "planned"
+    SATISFIED = "satisfied"
+    REJECTED = "rejected"
+
+
+class ReplayPolicy(str, Enum):
+    IDEMPOTENT = "idempotent"
+    ADDITIVE = "additive"
+
+
+class ItemStatus(str, Enum):
+    RECEIVED = "received"
+    WAITING = "waiting"
+    DELIVERED = "delivered"
+    BLOCKED = "blocked"
+
+
+class ItemReason(str, Enum):
+    PLANNING = "planning"
+    EXECUTION = "execution"
+    CONTEXT = "context"
+    DEPENDENCY = "dependency"
+    CONFIRMATION = "confirmation"
+    REJECTED = "rejected"
+    EFFECT_UNKNOWN = "effect_unknown"
+    ROOM_BLOCKED = "room_blocked"
+    PLAYER_RESOLVED = "player_resolved"
+    NONE = "none"
+
+
+class Authority(str, Enum):
+    SHADOW = "shadow"
+    LEDGER = "ledger"
+
+
+class SourceKind(str, Enum):
+    STARTING_GRANT = "starting_grant"
+    DERIVED_FACT = "derived_fact"
+    BOOTSTRAP = "bootstrap"
+    TEMPORARY_CLEANUP = "temporary_cleanup"
+
+
+class SaveEpochState(str, Enum):
+    PREPARED = "prepared"
+    APPLIED = "applied"
+    ABORTED = "aborted"
+
+
+class ResolutionAction(str, Enum):
+    TRY_AGAIN = "try_again"
+    MARK_AS_RECEIVED = "mark_as_received"
+
+
+class Resolution(str, Enum):
+    ACCEPTED_BY_PLAYER = "accepted_by_player"
+    REPLACED = "replaced"
+
+
+class AmmoKind(str, Enum):
+    SPEND = "spend"
+    DISCARD = "discard"
+
+
+class AmmoState(str, Enum):
+    PREPARED = "prepared"
+    REQUESTED = "requested"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+    UNKNOWN = "unknown"
+
+
+class CheckState(str, Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    ACKNOWLEDGED = "acknowledged"
+    BLOCKED = "blocked"
+
+
+@dataclass(frozen=True)
+class RoomKey:
+    seed: str
+    team: int
+    slot: int
+    generation_fp: str
+
+
+@dataclass(frozen=True)
+class Binding:
+    room: RoomKey
+    writer_epoch: int
+    connection_id: str
+
+
+@dataclass(frozen=True)
+class NetworkReceipt:
+    item: int
+    location: int
+    player: int
+    flags: int
+
+
+@dataclass(frozen=True)
+class Context:
+    context_id: str
+    binding: Binding
+    pid: int
+    process_created: str
+    native_instance: str
+    campaign: str
+    map_name: str
+    save_id: str
+    load_id: str
+    native_generation: int
+    save_binding_id: str | None = None
+
+
+@dataclass(frozen=True)
+class EffectSource:
+    source_id: str
+    kind: SourceKind
+    source_key: str
+    evidence: bytes
+
+
+@dataclass(frozen=True)
+class CommandPlan:
+    command_id: str
+    receipt_index: int | None
+    ammo_operation_id: str | None
+    effect_key: str
+    realization_key: str
+    ordinal: int
+    predecessor_id: str | None
+    supersedes_id: str | None
+    kind: str
+    payload_revision: int
+    payload: bytes
+    context_id: str
+    replay: ReplayPolicy
+    required: bool
+    retry_limit: int
+    local_source_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ManualResolution:
+    command_id: str
+    expected_revision: int
+    action: ResolutionAction
+    replacement: CommandPlan | None = None
+    evidence: bytes = b""
+
+
+@dataclass(frozen=True)
+class ReceiptDecision:
+    ap_index: int
+    state: ReceiptState
+    reason: str | None
+    evidence: bytes
+    expected_revision: int = 0
+
+
+@dataclass(frozen=True)
+class CommandChange:
+    command_id: str
+    expected_revision: int
+    state: CommandState
+    reason: str | None
+    evidence: bytes
+    next_eligible_at: int | None
+
+
+@dataclass(frozen=True)
+class Attempt:
+    command_id: str
+    number: int
+    request_id: str
+    binding: Binding
+    context_id: str
+    envelope: bytes
+    deadline_at: int
+    expected_revision: int = 0
+    reference: bytes = b""
+
+
+@dataclass(frozen=True)
+class AttemptRow:
+    attempt: Attempt
+    envelope_fingerprint: str
+    prepared_at: int
+    acceptance: bytes
+    result: bytes
+    completed_at: int | None
+    revision: int
+
+
+@dataclass(frozen=True)
+class AttemptChange:
+    command_id: str
+    number: int
+    expected_revision: int
+    acceptance: bytes
+    result: bytes
+    completed_at: int | None
+
+
+@dataclass(frozen=True)
+class Observation:
+    run_id: str
+    sequence: int
+    kind: str
+    command_id: str | None
+    receipt_index: int | None
+    evidence: bytes
+
+
+@dataclass(frozen=True)
+class AmmoOperation:
+    operation_id: str
+    storage_key: str
+    request: bytes
+    kind: AmmoKind
+    absolute_target: int
+    writer_id: str
+    deadline_at: int
+
+
+@dataclass(frozen=True)
+class AmmoChange:
+    operation_id: str
+    expected_revision: int
+    state: AmmoState
+    evidence: bytes
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class AmmoOperationRow:
+    operation: AmmoOperation
+    state: AmmoState
+    revision: int
+    evidence: bytes
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class AmmoTotals:
+    expected_revision: int
+    credited: int
+    consumed: int
+    discarded: int
+    reserved: int
+    observations: bytes
+
+
+@dataclass(frozen=True)
+class CheckChange:
+    location_id: int
+    expected_revision: int | None
+    state: CheckState
+    observation: bytes
+    send_attempts: int
+    next_attempt_at: int | None
+    acknowledgement: bytes
+    reason: str | None
+
+
+@dataclass(frozen=True)
+class Commit:
+    event_sequence: int
+    receipt_boundary: int
+
+
+@dataclass(frozen=True)
+class ItemAction:
+    kind: ResolutionAction
+    command_id: str
+    expected_revision: int
+
+
+@dataclass(frozen=True)
+class ItemRow:
+    ap_index: int
+    item: int
+    sender: int
+    status: ItemStatus
+    reason: str | None
+    actions: tuple[ItemAction, ...]
+    event_sequence: int
+    reason_code: ItemReason = ItemReason.NONE
+    revision: int = 0
+    resolution: Resolution | None = None
+    flags: int | None = None
+    received_at: int | None = None
+
+
+@dataclass(frozen=True)
+class ItemPage(Sequence[ItemRow]):
+    rows: tuple[ItemRow, ...]
+    watermark: int
+
+    def __getitem__(self, index):
+        return self.rows[index]
+
+    def __len__(self):
+        return len(self.rows)
+
+
+@dataclass(frozen=True)
+class Room:
+    key: RoomKey
+    compatibility_revision: int
+    authority: Authority
+    receipt_boundary: int
+    active_binding: str | None
+    active_context_id: str | None
+    activation_event_sequence: int | None
+    blocked_reason: str | None
+    revision: int
+
+
+@dataclass(frozen=True)
+class SaveEpoch:
+    epoch_id: str
+    receipt_boundary: int
+    evidence: bytes
+    state: SaveEpochState = SaveEpochState.APPLIED
+
+
+@dataclass(frozen=True)
+class CommandRow:
+    plan: CommandPlan
+    state: CommandState
+    revision: int
+    attempt_count: int
+    next_eligible_at: int | None
+    result: bytes
+    reason: str | None
+    resolution: Resolution | None = None
+    replacement_id: str | None = None
 
 
 class Ledger:
@@ -108,10 +439,12 @@ class Ledger:
 
     @classmethod
     async def _start(cls, path: Path, create: bool, read_only: bool, capacity: int) -> Ledger:
+        from doom_eap.runtime import ledger_schema
+
         if not isinstance(path, Path) or not path.is_absolute():
             raise InvalidRecord("database path must be an absolute Path")
-        _validate(read_only, bool, "read_only")
-        _validate(capacity, int, "capacity")
+        ledger_schema._validate(read_only, bool, "read_only")
+        ledger_schema._validate(capacity, int, "capacity")
         if capacity < 1:
             raise InvalidRecord("worker capacity must be positive")
         ledger = cls(path.resolve(), create, read_only, capacity)
@@ -124,6 +457,8 @@ class Ledger:
         return ledger
 
     def _connect(self) -> sqlite3.Connection:
+        from doom_eap.runtime import ledger_schema
+
         if self._create:
             descriptor = os.open(self._path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             os.close(descriptor)
@@ -131,9 +466,9 @@ class Ledger:
         connection = sqlite3.connect(f"{self._path.as_uri()}?mode={mode}", uri=True, isolation_level=None)
         self._connection = connection
         connection.row_factory = sqlite3.Row
-        version = _schema_version(connection, self._create)
-        _configure(connection, self._read_only)
-        _migrate(connection, self._path, self._create, self._read_only, version)
+        version = ledger_schema._schema_version(connection, self._create)
+        ledger_schema._configure(connection, self._read_only)
+        ledger_schema._migrate(connection, self._path, self._create, self._read_only, version)
         if connection.execute("PRAGMA quick_check").fetchone()[0] != "ok":
             raise StorageError("database integrity check failed")
         if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
@@ -148,25 +483,29 @@ class Ledger:
     def _claim_writer(self) -> None:
         connection = self._connection
         connection.execute("BEGIN IMMEDIATE")
+        completed = False
         try:
             connection.execute("UPDATE profile SET writer_epoch=writer_epoch+1 WHERE singleton=1")
             self._epoch = connection.execute("SELECT writer_epoch FROM profile WHERE singleton=1").fetchone()[0]
             connection.commit()
-        except BaseException:
-            connection.rollback()
-            raise
+            completed = True
+        finally:
+            if not completed:
+                connection.rollback()
 
     def _worker(self) -> None:
+        from doom_eap.runtime import ledger_schema
+
         lock = None
         failure = None
         self._connection = None
         try:
             if not self._read_only:
-                lock = _writer_lock(self._path)
+                lock = ledger_schema._writer_lock(self._path)
             self._connect()
             self._ready.set_result(None)
             self._work_loop()
-        except Exception as error:
+        except (LedgerError, sqlite3.Error, OSError, ValueError, TypeError) as error:
             failure = self._error(error)
         finally:
             if self._connection is not None:
@@ -187,7 +526,7 @@ class Ledger:
             operation, arguments, future, mutate = request
             try:
                 result = self._execute(operation, arguments, mutate)
-            except Exception as error:
+            except (LedgerError, sqlite3.Error, OSError, ValueError, TypeError) as error:
                 future.set_exception(self._error(error))
             else:
                 future.set_result(result)
@@ -203,13 +542,15 @@ class Ledger:
     def _execute(self, operation, arguments: tuple, mutate: bool):
         connection = self._connection
         connection.execute("BEGIN IMMEDIATE" if mutate else "BEGIN")
+        completed = False
         try:
             result = operation(*arguments)
             connection.commit()
+            completed = True
             return result
-        except BaseException:
-            connection.rollback()
-            raise
+        finally:
+            if not completed:
+                connection.rollback()
 
     async def _submit(self, operation, arguments: tuple, mutate: bool = True):
         if self._closed:
@@ -237,6 +578,7 @@ class Ledger:
     def _backup(self, destination):
         descriptor = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(descriptor)
+        completed = False
         try:
             target = sqlite3.connect(destination)
             try:
@@ -247,9 +589,10 @@ class Ledger:
                 target.close()
             with destination.open("r+b") as stream:
                 os.fsync(stream.fileno())
-        except BaseException:
-            destination.unlink()
-            raise
+            completed = True
+        finally:
+            if not completed:
+                destination.unlink()
 
     async def bind(
         self,
@@ -260,11 +603,13 @@ class Ledger:
         authority: Authority = Authority.SHADOW,
         expected_revision: int | None = None,
     ) -> Binding:
-        _validate(room, RoomKey)
-        _validate(connection_id, str, "connection_id")
-        _validate(compatibility_revision, int, "compatibility_revision")
-        _validate(authority, Authority)
-        _validate(expected_revision, int | None, "expected_revision")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(connection_id, str, "connection_id")
+        ledger_schema._validate(compatibility_revision, int, "compatibility_revision")
+        ledger_schema._validate(authority, Authority)
+        ledger_schema._validate(expected_revision, int | None, "expected_revision")
         return await self._submit(
             self._bind, (room, connection_id, compatibility_revision, authority, expected_revision)
         )
@@ -299,7 +644,9 @@ class Ledger:
             raise Conflict("room compatibility and authority are fixed at creation")
 
     def _room(self, room: RoomKey):
-        return self._connection.execute(f"SELECT * FROM rooms WHERE {_ROOM_WHERE}", _room_values(room)).fetchone()
+        from doom_eap.runtime import ledger_schema
+
+        return self._connection.execute(f"SELECT * FROM rooms WHERE {ledger_schema._ROOM_WHERE}", ledger_schema._room_values(room)).fetchone()
 
     def _binding(self, binding: Binding):
         row = self._room(binding.room)
@@ -317,36 +664,46 @@ class Ledger:
         )
 
     def _room_dict(self, room: RoomKey) -> dict:
-        return dict(zip(_ROOM_COLUMNS.split(", "), _room_values(room), strict=True))
+        from doom_eap.runtime import ledger_schema
+
+        return dict(zip(ledger_schema._ROOM_COLUMNS.split(", "), ledger_schema._room_values(room), strict=True))
 
     def _update(self, table: str, room: RoomKey, values: dict, revision: int, **key) -> None:
+        from doom_eap.runtime import ledger_schema
+
         assignments = ", ".join(f"{name}=?" for name in values)
         where = " AND ".join(f"{name}=?" for name in key)
         clause = f" AND {where}" if key else ""
-        parameters = (*values.values(), *_room_values(room), *key.values(), revision)
+        parameters = (*values.values(), *ledger_schema._room_values(room), *key.values(), revision)
         cursor = self._connection.execute(
-            f"UPDATE {table} SET {assignments}, revision=revision+1 WHERE {_ROOM_WHERE}{clause} AND revision=?",
+            f"UPDATE {table} SET {assignments}, revision=revision+1 WHERE {ledger_schema._ROOM_WHERE}{clause} AND revision=?",
             parameters,
         )
         if cursor.rowcount != 1:
             raise RevisionConflict(f"{table} row or revision has changed")
 
     def _event(self, room: RoomKey, kind: str, **details) -> int:
-        values = self._room_dict(room) | {"kind": kind, "evidence": b"", "wall_time": _now()} | details
+        from doom_eap.runtime import ledger_schema
+
+        values = self._room_dict(room) | {"kind": kind, "evidence": b"", "wall_time": ledger_schema._now()} | details
         cursor = self._insert("events", values)
         return cursor.lastrowid
 
     def _commit(self, room: RoomKey) -> Commit:
+        from doom_eap.runtime import ledger_schema
+
         sequence = self._connection.execute(
-            f"SELECT coalesce(max(sequence),0) FROM events WHERE {_ROOM_WHERE}",
-            _room_values(room),
+            f"SELECT coalesce(max(sequence),0) FROM events WHERE {ledger_schema._ROOM_WHERE}",
+            ledger_schema._room_values(room),
         ).fetchone()[0]
         return Commit(sequence, self._room(room)["receipt_boundary"])
 
     async def ingest(self, binding: Binding, start: int, items: tuple[NetworkReceipt, ...]) -> Commit:
-        _validate(binding, Binding)
-        _validate(start, int, "start")
-        _validate(items, tuple[NetworkReceipt, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(start, int, "start")
+        ledger_schema._validate(items, tuple[NetworkReceipt, ...])
         if len(items) > 256:
             raise InvalidRecord("receipt batch cannot exceed 256 items")
         result = await self._submit(self._ingest, (binding, start, items))
@@ -355,18 +712,20 @@ class Ledger:
         return result
 
     def _ingest(self, binding, start, items):
+        from doom_eap.runtime import ledger_schema
+
         row = self._binding(binding)
         boundary = row["receipt_boundary"]
         if start > boundary:
             raise Conflict("receipt history has a gap")
         room = binding.room
         old = self._connection.execute(
-            f"SELECT * FROM receipts WHERE {_ROOM_WHERE} AND ap_index>=? AND ap_index<? ORDER BY ap_index",
-            (*_room_values(room), start, min(start + len(items), boundary)),
+            f"SELECT * FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND ap_index>=? AND ap_index<? ORDER BY ap_index",
+            (*ledger_schema._room_values(room), start, min(start + len(items), boundary)),
         ).fetchall()
         if not self._matching_receipts(old, items):
             return self._block_history(room, row)
-        timestamp = _now()
+        timestamp = ledger_schema._now()
         for offset in range(len(old), len(items)):
             index = start + offset
             receipt = items[offset]
@@ -400,14 +759,18 @@ class Ledger:
         return HistoryConflict(reason)
 
     async def context(self, binding: Binding, context: Context, changes: tuple[CommandChange, ...]) -> Commit:
-        _validate(binding, Binding)
-        _validate(context, Context)
-        _validate(changes, tuple[CommandChange, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(context, Context)
+        ledger_schema._validate(changes, tuple[CommandChange, ...])
         if context.binding != binding:
             raise InvalidRecord("context belongs to another binding")
         return await self._submit(self._context, (binding, context, changes))
 
     def _context(self, binding, context, changes):
+        from doom_eap.runtime import ledger_schema
+
         row = self._binding(binding)
         values = self._room_dict(binding.room) | vars(context)
         del values["binding"]
@@ -418,7 +781,7 @@ class Ledger:
         if existing is not None:
             self._same(existing, values, "context")
         else:
-            self._insert("contexts", values, started_at=_now())
+            self._insert("contexts", values, started_at=ledger_schema._now())
         if row["active_context_id"] != context.context_id:
             self._end_context(row["active_context_id"])
             self._update("rooms", binding.room, {"active_context_id": context.context_id}, row["revision"])
@@ -427,9 +790,11 @@ class Ledger:
         return self._commit(binding.room)
 
     def _end_context(self, context_id):
+        from doom_eap.runtime import ledger_schema
+
         if context_id is not None:
             self._connection.execute(
-                "UPDATE contexts SET ended_at=? WHERE context_id=? AND ended_at IS NULL", (_now(), context_id)
+                "UPDATE contexts SET ended_at=? WHERE context_id=? AND ended_at IS NULL", (ledger_schema._now(), context_id)
             )
 
     @staticmethod
@@ -441,10 +806,12 @@ class Ledger:
         self, binding: Binding, plans: tuple[CommandPlan, ...], decisions: tuple[ReceiptDecision, ...],
         *, sources: tuple[EffectSource, ...] = (),
     ) -> Commit:
-        _validate(binding, Binding)
-        _validate(plans, tuple[CommandPlan, ...])
-        _validate(decisions, tuple[ReceiptDecision, ...])
-        _validate(sources, tuple[EffectSource, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(plans, tuple[CommandPlan, ...])
+        ledger_schema._validate(decisions, tuple[ReceiptDecision, ...])
+        ledger_schema._validate(sources, tuple[EffectSource, ...])
         for plan in plans:
             if sum(source is not None for source in (plan.receipt_index, plan.ammo_operation_id, plan.local_source_id)) != 1:
                 raise InvalidRecord("command needs exactly one source")
@@ -469,8 +836,10 @@ class Ledger:
         self._event(room, "local_source_recorded", evidence=source.evidence)
 
     async def resolve(self, binding: Binding, resolution: ManualResolution) -> Commit:
-        _validate(binding, Binding)
-        _validate(resolution, ManualResolution)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(resolution, ManualResolution)
         if (resolution.action is ResolutionAction.TRY_AGAIN) != (resolution.replacement is not None):
             raise InvalidRecord("only Try again needs a replacement")
         return await self._submit(self._resolve, (binding, resolution))
@@ -527,13 +896,17 @@ class Ledger:
         )
 
     async def prepare(self, binding: Binding, attempt: Attempt) -> Commit:
-        _validate(binding, Binding)
-        _validate(attempt, Attempt)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(attempt, Attempt)
         if attempt.binding != binding or attempt.number < 1:
             raise InvalidRecord("attempt needs this binding and a positive number")
         return await self._submit(self._prepare, (binding, attempt))
 
     def _prepare(self, binding, attempt):
+        from doom_eap.runtime import ledger_schema
+
         self._binding(binding)
         command = self._command(binding.room, attempt.command_id)
         if command is None or command["context_id"] != attempt.context_id:
@@ -552,7 +925,7 @@ class Ledger:
             envelope=attempt.envelope,
             reference=attempt.reference,
             envelope_hash=sha256(attempt.envelope).hexdigest(),
-            prepared_at=_now(),
+            prepared_at=ledger_schema._now(),
             deadline_at=attempt.deadline_at,
             acceptance=b"",
             result=b"",
@@ -582,11 +955,13 @@ class Ledger:
         *,
         attempts: tuple[AttemptChange, ...] = (),
     ) -> Commit:
-        _validate(binding, Binding)
-        _validate(changes, tuple[CommandChange, ...])
-        _validate(decisions, tuple[ReceiptDecision, ...])
-        _validate(observations, tuple[Observation, ...])
-        _validate(attempts, tuple[AttemptChange, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(changes, tuple[CommandChange, ...])
+        ledger_schema._validate(decisions, tuple[ReceiptDecision, ...])
+        ledger_schema._validate(observations, tuple[Observation, ...])
+        ledger_schema._validate(attempts, tuple[AttemptChange, ...])
         return await self._submit(self._apply, (binding, changes, decisions, observations, attempts))
 
     def _apply(self, binding, changes, decisions, observations, attempts):
@@ -611,10 +986,12 @@ class Ledger:
             self._state_change("receipts", room, {"ap_index": decision.ap_index}, decision, evidence=decision.evidence)
 
     def _state_change(self, table, room, key, change, **extra):
+        from doom_eap.runtime import ledger_schema
+
         clause = " AND ".join(f"{name}=?" for name in key)
         row = self._connection.execute(
-            f"SELECT state FROM {table} WHERE {_ROOM_WHERE} AND {clause}",
-            (*_room_values(room), *key.values()),
+            f"SELECT state FROM {table} WHERE {ledger_schema._ROOM_WHERE} AND {clause}",
+            (*ledger_schema._room_values(room), *key.values()),
         ).fetchone()
         previous = row["state"] if row is not None else None
         self._update(
@@ -654,44 +1031,56 @@ class Ledger:
             )
 
     async def observe(self, binding: Binding, observations: tuple[Observation, ...]) -> Commit:
-        _validate(binding, Binding)
-        _validate(observations, tuple[Observation, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(observations, tuple[Observation, ...])
         return await self._submit(self._apply, (binding, (), (), observations, ()))
 
     async def timeline(self, room: RoomKey, limit: int = 128) -> tuple[dict, ...]:
         """Recent room events without private command or observation payloads."""
-        _validate(room, RoomKey)
-        _validate(limit, int, "limit")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(limit, int, "limit")
         if not 1 <= limit <= 256:
             raise InvalidRecord("timeline limit must be between 1 and 256")
         return await self._submit(self._timeline, (room, limit), False)
 
     def _timeline(self, room, limit):
+        from doom_eap.runtime import ledger_schema
+
         rows = self._connection.execute(
             f"SELECT sequence, kind, receipt_index, command_id, previous_state, new_state, wall_time "
-            f"FROM events WHERE {_ROOM_WHERE} ORDER BY sequence DESC LIMIT ?",
-            (*_room_values(room), limit),
+            f"FROM events WHERE {ledger_schema._ROOM_WHERE} ORDER BY sequence DESC LIMIT ?",
+            (*ledger_schema._room_values(room), limit),
         ).fetchall()
         return tuple(dict(row) for row in reversed(rows))
 
     async def observations(self, room: RoomKey, run_id: str, after_sequence: int, limit: int) -> tuple[Observation, ...]:
-        _validate(room, RoomKey)
-        _validate(run_id, str, "run_id")
-        _validate(after_sequence, int, "after_sequence")
-        _validate(limit, int, "limit")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(run_id, str, "run_id")
+        ledger_schema._validate(after_sequence, int, "after_sequence")
+        ledger_schema._validate(limit, int, "limit")
         if not 1 <= limit <= 256:
             raise InvalidRecord("observation limit must be between 1 and 256")
         return await self._submit(self._read_observations, (room, run_id, after_sequence, limit), False)
 
     def _read_observations(self, room, run_id, after_sequence, limit):
+        from doom_eap.runtime import ledger_schema
+
         rows = self._connection.execute(
-            f"SELECT * FROM events WHERE {_ROOM_WHERE} AND observer_run=? AND observer_sequence>? "
-            "ORDER BY observer_sequence LIMIT ?", (*_room_values(room), run_id, after_sequence, limit),
+            f"SELECT * FROM events WHERE {ledger_schema._ROOM_WHERE} AND observer_run=? AND observer_sequence>? "
+            "ORDER BY observer_sequence LIMIT ?", (*ledger_schema._room_values(room), run_id, after_sequence, limit),
         ).fetchall()
         return tuple(Observation(row["observer_run"], row["observer_sequence"], row["kind"],
                                  row["command_id"], row["receipt_index"], row["evidence"]) for row in rows)
 
     def _observations(self, room, observations):
+        from doom_eap.runtime import ledger_schema
+
         for observation in observations:
             values = self._room_dict(room) | {
                 "observer_run": observation.run_id,
@@ -706,7 +1095,7 @@ class Ledger:
                 (observation.run_id, observation.sequence),
             ).fetchone()
             if existing is None:
-                self._insert("events", values, wall_time=_now())
+                self._insert("events", values, wall_time=ledger_schema._now())
             else:
                 self._same(existing, values, "observation")
 
@@ -719,12 +1108,14 @@ class Ledger:
         commands: tuple[CommandChange, ...] = (),
         *, plans: tuple[CommandPlan, ...] = (),
     ) -> Commit:
-        _validate(binding, Binding)
-        _validate(operations, tuple[AmmoOperation, ...])
-        _validate(changes, tuple[AmmoChange, ...])
-        _validate(totals, AmmoTotals | None)
-        _validate(commands, tuple[CommandChange, ...])
-        _validate(plans, tuple[CommandPlan, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(operations, tuple[AmmoOperation, ...])
+        ledger_schema._validate(changes, tuple[AmmoChange, ...])
+        ledger_schema._validate(totals, AmmoTotals | None)
+        ledger_schema._validate(commands, tuple[CommandChange, ...])
+        ledger_schema._validate(plans, tuple[CommandPlan, ...])
         return await self._submit(self._ammo, (binding, operations, changes, totals, commands, plans))
 
     def _ammo(self, binding, operations, changes, totals, commands, plans):
@@ -759,12 +1150,16 @@ class Ledger:
         self._event(room, "ammo_prepared", operation_id=operation.operation_id, new_state=AmmoState.PREPARED)
 
     async def ammo_totals(self, room: RoomKey) -> AmmoTotals:
-        _validate(room, RoomKey)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
         return await self._submit(self._read_ammo_totals, (room,), False)
 
     def _read_ammo_totals(self, room):
+        from doom_eap.runtime import ledger_schema
+
         row = self._connection.execute(
-            f"SELECT * FROM ammo_totals WHERE {_ROOM_WHERE}", _room_values(room)
+            f"SELECT * FROM ammo_totals WHERE {ledger_schema._ROOM_WHERE}", ledger_schema._room_values(room)
         ).fetchone()
         if row is None:
             raise Conflict("Ammo room does not exist")
@@ -774,30 +1169,38 @@ class Ledger:
     async def ammo_operations(
         self, room: RoomKey, states: tuple[AmmoState, ...], after_id: str | None, limit: int,
     ) -> tuple[AmmoOperationRow, ...]:
-        _validate(room, RoomKey)
-        _validate(states, tuple[AmmoState, ...])
-        _validate(after_id, str | None, "after_id")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(states, tuple[AmmoState, ...])
+        ledger_schema._validate(after_id, str | None, "after_id")
         _page_limit(limit)
         return await self._submit(self._read_ammo_operations, (room, states, after_id, limit), False)
 
     def _read_ammo_operations(self, room, states, after_id, limit):
+        from doom_eap.runtime import ledger_schema
+
         placeholders = ",".join("?" for _ in states)
         rows = self._connection.execute(
-            f"SELECT * FROM ammo_operations WHERE {_ROOM_WHERE} AND state IN ({placeholders}) "
+            f"SELECT * FROM ammo_operations WHERE {ledger_schema._ROOM_WHERE} AND state IN ({placeholders}) "
             "AND operation_id>? ORDER BY operation_id LIMIT ?",
-            (*_room_values(room), *states, after_id or "", limit),
+            (*ledger_schema._room_values(room), *states, after_id or "", limit),
         ).fetchall()
         return tuple(self._ammo_row(row) for row in rows)
 
     async def ammo_operation(self, room: RoomKey, operation_id: str) -> AmmoOperationRow | None:
-        _validate(room, RoomKey)
-        _validate(operation_id, str, "operation_id")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(operation_id, str, "operation_id")
         return await self._submit(self._read_ammo_operation, (room, operation_id), False)
 
     def _read_ammo_operation(self, room, operation_id):
+        from doom_eap.runtime import ledger_schema
+
         row = self._connection.execute(
-            f"SELECT * FROM ammo_operations WHERE {_ROOM_WHERE} AND operation_id=?",
-            (*_room_values(room), operation_id),
+            f"SELECT * FROM ammo_operations WHERE {ledger_schema._ROOM_WHERE} AND operation_id=?",
+            (*ledger_schema._room_values(room), operation_id),
         ).fetchone()
         return self._ammo_row(row) if row is not None else None
 
@@ -810,8 +1213,10 @@ class Ledger:
         )
 
     async def checks(self, binding: Binding, changes: tuple[CheckChange, ...]) -> Commit:
-        _validate(binding, Binding)
-        _validate(changes, tuple[CheckChange, ...])
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(changes, tuple[CheckChange, ...])
         return await self._submit(self._checks, (binding, changes))
 
     def _checks(self, binding, changes):
@@ -837,27 +1242,33 @@ class Ledger:
         )
 
     async def room(self, room: RoomKey) -> Room | None:
-        _validate(room, RoomKey)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
         return await self._submit(self._read_room, (room,), False)
 
     async def new_save_epoch(self, binding: Binding, epoch_id: str, evidence: bytes, *, pending: bool = False) -> SaveEpoch:
-        _validate(binding, Binding)
-        _validate(epoch_id, str, "epoch_id")
-        _validate(evidence, bytes, "evidence")
-        _validate(pending, bool, "pending")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(epoch_id, str, "epoch_id")
+        ledger_schema._validate(evidence, bytes, "evidence")
+        ledger_schema._validate(pending, bool, "pending")
         return await self._submit(self._new_save_epoch, (binding, epoch_id, evidence, pending))
 
     def _new_save_epoch(self, binding, epoch_id, evidence, pending):
+        from doom_eap.runtime import ledger_schema
+
         room = self._binding(binding)
         if room["authority"] != Authority.LEDGER:
             raise Conflict("Save epochs require ledger delivery")
         existing = self._connection.execute(
-            f"SELECT * FROM save_epochs WHERE {_ROOM_WHERE} AND epoch_id=?",
-            (*_room_values(binding.room), epoch_id),
+            f"SELECT * FROM save_epochs WHERE {ledger_schema._ROOM_WHERE} AND epoch_id=?",
+            (*ledger_schema._room_values(binding.room), epoch_id),
         ).fetchone()
         if existing is None:
             self._insert("save_epochs", self._room_dict(binding.room), epoch_id=epoch_id,
-                         receipt_boundary=room["receipt_boundary"], evidence=evidence, created_at=_now(),
+                         receipt_boundary=room["receipt_boundary"], evidence=evidence, created_at=ledger_schema._now(),
                          state=SaveEpochState.PREPARED if pending else SaveEpochState.APPLIED)
             self._event(binding.room, "new_save_epoch", evidence=evidence)
         elif existing["evidence"] != evidence:
@@ -865,75 +1276,95 @@ class Ledger:
         return SaveEpoch(epoch_id, room["receipt_boundary"], evidence, SaveEpochState.PREPARED if pending else SaveEpochState.APPLIED)
 
     async def finish_save_epoch(self, binding: Binding, epoch_id: str, *, applied: bool) -> None:
-        _validate(binding, Binding)
-        _validate(epoch_id, str, "epoch_id")
-        _validate(applied, bool, "applied")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(epoch_id, str, "epoch_id")
+        ledger_schema._validate(applied, bool, "applied")
         await self._submit(self._finish_save_epoch, (binding, epoch_id, applied))
 
     def _finish_save_epoch(self, binding, epoch_id, applied):
+        from doom_eap.runtime import ledger_schema
+
         row = self._binding(binding)
         state = SaveEpochState.APPLIED if applied else SaveEpochState.ABORTED
-        existing = self._connection.execute(f"SELECT state FROM save_epochs WHERE {_ROOM_WHERE} AND epoch_id=?",
-                                             (*_room_values(binding.room), epoch_id)).fetchone()
+        existing = self._connection.execute(f"SELECT state FROM save_epochs WHERE {ledger_schema._ROOM_WHERE} AND epoch_id=?",
+                                             (*ledger_schema._room_values(binding.room), epoch_id)).fetchone()
         if existing is None or existing["state"] not in (SaveEpochState.PREPARED, state):
             raise Conflict("Save epoch has a different outcome")
         if existing["state"] == state:
             return
-        self._connection.execute(f"UPDATE save_epochs SET state=? WHERE {_ROOM_WHERE} AND epoch_id=? AND state='prepared'",
-                                 (state, *_room_values(binding.room), epoch_id))
+        self._connection.execute(f"UPDATE save_epochs SET state=? WHERE {ledger_schema._ROOM_WHERE} AND epoch_id=? AND state='prepared'",
+                                 (state, *ledger_schema._room_values(binding.room), epoch_id))
         self._end_context(row["active_context_id"])
         self._update("rooms", binding.room, {"active_context_id": None}, row["revision"])
         self._event(binding.room, "save_epoch_finished", new_state=state)
 
     async def save_epoch(self, room: RoomKey) -> SaveEpoch | None:
-        _validate(room, RoomKey)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
         return await self._submit(self._read_save_epoch, (room,), False)
 
     def _read_save_epoch(self, room):
+        from doom_eap.runtime import ledger_schema
+
         row = self._connection.execute(
-            f"SELECT * FROM save_epochs WHERE {_ROOM_WHERE} AND state<>'aborted' ORDER BY created_at DESC LIMIT 1", _room_values(room),
+            f"SELECT * FROM save_epochs WHERE {ledger_schema._ROOM_WHERE} AND state<>'aborted' ORDER BY created_at DESC LIMIT 1", ledger_schema._room_values(room),
         ).fetchone()
         return SaveEpoch(row["epoch_id"], row["receipt_boundary"], row["evidence"], SaveEpochState(row["state"])) if row else None
 
     async def receipts(self, room: RoomKey, start: int, limit: int) -> tuple[NetworkReceipt, ...]:
-        _validate(room, RoomKey)
-        _validate(start, int, "start")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(start, int, "start")
         _page_limit(limit)
         return await self._submit(self._read_receipts, (room, start, limit), False)
 
     def _read_receipts(self, room, start, limit):
+        from doom_eap.runtime import ledger_schema
+
         rows = self._connection.execute(
-            f"SELECT item, location, player, flags FROM receipts WHERE {_ROOM_WHERE} AND ap_index>=? ORDER BY ap_index LIMIT ?",
-            (*_room_values(room), start, limit),
+            f"SELECT item, location, player, flags FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND ap_index>=? ORDER BY ap_index LIMIT ?",
+            (*ledger_schema._room_values(room), start, limit),
         ).fetchall()
         return tuple(NetworkReceipt(*row) for row in rows)
 
     async def satisfy(self, binding: Binding, indices: tuple[int, ...], evidence: bytes) -> Commit:
-        _validate(binding, Binding)
-        _validate(indices, tuple[int, ...])
-        _validate(evidence, bytes)
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(binding, Binding)
+        ledger_schema._validate(indices, tuple[int, ...])
+        ledger_schema._validate(evidence, bytes)
         return await self._submit(self._satisfy, (binding, indices, evidence))
 
     def _satisfy(self, binding, indices, evidence):
+        from doom_eap.runtime import ledger_schema
+
         self._binding(binding)
         decisions = []
         for index in indices:
-            row = self._connection.execute(f"SELECT state, revision FROM receipts WHERE {_ROOM_WHERE} AND ap_index=?",
-                                           (*_room_values(binding.room), index)).fetchone()
+            row = self._connection.execute(f"SELECT state, revision FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND ap_index=?",
+                                           (*ledger_schema._room_values(binding.room), index)).fetchone()
             if row is not None and row["state"] == ReceiptState.RECEIVED:
                 decisions.append(ReceiptDecision(index, ReceiptState.SATISFIED, None, evidence, row["revision"]))
         self._changes(binding.room, (), decisions)
         return self._commit(binding.room)
 
     async def saved_context(self, room: RoomKey, context_id: str) -> Context | None:
-        _validate(room, RoomKey)
-        _validate(context_id, str, "context_id")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(context_id, str, "context_id")
         return await self._submit(self._read_context, (room, context_id), False)
 
     def _read_context(self, room, context_id):
+        from doom_eap.runtime import ledger_schema
+
         row = self._connection.execute(
-            f"SELECT * FROM contexts WHERE {_ROOM_WHERE} AND context_id=?",
-            (*_room_values(room), context_id),
+            f"SELECT * FROM contexts WHERE {ledger_schema._ROOM_WHERE} AND context_id=?",
+            (*ledger_schema._room_values(room), context_id),
         ).fetchone()
         if row is None:
             return None
@@ -959,21 +1390,27 @@ class Ledger:
         )
 
     def _command(self, room, command_id):
+        from doom_eap.runtime import ledger_schema
+
         return self._connection.execute(
-            f"SELECT * FROM commands WHERE {_ROOM_WHERE} AND command_id=?",
-            (*_room_values(room), command_id),
+            f"SELECT * FROM commands WHERE {ledger_schema._ROOM_WHERE} AND command_id=?",
+            (*ledger_schema._room_values(room), command_id),
         ).fetchone()
 
     async def command(self, room: RoomKey, command_id: str) -> CommandRow | None:
-        _validate(room, RoomKey)
-        _validate(command_id, str, "command_id")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(command_id, str, "command_id")
         return await self._submit(self._read_command, (room, command_id), False)
 
     def _read_command(self, room, command_id):
+        from doom_eap.runtime import ledger_schema
+
         row = self._command(room, command_id)
         if row is None:
             return None
-        values = {name: row[name] for name in _COMMAND_FIELDS}
+        values = {name: row[name] for name in ledger_schema._COMMAND_FIELDS}
         values.update(replay=ReplayPolicy(row["replay"]), required=bool(row["required"]))
         return CommandRow(
             CommandPlan(**values),
@@ -991,48 +1428,60 @@ class Ledger:
         self, room: RoomKey, states: tuple[CommandState, ...], after_id: str | None, limit: int,
         *, unresolved_only: bool = False,
     ) -> tuple[CommandRow, ...]:
-        _validate(room, RoomKey)
-        _validate(states, tuple[CommandState, ...])
-        _validate(after_id, str | None, "after_id")
-        _validate(unresolved_only, bool, "unresolved_only")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(states, tuple[CommandState, ...])
+        ledger_schema._validate(after_id, str | None, "after_id")
+        ledger_schema._validate(unresolved_only, bool, "unresolved_only")
         _page_limit(limit)
         return await self._submit(self._read_commands, (room, states, after_id, limit, unresolved_only), False)
 
     def _read_commands(self, room, states, after_id, limit, unresolved_only):
+        from doom_eap.runtime import ledger_schema
+
         placeholders = ",".join("?" for _ in states)
         resolution_filter = f"AND resolution IS NULL AND NOT ({_SUPERSEDED_COMMAND}) " if unresolved_only else ""
         rows = self._connection.execute(
-            f"SELECT command_id FROM commands c WHERE {_ROOM_WHERE} AND state IN ({placeholders}) "
+            f"SELECT command_id FROM commands c WHERE {ledger_schema._ROOM_WHERE} AND state IN ({placeholders}) "
             f"{resolution_filter}AND command_id>? ORDER BY command_id LIMIT ?",
-            (*_room_values(room), *states, after_id or "", limit),
+            (*ledger_schema._room_values(room), *states, after_id or "", limit),
         ).fetchall()
         return tuple(self._read_command(room, row["command_id"]) for row in rows)
 
     async def sources(self, room: RoomKey, after_id: str | None, limit: int) -> tuple[EffectSource, ...]:
-        _validate(room, RoomKey)
-        _validate(after_id, str | None, "after_id")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(after_id, str | None, "after_id")
         _page_limit(limit)
         return await self._submit(self._read_sources, (room, after_id, limit), False)
 
     def _read_sources(self, room, after_id, limit):
+        from doom_eap.runtime import ledger_schema
+
         rows = self._connection.execute(
-            f"SELECT * FROM effect_sources WHERE {_ROOM_WHERE} AND source_id>? ORDER BY source_id LIMIT ?",
-            (*_room_values(room), after_id or "", limit),
+            f"SELECT * FROM effect_sources WHERE {ledger_schema._ROOM_WHERE} AND source_id>? ORDER BY source_id LIMIT ?",
+            (*ledger_schema._room_values(room), after_id or "", limit),
         ).fetchall()
         return tuple(EffectSource(row["source_id"], SourceKind(row["kind"]), row["source_key"], row["evidence"])
                      for row in rows)
 
     async def attempts(self, room: RoomKey, command_id: str, after_number: int, limit: int) -> tuple[AttemptRow, ...]:
-        _validate(room, RoomKey)
-        _validate(command_id, str, "command_id")
-        _validate(after_number, int, "after_number")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(command_id, str, "command_id")
+        ledger_schema._validate(after_number, int, "after_number")
         _page_limit(limit)
         return await self._submit(self._read_attempts, (room, command_id, after_number, limit), False)
 
     def _read_attempts(self, room, command_id, after_number, limit):
+        from doom_eap.runtime import ledger_schema
+
         rows = self._connection.execute(
-            f"SELECT * FROM attempts WHERE {_ROOM_WHERE} AND command_id=? AND attempt_no>? ORDER BY attempt_no LIMIT ?",
-            (*_room_values(room), command_id, after_number, limit),
+            f"SELECT * FROM attempts WHERE {ledger_schema._ROOM_WHERE} AND command_id=? AND attempt_no>? ORDER BY attempt_no LIMIT ?",
+            (*ledger_schema._room_values(room), command_id, after_number, limit),
         ).fetchall()
         return tuple(AttemptRow(
             Attempt(row["command_id"], row["attempt_no"], row["request_id"],
@@ -1048,13 +1497,15 @@ class Ledger:
         blocked_only: bool = False,
     ) -> ItemPage:
         """Rows are current; pin the first watermark while paging, then poll since it from index -1."""
-        _validate(room, RoomKey)
-        _validate(after_index, int, "after_index")
-        _validate(since, int | None, "since")
-        _validate(watermark, int | None, "watermark")
-        _validate(before_index, int | None, "before_index")
-        _validate(newest_first, bool, "newest_first")
-        _validate(blocked_only, bool, "blocked_only")
+        from doom_eap.runtime import ledger_schema
+
+        ledger_schema._validate(room, RoomKey)
+        ledger_schema._validate(after_index, int, "after_index")
+        ledger_schema._validate(since, int | None, "since")
+        ledger_schema._validate(watermark, int | None, "watermark")
+        ledger_schema._validate(before_index, int | None, "before_index")
+        ledger_schema._validate(newest_first, bool, "newest_first")
+        ledger_schema._validate(blocked_only, bool, "blocked_only")
         _page_limit(limit)
         if after_index < -1 or (since is not None and watermark is not None and since > watermark):
             raise InvalidRecord("invalid items cursor or watermark")
@@ -1075,53 +1526,61 @@ class Ledger:
                               for receipt in receipts), watermark)
 
     def _item_receipts(self, room, after_index, limit, since, watermark, before_index, newest_first, blocked_only):
+        from doom_eap.runtime import ledger_schema
+
         order = "DESC" if newest_first else "ASC"
         cursor = "AND ap_index<?" if before_index is not None else ""
         upper = (before_index,) if before_index is not None else ()
         if since is None:
             blocked, arguments = self._blocked_items_filter(room, blocked_only)
             return self._connection.execute(
-                f"SELECT * FROM receipts WHERE {_ROOM_WHERE} AND ap_index>? {cursor} "
-                f"AND ap_index IN (SELECT receipt_index FROM events WHERE {_ROOM_WHERE} "
+                f"SELECT * FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND ap_index>? {cursor} "
+                f"AND ap_index IN (SELECT receipt_index FROM events WHERE {ledger_schema._ROOM_WHERE} "
                 f"AND kind='receipt_received' AND sequence<=?) {blocked} ORDER BY ap_index {order} LIMIT ?",
-                (*_room_values(room), after_index, *upper, *_room_values(room), watermark, *arguments, limit),
+                (*ledger_schema._room_values(room), after_index, *upper, *ledger_schema._room_values(room), watermark, *arguments, limit),
             ).fetchall()
         keys = self._changed_items_sql()
         return self._connection.execute(
-            f"SELECT * FROM receipts WHERE {_ROOM_WHERE} AND ap_index>? {cursor} AND ap_index IN ({keys}) "
+            f"SELECT * FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND ap_index>? {cursor} AND ap_index IN ({keys}) "
             f"ORDER BY ap_index {order} LIMIT ?",
-            (*_room_values(room), after_index, *upper,
-             *_room_values(room), since or 0, watermark,
-             *_room_values(room), since or 0, watermark,
-             *_room_values(room), *_room_values(room), since or 0, watermark, limit),
+            (*ledger_schema._room_values(room), after_index, *upper,
+             *ledger_schema._room_values(room), since or 0, watermark,
+             *ledger_schema._room_values(room), since or 0, watermark,
+             *ledger_schema._room_values(room), *ledger_schema._room_values(room), since or 0, watermark, limit),
         ).fetchall()
 
     @staticmethod
     def _blocked_items_filter(room, blocked_only):
+        from doom_eap.runtime import ledger_schema
+
         if not blocked_only:
             return "", ()
         return (f"""AND (state='rejected' OR ap_index IN (
-            SELECT receipt_index FROM commands c WHERE {_ROOM_WHERE} AND required=1 AND resolution IS NULL
+            SELECT receipt_index FROM commands c WHERE {ledger_schema._ROOM_WHERE} AND required=1 AND resolution IS NULL
             AND state IN ('effect_unknown','rejected') AND NOT ({_SUPERSEDED_COMMAND})))""",
-                _room_values(room))
+                ledger_schema._room_values(room))
 
     @staticmethod
     def _changed_items_sql():
-        return f"""SELECT receipt_index FROM events WHERE {_ROOM_WHERE}
+        from doom_eap.runtime import ledger_schema
+
+        return f"""SELECT receipt_index FROM events WHERE {ledger_schema._ROOM_WHERE}
             AND sequence>? AND sequence<=? AND receipt_index IS NOT NULL
             UNION SELECT c.receipt_index FROM commands c JOIN events e ON e.command_id=c.command_id
             WHERE e.seed=? AND e.team=? AND e.slot=? AND e.generation_fp=? AND e.sequence>? AND e.sequence<=?
             AND c.receipt_index IS NOT NULL
-            UNION SELECT ap_index FROM receipts WHERE {_ROOM_WHERE} AND EXISTS
-                (SELECT 1 FROM events WHERE {_ROOM_WHERE} AND sequence>? AND sequence<=? AND kind='history_conflict')"""
+            UNION SELECT ap_index FROM receipts WHERE {ledger_schema._ROOM_WHERE} AND EXISTS
+                (SELECT 1 FROM events WHERE {ledger_schema._ROOM_WHERE} AND sequence>? AND sequence<=? AND kind='history_conflict')"""
 
     def _item(self, room, receipt, blocked_reason, watermark):
+        from doom_eap.runtime import ledger_schema
+
         commands = self._connection.execute(
-            f"""SELECT c.* FROM commands c WHERE {_ROOM_WHERE} AND receipt_index=? AND required=1
+            f"""SELECT c.* FROM commands c WHERE {ledger_schema._ROOM_WHERE} AND receipt_index=? AND required=1
             AND resolution IS NOT 'replaced'
             AND NOT ({_SUPERSEDED_COMMAND})
             ORDER BY ordinal, command_id""",
-            (*_room_values(room), receipt["ap_index"]),
+            (*ledger_schema._room_values(room), receipt["ap_index"]),
         ).fetchall()
         status, reason, actions = _item_status(receipt, commands, blocked_reason)
         resolution = Resolution.ACCEPTED_BY_PLAYER if any(
@@ -1195,6 +1654,8 @@ def _pending_item_command(commands):
 
 
 def _page_limit(limit):
-    _validate(limit, int, "limit")
+    from doom_eap.runtime import ledger_schema
+
+    ledger_schema._validate(limit, int, "limit")
     if not 1 <= limit <= 256:
         raise InvalidRecord("page limit must be between 1 and 256")

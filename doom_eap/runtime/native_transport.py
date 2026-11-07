@@ -1,20 +1,19 @@
-"""Own asynchronous v2 transport through a persistent Windows pipe helper.
-
-Delivery decisions, retries and durable result acknowledgement belong to the caller.
-"""
-
 from __future__ import annotations
 
 import asyncio
 import os
 import signal
 import subprocess
-from collections.abc import Mapping, Sequence
+import time
+from collections import deque
+from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from . import sentinel_protocol_generated as codec
+from doom_eap.runtime import sentinel_protocol_generated as codec
+from doom_eap.strings import text as player_text
 
 
 class Operation(IntEnum):
@@ -56,15 +55,6 @@ class CommandResponse:
     response: dict[str, Any]
     result: dict[str, Any] | None
     body: bytes
-
-
-def _decode_prefix(name: str, body: bytes) -> tuple[dict[str, Any], bytes]:
-    value, end = codec._decode_type(name, body, 0)
-    return value, body[end:]
-
-
-def _same_process(scope: Mapping[str, Any], expected: Mapping[str, Any]) -> bool:
-    return all(scope[key] == expected[key] for key in ("pid", "process_created", "instance_id"))
 
 
 class NativeTransport:
@@ -264,3 +254,381 @@ class NativeTransport:
     async def close(self) -> None:
         async with self._lock:
             await self._stop()
+
+
+class StaleNativeResult(asyncio.CancelledError):
+    pass
+
+
+class NativeWorker:
+    def __init__(self, identity, process_probe):
+        self.identity = identity
+        self.process_probe = process_probe
+        self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="native-owner")
+
+    async def call(self, function, *args, process=None, **kwargs):
+        identity = self.identity()
+
+        def execute():
+            if identity != self.identity():
+                raise StaleNativeResult("Room or runtime session changed before native operation")
+            if process is not None and self.process_probe() != process:
+                raise StaleNativeResult("Game process changed before native operation")
+            try:
+                result = function(*args, **kwargs)
+            finally:
+                if process is not None and self.process_probe() != process:
+                    raise StaleNativeResult("Game process changed during native operation")
+            return result
+
+        try:
+            result = await asyncio.get_running_loop().run_in_executor(self.executor, execute)
+        except (OSError, RuntimeError, ValueError):
+            if identity != self.identity():
+                raise StaleNativeResult("Room or runtime session changed during native operation") from None
+            raise
+        if identity != self.identity():
+            raise StaleNativeResult("Room or runtime session changed during native operation")
+        return result
+
+    def close(self):
+        self.executor.shutdown(wait=False, cancel_futures=True)
+
+
+def hints_key(team, slot):
+    if (
+        not isinstance(team, int)
+        or isinstance(team, bool)
+        or not isinstance(slot, int)
+        or isinstance(slot, bool)
+    ):
+        return None
+    return f"_read_hints_{team}_{slot}"
+
+
+class ProtocolFeed:
+    def __init__(self):
+        self._echoes = deque()
+
+    def invalidate(self):
+        self._echoes.clear()
+
+    def record_echo(self, accepted):
+        self._echoes.append((accepted, time.monotonic() + 5.0))
+
+    def consume_echo(self, event):
+        now = time.monotonic()
+        while self._echoes and self._echoes[0][1] < now:
+            self._echoes.popleft()
+        if not any(
+            segment.get("type") == "player" and segment.get("self") is True
+            for segment in event.get("segments", ())
+            if isinstance(segment, dict)
+        ):
+            return False
+        plain = event.get("plain")
+        if not isinstance(plain, str):
+            return False
+        for index, (text, _) in enumerate(self._echoes):
+            if plain.endswith(text):
+                del self._echoes[index]
+                return True
+        return False
+
+
+@dataclass(frozen=True)
+class ProtocolNames:
+    item_names: object
+    location_names: object
+    player_names: Mapping
+    slot_concerns_self: Callable[[int], bool]
+
+
+def format_archipelago_event(context, args):
+    parts = args.get("data") if isinstance(args, dict) else None
+    if not isinstance(parts, list | tuple):
+        parts = (None,)
+    segments = []
+    plain_parts = []
+    for part in parts[:ARCHIPELAGO_EVENT_SEGMENT_COUNT]:
+        try:
+            segment, raw_text = _format_archipelago_part(context, part)
+        except (AttributeError, TypeError, ValueError, LookupError, AssertionError):
+            segment, raw_text = _fallback_archipelago_segment(part)
+        segments.append(segment)
+        plain_parts.append(raw_text if isinstance(raw_text, str) else player_text("hints", "unavailable"))
+    return {
+        "schema": ARCHIPELAGO_EVENT_SCHEMA,
+        "plain": _bounded_event_text("".join(plain_parts), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+        "segments": segments,
+    }
+
+
+def emit_hints(key, source, names, emit, logger, update_kind="DATA_RECEIVED") -> None:
+    if key is None:
+        return
+    records, row_arities = _hint_records(source, names)
+    if row_arities:
+        logger.warning(
+            "HINTS_DATA_REJECTED key=%s source_type=%s source_count=%s rejected=%d row_arities=%s",
+            key, type(source).__name__, len(source) if isinstance(source, list | tuple) else "n/a",
+            len(row_arities), row_arities,
+        )
+    logger.info("HINTS_%s key=%s records=%d", update_kind, key, len(records))
+    emit("hints", hints=records)
+    return records
+
+
+def _decode_prefix(name: str, body: bytes) -> tuple[dict[str, Any], bytes]:
+    value, end = codec._decode_type(name, body, 0)
+    return value, body[end:]
+
+
+def _same_process(scope: Mapping[str, Any], expected: Mapping[str, Any]) -> bool:
+    return all(scope[key] == expected[key] for key in ("pid", "process_created", "instance_id"))
+
+
+def _bounded_event_text(value, limit):
+    """Return bounded plain text with control characters removed."""
+    if not isinstance(value, str):
+        return ""
+    value = value.replace("\r", " ").replace("\n", " ")
+    output = []
+    for character in value:
+        if not character.isprintable():
+            continue
+        if len(output) >= limit:
+            break
+        output.append(character)
+    return "".join(output)
+
+
+def _fallback_archipelago_segment(part):
+    raw_text = part.get("text") if isinstance(part, dict) else None
+    if not isinstance(raw_text, str):
+        raw_text = player_text("hints", "unavailable")
+    return {"type": "text", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+
+
+def _valid_part_type(part):
+    from NetUtils import JSONTypes
+
+    if not isinstance(part, dict):
+        return None
+    part_type = part.get("type", JSONTypes.text.value)
+    part_type = getattr(part_type, "value", part_type)
+    return part_type if isinstance(part_type, str) else None
+
+
+def _item_event_classification(flags):
+    if not isinstance(flags, int) or isinstance(flags, bool) or flags < 0:
+        return None
+    from doom_eap.content.item_classification import (
+        ITEM_CLASSIFICATION_PROGRESSION,
+        ITEM_CLASSIFICATION_TRAP,
+        ITEM_CLASSIFICATION_USEFUL,
+    )
+
+    if flags & ITEM_CLASSIFICATION_TRAP:
+        return "trap"
+    if flags & ITEM_CLASSIFICATION_PROGRESSION:
+        return "progression"
+    if flags & ITEM_CLASSIFICATION_USEFUL:
+        return "useful"
+    return "filler"
+
+
+def _format_archipelago_part(context, part: JSONMessagePart):
+    from NetUtils import JSONTypes
+
+    part_type = _valid_part_type(part)
+    if part_type in _ARCHIPELAGO_TEXT_TYPES:
+        raw_text = part.get("text")
+        if isinstance(raw_text, str):
+            return {"type": "text", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+    elif part_type in _ARCHIPELAGO_ITEM_TYPES:
+        return _format_item_part(context, part, part_type)
+    elif part_type in _ARCHIPELAGO_LOCATION_TYPES:
+        return _format_location_part(context, part, part_type)
+    elif part_type in {JSONTypes.player_id.value, JSONTypes.player_name.value}:
+        return _format_player_part(context, part, part_type)
+    return _fallback_archipelago_segment(part)
+
+
+def _format_item_part(context, part, part_type):
+    from NetUtils import JSONTypes
+
+    raw_text = part.get("text") if isinstance(part, dict) else None
+    classification = _item_event_classification(part.get("flags", 0)) if isinstance(part, dict) else None
+    if not isinstance(raw_text, str) or classification is None:
+        return _fallback_archipelago_segment(part)
+    if part_type == JSONTypes.item_id.value:
+        player = part.get("player")
+        if not isinstance(player, int) or isinstance(player, bool):
+            return _fallback_archipelago_segment(part)
+        try:
+            item_text = context.item_names.lookup_in_slot(int(raw_text), player)
+        except (AttributeError, TypeError, ValueError, KeyError, LookupError, AssertionError):
+            return _fallback_archipelago_segment(part)
+        if not isinstance(item_text, str):
+            return _fallback_archipelago_segment(part)
+        raw_text = item_text
+    return {
+        "type": "item",
+        "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT),
+        "classification": classification,
+    }, raw_text
+
+
+def _format_location_part(context, part, part_type):
+    from NetUtils import JSONTypes
+
+    raw_text = part.get("text") if isinstance(part, dict) else None
+    if not isinstance(raw_text, str):
+        return _fallback_archipelago_segment(part)
+    if part_type == JSONTypes.location_id.value:
+        player = part.get("player")
+        if not isinstance(player, int) or isinstance(player, bool):
+            return _fallback_archipelago_segment(part)
+        try:
+            location_text = context.location_names.lookup_in_slot(int(raw_text), player)
+        except (AttributeError, TypeError, ValueError, KeyError, LookupError, AssertionError):
+            return _fallback_archipelago_segment(part)
+        if not isinstance(location_text, str):
+            return _fallback_archipelago_segment(part)
+        raw_text = location_text
+    return {"type": "location", "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT)}, raw_text
+
+
+def _player_name(context, raw_text):
+    if not isinstance(raw_text, str):
+        return None
+    try:
+        player = int(raw_text)
+    except (TypeError, ValueError):
+        return None
+    try:
+        name = context.player_names.get(player, raw_text)
+    except (AttributeError, TypeError):
+        return None
+    if not isinstance(name, str):
+        return None
+    return player, name
+
+
+def _format_player_part(context, part, part_type):
+    from NetUtils import JSONTypes
+
+    raw_text = part.get("text") if isinstance(part, dict) else None
+    player = part.get("player") if isinstance(part, dict) else None
+    if part_type == JSONTypes.player_id.value:
+        resolved = _player_name(context, raw_text)
+        if resolved is None:
+            return _fallback_archipelago_segment(part)
+        player, raw_text = resolved
+    if not isinstance(raw_text, str) or not isinstance(player, int) or isinstance(player, bool):
+        return _fallback_archipelago_segment(part)
+    try:
+        is_self = bool(context.slot_concerns_self(player))
+    except (AttributeError, TypeError, ValueError, LookupError, AssertionError):
+        return _fallback_archipelago_segment(part)
+    return {
+        "type": "player",
+        "text": _bounded_event_text(raw_text, ARCHIPELAGO_EVENT_SEGMENT_LIMIT),
+        "self": is_self,
+    }, raw_text
+
+
+def _hint_record(hint, names):
+    from NetUtils import HintStatus
+
+    try:
+        status = HintStatus(hint.status)
+        status_value, status_name = int(status), status.name
+    except (TypeError, ValueError):
+        status_value, status_name = int(HintStatus.HINT_UNSPECIFIED), "HINT_UNSPECIFIED"
+    try:
+        item_name = names.item_names.lookup_in_slot(hint.item, hint.receiving_player)
+    except (KeyError, LookupError, AttributeError):
+        item_name = player_text("hints", "unknown_item", item_id=str(hint.item))
+    try:
+        location_name = names.location_names.lookup_in_slot(hint.location, hint.finding_player)
+    except (KeyError, LookupError, AttributeError):
+        location_name = player_text("hints", "unknown_location", location_id=str(hint.location))
+    return {
+        "receiving_player": hint.receiving_player,
+        "receiving_player_name": names.player_names.get(hint.receiving_player, str(hint.receiving_player)),
+        "finding_player": hint.finding_player,
+        "finding_player_name": names.player_names.get(hint.finding_player, str(hint.finding_player)),
+        "location": hint.location,
+        "location_name": location_name,
+        "item": hint.item,
+        "item_name": item_name,
+        "found": hint.found,
+        "entrance": hint.entrance,
+        "item_flags": hint.item_flags,
+        "status": status_value,
+        "status_name": status_name,
+    }
+
+
+def _parse_hint(raw):
+    from NetUtils import Hint
+
+    if isinstance(raw, dict):
+        if not _valid_hint_mapping(raw):
+            return None
+        raw = tuple(raw[field] for field in _HINT_FIELDS)
+    elif not isinstance(raw, list | tuple) or not 5 <= len(raw) <= 8:
+        return None
+    try:
+        return Hint(*raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _hint_records(source, names):
+    records, row_arities = [], []
+    if isinstance(source, list | tuple):
+        for raw in source:
+            hint = _parse_hint(raw)
+            if hint is None:
+                row_arities.append(len(raw) if isinstance(raw, list | tuple) else type(raw).__name__)
+            else:
+                records.append(_hint_record(hint, names))
+    elif source is not None:
+        row_arities.append(type(source).__name__)
+    return records, row_arities
+
+
+def _valid_hint_mapping(raw):
+    if raw.get("class") != "Hint" or set(raw) != set(_HINT_FIELDS) | {"class"}:
+        return False
+    if not all(isinstance(raw[field], int) and not isinstance(raw[field], bool)
+               for field in _HINT_FIELDS[:4] + _HINT_FIELDS[6:]):
+        return False
+    return isinstance(raw["found"], bool) and isinstance(raw["entrance"], str)
+
+
+if TYPE_CHECKING:
+    from NetUtils import JSONMessagePart
+
+
+ARCHIPELAGO_EVENT_SCHEMA = 1
+ARCHIPELAGO_EVENT_PLAIN_LIMIT = 512
+ARCHIPELAGO_EVENT_SEGMENT_LIMIT = 128
+ARCHIPELAGO_EVENT_SEGMENT_COUNT = 64
+_ARCHIPELAGO_TEXT_TYPES = frozenset({
+    "text",
+    "color",
+    "hint_status",
+})
+_ARCHIPELAGO_ITEM_TYPES = frozenset({
+    "item_name",
+    "item_id",
+})
+_ARCHIPELAGO_LOCATION_TYPES = frozenset({
+    "location_name",
+    "location_id",
+})
+_HINT_FIELDS = ("receiving_player", "finding_player", "location", "item", "found", "entrance", "item_flags", "status")

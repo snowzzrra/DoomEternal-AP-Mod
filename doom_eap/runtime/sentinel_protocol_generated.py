@@ -112,12 +112,16 @@ def _array_constraints(field, values):
     if field.get("nonzero") and not any(values):
         raise ValueError("zero identity")
     if field.get("encoding", "").startswith("lower_hex"):
-        if field["encoding"].endswith("_or_empty") and not any(values):
-            return
-        if len(values) not in (64, 65) or any(v not in b"0123456789abcdef" for v in values[:64]):
-            raise ValueError("namespace encoding")
-        if len(values) == 65 and values[64]:
-            raise ValueError("namespace terminator")
+        _hex_constraints(field, values)
+
+
+def _hex_constraints(field, values):
+    if field["encoding"].endswith("_or_empty") and not any(values):
+        return
+    if len(values) not in (64, 65) or any(v not in b"0123456789abcdef" for v in values[:64]):
+        raise ValueError("namespace encoding")
+    if len(values) == 65 and values[64]:
+        raise ValueError("namespace terminator")
 
 
 def _decode_type(type_name, data, pos):

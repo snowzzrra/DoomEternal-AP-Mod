@@ -1,1976 +1,92 @@
+from __future__ import annotations
+
 import asyncio
-import atexit
-import copy
-import glob
 import hashlib
 import json
-import logging
 import os
 import re
-import shutil
-import subprocess
 import sys
 import time
-import traceback
+import urllib.parse
 import uuid
-from collections.abc import Mapping
 from pathlib import Path
 
-from doom_eap.content.automap_visual_registry import (
-    index_automap_visual_registry,
-    load_automap_visual_registry,
-)
-from doom_eap.content.item_classification import (
-    load_item_classification_identity,
-    normalize_network_classification,
-    notification_style_for_item,
-)
+import colorama
+from websockets.exceptions import WebSocketException
+
 from doom_eap.content.killsanity_plan import milestone_ids
-from doom_eap.content.mastery_requirements import mastery_entries_for_counts
-from doom_eap.content.publisher_loader import (
-    load_publisher_contracts,
-)
 from doom_eap.contracts.campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
-from doom_eap.contracts.challenge_registry import (
-    canonical_map_name,
-    load_challenge_registry,
-)
-from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.contracts.command_publication import (
-    build_materialization_epoch,
-)
-from doom_eap.contracts.foundation import (
-    compile_item_delivery_plan,
-    load_foundation_contracts,
-    load_primitive_registry,
-)
-from doom_eap.contracts.goal_policy import GoalPolicy
-from doom_eap.contracts.inventory_domain import OWNED as OWNED
+from doom_eap.contracts.challenge_registry import canonical_map_name
+from doom_eap.contracts.foundation import compile_item_delivery_plan, load_foundation_contracts, load_primitive_registry
 from doom_eap.contracts.inventory_domain import InventoryObservationPort
 from doom_eap.contracts.item_contracts import DEFAULT_DEATH_LINK_MODE
-from doom_eap.contracts.materialization import GATE_KEY_TO_MAP
-from doom_eap.contracts.publisher_contracts import PublisherEngine
-from doom_eap.contracts.receipt_delivery import (
-    HISTORICAL_OWNERSHIP,
-    NEW_RECEIPT,
-    ReceiptFeedbackFacts,
-    ReceiptIntent,
-)
-from doom_eap.contracts.save_observation import (
-    CheckpointRecovery,
-    CheckpointRecoveryState,
-    PrimarySaveSelection,
-)
-from doom_eap.runtime import save_files
-from doom_eap.runtime.ammo_adapters import AmmoRequestPump
-from doom_eap.runtime.ammo_refill import (
-    AMMO_REFILL_ITEM_ID,
-    AmmoCommandScope,
-    active_crucible,
-)
-from doom_eap.runtime.bootstrap import Bootstrap, BootstrapOwnership
-from doom_eap.runtime.bootstrap_actions import (
-    BOOTSTRAP_ACTIONS,
-    BOOTSTRAP_REVISION,
-)
-from doom_eap.runtime.check_publication import CheckPublication
-from doom_eap.runtime.checked_visuals import CheckedVisuals
-from doom_eap.runtime.client_state_store import ClientStateLoadError, ClientStateStore, atomic_write_json
+from doom_eap.runtime import bridge_checks, bridge_config, bridge_items, bridge_saves
+from doom_eap.runtime.ammo import AmmoRequestPump
+from doom_eap.runtime.bridge_checks import CheckedVisuals, LocationSetup, PhysicalChecks, resolve_placement_records
+from doom_eap.runtime.bridge_items import TransientEffectManager, TransientPublication
+from doom_eap.runtime.bridge_saves import SaveChecks, SaveObserver
+from doom_eap.runtime.campaign import STAGES, FastTravel, GoalProgress, Killsanity, UnifiedCampaign
 from doom_eap.runtime.connection_diagnostics import ConnectionDiagnostics
-from doom_eap.runtime.context_registry import (
-    CONTEXT_BY_IDENTITY,
-    CONTEXT_BY_MAP,
-    GOAL_CAPABILITIES,
-    SUPPORT_RUNE_IDS,
-    classify_runtime_context,
-    evaluate_dlc_availability,
-    resolve_context_evidence,
-    validate_slot_contract,
-)
-from doom_eap.runtime.death_observation import DeathObservation
-from doom_eap.runtime.deathlink_publication import DeathLinkPublication
-from doom_eap.runtime.deathlink_receive import DeathLinkReceiver
-from doom_eap.runtime.deathlink_session import DEATHLINK_MESSAGES, DeathLinkSession
-from doom_eap.runtime.delivery_control import handle_delivery_control
-from doom_eap.runtime.delivery_runtime import (
-    RoomDelivery,
-)
-from doom_eap.runtime.fast_travel import FastTravel
-from doom_eap.runtime.goal_progress import GoalProgress
-from doom_eap.runtime.inventory_observation import SentinelInventoryObservation
-from doom_eap.runtime.item_reconciliation import (
-    CLIENT_STATE_VERSION,
-    ReceiptSession,
-    default_session_state,
-    effective_ownership,
-    fresh_receipt_owned_count,
-    load_policy_registry,
-    migrate_client_state,
-    migrate_legacy_session_key,
-    normalize_session_state,
-    observe_received_items,
-    processed_receipt_counts,
-    progressive_receipt_stage,
-    project_receipt_history,
-    receipt_history_fingerprint,
-    receipt_item_ids,
-    record_processed_receipt,
-    validate_receipt_history_prefix,
-    validate_session_receipt_prefix,
-)
-from doom_eap.runtime.killsanity import Killsanity
-from doom_eap.runtime.level_ready import LevelReady
-from doom_eap.runtime.lifecycle import RuntimeLifecycle
-from doom_eap.runtime.location_names import resolve_placement_records
-from doom_eap.runtime.location_setup import LocationSetup
-from doom_eap.runtime.materialization import (
-    ReconciliationBlock,
-    authored_effects_allowed,
-)
-from doom_eap.runtime.native_worker import StaleNativeResult
-from doom_eap.runtime.observer_lifecycle import RuntimeObservationLease, observer_registry_revision
-from doom_eap.runtime.physical_checks import PhysicalChecks
-from doom_eap.runtime.protocol_feed import ProtocolFeed, hints_key
-from doom_eap.runtime.publisher_dispatch import PublisherDispatch
-from doom_eap.runtime.publisher_runtime import quarantine_malformed_event, read_map_event
-from doom_eap.runtime.receipt_delivery import (
-    compile_receipt_plan,
-    requires_progressive_observation,
-)
-from doom_eap.runtime.rune_reconciliation import (
-    RuneNativeState,
-)
-from doom_eap.runtime.save_check_observation import SaveCheckBinding, SaveCheckObservations
-from doom_eap.runtime.save_checks import SaveCheckReadiness, SaveChecks
-from doom_eap.runtime.save_observer import SaveObserver, SaveObserverBaselineStore
-from doom_eap.runtime.save_records import read_unlockable_record
-from doom_eap.runtime.task_supervision import SessionTasks
-from doom_eap.runtime.transient_effects import (
-    TransientEffectManager,
-)
-from doom_eap.runtime.transient_files import TransientPublication, read_transient_runtime
-from doom_eap.runtime.unified_campaign import ACCESS_IDS, STAGES, UnifiedCampaign
-from doom_eap.strings import text as player_text
-
-MODULE_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODULE_DIR if (MODULE_DIR / "data").is_dir() else Path(__file__).resolve().parents[2]
-APPLICATION_DIR = Path(
-    os.environ.get("DOOM_AP_APPLICATION_DIR", REPO_ROOT)
-).resolve()
-CONFIG_FILE = Path(
-    os.environ.get("DOOM_AP_CONFIG_FILE", APPLICATION_DIR / "ap_config.json")
-).expanduser().resolve()
-def resolve_bridge_identity(
-    application_dir: Path | None = None,
-    repo_root: Path | None = None,
-    module_file: Path | None = None,
-    is_frozen: bool | None = None,
-) -> tuple[Path, str, str]:
-    """Resolve bridge client file reference, deterministic SHA-256, and revision string.
-
-    In source/development mode and unpacked release packages, hashes physical Python source bytes.
-    In frozen standalone mode (PyInstaller), computes deterministic identity without reading
-    non-materialized source files.
-    """
-    frozen = bool(getattr(sys, "frozen", False)) if is_frozen is None else is_frozen
-    app_dir = (application_dir or (Path(sys.executable).resolve().parent if frozen else Path(__file__).resolve().parent)).resolve()
-    root = (repo_root or (Path(__file__).resolve().parent if (Path(__file__).resolve().parent / "data").is_dir() else Path(__file__).resolve().parents[2])).resolve()
-    mod_file = (module_file or Path(__file__)).resolve()
-
-    candidate = app_dir / "bridge_client.py"
-    if candidate.is_file():
-        sha256 = hashlib.sha256(candidate.read_bytes()).hexdigest()
-        return candidate, sha256, f"mission-unified-{sha256[:12]}"
-
-    if mod_file.is_file():
-        sha256 = hashlib.sha256(mod_file.read_bytes()).hexdigest()
-        return mod_file, sha256, f"mission-unified-{sha256[:12]}"
-
-    for id_path in (app_dir / "bridge_identity.json", root / "data" / "bridge_identity.json"):
-        if id_path.is_file():
-            try:
-                doc = json.loads(id_path.read_text(encoding="utf-8"))
-                if isinstance(doc, dict) and "sha256" in doc:
-                    sha = str(doc["sha256"])
-                    rev = str(doc.get("revision", f"mission-unified-{sha[:12]}"))
-                    file_ref = Path(sys.executable).resolve() if frozen else mod_file
-                    return file_ref, sha, rev
-            except Exception:
-                pass
-
-    content_id_path = root / "data" / "content_identity.json"
-    if content_id_path.is_file():
-        sha256 = hashlib.sha256(content_id_path.read_bytes()).hexdigest()
-    else:
-        sha256 = hashlib.sha256(b"doom-eternal-archipelago-bridge-runtime").hexdigest()
-
-    file_ref = Path(sys.executable).resolve() if frozen else mod_file
-    return file_ref, sha256, f"mission-unified-{sha256[:12]}"
-
-
-BRIDGE_FILE, BRIDGE_SHA256, BRIDGE_REVISION = resolve_bridge_identity(
-    APPLICATION_DIR, REPO_ROOT, Path(__file__).resolve()
-)
-_CONTENT_IDENTITY = json.loads(
-    (REPO_ROOT / "data" / "content_identity.json").read_text(encoding="utf-8")
-)
-BRIDGE_PROTOCOL = _CONTENT_IDENTITY["bridge_protocol_version"]
-TRANSITION_HANDLER = "unified"
-GAME_NAME = _CONTENT_IDENTITY["game"]
-AMMO_REFILL_REQUEST_FILENAME = "AP_REFILL_REQUEST.txt"
-AMMO_REFILL_REQUEST_RE = re.compile(r"^AP_REFILL_REQUEST(?:_(\d+))?\.txt$")
-
-
-def doom_process_identity():
-    """Return current game PID plus process-start identity when available."""
-    if os.name == "nt":
-        try:
-            from doom_eap.runtime.observer_lifecycle import same_executable_path, windows_game_processes
-            rows = windows_game_processes()
-            if rows is None or len(rows) != 1:
-                return None
-            row = rows[0]
-            base = globals().get("DOOM_BASE_DIR")
-            expected = Path(str(base)).parent / "DOOMEternalx64vk.exe" if base else None
-            if expected is None or not same_executable_path(row["path"], expected.resolve()):
-                return None
-            return f"windows:{row['pid']}:{row['created']}"
-        except (OSError, ValueError, subprocess.SubprocessError):
-            return None
-    try:
-        from doom_eap.runtime.proton import windows_path, windows_processes
-        owner = APPLICATION_DIR / "APSessionOwner.exe"
-        rows = windows_processes(config, owner)
-        expected = windows_path(Path(DOOM_BASE_DIR).parent / "DOOMEternalx64vk.exe")
-        if rows is None or len(rows) != 1:
-            return None
-        row = rows[0]
-        if ((row["path"].casefold() != expected.casefold() and row.get("same_executable") is not True)
-                or type(row["pid"]) is not int or type(row["created"]) is not int):
-            return None
-        return f"windows:{row['pid']}:{row['created']}"
-    except (OSError, ValueError, RuntimeError, KeyError, subprocess.SubprocessError):
-        return None
-
-def _doom_location_ids():
-    locations = _doom_location_names()
-    if not locations:
-        raise ValueError("DOOM location-name data is malformed")
-    return set(locations)
-
-
-def _doom_location_names():
-    identity = json.loads(
-        (REPO_ROOT / "data" / "location_names.json").read_text(encoding="utf-8")
-    )
-    raw_locations = identity.get("locations")
-    if not isinstance(raw_locations, dict):
-        return {}
-    try:
-        return {int(location_id): name for location_id, name in raw_locations.items() if isinstance(name, str)}
-    except (TypeError, ValueError):
-        return {}
-
-
-DOOM_LOCATION_NAMES = _doom_location_names()
-HELL_ON_EARTH_LOCATION_IDS = frozenset(
-    loc_id for loc_id, name in DOOM_LOCATION_NAMES.items()
-    if name.startswith("Hell on Earth - ")
-)
-GOAL_ENDPOINT_LOCATION_IDS = {
-    "Acquire the Unmaykr": 7770418,
-    "Kill the Icon of Sin": 7770414,
-    "Kill the Dark Lord": 7770419,
-    "Complete the Full Saga": 7770419,
-}
-GOAL_ENDPOINT_LOCATION_NAMES = {
-    "Acquire the Unmaykr": "Fortress of Doom - Unmaykr Acquired",
-    "Kill the Icon of Sin": "Final Sin - Mission Complete",
-    "Kill the Dark Lord": "The Dark Lord - Defeated",
-    "Complete the Full Saga": "The Dark Lord - Defeated",
-}
-if any(
-    DOOM_LOCATION_NAMES.get(location_id) != location_name
-    for goal, location_id in GOAL_ENDPOINT_LOCATION_IDS.items()
-    for location_name in (GOAL_ENDPOINT_LOCATION_NAMES[goal],)
-):
-    raise RuntimeError("packaged goal endpoint IDs diverge from canonical location names")
-
-GOAL_REQUIREMENT_SUFFIXES = {
-    "Complete All Enabled Missions": " - Mission Complete",
-    "Complete All Included Missions": " - Mission Complete",
-    "Complete All Slayer Gates": " - Slayer Gate Complete",
-    "Complete All Escalation Encounters": " - Escalation Encounter Wave ",
-    "Complete All Secret Encounters": " - Secret Encounter - ",
-    "Complete All Mission Challenges": " - All Mission Challenges Completed",
-    "Complete All Weapon Mastery Challenges": " - Weapon Mastery Challenge",
-}
-GOAL_NAMES = frozenset(GOAL_ENDPOINT_LOCATION_IDS)
-GOAL_REQUIREMENT_NAMES = frozenset(GOAL_REQUIREMENT_SUFFIXES) | {"Acquire the Unmaykr"}
-DLC_MISSION_PREFIXES = frozenset({
-    "UAC Atlantica Facility",
-    "The Blood Swamps",
-    "The Holt",
-    "The World Spear",
-    "Reclaimed Earth",
-    "Immora",
-    "The Dark Lord",
-})
-DEATHLINK_RECEIVE_TIMEOUT = 20.0
-DEATHLINK_CONFIRM_TIMEOUT = 8.0
-DEATHLINK_TOTAL_TIMEOUT = 60.0
-DEATHLINK_LATE_SUPPRESSION_GRACE = 15.0
-DEATHLINK_MAX_ATTEMPTS = 1
-LAUNCHER_EVENTS_ENABLED = os.environ.get("DOOM_AP_LAUNCHER_EVENTS") == "1"
-FAST_TRAVEL_MISSION_COMPLETE_IDS = {
-    "e1m1_intro": 7770122, "e1m2_war": 7770123, "e1m3_cult": 7770124,
-    "e1m4_boss": 7770162, "e2m1_nest": 7770210, "e2m2_base": 7770248,
-    "e2m3_core": 7770289, "e2m4_boss": 7770290, "e3m1_slayer": 7770337,
-    "e3m2_hell": 7770362, "e3m2_hell_b": 7770387, "e3m3_maykr": 7770411,
-    "e3m4_boss": 7770414,
-    "e4m1_rig": 7770432, "e4m2_swamp": 7770443, "e4m3_mcity": 7770457,
-}
-
-
-def gameplay_evidence_mtime_ns():
-    try:
-        return Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
-    except OSError:
-        return None
-
-
-def emit_launcher_event(event_type: str, **payload):
-    if not LAUNCHER_EVENTS_ENABLED:
-        return
-    event = {"type": event_type, **payload}
-    print("AP_EVENT " + json.dumps(event, sort_keys=True, separators=(",", ":")), flush=True)
-
-
-ENABLE_ITEM_NOTIFICATIONS = False
-ITEM_DELIVERY_BATCH_SIZE = 16
-try:
-    _identity_path = APPLICATION_DIR / "bridge_identity.json"
-    if _identity_path.is_file():
-        _identity = json.loads(_identity_path.read_text(encoding="utf-8"))
-        if _identity.get("item_notifications", {}).get("enabled"):
-            ENABLE_ITEM_NOTIFICATIONS = True
-except Exception:
-    pass
-def abort_setup(message):
-    print(message, file=sys.stderr)
-    if os.name == "nt" and not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("HEADLESS") and not os.environ.get("CI"):
-        try:
-            import tkinter as tk
-            import tkinter.messagebox as messagebox
-
-            root = tk.Tk()
-            root.withdraw()
-            messagebox.showerror(player_text("activity", "setup_error_title"), message)
-            root.destroy()
-        except Exception:
-            pass
-    raise RuntimeError(message)
-
-
-def load_config():
-    if not CONFIG_FILE.exists():
-        return {}
-    try:
-        with CONFIG_FILE.open("r", encoding="utf-8") as file:
-            loaded = json.load(file)
-    except json.JSONDecodeError as error:
-        abort_setup(player_text("activity", "config_invalid_json", path=str(CONFIG_FILE), error=str(error)))
-    if not isinstance(loaded, dict):
-        abort_setup(player_text("activity", "config_object_required", path=str(CONFIG_FILE)))
-    return loaded
-
-
-def save_config():
-    atomic_write_json(CONFIG_FILE, config, indent=4, sort_keys=False)
-
-
-def parse_int(value, default=0):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
-
-
-def normalize_doom_base_dir(path):
-    selected = Path(path).expanduser().resolve()
-
-    if selected.name.lower() == "base":
-        game_root = selected.parent
-        base_dir = selected
-    else:
-        game_root = selected
-        base_dir = selected / "base"
-
-    executable = game_root / "DOOMEternalx64vk.exe"
-
-    if executable.is_file() and base_dir.is_dir():
-        return str(base_dir)
-
-    raise ValueError(
-        player_text("activity", "game_directory_invalid", newline="\n", executable=str(executable), base_dir=str(base_dir))
-    )
-
-
-SAVE_GAMES_SELECTION: dict[str, object] | None = None
-
-
-def normalize_save_games_dir(path):
-    from doom_eap.launcher.launcher_platform import (
-        doom_saved_games_base,
-        select_saved_games_dir,
-    )
-
-    global SAVE_GAMES_SELECTION
-    SAVE_GAMES_SELECTION = None
-    selected = Path(path).expanduser()
-    name = selected.name.lower()
-    if name == "base" and selected.parent.name.lower() == "doometernal" and selected.parent.parent.name.lower() == "id software":
-        probe = selected
-    elif name == "doometernal":
-        probe = selected / "base"
-    elif name == "id software":
-        probe = selected / "DOOMEternal" / "base"
-    else:
-        shaped = selected / "id Software" / "DOOMEternal" / "base"
-        probe = shaped if shaped.is_dir() else selected
-    game_root = None
-    try:
-        doom_base = globals().get("DOOM_BASE_DIR") or (config or {}).get("doom_base_dir")
-        if doom_base:
-            game_root = Path(doom_base).expanduser()
-            if game_root.name.casefold() == "base":
-                game_root = game_root.parent
-    except (OSError, TypeError, ValueError, RuntimeError):
-        game_root = None
-    known = None
-    try:
-        known = doom_saved_games_base(game_root=game_root)
-    except (OSError, TypeError, ValueError, RuntimeError):
-        known = None
-    selection = select_saved_games_dir(
-        str(probe),
-        known_base=known,
-        app_dir=APPLICATION_DIR,
-        game_root=game_root,
-    )
-    if selection.path is None:
-        rejected = "; ".join(
-            f"{item.get('path')} ({item.get('reason')})"
-            for item in selection.rejected[:4]
-        )
-        raise ValueError(
-            player_text("activity", "save_directory_invalid", reason=str(selection.reason))
-            + (player_text("activity", "save_directory_rejected", rejected=str(rejected)) if rejected else "")
-        )
-    SAVE_GAMES_SELECTION = {
-        "selected_path": str(selection.path),
-        "source": selection.source,
-        "reason": selection.reason,
-        "repaired": selection.repaired,
-        "previous_path": selection.previous_path,
-    }
-    return str(selection.path)
-
-
-config = load_config()
-SAVE_GAMES_SELECTION_SOURCE = "unresolved"
-SAVE_GAMES_SELECTION_REASON = "configuration has not been resolved"
-
-AP_SOURCE_PATH = os.environ.get("ARCHIPELAGO_SOURCE")
-if not getattr(sys, "frozen", False) and AP_SOURCE_PATH:
-    sys.path.insert(0, os.path.abspath(AP_SOURCE_PATH))
-
-import colorama  # noqa: E402
-import CommonClient as APCommonClient  # noqa: E402
-import Utils  # noqa: E402
-from CommonClient import (  # noqa: E402
-    ClientCommandProcessor,
-    CommonContext,
-    get_base_parser,
-    gui_enabled,
-)
-from NetUtils import ClientStatus  # noqa: E402
-
-from doom_eap.runtime.protocol_feed_format import (  # noqa: E402
+from doom_eap.runtime.deathlink import DEATHLINK_MESSAGES, DeathLinkReceiver, DeathLinkSession, DeathObservation
+from doom_eap.runtime.delivery import handle_delivery_control
+from doom_eap.runtime.inventory import CLIENT_STATE_VERSION, ReceiptSession, SentinelInventoryObservation
+from doom_eap.runtime.native_transport import (
     ARCHIPELAGO_EVENT_PLAIN_LIMIT,
+    ProtocolFeed,
     ProtocolNames,
+    StaleNativeResult,
     _bounded_event_text,
     emit_hints,
     format_archipelago_event,
+    hints_key,
 )
-
-server_loop = APCommonClient.server_loop
-
-if "doom_base_dir" in config and "save_games_dir" in config:
-    try:
-        DOOM_BASE_DIR = normalize_doom_base_dir(config["doom_base_dir"])
-        SAVE_GAMES_DIR = normalize_save_games_dir(config["save_games_dir"])
-        SAVE_GAMES_SELECTION_SOURCE = str(
-            (SAVE_GAMES_SELECTION or {}).get("source") or "config.save_games_dir"
-        )
-        SAVE_GAMES_SELECTION_REASON = str(
-            (SAVE_GAMES_SELECTION or {}).get("reason")
-            or "configured path normalized to existing Saved Games base"
-        )
-    except ValueError as error:
-        if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("CI"):
-            DOOM_BASE_DIR = str(config.get("doom_base_dir", ""))
-            SAVE_GAMES_DIR = str(config.get("save_games_dir", ""))
-        else:
-            abort_setup(player_text("activity", "config_invalid_paths", path=str(CONFIG_FILE), error=str(error)))
-    if (
-        config.get("doom_base_dir") != DOOM_BASE_DIR
-        or config.get("save_games_dir") != SAVE_GAMES_DIR
-    ):
-        config["doom_base_dir"] = DOOM_BASE_DIR
-        config["save_games_dir"] = SAVE_GAMES_DIR
-        save_config()
-else:
-    def prompt_for_dir(title, validation_func, error_msg):
-        path = None
-        has_tty = sys.stdin and sys.stdin.isatty()
-
-        while True:
-            try:
-                import tkinter as tk
-                from tkinter import filedialog
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes("-topmost", True)
-                path = filedialog.askdirectory(title=title)
-                root.destroy()
-            except Exception:
-                pass
-
-            if not path and has_tty:
-                print(f"\n{title}")
-                path = input('Enter Path: ').strip()
-
-            if not path:
-                raise RuntimeError("DOOM Eternal Client Setup cancelled. Please create ap_config.json manually with 'doom_base_dir' and 'save_games_dir'.")
-
-            try:
-                normalized = validation_func(path)
-            except ValueError:
-                normalized = None
-            if normalized:
-                return normalized
-
-            if has_tty:
-                print(f'Validation Error: {error_msg!s}')
-            else:
-                try:
-                    import tkinter.messagebox as messagebox
-                    root = tk.Tk()
-                    root.withdraw()
-                    messagebox.showerror(player_text("activity", "validation_error_title"), error_msg)
-                    root.destroy()
-                except Exception:
-                    pass
-
-    DOOM_BASE_DIR = prompt_for_dir(
-        player_text("activity", "select_game_directory"),
-        lambda p: normalize_doom_base_dir(p) if p else None,
-        (player_text("activity", "game_directory_validation_failed")),
-    )
-
-    SAVE_GAMES_DIR = prompt_for_dir(
-        player_text("activity", "select_save_directory"),
-        lambda p: normalize_save_games_dir(p) if p else None,
-        player_text("activity", "save_directory_validation_failed"),
-    )
-    SAVE_GAMES_SELECTION_SOURCE = "interactive_selection"
-    SAVE_GAMES_SELECTION_REASON = "path selected during client setup"
-
-    config["doom_base_dir"] = DOOM_BASE_DIR
-    config["save_games_dir"] = SAVE_GAMES_DIR
-    save_config()
-    if sys.stdin and sys.stdin.isatty():
-        print('Configuration saved to ap_config.json!{newline}'.format(newline='\n'))
-
-TAG_INVENTORY_SETTLE_SECONDS = 1.0
-GAMEPLAY_SAVE_EVIDENCE_PATH = Path(DOOM_BASE_DIR) / "ap_gameplay_save.state"
-INV_DUMP_DIR = SAVE_GAMES_DIR
-CULTIST_BASE_MAP = "game/sp/e1m3_cult/e1m3_cult"
-DOOM_HUNTER_BASE_MAP = "game/sp/e1m4_boss/e1m4_boss"
-DEATHLINK_KILL_INTERVAL = 2.0
-CHECK_EVENT_PREFIX = "ap_event_"
-GOAL_EVENT_PREFIX = "ap_transition_"
-GOAL_EVENT_FILENAME = "ap_transition_e1m3_cult_to_e1m4_boss.evt"
-TELEMETRY_DUMP_PREFIX = "ap_telemetry"
-LEGACY_TELEMETRY_DUMP_PREFIX = "ap_condump"
-ITEM_MAPPING_REVISION = 9
-RPC_ENTITY_PREFIX = "ap_rpc_v3"
-REVISION_ONE_RUNE_IDS = {
-    7770085,
-    7770086,
-    7770087,
-    7770089,
-    7770090,
-    7770091,
-    7770093,
-    7770094,
-    7770095,
-} | SUPPORT_RUNE_IDS
-NORMAL_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate((
-    7770085, 7770086, 7770087, 7770089, 7770090, 7770091, 7770093, 7770094, 7770095,
-))}
-SUPPORT_RUNE_ITEM_BITS = {item_id: 1 << index for index, item_id in enumerate(sorted(SUPPORT_RUNE_IDS))}
-REVISION_TWO_SUIT_IDS = {7770021}
-REVISION_FOUR_FLAME_BELCH_IDS = {7770012}
-REVISION_FIVE_EQUIPMENT_LAUNCHER_IDS = {7770011, 7770013}
-REVISION_NINE_ICE_BOMB_IDS = {7770013}
-
-
-def discover_client_state_file():
-    configured = config.get("client_state_file")
-    if configured:
-        path = Path(configured).expanduser()
-        if not path.is_absolute():
-            path = CONFIG_FILE.parent / path
-        return path.resolve()
-    if os.name == "nt":
-        root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
-    else:
-        root = Path(
-            os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")
-        )
-    return root / "doom-eternal-ap" / "client_state.json"
-
-
-CLIENT_STATE_FILE = discover_client_state_file()
-
-
-def discover_bridge_log_dir():
-    candidates = []
-    configured = config.get("bridge_log_dir")
-    if configured:
-        candidates.append(Path(configured))
-    if os.name == "nt":
-        root = Path(os.environ.get("LOCALAPPDATA", Path.home()))
-    else:
-        root = Path(
-            os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")
-        )
-    candidates.append(root / "doom-eternal-ap" / "logs")
-    candidates.append(CONFIG_FILE.parent / "logs")
-
-    for candidate in candidates:
-        try:
-            candidate.mkdir(parents=True, exist_ok=True)
-            probe = candidate / ".write-test"
-            with probe.open("a", encoding="utf-8"):
-                pass
-            probe.unlink(missing_ok=True)
-            return candidate
-        except OSError:
-            continue
-
-    return Path.cwd() / "logs"
-
-
-BRIDGE_LOG_DIR = discover_bridge_log_dir()
-BRIDGE_LOG_PATH = BRIDGE_LOG_DIR / "bridge.log"
-
-
-def configure_bridge_logger():
-    bridge_logger = logging.getLogger("doom_eternal_ap.bridge")
-    bridge_logger.setLevel(logging.DEBUG)
-    bridge_logger.propagate = False
-    return bridge_logger
-
-
-def start_bridge_logger(path=None):
-    """Start a fresh production log for an active client session."""
-    target = Path(path or BRIDGE_LOG_PATH)
-    _native_probe_log_signatures.clear()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    previous = target.with_name("bridge.previous.log")
-    for handler in list(logger.handlers):
-        if isinstance(handler, logging.FileHandler):
-            logger.removeHandler(handler)
-            handler.close()
-    try:
-        previous.unlink(missing_ok=True)
-        if target.exists():
-            target.replace(previous)
-    except OSError:
-        # Logging must not prevent a client connection when a host filesystem
-        # momentarily refuses a rename.
-        pass
-    handler = logging.FileHandler(target, mode="w", encoding="utf-8")
-    handler.setLevel(logging.DEBUG)
-    handler.setFormatter(
-        logging.Formatter(
-            "[%(asctime)s] %(levelname)s %(message)s",
-            "%Y-%m-%d %H:%M:%S",
-        )
-    )
-    logger.addHandler(handler)
-    return logger
-
-
-logger = configure_bridge_logger()
-_native_probe_log_signatures = {}
-
-
-def log_effective_runtime_paths():
-    """Record bridge-owned configuration and effective runtime path surfaces."""
-    logger.info("CONFIG_FILE=%s", CONFIG_FILE.resolve())
-    logger.info("CLIENT_STATE_FILE=%s", CLIENT_STATE_FILE.resolve())
-    logger.info("DOOM_BASE_DIR=%s", DOOM_BASE_DIR)
-    logger.info("SAVE_GAMES_DIR=%s", SAVE_GAMES_DIR)
-    logger.info("INV_DUMP_DIR=%s", INV_DUMP_DIR)
-    logger.info("STEAM_REMOTE_DIR=%s", STEAM_REMOTE_DIR if STEAM_REMOTE_DIR is not None else "unavailable")
-    logger.info("STEAM_ID3=%s", STEAM_ID3)
-    logger.info("SAVE_GAMES_SELECTION_SOURCE=%s", SAVE_GAMES_SELECTION_SOURCE)
-    logger.info("SAVE_GAMES_SELECTION_REASON=%s", SAVE_GAMES_SELECTION_REASON)
-
-
-def client_state_store():
-    """Compose the persistence adapter; callers retain current commit timing."""
-    return ClientStateStore(
-        CLIENT_STATE_FILE, version=CLIENT_STATE_VERSION, migrate=migrate_client_state,
-        log_event=log_item_event, logger=logger,
-    )
-
-
-def load_client_state():
-    return client_state_store().load()
-
-
-def save_client_state(state, *, reason="state_update", boundary=None, boundary_before=None):
-    return client_state_store().commit(
-        state, reason=reason, boundary=boundary, boundary_before=boundary_before,
-    )
-
-DOOM_STEAM_APP_ID = "782330"
-
-
-def _unique_existing_paths(paths):
-    unique = []
-    seen = set()
-    for raw_path in paths:
-        if not raw_path:
-            continue
-        try:
-            path = Path(raw_path).expanduser()
-            key = os.path.normcase(os.path.abspath(str(path)))
-        except (OSError, TypeError, ValueError):
-            continue
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(path)
-    return unique
-
-
-def _windows_steam_roots():
-    """Return likely Steam installation roots on Windows.
-
-    The game library and the Steam installation are often on different drives.
-    Steam userdata normally lives beside the Steam client, so the registry is
-    the primary source instead of the DOOM installation path.
-    """
-    if os.name != "nt":
-        return []
-
-    roots = []
-
-    try:
-        import winreg
-
-        registry_values = [
-            (
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Valve\Steam",
-                "SteamPath",
-            ),
-            (
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\WOW6432Node\Valve\Steam",
-                "InstallPath",
-            ),
-            (
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Valve\Steam",
-                "InstallPath",
-            ),
-        ]
-
-        for hive, key_name, value_name in registry_values:
-            try:
-                with winreg.OpenKey(hive, key_name) as key:
-                    value, _ = winreg.QueryValueEx(key, value_name)
-                if value:
-                    roots.append(Path(value))
-            except (FileNotFoundError, OSError):
-                continue
-    except ImportError:
-        pass
-
-    for variable in ("PROGRAMFILES(X86)", "PROGRAMFILES", "PROGRAMW6432"):
-        value = os.environ.get(variable)
-        if value:
-            roots.append(Path(value) / "Steam")
-
-    configured_root = config.get("steam_root_dir")
-    if configured_root:
-        roots.append(Path(configured_root).expanduser())
-
-    return _unique_existing_paths(roots)
-
-
-def _linux_steam_roots():
-    if os.name == "nt":
-        return []
-
-    home = Path.home()
-    homes = [home]
-    if home.is_absolute():
-        try:
-            var_home = Path("/var") / home.relative_to("/")
-            if var_home != home:
-                homes.append(var_home)
-        except ValueError:
-            pass
-
-    roots = []
-    for candidate_home in homes:
-        roots.extend(
-            [
-                candidate_home / ".local/share/Steam",
-                candidate_home / ".steam/steam",
-                candidate_home
-                / ".var/app/com.valvesoftware.Steam/data/Steam",
-            ]
-        )
-
-    configured_root = config.get("steam_root_dir")
-    if configured_root:
-        roots.append(Path(configured_root).expanduser())
-
-    return _unique_existing_paths(roots)
-
-
-def _game_library_steam_root():
-    """Return the Steam-library root inferred from the DOOM installation."""
-    try:
-        doom_base = Path(DOOM_BASE_DIR)
-    except NameError:
-        return None
-
-    for parent in [doom_base, *doom_base.parents]:
-        if parent.name.lower() == "steamapps":
-            return parent.parent
-    return None
-
-
-def _steam_roots():
-    roots = []
-    roots.extend(_windows_steam_roots())
-    roots.extend(_linux_steam_roots())
-
-    library_root = _game_library_steam_root()
-    if library_root is not None:
-        roots.append(library_root)
-
-    return _unique_existing_paths(roots)
-
-
-def normalize_steam_remote_dir(path):
-    """Accept remote, 782330, account, userdata, or Steam-root selections."""
-    selected = Path(path).expanduser()
-
-    direct_candidates = [selected]
-    name = selected.name.lower()
-
-    if name == "782330":
-        direct_candidates.insert(0, selected / "remote")
-    elif name.isdigit():
-        direct_candidates.insert(
-            0,
-            selected / DOOM_STEAM_APP_ID / "remote",
-        )
-    elif name == "userdata":
-        direct_candidates.extend(
-            selected.glob(f"*/{DOOM_STEAM_APP_ID}/remote")
-        )
-    else:
-        direct_candidates.extend(
-            (selected / "userdata").glob(
-                f"*/{DOOM_STEAM_APP_ID}/remote"
-            )
-        )
-
-    valid = []
-    for candidate in direct_candidates:
-        try:
-            candidate = candidate.resolve()
-        except OSError:
-            candidate = candidate.absolute()
-
-        if not candidate.is_dir():
-            continue
-        if candidate.name.lower() != "remote":
-            continue
-        if candidate.parent.name != DOOM_STEAM_APP_ID:
-            continue
-
-        try:
-            steam_id3 = int(candidate.parents[1].name)
-        except (IndexError, ValueError):
-            continue
-
-        valid.append((candidate, steam_id3))
-
-    if not valid:
-        raise ValueError(player_text("activity", "steam_directory_invalid"))
-
-    valid.sort(
-        key=lambda pair: _steam_remote_candidate_score(pair[0]),
-        reverse=True,
-    )
-    return valid[0]
-
-
-def _steam_remote_candidate_score(remote):
-    duration_files = [
-        p for p in remote.glob("*-AUTOSAVE*/game_duration.dat")
-        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
-    ]
-    details_files = [
-        p for p in remote.glob("*-AUTOSAVE*/game.details")
-        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
-    ]
-    save_files = duration_files + details_files
-
-    newest_mtime = 0
-    for save_file in save_files:
-        try:
-            newest_mtime = max(
-                newest_mtime,
-                save_file.stat().st_mtime_ns,
-            )
-        except OSError:
-            continue
-
-    return (
-        bool(duration_files),
-        bool(details_files),
-        newest_mtime,
-    )
-
-
-def _discover_steam_remote_candidates():
-    discovered = []
-    seen = set()
-
-    for steam_root in _steam_roots():
-        userdata = steam_root / "userdata"
-        if not userdata.is_dir():
-            continue
-
-        for remote in userdata.glob(
-            f"*/{DOOM_STEAM_APP_ID}/remote"
-        ):
-            try:
-                normalized, steam_id3 = normalize_steam_remote_dir(remote)
-            except ValueError:
-                continue
-
-            key = os.path.normcase(
-                os.path.abspath(str(normalized))
-            )
-            if key in seen:
-                continue
-            seen.add(key)
-            discovered.append((normalized, steam_id3))
-
-    discovered.sort(
-        key=lambda pair: _steam_remote_candidate_score(pair[0]),
-        reverse=True,
-    )
-    return discovered
-
-
-def _describe_steam_remote_candidate(remote, steam_id3):
-    duration_files = [
-        p for p in remote.glob("*-AUTOSAVE*/game_duration.dat")
-        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
-    ]
-    details_files = [
-        p for p in remote.glob("*-AUTOSAVE*/game.details")
-        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", p.parent.name)
-    ]
-    save_files = duration_files + details_files
-
-    newest = None
-    for save_file in save_files:
-        try:
-            mtime = save_file.stat().st_mtime
-        except OSError:
-            continue
-        newest = mtime if newest is None else max(newest, mtime)
-
-    if newest is None:
-        save_description = 'no autosave files found yet'
-    else:
-        save_description = time.strftime(
-            "%Y-%m-%d %H:%M:%S",
-            time.localtime(newest),
-        )
-
-    return f'{remote!s} (Steam account {steam_id3!s}; latest save: {save_description!s})'
-
-
-def prompt_for_steam_remote(candidates):
-    """Ask only when automatic discovery cannot choose a usable directory."""
-    has_tty = bool(sys.stdin and sys.stdin.isatty())
-
-    if candidates and has_tty:
-        print('{newline}Found DOOM Eternal Steam save directories:'.format(newline='\n'))
-        for index, (remote, steam_id3) in enumerate(candidates, start=1):
-            print(
-                f"  {index}. "
-                f"{_describe_steam_remote_candidate(remote, steam_id3)}"
-            )
-
-        while True:
-            answer = input(f'Choose the active Steam account [1-{len(candidates)!s}] (default 1): ').strip()
-            if not answer:
-                return candidates[0]
-            try:
-                index = int(answer)
-            except ValueError:
-                index = 0
-            if 1 <= index <= len(candidates):
-                return candidates[index - 1]
-            print('Invalid selection.')
-
-    while True:
-        selected = None
-        try:
-            import tkinter as tk
-            from tkinter import filedialog
-
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            selected = filedialog.askdirectory(title=(player_text("activity", "select_steam_directory")))
-            root.destroy()
-        except Exception:
-            selected = None
-
-        if not selected and has_tty:
-            print('{newline}Select the Steam directory that contains userdata/<ACCOUNT_ID>/782330/remote.'.format(newline='\n'))
-            print('Windows example: C:/Program Files (x86)/Steam')
-            selected = input('Steam path: ').strip()
-
-        if not selected:
-            return None, 0
-
-        try:
-            return normalize_steam_remote_dir(selected)
-        except ValueError as error:
-            if has_tty:
-                print(f'Validation error: {error!s}')
-                continue
-
-            try:
-                import tkinter as tk
-                import tkinter.messagebox as messagebox
-
-                root = tk.Tk()
-                root.withdraw()
-                messagebox.showerror(player_text("activity", "steam_directory_title"), str(error))
-                root.destroy()
-            except Exception:
-                return None, 0
-
-
-def discover_steam_remote():
-    configured = config.get("steam_remote_dir")
-    configured_id = parse_int(config.get("steam_id3"), 0)
-
-    if configured is not None:
-        configured_text = str(configured).strip()
-        if configured_text in ("", ".") or configured_id < 0:
-            logger.warning(
-                "[Setup] Invalid legacy Steam remote configuration "
-                f"detected: {configured_text!r} / ID {configured_id}. "
-                "Running auto-discovery again."
-            )
-            config.pop("steam_remote_dir", None)
-            config.pop("steam_id3", None)
-            save_config()
-            configured = None
-            configured_id = 0
-        else:
-            try:
-                remote, inferred_id = normalize_steam_remote_dir(
-                    configured_text
-                )
-                if configured_id not in (0, inferred_id):
-                    logger.warning(
-                        "[Setup] steam_id3 did not match the userdata "
-                        f"directory; using inferred ID {inferred_id}."
-                    )
-                return remote, inferred_id
-            except ValueError as error:
-                logger.warning(
-                    "[Setup] Stored steam_remote_dir is invalid: "
-                    f"{error}. Running auto-discovery again."
-                )
-                config.pop("steam_remote_dir", None)
-                config.pop("steam_id3", None)
-                save_config()
-
-    candidates = _discover_steam_remote_candidates()
-    if candidates:
-        chosen = candidates[0]
-        if len(candidates) > 1:
-            logger.info(
-                "[Setup] Multiple Steam save directories found. "
-                "Selected the candidate with the newest DOOM Eternal "
-                f"autosave: {_describe_steam_remote_candidate(*chosen)}"
-            )
-        else:
-            logger.info(
-                "[Setup] Steam save directory discovered automatically: "
-                f"{_describe_steam_remote_candidate(*chosen)}"
-            )
-        return chosen
-
-    logger.warning(
-        "[Setup] Could not discover a DOOM Eternal Steam save directory "
-        "automatically. Manual selection is required for DeathLink SEND "
-        "and save-based goal fallback."
-    )
-    return prompt_for_steam_remote(candidates)
-
-
-STEAM_REMOTE_DIR, STEAM_ID3 = discover_steam_remote()
-if (
-    STEAM_REMOTE_DIR is not None
-    and STEAM_ID3 > 0
-    and STEAM_REMOTE_DIR.is_dir()
-):
-    remote_path = str(STEAM_REMOTE_DIR)
-    if (
-        config.get("steam_remote_dir") != remote_path
-        or parse_int(config.get("steam_id3"), 0) != STEAM_ID3
-    ):
-        config["steam_remote_dir"] = remote_path
-        config["steam_id3"] = STEAM_ID3
-        save_config()
-        logger.info(
-            "[Setup] Saved Steam remote configuration: "
-            f"{remote_path} / Steam account {STEAM_ID3}."
-        )
-else:
-    STEAM_REMOTE_DIR = None
-    STEAM_ID3 = 0
-    logger.warning(
-        "[Setup] Steam remote directory is unavailable. "
-        "DeathLink SEND and save-based goal fallback are disabled "
-        "until the path is configured."
-    )
-
-
-DEATH_PROBE = APPLICATION_DIR / "save_death_probe.exe"
-DEATH_PROBE_RUNTIME = APPLICATION_DIR / f".death-probe-{os.getpid()}"
-
-
-def discover_oodle_dll():
-    configured = config.get("oodle_dll")
-    candidates = [
-        Path(configured) if configured else Path(),
-        Path(DOOM_BASE_DIR).parent / "oo2core_8_win64.dll",
-        Path(DOOM_BASE_DIR) / "oo2core_8_win64.dll",
-    ]
-    return next((path for path in candidates if path.is_file()), Path())
-
-
-def refresh_death_probe_proton():
-    global PROTON_PATH, STEAM_COMPAT_DATA, STEAM_INSTALL
-    if os.name == "nt":
-        return
-    from doom_eap.runtime.proton import runtime
-    try:
-        command, environment = runtime(config)
-        PROTON_PATH = Path(command[0])
-        STEAM_COMPAT_DATA = Path(environment["STEAM_COMPAT_DATA_PATH"])
-        STEAM_INSTALL = Path(environment["STEAM_COMPAT_CLIENT_INSTALL_PATH"])
-    except (OSError, ValueError, RuntimeError, KeyError):
-        PROTON_PATH = STEAM_COMPAT_DATA = STEAM_INSTALL = Path()
-
-
-OODLE_DLL = discover_oodle_dll()
-PROTON_PATH = STEAM_COMPAT_DATA = STEAM_INSTALL = Path()
-refresh_death_probe_proton()
-DEATH_PROBE_COMPAT_DATA = Path(
-    config.get(
-        "death_probe_compat_data",
-        Path.home() / ".cache" / "doom-eap" / "death-probe-compat",
-    )
+from doom_eap.runtime.observers import (
+    BOOTSTRAP_ACTIONS,
+    Bootstrap,
+    LevelReady,
+    PublisherDispatch,
+    RuntimeLifecycle,
+    RuntimeObservationLease,
+    admit_slot_data,
+    evaluate_dlc_availability,
 )
-DISTROBOX_HOST_EXEC = (
-    shutil.which("distrobox-host-exec")
-    if Path("/run/.containerenv").exists()
-    else None
-)
+from doom_eap.strings import text as player_text
 
+# config prepares the Archipelago source path before CommonClient imports
+# isort: split
 
-def cleanup_death_probe_runtime():
-    shutil.rmtree(DEATH_PROBE_RUNTIME, ignore_errors=True)
+import CommonClient as APCommonClient
+import Utils
+from CommonClient import ClientCommandProcessor, CommonContext, get_base_parser, gui_enabled
 
 
-atexit.register(cleanup_death_probe_runtime)
+class SessionTasks:
+    def __init__(self):
+        self._tasks = set()
+        self._generation = 0
 
+    def start(self, operation):
+        generation = self._generation
 
-def primary_save_candidates(filename="game_duration.dat", slot_prefix=None):
-    """Return valid primary slots newest-first."""
-    return save_files.primary_save_candidates(
-        STEAM_REMOTE_DIR, STEAM_ID3, filename, slot_prefix,
-    )
+        async def run():
+            if generation == self._generation:
+                await operation()
 
+        task = asyncio.create_task(run())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return task
 
-def active_primary_save(filename="game_duration.dat"):
-    """Compatibility view of the newest candidate, not an active-slot proof."""
-    candidates = primary_save_candidates(filename)
-    return candidates[0] if candidates else None
+    def invalidate(self):
+        self._generation += 1
+        for task in tuple(self._tasks):
+            task.cancel()
 
+    async def close(self):
+        tasks = tuple(self._tasks)
+        self.invalidate()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-def primary_save_for_slot(slot_directory, filename="game_duration.dat"):
-    for selected in primary_save_candidates(filename):
-        if selected.slot_directory == slot_directory:
-            return selected
-    return None
-
-
-def read_gameplay_save_evidence(path=None):
-    """Read the native gameplay/slot handshake published by ap_client.exe."""
-    return save_files.read_gameplay_save_evidence(path or GAMEPLAY_SAVE_EVIDENCE_PATH)
-
-
-def mastery_save_selection():
-    return active_primary_save("game_duration.dat")
-
-
-def mastery_save_file():
-    """Compatibility path view of the dynamically selected primary save."""
-    selected = mastery_save_selection()
-    return selected.path if selected else None
-
-
-def sticky_mastery_save_file():
-    """Compatibility name for Sticky's shared primary-save reader."""
-    return mastery_save_file()
-
-
-def active_slot_file(filename):
-    """Return a companion file from the newest game_duration primary slot."""
-    selected = mastery_save_selection()
-    if selected is None:
-        return None
-    path = selected.path.parent / filename
-    return path if path.is_file() else None
-
-
-def death_probe_available():
-    if (
-        STEAM_REMOTE_DIR is None
-        or STEAM_ID3 <= 0
-        or not STEAM_REMOTE_DIR.is_dir()
-        or not DEATH_PROBE.is_file()
-        or not OODLE_DLL.is_file()
-    ):
-        return False
-
-    if os.name == "nt":
-        return True
-
-    return (
-        PROTON_PATH.is_file()
-        and STEAM_COMPAT_DATA.is_dir()
-        and STEAM_INSTALL.is_dir()
-    )
-
-
-STICKY_UNLOCKABLE = b"weapon_mastery/shotgun/sticky_bomb"
-
-
-def read_weapon_mastery_record(payload, entry):
-    """Compatibility wrapper for one exact Weapon Mastery record."""
-    return read_unlockable_record(payload, entry)
-
-
-def read_weapon_mastery_records(payload):
-    """Return only structured records that exist in the fixed vanilla manager."""
-    records = {}
-    for entry in WEAPON_MASTERY_ENTRIES:
-        try:
-            record = read_weapon_mastery_record(payload, entry)
-            if record is not None:
-                records[entry["signal"]["unlockable"]] = record
-        except Exception as error:
-            logger.warning(
-                "[Mastery] RECORD_PARSE_ERROR unlockable=%s error=%s",
-                entry["signal"]["unlockable"], error,
-            )
-    return records
-
-
-def read_mission_challenge_records(payload):
-    """Return exact challenge records from the native manager."""
-    records = {}
-    for entry in MISSION_CHALLENGE_ENTRIES:
-        try:
-            record = read_unlockable_record(payload, entry)
-            if record is not None:
-                records[entry["signal"]["unlockable"]] = record
-        except Exception as error:
-            logger.warning(
-                "[Challenge] RECORD_PARSE_ERROR unlockable=%s error=%s",
-                entry["signal"]["unlockable"], error,
-            )
-    return records
-
-
-def read_sticky_mastery_record(payload):
-    """Compatibility view retaining Sticky's exact runtime-PASS record shape."""
-    record = read_weapon_mastery_record(payload, STICKY_MASTERY_ENTRY)
-    if record is None:
-        raise ValueError("Sticky native record is missing")
-    return {
-        key: record[key]
-        for key in (
-            "rule_0_statname", "rule_0_statCount", "rule_0_satisfied",
-            "unlockableIsUnlocked",
-        )
-    }
-
-
-def read_checkpoint_deaths(unpacked: bytes) -> int | None:
-    marker = b"numCheckpointDeaths\x01"
-    idx = unpacked.find(marker)
-    if idx == -1 or idx + len(marker) >= len(unpacked):
-        return None
-    return int(unpacked[idx + len(marker)])
-
-
-def probe_game_duration(path):
-    unpacked, result_code, stdout = save_files.unpack_game_duration(
-        path, steam_id=STEAM_ID3, runtime_directory=DEATH_PROBE_RUNTIME,
-        probe_path=DEATH_PROBE, oodle_path=OODLE_DLL, compat_data=DEATH_PROBE_COMPAT_DATA,
-        proton_path=PROTON_PATH, steam_install=STEAM_INSTALL, host_exec=DISTROBOX_HOST_EXEC,
-    )
-    mastery_records = read_weapon_mastery_records(unpacked)
-    raw_deaths = read_checkpoint_deaths(unpacked)
-    if raw_deaths is None and stdout:
-        m = re.search(r"numCheckpointDeaths=(\d+)", stdout)
-        if m:
-            raw_deaths = int(m.group(1))
-    snapshot = {
-        "mastery_records": mastery_records,
-        "mission_challenge_records": read_mission_challenge_records(unpacked),
-        "raw_num_checkpoint_deaths": raw_deaths if raw_deaths is not None else (1 if result_code == 20 else 0),
-    }
-    sticky_record = mastery_records.get(STICKY_UNLOCKABLE.decode("ascii"))
-    if sticky_record is not None:
-        snapshot.update({
-            key: sticky_record[key]
-            for key in (
-                "rule_0_statname", "rule_0_statCount", "rule_0_satisfied",
-                "unlockableIsUnlocked",
-            )
-        })
-    snapshot["checkpoint_death"] = snapshot["raw_num_checkpoint_deaths"] > 0
-    return snapshot
-
-
-def probe_checkpoint_death(path):
-    """Compatibility wrapper used by focused DeathLink tests."""
-    return probe_game_duration(path)["checkpoint_death"]
-
-
-# load item definitions
-ITEMS_FILE = REPO_ROOT / "data" / "items.json"
-with open(ITEMS_FILE, encoding="utf-8") as f:
-    # keys in json are strings, convert them to ints
-    _raw_items = json.load(f)
-    ITEM_ID_TO_COMMAND = {int(k): v for k, v in _raw_items.items()}
-ITEM_REPLAY_POLICIES_FILE = REPO_ROOT / "data" / "item_replay_policies.json"
-ITEM_REPLAY_POLICIES = load_policy_registry(
-    Path(ITEM_REPLAY_POLICIES_FILE), ITEM_ID_TO_COMMAND
-)
-ITEM_CLASSIFICATIONS_FILE = REPO_ROOT / "data" / "item_classifications.json"
-_item_classification_document = json.loads(
-    Path(ITEM_CLASSIFICATIONS_FILE).read_text(encoding="utf-8")
-)
-if (
-    _item_classification_document.get("item_mapping_revision")
-    != ITEM_MAPPING_REVISION
-):
-    raise RuntimeError(
-        "Packaged item classification revision diverges from item mapping"
-    )
-ITEM_CLASSIFICATION_IDENTITY = load_item_classification_identity(
-    Path(ITEM_CLASSIFICATIONS_FILE)
-)
-ITEM_CLASSIFICATIONS = {
-    item_id: entry["classification"]
-    for item_id, entry in ITEM_CLASSIFICATION_IDENTITY.items()
-}
-if set(ITEM_CLASSIFICATIONS) != set(ITEM_ID_TO_COMMAND):
-    raise RuntimeError(
-        "Packaged item classifications diverge from the item command mapping"
-    )
-
-
-def received_item_classification(item_id, network_classification):
-    """Use the packaged identity when a compatible server reports stale flags."""
-    if item_id not in ITEM_CLASSIFICATIONS:
-        raise ValueError(f"item {item_id} has no packaged classification")
-    expected = ITEM_CLASSIFICATIONS[item_id]
-    if network_classification is None:
-        classification = expected
-    else:
-        classification = int(network_classification)
-        normalized = normalize_network_classification(item_id, classification)
-        expected_normalized = normalize_network_classification(item_id, expected)
-        if normalized != expected_normalized:
-            logger.warning(
-                "[To Game] CLASSIFICATION_MISMATCH item_id=%s server_flags=%s "
-                "packaged_flags=%s mapping_revision=%s; using packaged identity",
-                item_id, classification, expected, ITEM_MAPPING_REVISION,
-            )
-    notification_style_for_item(item_id, expected)
-    return expected
-
-RUNTIME_LOCATIONS_FILE = REPO_ROOT / "data" / "runtime_locations.json"
-with open(RUNTIME_LOCATIONS_FILE, encoding="utf-8") as f:
-    RUNTIME_LOCATIONS = json.load(f)
-EXULTIA_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
-    "Exultia - Mission Complete"
-]
-CULTIST_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
-    "Cultist Base - Mission Complete"
-]
-DOOM_HUNTER_BASE_COMPLETE_LOCATION = RUNTIME_LOCATIONS[
-    "Doom Hunter Base - Mission Complete"
-]
-
-
-CHALLENGE_LOCATION_REGISTRY = load_challenge_registry()
-OBSERVER_REGISTRY_REVISION = observer_registry_revision(CHALLENGE_LOCATION_REGISTRY)
-WEAPON_MASTERY_ENTRIES = tuple(CHALLENGE_LOCATION_REGISTRY["weapon_masteries"])
-WEAPON_MASTERY_BY_UNLOCKABLE = {
-    entry["signal"]["unlockable"]: entry
-    for entry in WEAPON_MASTERY_ENTRIES
-}
-MISSION_CHALLENGE_ENTRIES = tuple(
-    CHALLENGE_LOCATION_REGISTRY["mission_challenges"]
-)
-MISSION_CHALLENGE_BY_UNLOCKABLE = {
-    entry["signal"]["unlockable"]: entry
-    for entry in MISSION_CHALLENGE_ENTRIES
-}
-def _validated_catalog_maps(active_maps):
-    """Validate and canonicalize runtime map identity from packaged contracts."""
-    if not isinstance(active_maps, dict) or not active_maps:
-        raise ValueError("foundation active_maps must be a non-empty object")
-    validated = {}
-    seen_runtime_maps = set()
-    for raw_map_key, raw_runtime_map in active_maps.items():
-        if not isinstance(raw_map_key, str) or not raw_map_key.strip():
-            raise ValueError("foundation active_maps contains an invalid map key")
-        if raw_map_key != raw_map_key.strip():
-            raise ValueError(f"foundation active_maps map key is not canonical: {raw_map_key!r}")
-        if not isinstance(raw_runtime_map, str) or not raw_runtime_map.strip():
-            raise ValueError(f"foundation active_maps[{raw_map_key!r}] has an invalid runtime map")
-        runtime_map = canonical_map_name(raw_runtime_map)
-        if not runtime_map:
-            raise ValueError(f"foundation active_maps[{raw_map_key!r}] has an empty canonical runtime map")
-        if runtime_map in seen_runtime_maps:
-            raise ValueError(f"foundation active_maps contains duplicate runtime map: {runtime_map}")
-        validated[raw_map_key] = runtime_map
-        seen_runtime_maps.add(runtime_map)
-    return validated
-
-
-KNOWN_CATALOG_MAPS = _validated_catalog_maps(
-    load_foundation_contracts().get("active_maps")
-)
-MATERIALIZATION_MAPS = _validated_catalog_maps({
-    **{context.map_keys[0]: runtime_map for runtime_map, context in CONTEXT_BY_MAP.items()
-       if len(context.map_keys) == 1},
-    **KNOWN_CATALOG_MAPS,
-})
-
-
-def _materialization_map_key(runtime_map):
-    runtime_map = canonical_map_name(runtime_map)
-    matches = [
-        map_key
-        for map_key, catalog_runtime_map in MATERIALIZATION_MAPS.items()
-        if catalog_runtime_map == runtime_map
-    ]
-    return matches[0] if len(matches) == 1 else None
-
-
-FAST_TRAVEL_MAP_KEYS = frozenset(
-    map_key for map_key, runtime_map in KNOWN_CATALOG_MAPS.items()
-    if map_key != "hub" and runtime_map in {
-        "game/sp/e1m1_intro/e1m1_intro",
-        "game/sp/e1m2_battle/e1m2_battle",
-        "game/sp/e1m3_cult/e1m3_cult",
-        "game/sp/e1m4_boss/e1m4_boss",
-        "game/sp/e2m1_nest/e2m1_nest",
-        "game/sp/e2m2_base/e2m2_base",
-        "game/sp/e2m3_core/e2m3_core",
-        "game/sp/e2m4_boss/e2m4_boss",
-        "game/sp/e3m1_slayer/e3m1_slayer",
-        "game/sp/e3m2_hell/e3m2_hell",
-        "game/sp/e3m2_hell_b/e3m2_hell_b",
-        "game/sp/e3m3_maykr/e3m3_maykr",
-        "game/sp/e3m4_boss/e3m4_boss",
-        "game/dlc/e4m1_rig/e4m1_rig",
-        "game/dlc/e4m2_swamp/e4m2_swamp",
-        "game/dlc/e4m3_mcity/e4m3_mcity",
-    }
-)
-
-MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE = {
-    entry["signal"]["unlockable"]: canonical_map_name(entry["runtime_map"])
-    for entry in MISSION_CHALLENGE_ENTRIES
-}
-MISSION_CHALLENGE_RUNTIME_MAPS = frozenset(
-    (set(MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE.values()) | set(KNOWN_CATALOG_MAPS.values()))
-    - {"game/hub/hub", ""}
-)
-ALL_MISSION_CHALLENGES_ENTRIES = list(
-    CHALLENGE_LOCATION_REGISTRY.get("all_mission_challenges", [])
-)
-STICKY_MASTERY_ENTRY = WEAPON_MASTERY_BY_UNLOCKABLE[
-    "weapon_mastery/shotgun/sticky_bomb"
-]
-STICKY_MASTERY_LOCATION = STICKY_MASTERY_ENTRY["location_id"]
-PUBLISHERS = load_publisher_contracts()
-PUBLISHER_ENGINE = PublisherEngine(PUBLISHERS)
-PUBLISHER_MAP_EVENT_FILENAMES = frozenset(
-    trigger["filename"]
-    for publisher in PUBLISHERS
-    for trigger in publisher.triggers_for("map_event_file")
-)
-# load all level manifests dynamically
-DECL_TO_LOCATION = {}
-MANIFESTS_DIR = REPO_ROOT / "manifests"
-if os.path.exists(MANIFESTS_DIR):
-    for filename in os.listdir(MANIFESTS_DIR):
-        if filename.endswith(".json"):
-            with open(os.path.join(MANIFESTS_DIR, filename), encoding="utf-8") as f:
-                manifest_data = json.load(f)
-                DECL_TO_LOCATION.update(manifest_data)
-
-AUTOMAP_VISUAL_REGISTRY = load_automap_visual_registry()
-AUTOMAP_VISUALS_BY_MAP = index_automap_visual_registry(AUTOMAP_VISUAL_REGISTRY)
-
-poll_counter = 0
-
-def log_delivery_event(event: str, **fields) -> None:
-    """Emit bounded, correlation-friendly delivery diagnostics only."""
-    wall_time_ns = fields.pop("wall_time_ns", None)
-    monotonic_ns = fields.pop("monotonic_ns", None)
-    record = {
-        "event": event,
-        "wall_time_ns": time.time_ns() if wall_time_ns is None else wall_time_ns,
-        "monotonic_ns": time.monotonic_ns() if monotonic_ns is None else monotonic_ns,
-        **{key: value for key, value in fields.items() if value is not None},
-    }
-    logger.info("DELIVERY_EVENT %s", json.dumps(record, sort_keys=True, separators=(",", ":")))
-
-
-def log_item_event(event: str, **fields) -> None:
-    """Emit structured item diagnostics with a stable ITEM_* event name."""
-    if not event.startswith("ITEM_"):
-        event = f"ITEM_{event}"
-    if (event == "ITEM_NATIVE_PROBE_RESPONSE" and fields.get("returncode") == 0
-            and fields.get("stage") in {"--native", "--inspect", "--save-admission"}):
-        try:
-            response = json.loads(fields.get("stdout", ""))
-        except (TypeError, ValueError):
-            response = None
-        if isinstance(response, dict) and response.get("result") == "ok":
-            signature = json.dumps({key: value for key, value in response.items()
-                                    if key not in {"callback_sequence", "callback_at_ms", "context_sampled_at_ms"}},
-                                   sort_keys=True, separators=(",", ":"))
-            key = (fields["stage"], response.get("target_pid"), fields.get("sha256"))
-            if _native_probe_log_signatures.get(key) == signature:
-                return
-            _native_probe_log_signatures[key] = signature
-    fields.setdefault("bridge_revision", globals().get("BRIDGE_REVISION"))
-    fields.setdefault("protocol_version", globals().get("BRIDGE_PROTOCOL"))
-    fields.setdefault("mapping_revision", globals().get("ITEM_MAPPING_REVISION"))
-    log_delivery_event(event, **fields)
-
-
-def is_item_delivery_activation(command):
-    return command.strip().startswith(f"ai_ScriptCmdEnt {RPC_ENTITY_PREFIX}_")
-
-
-def delegated_rpc_command(item_id, command_index=None):
-    entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
-    if command_index is not None:
-        entity_name = f"{entity_name}_{command_index}"
-    return f"ai_ScriptCmdEnt {entity_name} activate"
-
-
-def telemetry_dump_files():
-    files = set()
-    for prefix in (TELEMETRY_DUMP_PREFIX, LEGACY_TELEMETRY_DUMP_PREFIX):
-        files.update(
-            glob.glob(os.path.join(INV_DUMP_DIR, f"{prefix}*.txt"))
-        )
-    return sorted(files)
-
-
-def ammo_refill_request_files(directory=None):
-    """Return only DoomEAP refill request files in safe creation order."""
-    root = directory if directory is not None else globals().get("SAVE_GAMES_DIR")
-    if not root:
-        return []
-    candidates = glob.glob(os.path.join(str(root), "AP_REFILL_REQUEST*.txt"))
-    valid_files = []
-    for path in set(candidates):
-        match = AMMO_REFILL_REQUEST_RE.fullmatch(os.path.basename(path))
-        if match is None:
-            continue
-        try:
-            mtime_ns = os.stat(path).st_mtime_ns
-        except OSError:
-            continue
-        suffix = int(match.group(1) or 0)
-        valid_files.append((mtime_ns, suffix, os.path.basename(path), path))
-    valid_files.sort()
-    return [path for _, _, _, path in valid_files]
-
-
-def cleanup_ammo_refill_request_files(directory=None):
-    """Remove only stale DoomEAP Ammo Refill request files."""
-    removed = 0
-    for path in ammo_refill_request_files(directory):
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            continue
-        except OSError as error:
-            logger.warning("[Ammo Refill] Could not remove stale request %s: %s", path, error)
-        else:
-            removed += 1
-    return removed
-
-
-def check_event_files():
-    return sorted(glob.glob(os.path.join(INV_DUMP_DIR, f"{CHECK_EVENT_PREFIX}*.txt")))
-
-
-def goal_event_files():
-    return sorted(glob.glob(os.path.join(DOOM_BASE_DIR, f"{GOAL_EVENT_PREFIX}*.evt")))
-
-
-def extract_location_id_from_event(path):
-    basename = os.path.basename(path)
-    filename_match = re.match(
-        rf"^{CHECK_EVENT_PREFIX}(\d+)(?:_.*)?\.txt$",
-        basename,
-    )
-    if filename_match:
-        return int(filename_match.group(1))
-
-    try:
-        with open(path, encoding="utf-8", errors="ignore") as f:
-            contents = f.read()
-    except OSError:
-        return None
-
-    content_match = re.search(r"AP_CHECK_EVENT_(\d+)", contents)
-    if content_match:
-        return int(content_match.group(1))
-    return None
-
-
-def quarantine_event_file(path, old_state_key=None, new_state_key=None, reason="session_changed"):
-    path = Path(path)
-    if not path.exists():
-        return
-    quarantine_base = Path(INV_DUMP_DIR) / "ap_event_quarantine"
-    timestamp_folder = time.strftime("%Y%m%d_%H%M%S")
-    dest_dir = quarantine_base / timestamp_folder
-    dest_dir.mkdir(parents=True, exist_ok=True)
-
-    dest_path = dest_dir / path.name
-    try:
-        mtime_ns = path.stat().st_mtime_ns
-    except OSError:
-        mtime_ns = 0
-    location_id = extract_location_id_from_event(path)
-
-    meta = {
-        "filename": path.name,
-        "parsed_location_id": location_id,
-        "mtime_ns": mtime_ns,
-        "old_state_key": old_state_key,
-        "new_state_key": new_state_key,
-        "reason": reason,
-        "quarantined_at": time.time(),
-    }
-
-    try:
-        shutil.move(str(path), str(dest_path))
-        meta_path = dest_dir / f"{path.name}.meta.json"
-        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-        logger.warning(
-            "[Quarantine] Quarantined event file %s -> %s (reason: %s, location_id: %s)",
-            path.name, dest_path, reason, location_id,
-        )
-    except Exception as err:
-        logger.error("[Quarantine] Failed to quarantine event file %s: %s", path.name, err)
-
-
-ACTIVE_MAP_MARKER_PREFIX = "ap_active_map"
-def discover_active_map_markers():
-    """Discover all suffixed map start identity files in INV_DUMP_DIR, ordered by mtime."""
-    patterns = [
-        os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt"),
-        os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt"),
-    ]
-    valid_files = []
-    seen_paths = set()
-    for pattern in patterns:
-        for path in glob.glob(pattern):
-            if path in seen_paths:
-                continue
-            seen_paths.add(path)
-            basename = os.path.basename(path)
-            if (
-                re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename)
-                or re.match(rf"^{TELEMETRY_DUMP_PREFIX}(?:_.*)?\.txt$", basename)
-            ):
-                try:
-                    st = os.stat(path)
-                    valid_files.append((st.st_mtime_ns, path))
-                except OSError:
-                    pass
-    valid_files.sort(key=lambda item: item[0])
-    return valid_files
-
-
-def parse_active_map_marker(path, mtime_ns):
-    try:
-        with open(path, encoding="utf-8", errors="ignore") as f:
-            content = f.read()
-    except OSError:
-        return None
-
-    return RuntimeLifecycle.parse_authored_marker(
-        content, path, mtime_ns, MATERIALIZATION_MAPS, CONTEXT_BY_MAP,
-    )
-
-
-def cleanup_active_map_marker_file(path):
-    """Remove a consumed or stale active-map condump file."""
-    if not path:
-        return False
-    basename = os.path.basename(path)
-    if not re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
-        return False
-    try:
-        os.remove(path)
-        return True
-    except FileNotFoundError:
-        return True
-    except OSError as error:
-        logger.warning(
-            f"[MAP] Could not remove active map marker {basename}: {error}"
-        )
-        return False
-
-
-def cleanup_active_map_markers(preserve_path=None):
-    """Remove consumed or stale active-map condump files to prevent progressive suffixed names."""
-    pattern = os.path.join(INV_DUMP_DIR, f"{ACTIVE_MAP_MARKER_PREFIX}*.txt")
-    for path in glob.glob(pattern):
-        if preserve_path and os.path.abspath(path) == os.path.abspath(preserve_path):
-            continue
-        basename = os.path.basename(path)
-        if not re.match(rf"^{ACTIVE_MAP_MARKER_PREFIX}(?:_.*)?\.txt$", basename):
-            continue
-        try:
-            with open(path, encoding="utf-8", errors="ignore") as f:
-                content = f.read(256)
-            if "AP_ACTIVE_MAP_V1" not in content and "echo AP_ACTIVE_MAP_V1" not in content:
-                continue
-        except OSError:
-            continue
-        cleanup_active_map_marker_file(path)
-
-
-def discover_telemetry_markers():
-    """Discover all suffixed telemetry marker files in INV_DUMP_DIR, ordered by mtime."""
-    pattern = os.path.join(INV_DUMP_DIR, f"{TELEMETRY_DUMP_PREFIX}*.txt")
-    valid_files = []
-    for path in glob.glob(pattern):
-        basename = os.path.basename(path)
-        if re.match(rf"^{TELEMETRY_DUMP_PREFIX}(?:_.*)?\.txt$", basename):
-            try:
-                st = os.stat(path)
-                valid_files.append((st.st_mtime_ns, path))
-            except OSError:
-                pass
-    valid_files.sort(key=lambda item: item[0])
-    return valid_files
-
-
-def parse_goal_transition_event(path, include_raw=False):
-    data = {}
-    with open(path, encoding="utf-8", errors="ignore") as f:
-        for raw_line in f:
-            line = raw_line.strip()
-            if not line or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            data[key] = value
-
-    if not data.get("from_map") or not data.get("to_map"):
-        return None
-    raw_from_map = data["from_map"]
-    raw_to_map = data["to_map"]
-    data["from_map"] = canonical_map_name(data["from_map"])
-    data["to_map"] = canonical_map_name(data["to_map"])
-    if include_raw:
-        data["raw_from_map"] = raw_from_map
-        data["raw_to_map"] = raw_to_map
-    return data
-
-
-def log_mission_bridge_identity():
-    from doom_eap.runtime import weapon_points
-
-    executable = Path(sys.executable).resolve()
-    try:
-        executable_sha256 = hashlib.sha256(executable.read_bytes()).hexdigest()
-    except OSError as error:
-        executable_sha256 = f"unavailable:{type(error).__name__}"
-    logger.info("BRIDGE_REVISION=%s", BRIDGE_REVISION)
-    logger.info("BRIDGE_FILE=%s", BRIDGE_FILE)
-    logger.info("BRIDGE_SHA256=%s", BRIDGE_SHA256)
-    logger.info("BRIDGE_EXECUTABLE_SHA256=%s", executable_sha256)
-    logger.info("BRIDGE_PROTOCOL=%s", BRIDGE_PROTOCOL)
-    logger.info("GAME_NAME=%s", GAME_NAME)
-    logger.info("TRANSITION_HANDLER=%s", TRANSITION_HANDLER)
-    log_item_event(
-        "ITEM_WORKER_RUNTIME_IDENTITY",
-        frozen=bool(getattr(sys, "frozen", False)),
-        executable=str(executable),
-        executable_sha256=executable_sha256,
-        application_dir=str(APPLICATION_DIR),
-        modules={
-            __name__: {
-                "origin": __spec__.origin if __spec__ else None,
-                "loader": type(__loader__).__name__,
-                "methods": {
-                    name: hashlib.sha256(getattr(DoomEternalContext, name).__code__.co_code).hexdigest()
-                    for name in (
-                        "process_pending_item_receipts",
-                        "native_game_link",
-                        "_reconcile_native_receipt_owners",
-                    )
-                },
-            },
-            weapon_points.__name__: {
-                "origin": weapon_points.__spec__.origin if weapon_points.__spec__ else None,
-                "loader": type(weapon_points.__loader__).__name__,
-                "methods": {
-                    "SentinelWeaponPoints._run": hashlib.sha256(
-                        weapon_points.SentinelWeaponPoints._run.__code__.co_code
-                    ).hexdigest(),
-                },
-            },
-        },
-    )
-
-
-def cleanup_telemetry_dumps():
-    """Remove completed telemetry files before DOOM chooses a suffixed name."""
-    removed_all = True
-    for path in telemetry_dump_files():
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
-        except OSError as error:
-            removed_all = False
-            logger.warning(
-                f"[Telemetry] Could not remove {os.path.basename(path)} yet: "
-                f"{error}"
-            )
-    return removed_all
-
-
-def read_telemetry_dump():
-    files = telemetry_dump_files()
-
-    if not files:
-        return [], None
-
-    latest_file = max(files, key=os.path.getmtime)
-    try:
-        if time.time() - os.path.getmtime(latest_file) < 0.5:
-            return [], None
-    except OSError:
-        return [], None
-
-    checks_found = set()
-    map_name = None
-
-    try:
-        with open(latest_file, encoding="utf-8", errors="ignore") as f:
-            lines = f.readlines()
-            for line in lines:
-                lower_line = line.lower()
-                if lower_line.startswith("mapname:"):
-                    _, value = line.split(":", 1)
-                    map_name = canonical_map_name(value.strip())
-                if "idbloatedentity::activate" in lower_line and "ap_check_" in lower_line:
-                    match = re.search(r'(ap_check_[a-z0-9_]+)', lower_line)
-                    if match:
-                        checks_found.add(match.group(1).upper())
-
-        cleanup_telemetry_dumps()
-
-        return list(checks_found), map_name
-    except Exception as e:
-        logger.error(f"[Error] Failed to process telemetry condump: {e}")
-        return [], None
-
-def read_game_details_for_selection(selected):
-    return save_files.read_game_details_for_selection(selected, STEAM_ID3, logger)
-
-
-def read_game_details():
-    """Compatibility view; runtime observers use lifecycle-proven selections."""
-    path = active_slot_file("game.details")
-    if not path:
-        return None
-    selected = PrimarySaveSelection(path.parent.name, path.parent / "game_duration.dat", 0)
-    return read_game_details_for_selection(selected)
 
 class DoomCommandProcessor(ClientCommandProcessor):
     def _cmd_resync(self):
@@ -1981,7 +97,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.ctx.session_tasks.start(self._reconcile)
 
     async def _reconcile(self):
-        plan, error = await self.ctx.manual_reconcile_inventory()
+        plan, error = await self.ctx.items.manual_reconcile_inventory()
         if error:
             self.output(f'AP reconcile rejected: {error!s}')
             return
@@ -1994,12 +110,12 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.ctx.session_tasks.start(self._rune_diag)
 
     async def _rune_diag(self):
-        for line in await self.ctx.observe_rune_diagnostic_lines():
+        for line in await self.ctx.items.observe_rune_diagnostic_lines():
             self.output(line)
 
     def _cmd_doom_context_diag(self):
         """Show bounded campaign-context and DLC evidence."""
-        for key, value in self.ctx.context_support_report().items():
+        for key, value in self.ctx.items.context_support_report().items():
             self.output(f"{key}={json.dumps(value, sort_keys=True)}")
 
 
@@ -2036,13 +152,13 @@ class DoomCommandProcessor(ClientCommandProcessor):
             self.output(
                 'Blocked item: index={index} id={item_id} name={name}'.format(index=str(blocked_info.get("index")), item_id=str(blocked_info.get("item_id")), name=str(blocked_info.get("item_name")))
             )
-        self.output(f'Detailed diagnostics: {BRIDGE_LOG_DIR!s}')
+        self.output(f'Detailed diagnostics: {bridge_config.BRIDGE_LOG_DIR!s}')
 
     def _cmd_doom_deathlink_diag(self):
         """Show bounded DeathLink receive evidence and active policy."""
         receiver = self.ctx.deathlink
         self.output(
-            f"DeathLink mode={self.ctx.death_link_mode} enabled={self.ctx.death_link_enabled} "
+            f"DeathLink mode={self.ctx.deathlink.mode} enabled={self.ctx.deathlink.enabled} "
             f"policy={'single_dispatch' if receiver.mode == 'soft' else 'retry_until_confirmed'}"
         )
         for entry in receiver.instrumentation()[-8:]:
@@ -2053,7 +169,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
     def _cmd_doom_onboarding_status(self):
         """Show the compact, safe bootstrap onboarding state."""
-        for line in self.ctx.onboarding_status_lines():
+        for line in self.ctx.items.onboarding_status_lines():
             self.output(line)
 
     def _cmd_doom_test_plan(
@@ -2061,16 +177,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
     ):
         """Compile and display an item plan without executing it."""
         if item_id == "location":
-            entry = load_foundation_contracts()["location_entrypoints"].get(stage_flag)
-            if not entry:
-                self.output("Usage: /doom_test_plan location <registered location id>")
-                return
-            record = load_primitive_registry()["primitives"][entry["primitive_id"]]
-            self.output(
-                f"location={stage_flag} primitive={entry['primitive_id']} "
-                f"evidence={record['status']} entity={entry['entity']} map={entry['map']} "
-                f"current_map={self.ctx.current_map_name or 'unknown'} destructive=yes"
-            )
+            self._show_location_plan(stage_flag)
             return
         try:
             parsed_id = int(item_id)
@@ -2080,19 +187,19 @@ class DoomCommandProcessor(ClientCommandProcessor):
                     raise ValueError("expected --stage <index>")
                 stage = int(stage_value)
             plan = compile_item_delivery_plan(
-                parsed_id, ITEM_ID_TO_COMMAND, stage=stage
+                parsed_id, bridge_items.ITEM_ID_TO_COMMAND, stage=stage
             )
         except (ValueError, TypeError) as error:
             self.output(f"Usage: /doom_test_plan <item id> [--stage N] ({error})")
             return
         record = load_primitive_registry()["primitives"][plan.primitive_id]
-        map_supported = canonical_map_name(self.ctx.current_map_name) in {
+        map_supported = canonical_map_name(self.ctx.runtime_lifecycle.map_identity.current_map) in {
             canonical_map_name(name)
             for name in load_foundation_contracts()["active_maps"].values()
         }
         self.output(
             f"item={plan.item_id} family={plan.family} primitive={plan.primitive_id} "
-            f"evidence={record['status']} map={self.ctx.current_map_name or 'unknown'} "
+            f"evidence={record['status']} map={self.ctx.runtime_lifecycle.map_identity.current_map or 'unknown'} "
             f"entities_expected={'yes' if map_supported else 'unknown'}"
         )
         for command in plan.commands:
@@ -2114,12 +221,12 @@ class DoomCommandProcessor(ClientCommandProcessor):
                     raise ValueError("expected --stage <index>")
                 stage = int(stage_value)
             plan = compile_item_delivery_plan(
-                parsed_id, ITEM_ID_TO_COMMAND, stage=stage
+                parsed_id, bridge_items.ITEM_ID_TO_COMMAND, stage=stage
             )
         except (ValueError, TypeError) as error:
             self.output(f"Usage: /doom_test_item <item id> [--stage N] ({error})")
             return
-        correlation = await self.ctx.queue_dev_plan(plan, "item")
+        correlation = await self.ctx.items.queue_dev_plan(plan, "item")
         if correlation:
             self.output(
                 f"Queued {len(plan.commands)} map-side command(s): {correlation}; effect unconfirmed."
@@ -2130,12 +237,12 @@ class DoomCommandProcessor(ClientCommandProcessor):
         allowed = bool(re.fullmatch(r"ap_rpc_v3_[0-9]+(?:_[0-9]+)?", entity))
         allowed = allowed or entity.startswith("ap_test_")
         allowed = allowed or bool(re.fullmatch(r"ap_bootstrap_v[12]_[a-z_]+", entity))
-        allowed = allowed or entity in set(DECL_TO_LOCATION)
+        allowed = allowed or entity in set(bridge_checks.DECL_TO_LOCATION)
         allowed = allowed or entity == "ap_independent_rocket_launcher_7770056"
         if not allowed:
             self.output("Entity rejected by the directed-test allowlist.")
             return
-        correlation = await self.ctx.queue_dev_commands(
+        correlation = await self.ctx.items.queue_dev_commands(
             [f"ai_ScriptCmdEnt {entity} activate"], f"entity:{entity}"
         )
         self.output(f"Queued allowlisted entity: {correlation}; effect unconfirmed.")
@@ -2152,7 +259,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
             self.output("Usage: /doom_test_bootstrap rune_page|frag_acquired|ice_acquired")
             return
         before = json.dumps(self.ctx.session_state.get("bootstrap", {}), sort_keys=True)
-        correlation = await self.ctx.queue_dev_commands(
+        correlation = await self.ctx.items.queue_dev_commands(
             [f"ai_ScriptCmdEnt {entity} activate"], f"bootstrap:{action_name}"
         )
         after = json.dumps(self.ctx.session_state.get("bootstrap", {}), sort_keys=True)
@@ -2179,10 +286,10 @@ class DoomCommandProcessor(ClientCommandProcessor):
                 f"This can change the save/check. Re-run /doom_test_location {parsed_id} --confirm"
             )
             return
-        if canonical_map_name(self.ctx.current_map_name) != canonical_map_name(entry["map"]):
-            self.output(f"Wrong map: requires {entry['map']}, current={self.ctx.current_map_name}")
+        if canonical_map_name(self.ctx.runtime_lifecycle.map_identity.current_map) != canonical_map_name(entry["map"]):
+            self.output(f"Wrong map: requires {entry['map']}, current={self.ctx.runtime_lifecycle.map_identity.current_map}")
             return
-        correlation = await self.ctx.queue_dev_commands(
+        correlation = await self.ctx.items.queue_dev_commands(
             [f"ai_ScriptCmdEnt {entry['entity']} activate"],
             f"location:{parsed_id}",
         )
@@ -2192,137 +299,75 @@ class DoomCommandProcessor(ClientCommandProcessor):
 
     def _cmd_doom_test_status(self):
         """Show isolated directed-test state."""
-        self.output(f"map={self.ctx.current_map_name or 'unknown'}")
+        self.output(f"map={self.ctx.runtime_lifecycle.map_identity.current_map or 'unknown'}")
         self.output(f"last_action={self.ctx.dev_last_action or '-'}")
         self.output(f"last_correlation={self.ctx.dev_last_correlation or '-'}")
         self.output("primitive_registry=foundation.py (embedded registry)")
-        self.output(f"logs={BRIDGE_LOG_DIR}")
+        self.output(f"logs={bridge_config.BRIDGE_LOG_DIR}")
 
-
-GOAL_POLICY = GoalPolicy(DOOM_LOCATION_NAMES, DLC_MISSION_PREFIXES, GOAL_CAPABILITIES,
-                        GOAL_ENDPOINT_LOCATION_IDS, GOAL_REQUIREMENT_SUFFIXES,
-                        (stage for stage in STAGES.values() if stage["kind"] == "master"))
-
-
-def _remove_acknowledged_event(path):
-    try:
-        os.remove(path)
-    except FileNotFoundError:
-        pass
-    except OSError as error:
-        logger.warning(
-            "[Trigger] Could not remove acknowledged AP event "
-            f"{os.path.basename(path)} yet: {error}"
+    def _show_location_plan(self, stage_flag):
+        entry = load_foundation_contracts()["location_entrypoints"].get(stage_flag)
+        if not entry:
+            self.output("Usage: /doom_test_plan location <registered location id>")
+            return
+        record = load_primitive_registry()["primitives"][entry["primitive_id"]]
+        self.output(
+            f"location={stage_flag} primitive={entry['primitive_id']} "
+            f"evidence={record['status']} entity={entry['entity']} map={entry['map']} "
+            f"current_map={self.ctx.runtime_lifecycle.map_identity.current_map or 'unknown'} destructive=yes"
         )
-
-
-def _record_physical_gates(context, event_paths_by_location, facts):
-    gate_completions = set(context.session_state.get("physical_slayer_gates", ()))
-    observed_gates = {
-        location_id for location_id in event_paths_by_location
-        if location_id in facts.server_locations
-        and DOOM_LOCATION_NAMES.get(location_id, "").endswith(" - Slayer Gate Complete")
-    }
-    if observed_gates - gate_completions:
-        if not context.item_state_ready:
-            return False
-        context.session_state["physical_slayer_gates"] = sorted(gate_completions | observed_gates)
-        try:
-            context.persist_session_state()
-        except Exception:
-            context.session_state["physical_slayer_gates"] = sorted(gate_completions)
-            raise
-    return True
+        return
 
 
 class DoomEternalContext(CommonContext):
-    command_processor: type = DoomCommandProcessor
-    game = GAME_NAME
-    items_handling = 0b011 if _CONTENT_IDENTITY["slot_data_schema_version"] == 7 else 0b111
-    # full-saga enemy plans exceed Archipelago's default 16 MiB message limit
-    max_size = 64 * 1024 * 1024
+    def get_ap_state_key(self):
+        if not getattr(self, "server", None) or not getattr(self, "auth", None) or not getattr(self, "state_key", None):
+            return None
+        return self.state_key
 
-    def __init__(self, server_address, password):
-        super().__init__(server_address, password)
-        self.dev_session_id = uuid.uuid4().hex[:8]
-        self.dev_counter = 0
-        self.dev_last_action = None
-        self.dev_last_correlation = None
-        self.tracking_task = None
-        self._item_delivery_lock = asyncio.Lock()
-        self._item_delivery_task = None
-        self._item_delivery_wakeup = False
-        self._item_delivery_waiting_for_state = False
-        self.receipt_session = ReceiptSession()
-        self.room_delivery = None
-        self._room_session_authoritative = False
-        self._ammo_projection_active = False
-        self._ammo_projection_confirmed = None
-        self.ammo_requests = AmmoRequestPump(self.request_ammo_refill, self.exit_event, logger)
-        self.tracker_alive = False
-        self.tracker_restart_count = 0
-        self.last_tracker_error = None
-        self.last_heartbeat_timestamp = None
-        self.item_state_ready = False
-        self._slot_validation_task = None
-        self._pending_slot_packages = []
-        self.reconnect_resync_attempted = False
-        self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
-        self.state_key = ""
-        self.base_directory = DOOM_BASE_DIR
-        self.transient_effect_manager = TransientEffectManager(TransientPublication(self._send_runtime_command), os.getpid())
-        self.session_state = {}
-        self.goals = GoalProgress(CAMPAIGN_GOAL_CONTRACT["runtime_map"], CULTIST_BASE_MAP, logger)
-        self.publisher_dispatch = PublisherDispatch(PUBLISHERS, self.goals, logger)
-        self.physical_checks = PhysicalChecks(logger)
-        self.level_ready = LevelReady(logger)
-        self.session_tasks = SessionTasks()
-        self.location_setup = LocationSetup(logger)
-        self.protocol_feed = ProtocolFeed()
-        self.save_checks = SaveChecks(WEAPON_MASTERY_BY_UNLOCKABLE, MISSION_CHALLENGE_BY_UNLOCKABLE, MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, ALL_MISSION_CHALLENGES_ENTRIES, logger)
-        self.death_observer = DeathObservation(logger)
-        self.killsanity = Killsanity(logger)
-        self.killsanity_counter_visible = config.get("killsanity_counter_visible", True) is True
-        self.save_observer = SaveObserver()
-        self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self, logger, log_item_event)
-        self.runtime_observation_lease = RuntimeObservationLease()
-        self.save_observer.clear_mission_select()
-        self.last_observer_lease_block = None
-        # Pending lethal commands stay process-local. Seen event identities persist per
-        # room so reconnect/transport replay cannot create a second logical event.
-        self.deathlink = DeathLinkSession(DeathLinkReceiver(
-            wait_timeout=DEATHLINK_RECEIVE_TIMEOUT,
-            confirm_timeout=DEATHLINK_CONFIRM_TIMEOUT,
-            retry_interval=DEATHLINK_KILL_INTERVAL,
-            total_timeout=DEATHLINK_TOTAL_TIMEOUT,
-            late_suppression_grace=DEATHLINK_LATE_SUPPRESSION_GRACE,
-            max_attempts=DEATHLINK_MAX_ATTEMPTS,
-            mode=DEFAULT_DEATH_LINK_MODE,
-        ), DEATHLINK_MESSAGES, emit_launcher_event, logger)
-        self.room_seed_name = None
-        self._connected_slot_data = {}
-        self.runtime_lifecycle = RuntimeLifecycle()
-        self.dlc_evidence = evaluate_dlc_availability(None)
-        self.bootstrap = Bootstrap(logger)
-        self.checked_visuals = CheckedVisuals(KNOWN_CATALOG_MAPS, AUTOMAP_VISUALS_BY_MAP, uuid.uuid4().hex[:8], logger)
-        self._native_automap_published = None
-        self.server_checked_locations_ready = False
-        self.fast_travel = FastTravel(KNOWN_CATALOG_MAPS, FAST_TRAVEL_MAP_KEYS, FAST_TRAVEL_MISSION_COMPLETE_IDS, logger)
-        self._launcher_connection_failure_reported = False
-        self._room_session_established = False
-        self._launcher_connection_loss_reported = False
+    def persist_session_state(self):
+        if getattr(self, "_item_state_error", None):
+            raise RuntimeError(self._item_state_error)
+        if not self.item_state_ready:
+            return
+        try:
+            bridge_config.client_state_store().commit_session(
+                self.client_state, self.session_state, processed_items=self.items.items_processed,
+                cultist_autosave_path=self.goals.cultist_path,
+                received_deathlink_event_ids=self.deathlink.seen_events,
+                save_slot_observations=self.save_observer.observation_document,
+            )
+        except (OSError, RuntimeError, ValueError, TypeError) as error:
+            self.items._block_item_state(error)
+            raise
+
+    def on_deathlink(self, data: dict):
+        super().on_deathlink(data)
+        event_id = self.deathlink.receive(data, self.persist_session_state)
+        if event_id is None:
+            return
+        source = _bounded_event_text(str(data.get("source") or player_text("deathlink", "source_fallback")), 128)
+        cause = _bounded_event_text(str(data.get("cause") or ""), 512)
+        bridge_config.emit_launcher_event(
+            "deathlink",
+            direction="received",
+            event_id=event_id,
+            source=source,
+            cause=cause,
+            message=cause or player_text("deathlink", "received", source=str(source)),
+        )
 
     def on_print_json(self, args: dict):
         try:
             super().on_print_json(args)
         except Exception:
-            logger.exception("[Bridge] Archipelago PrintJSON logging failed")
+            bridge_config.logger.exception("[Bridge] Archipelago PrintJSON logging failed")
         try:
             event = format_archipelago_event(self.protocol_names(), args)
             if not self.protocol_feed.consume_echo(event):
-                emit_launcher_event("archipelago", **event)
+                bridge_config.emit_launcher_event("archipelago", **event)
         except Exception:
-            logger.exception("[Bridge] Archipelago PrintJSON event formatting failed")
+            bridge_config.logger.exception("[Bridge] Archipelago PrintJSON event formatting failed")
 
     async def send_launcher_chat(self, text: str) -> None:
         """Send launcher text through CommonClient's canonical Say path."""
@@ -2337,79 +382,24 @@ class DoomEternalContext(CommonContext):
         self.protocol_feed.record_echo(accepted)
         await self.send_msgs([{"cmd": "Say", "text": accepted}])
 
-
     def _launcher_hints_key(self):
         return hints_key(self.team, self.slot)
 
     def protocol_names(self):
         return ProtocolNames(self.item_names, self.location_names, dict(self.player_names), self.slot_concerns_self)
 
-
     def delivery_actions_ready(self):
         task = getattr(self, "input_task", None)
-        return LAUNCHER_EVENTS_ENABLED and task is not None and not task.done()
-
-    async def _owner_reconcile(self, evidence, *, selected=None):
-        from doom_eap.runtime.ledger import LedgerError
-        from doom_eap.runtime.native_transport import TransportError
-        if self.room_delivery is None:
-            return None, 'Return to DOOM and unpause within 30 seconds. Inventory resync is waiting for safe gameplay.'
-        try:
-            return await self.room_delivery.reconcile(evidence, selected=selected)
-        except (LedgerError, TransportError, OSError, TimeoutError) as error:
-            logger.error("DELIVERY_BLOCKED error=%s", error)
-            emit_launcher_event("item_history_status", status="blocked", message=player_text("launcher.items", "unavailable"))
-            return None, player_text("launcher.items", "unavailable")
-
-    async def _send_runtime_command(self, command, *, coalesce_key, **options):
-        from doom_eap.runtime.inventory import WeaponPointsBlocked
-        from doom_eap.runtime.ledger import LedgerError
-        from doom_eap.runtime.native_transport import TransportError
-        try:
-            if command.startswith(("g_damageScaleAllToAI ", "g_damageScaleAllToSlayer ", "g_infiniteAmmo ")) and options.get("receipt_index") is None:
-                from doom_eap.runtime.delivery_plans import console_payload
-                tag, payload = console_payload(command)
-                link = await self._native_game_link_async()
-                result = await self._native_call(link, "request", 46, tag, payload)
-                return result.get("outcome") == 1
-            if self.room_delivery is None:
-                return False
-            return await self.room_delivery.local_command(coalesce_key, command, read_gameplay_save_evidence(),
-                                                          lease=options.get("materialization_lease"), receipt_index=options.get("receipt_index"))
-        except (LedgerError, TransportError, WeaponPointsBlocked, OSError, TimeoutError) as error:
-            logger.error("RUNTIME_EFFECT_BLOCKED key=%s error=%s", coalesce_key, error)
-            return False
-
-
-    def _bind_delivery_backend(self):
-        self.session_state["delivery_backend"] = "ledger"
-        self.room_delivery = RoomDelivery(self, {**config, "client_state_file": str(CLIENT_STATE_FILE)},
-                                          ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES, emit_launcher_event)
-
-    def _receive_owner_storage(self, cmd, args):
-        owner = getattr(self, "room_delivery", None)
-        if owner is not None and owner.ammo is not None:
-            owner.storage.receive(cmd, args)
-
-
-    async def close_room_delivery(self):
-        if self.room_delivery is not None:
-            await self.room_delivery.close()
-
-    async def handle_delivery_control(self, control):
-        if await handle_delivery_control(getattr(self, "delivery_coordinator", None), control, emit_launcher_event):
-            self._schedule_item_delivery("resolution")
-
+        return bridge_config.LAUNCHER_EVENTS_ENABLED and task is not None and not task.done()
 
     def _emit_launcher_hints(self, update_kind="DATA_RECEIVED"):
         key = self._launcher_hints_key()
         if key is not None:
-            records = emit_hints(key, self.stored_data.get(key, []), self.protocol_names(), emit_launcher_event, logger, update_kind)
+            records = emit_hints(key, self.stored_data.get(key, []), self.protocol_names(), bridge_config.emit_launcher_event, bridge_config.logger, update_kind)
             self._presentation_hints_confirmed = (
                 (self.room_seed_name, self.team, self.slot,
                  self._connected_slot_data.get("native_generation_fingerprint", "")),
                 {record["location"] for record in records if record["finding_player"] == self.slot})
-
 
     def reset_room_session_authority(self, reason):
         task = getattr(self, "_slot_validation_task", None)
@@ -2425,7 +415,7 @@ class DoomEternalContext(CommonContext):
         self.location_setup.invalidate()
         self.protocol_feed.invalidate()
         self.ammo_requests.reset()
-        self.session_tasks.start(lambda: self._publish_native_ammo_refill(reason))
+        self.session_tasks.start(lambda: self.items._publish_owner_ammo_refill())
         self.deathlink.invalidate_outbound()
         self.goals.invalidate_publication()
         self.publisher_dispatch.invalidate()
@@ -2433,19 +423,19 @@ class DoomEternalContext(CommonContext):
         self._room_session_authoritative = False
         manager = getattr(self, "transient_effect_manager", None)
         if manager is not None:
-            self.reset_transient_effects(reason)
+            self.items.reset_transient_effects(reason)
 
     def _report_launcher_connection_failure(
         self, message, *, code="connection_failed", reason_codes=None,
         technical_message=None,
     ):
         if (
-            not LAUNCHER_EVENTS_ENABLED
+            not bridge_config.LAUNCHER_EVENTS_ENABLED
             or self._launcher_connection_failure_reported
         ):
             return
         self._launcher_connection_failure_reported = True
-        emit_launcher_event(
+        bridge_config.emit_launcher_event(
             "error",
             code=code,
             message=message,
@@ -2456,267 +446,15 @@ class DoomEternalContext(CommonContext):
         self.cancel_autoreconnect()
         self.exit_event.set()
 
-    @property
-    def cached_map_identity(self):
-        return self.runtime_lifecycle.map_identity.cached_marker
-
-    @property
-    def pending_map_identity(self):
-        return self.runtime_lifecycle.map_identity.pending_marker
-
-    @property
-    def current_map_name(self):
-        return self.runtime_lifecycle.map_identity.current_map
-
-    @property
-    def published_materialization_lease(self):
-        return self.runtime_lifecycle.map_epochs.published_materialization_lease
-
-    @property
-    def native_gameplay_epoch(self):
-        return self.runtime_lifecycle.map_epochs.native_gameplay_epoch
-
-    @property
-    def last_accepted_marker_mtime(self):
-        return self.runtime_lifecycle.map_epochs.accepted_marker_mtime
-
-    @property
-    def last_accepted_map_evidence_epoch(self):
-        return self.runtime_lifecycle.map_epochs.accepted_marker_evidence_epoch
-
-    @property
-    def context_identity(self):
-        return self.runtime_lifecycle.snapshot.identity
-
-    @property
-    def context_campaign(self):
-        return self.runtime_lifecycle.snapshot.campaign
-
-    @property
-    def context_capabilities(self):
-        return self.runtime_lifecycle.snapshot.capabilities
-
-    @property
-    def pending_context_transition(self):
-        return self.runtime_lifecycle.snapshot.pending_transition
-
-    def _refresh_runtime_context(self, slot_data, evidence=None):
-        """Bind exact runtime context without consulting location projections."""
-        use_dlc = bool(slot_data.get("runtime", slot_data).get("use_dlc_content"))
-        self.dlc_evidence = evaluate_dlc_availability(DOOM_BASE_DIR if use_dlc else None)
-        base_maps = load_foundation_contracts()["active_maps"].values()
-        marker = getattr(self, "cached_map_identity", None) or {}
-        evidence_map = getattr(evidence, "map_name", "")
-        resolution = resolve_context_evidence(
-            marker.get("runtime_map", ""), evidence_map,
-            materialization_suspended=bool(marker.get("materialization_suspended")),
-            base_maps=base_maps,
-        )
-        context = resolution.context
-        source = resolution.source
-        if resolution.rejection is not None:
-            self._record_context_evidence_rejection(*resolution.rejection)
-        if context is None:
-            return CONTEXT_BY_IDENTITY.get(getattr(self, "context_identity", "unknown"))
-
-        transition = self.runtime_lifecycle.bind_context(context)
-        if transition is not None:
-            self.reset_transient_effects("context_transition")
-            if self.runtime_lifecycle.record_transition(transition, context.identity):
-                logger.info(
-                    "CONTEXT_TRANSITION previous=%s current=%s identity=%s source=%s status=detected",
-                    transition[0], transition[1], context.identity, source,
-                )
-        return context
-
-    def _record_context_evidence_rejection(self, reason, marker_identity, evidence_identity):
-        result = self.runtime_lifecycle.record_evidence_rejection(reason, marker_identity, evidence_identity)
-        if result is not None:
-            logger.warning("CONTEXT_EVIDENCE_REJECTED reason=%s marker=%s evidence=%s count=%s", *result)
-
-    async def _active_materialization_lease(self, context=None):
-        if not await self.checkpoint_recovery_ready():
-            return None
-        marker = self.cached_map_identity or {}
-        if marker.get("native_scope") and not (await self.runtime_effects_ready()):
-            return None
-        marker_context = classify_runtime_context(marker.get("runtime_map", ""))
-        return self.runtime_lifecycle.materialization_lease(
-            getattr(marker_context, "campaign", None), getattr(context, "campaign", None),
-        )
-
-    async def authored_map_runtime_ready(self, evidence=None):
-        if not await self.checkpoint_recovery_ready():
-            return False
-        evidence = evidence or read_gameplay_save_evidence()
-        marker = self.cached_map_identity or {}
-        context = classify_runtime_context(marker.get("runtime_map", ""))
-        lease = (await self._active_materialization_lease(context))
-        socket = getattr(getattr(self, "server", None), "socket", None)
-        observation = self.runtime_observation_lease
-        return authored_effects_allowed(
-            evidence=evidence, campaign=getattr(context, "campaign", None),
-            epoch=marker.get("gameplay_epoch"), lease=lease,
-            process_running=bool(lease and observation.process_probe()),
-            item_ready=self.item_state_ready, room_identity=self.get_ap_state_key(),
-            connected=socket is not None and not socket.closed,
-            queue_authoritative=self._room_session_authoritative,
-        )
-
-    async def _native_materialization_scope(self, evidence, admitted=None, link=None):
-        from doom_eap.contracts.save_observation import admitted_evidence_matches
-        try:
-            link = link or (await self._native_game_link_async())
-            admitted = admitted or (await self.admitted_campaign_save())
-            admission = getattr(link, "save_admission", {})
-            if (not getattr(evidence, "native_safe", False)
-                    or not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, admission)):
-                return None
-            scope = (await self._native_call(link, '_run', ["--pid", str(link.pid), "--native", "--json"]))
-            identity = (str(admission.get("process_created")), admission.get("instance_id"), admission.get("build_id"))
-            if (scope.get("target_pid") != link.pid or scope.get("server_pid") != link.pid
-                    or (str(scope.get("process_created")), scope.get("instance_id"), scope.get("build_id")) != identity
-                    or scope.get("availability") != "enabled" or scope.get("lifecycle") != "active"
-                    or scope.get("context_reason") != "none"):
-                return None
-            generation = int(scope["lifecycle_generation"])
-            if generation <= 0 or int(scope["context_generation"]) != generation:
-                return None
-            runtime_map = canonical_map_name(scope.get("current_map"))
-            if len([key for key, value in MATERIALIZATION_MAPS.items() if value == runtime_map]) != 1:
-                return None
-            return (link.namespace, admission["native_root"], link.pid, *identity, generation, runtime_map)
-        except (RuntimeError, OSError, ValueError, KeyError, TypeError):
-            return None
-
-    async def _recover_native_materialization(self, evidence):
-        scope = (await self._native_materialization_scope(evidence))
-        marker = self.cached_map_identity or {}
-        if scope is None:
-            if marker.get("native_scope") and self.published_materialization_lease is not None:
-                self.runtime_lifecycle.record_lease_publication(None, False)
-            return False
-        if marker.get("native_scope") == scope:
-            if self.published_materialization_lease != marker["gameplay_epoch"]:
-                self.accept_map_identity(marker, evidence.epoch)
-            return True
-        # process creation and Core load generation keep the epoch stable across polls
-        epoch = build_materialization_epoch(scope[-2], int(scope[3]))
-        if epoch is None:
-            return False
-        marker = {**self.runtime_lifecycle.new_map_proposal(
-            _materialization_map_key(scope[-1]), scope[-1], evidence.epoch, time.time_ns(), epoch),
-            "native_scope": scope}
-        self.invalidate_active_save_proof()
-        self.accept_map_identity(marker, evidence.epoch)
-        self.snapshot_fast_travel_eligibility(marker_data=marker)
-        logger.info("[MAP] Native Core context recovered map=%s epoch=%s", scope[-1], epoch)
-        return True
-
-    async def runtime_effects_ready(self, evidence=None):
-        """Canonical admission predicate for map-scoped runtime effects."""
-        evidence = evidence or read_gameplay_save_evidence()
-        from doom_eap.contracts.save_observation import admitted_evidence_matches
-        admitted = (await self.admitted_campaign_save())
-        if admitted is None:
-            return False
-        link = (await self._native_game_link_async())
-        if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid,
-                                        getattr(link, "save_admission", {})):
-            return False
-        marker = getattr(self, "cached_map_identity", None)
-        if marker and marker.get("native_scope"):
-            return marker["native_scope"] == (await self._native_materialization_scope(evidence, admitted, link))
-        context = classify_runtime_context(
-            marker.get("runtime_map", "") if isinstance(marker, Mapping) else ""
-        )
-        if context is not None and context.campaign != "Base":
-            return (await self.authored_map_runtime_ready(evidence))
-        return bool(
-            evidence is not None
-            and evidence.state == "gameplay"
-            and evidence.native_safe
-            and self.has_authoritative_save_proof()
-        )
-
-    def _observe_transient_runtime(self):
-        evidence = read_gameplay_save_evidence()
-        return read_transient_runtime(
-            self.base_directory, self.state_key,
-            evidence is not None and evidence.state == "gameplay" and evidence.native_safe
-            and not self.runtime_observers_frozen
-            and getattr(getattr(self, "_checkpoint_recovery", None), "state", None) == CheckpointRecoveryState.READY,
-        )
-
-    def reset_transient_effects(self, reason):
-        self.session_tasks.start(lambda: self.transient_effect_manager.reset(reason, self._observe_transient_runtime()))
-
-    @property
-    def context_materialization_status(self):
-        return "ready" if self.room_delivery and self.room_delivery.coordinator else "waiting"
-
-    @property
-    def context_materialization_mode(self):
-        return "ledger"
-
-    @property
-    def context_materialization_block(self):
-        return None
-
-    def context_support_report(self):
-        marker = getattr(self, "cached_map_identity", None) or {}
-        materialization = self.session_state.get("context_materialization", {})
-        return {
-            "context_identity": self.context_identity,
-            "campaign": self.context_campaign,
-            "active_map_key": marker.get("map_key"),
-            "active_runtime_map": marker.get("runtime_map"),
-            "capabilities": sorted(self.context_capabilities),
-            "use_dlc_content": bool(getattr(self, "_connected_slot_data", {}).get("runtime", getattr(self, "_connected_slot_data", {})).get("use_dlc_content")),
-            "dlc": self.dlc_evidence.report(),
-            "materialization": self.context_materialization_status,
-            "materialization_mode": self.context_materialization_mode,
-            "materialization_block": self.context_materialization_block,
-            "checkpoint_recovery": {
-                "state": self._checkpoint_recovery.state.value,
-                "reason": self._checkpoint_recovery.reason,
-            } if hasattr(self, "_checkpoint_recovery") else None,
-            "native_probe_events": {"/".join(key): {field: row[field] for field in
-                ("first_seen", "last_seen", "count", "first_error") if field in row}
-                for key, row in getattr(getattr(self, "_weapon_points_link", None), "_diagnostic_signatures", {}).items()},
-            "special_stage": materialization.get("special_stage", 0),
-        }
-
-
-    async def _context_materialize_inventory(self, evidence, *, trigger="context", manual=False, observation=None, selected_item_ids=None):
-        return await self._owner_reconcile(evidence, selected=selected_item_ids)
-
-    def effective_delivery_ownership(self, receipts):
-        slot_data = self._connected_slot_data
-        return effective_ownership(
-            receipts,
-            randomize_chainsaw=bool(slot_data.get("runtime", slot_data).get("randomize_chainsaw", False)),
-            randomize_dash=bool(slot_data.get("runtime", slot_data).get("randomize_dash", False)),
-            checked_locations=frozenset(getattr(self, "checked_locations", ())),
-            local_checked_locations=frozenset(getattr(self, "locations_checked", ())),
-            server_checked_ready=getattr(self, "server_checked_locations_ready", False),
-            hell_on_earth_locations=HELL_ON_EARTH_LOCATION_IDS,
-            exultia_complete_location=(
-                STAGES[slot_data.get("campaign", slot_data.get("campaign_plan", {}))["fixed_dash_completion_stage"]]["completion_id"]
-                if slot_data.get("campaign", slot_data.get("campaign_plan", {})).get("fixed_dash_completion_stage") else EXULTIA_COMPLETE_LOCATION
-            ), slot=self.slot,
-            starting_item_ids=self.receipt_session.ownership_item_ids((), ITEM_ID_TO_COMMAND),
-        )
-
     def handle_connection_loss(self, msg: str) -> None:
-        self.reset_transient_effects("connection_loss")
+        self.items.reset_transient_effects("connection_loss")
         self.reset_room_session_authority("connection_loss")
         self.deathlink.abandon(time.monotonic(), "disconnect")
         super().handle_connection_loss(msg)
         if self._room_session_established:
-            if LAUNCHER_EVENTS_ENABLED and not self._launcher_connection_loss_reported:
+            if bridge_config.LAUNCHER_EVENTS_ENABLED and not self._launcher_connection_loss_reported:
                 self._launcher_connection_loss_reported = True
-                emit_launcher_event(
+                bridge_config.emit_launcher_event(
                     "connection_lost",
                     code="connection_closed",
                     message='The room connection was interrupted; reconnecting automatically.',
@@ -2731,11 +469,11 @@ class DoomEternalContext(CommonContext):
         diagnostics = getattr(self, "connection_diagnostics", None)
         if diagnostics is not None:
             diagnostics.disconnected()
-        self.reset_transient_effects("connection_closed")
+        self.items.reset_transient_effects("connection_closed")
         self.reset_room_session_authority("connection_closed")
         self.deathlink.abandon(time.monotonic(), "disconnect")
         unexpected_launcher_close = (
-            LAUNCHER_EVENTS_ENABLED
+            bridge_config.LAUNCHER_EVENTS_ENABLED
             and self.server is not None
             and not self.disconnected_intentionally
             and not self.exit_event.is_set()
@@ -2745,44 +483,15 @@ class DoomEternalContext(CommonContext):
             self._report_launcher_connection_failure('Disconnected from the Archipelago server', code="connection_closed")
         elif unexpected_launcher_close and not self._launcher_connection_loss_reported:
             self._launcher_connection_loss_reported = True
-            emit_launcher_event(
+            bridge_config.emit_launcher_event(
                 "connection_lost",
                 code="connection_closed",
                 message='The room connection was interrupted; reconnecting automatically.',
                 technical_message="Disconnected from the Archipelago server",
             )
 
-    async def queue_dev_commands(self, commands, action):
-        """Send isolated dev commands without changing receipt/bootstrap state."""
-        self.dev_counter += 1
-        correlation = f"devtest-{self.dev_session_id}-{self.dev_counter:04d}"
-        for index, command in enumerate(commands):
-            if not re.fullmatch(r"ai_ScriptCmdEnt [A-Za-z0-9_]+ activate", command):
-                raise ValueError("Directed tests accept only map-side entity activation")
-            command_id = f"{correlation}-cmd-{index:02d}"
-            if not await self._send_runtime_command(
-                command,
-                coalesce_key=command_id,
-                state_key=self.state_key,
-                room_scoped=False,
-            ):
-                return None
-            logger.info(
-                "[Test] correlation=%s action=%s map=%s command_id=%s command=%s effect=unknown",
-                correlation, action, self.current_map_name, command_id, command,
-            )
-        self.dev_last_action = action
-        self.dev_last_correlation = correlation
-        return correlation
-
-    async def queue_dev_plan(self, plan, action):
-        return await self.queue_dev_commands(
-            [command.command for command in plan.commands],
-            f"{action}:{plan.item_id}:{plan.family}:{plan.primitive_id}",
-        )
-
     async def server_auth(self, password_requested: bool = False):
-        if password_requested and LAUNCHER_EVENTS_ENABLED and not self.password:
+        if password_requested and bridge_config.LAUNCHER_EVENTS_ENABLED and not self.password:
             self._report_launcher_connection_failure(
                 'This room requires a password.',
                 code="password_required",
@@ -2795,74 +504,33 @@ class DoomEternalContext(CommonContext):
         await self.get_username()
         await self.send_connect()
 
-
-    async def _publish_native_ammo_refill(self, source):
-        return await self._publish_owner_ammo_refill()
-
-    async def _publish_owner_ammo_refill(self):
-        owner = self.room_delivery
-        if owner.coordinator is None:
-            return None
-        try:
-            link = await self._native_game_link_async()
-            return await self._native_call(link, "publish_ammo_refill", owner.balance,
-                                           connected=owner.can_spend and self._room_session_authoritative and owner.current())
-        except (RuntimeError, OSError, ValueError):
-            return None
-
-
-    def _ammo_refill_balance_payload(self):
-        return self.room_delivery.balance if self.room_delivery else {"available": 0, "consumed": 0, "authoritative": False}
-
-
-    def _configure_ammo_refill_storage(self):
-        self.ammo_requests.reset()
-
-
-    async def request_ammo_refill(self):
-        _, error = await self._owner_reconcile(read_gameplay_save_evidence())
-        owner = self.room_delivery
-        if error or not owner.can_spend:
-            return False
-        scope = AmmoCommandScope(self.state_key, self.current_map_name, self.active_save_slot,
-                                active_crucible(self._connected_slot_data["runtime"].get("special_weapon"), self.received_item_ids(processed_only=True)))
-        operation = await owner.ammo.request(scope, (None, {}), sum(item.item == AMMO_REFILL_ITEM_ID for item in self.items_received[:self.items_processed])
-                                             + self.receipt_session.resolved_starting_count(AMMO_REFILL_ITEM_ID))
-        if operation:
-            self._schedule_item_delivery("ammo")
-        return operation is not None
-
-    def _consume_ammo_refill_request_file(self):
-        return self.ammo_requests.consume(ammo_refill_request_files())
-
     def _reject_slot_contract(self, error):
         message = str(error)
-        logger.error("[Contract] Connected slot rejected: %s", error)
+        bridge_config.logger.error("[Contract] Connected slot rejected: %s", error)
         self._report_launcher_connection_failure(message, code=getattr(error, "code", "room_incompatible"), technical_message=message)
 
     async def _validate_connected_package(self, args):
         slot_data = args.get("slot_data", {})
         started = time.perf_counter()
         try:
-            await asyncio.to_thread(validate_slot_contract, slot_data if isinstance(slot_data, dict) else {})
+            admission = await asyncio.to_thread(admit_slot_data, slot_data if isinstance(slot_data, dict) else {})
         except ValueError as error:
             self._slot_validation_task = None
             self._pending_slot_packages = []
             self._reject_slot_contract(error)
             return
-        logger.info("ROOM_SLOT_VALIDATION elapsed_ms=%d", round((time.perf_counter() - started) * 1000))
-        previous = getattr(self, "room_delivery", None)
+        bridge_config.logger.info("ROOM_SLOT_VALIDATION elapsed_ms=%d", round((time.perf_counter() - started) * 1000))
+        previous = self.room_delivery
         if previous is not None:
             await previous.close()
             self.room_delivery = None
             self.delivery_coordinator = None
         pending, self._pending_slot_packages = self._pending_slot_packages, []
         self._slot_validation_task = None
-        self._handle_package("Connected", args)
+        self._handle_connected(args, dict(slot_data), admission)
         if self.item_state_ready:
             for cmd, packet, received_count in pending:
                 self._handle_package(cmd, packet, received_count=received_count)
-
 
     def on_package(self, cmd: str, args: dict):
         if cmd == "Connected":
@@ -2882,107 +550,39 @@ class DoomEternalContext(CommonContext):
         else:
             self._handle_package(cmd, args)
 
+    def _handle_checked_locations(self, args):
+        self.server_checked_locations_ready = isinstance(args.get("checked_locations"), list | tuple | set | frozenset)
+        if self.server_checked_locations_ready:
+            self.checked_locations.update(args["checked_locations"])
+            if any(stage["completion_id"] in args["checked_locations"] for stage in STAGES.values()):
+                self.items._schedule_item_delivery("mission_complete")
+            self.checks.snapshot_fast_travel_eligibility(refresh=True)
+        self.publisher_dispatch.observe_protocol(self.checks.check_observation())
+        self.session_tasks.start(lambda: self._reconcile_server_checks("server_checked_update"))
+        self.session_tasks.start(self.saves.check_mission_challenge_locations)
+        self.session_tasks.start(lambda: self.checks.evaluate_campaign_goal("server checked update"))
+
     def _handle_package(self, cmd: str, args: dict, *, received_count=None):
-        self._receive_owner_storage(cmd, args)
+        self.items._receive_owner_storage(cmd, args)
         if cmd == "RoomInfo":
-            self.reset_transient_effects("room_info")
+            self.items.reset_transient_effects("room_info")
             # Runtime effects require a matching
             # Connected identity for this room.
             self.reset_room_session_authority("room_info")
             self.room_seed_name = args.get("seed_name")
         elif cmd == "ReceivedItems":
             self._on_received_items_packet(args, authoritative_count=received_count)
-        elif cmd == "Connected":
-            self._item_history_received = False
-            self._room_session_established = True
-            self._launcher_connection_loss_reported = False
-            slot_data = args.get("slot_data", {})
-            if not isinstance(slot_data, dict):
-                slot_data = {}
-            try:
-                slot_data = validate_slot_contract(slot_data)
-            except ValueError as error:
-                self._reject_slot_contract(error)
-                return
-            self._connected_slot_data = slot_data
-            previous_state_key = self.state_key
-            self.initialize_item_state(slot_data)
-            if getattr(self, "_item_state_error", None):
-                return
-            if previous_state_key and previous_state_key != self.state_key:
-                abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
-                if abandoned:
-                    logger.warning(
-                        "[DeathLink] Cleared room-bound receive events after slot change: %s.",
-                        ", ".join(event_id[:12] for event_id in abandoned),
-                    )
-            try:
-                self.unified_campaign = UnifiedCampaign(slot_data, self.session_state, self.persist_session_state)
-            except ValueError as error:
-                message = f'Estado local incompatível com a campanha: {error!s}'
-                logger.error("[State] Connected campaign rejected: %s", error)
-                self._report_launcher_connection_failure(
-                    message, code="campaign_state_incompatible", technical_message=message,
-                )
-                return
-            self.goals.connected(self.persist_session_state)
-            self._refresh_runtime_context(slot_data)
-            self.deathlink.configure(slot_data["runtime"]["death_link"]["enabled"], slot_data["runtime"]["death_link"]["mode"])
-            logger.info(
-                "[DeathLink] enabled=%s receive_policy=native mode=%s",
-                self.death_link_enabled,
-                self.deathlink.mode,
-            )
-            self.receipt_session.configure_starting_ownership(slot_data)
-            self._death_link_task = self.session_tasks.start(
-                lambda: self.update_death_link(self.death_link_enabled)
-            )
-            self.server_checked_locations_ready = False
-            try:
-                active = self.location_setup.begin(args, _doom_location_ids(), milestone_ids(slot_data["killsanity"]))
-            except ValueError as error:
-                self._fail_placement_scout(str(error))
-                return
-            self.locations_info.clear()
-            if not active:
-                self._try_complete_location_scouts()
-            else:
-                self.session_tasks.start(self._scout_active_locations)
-            self._configure_ammo_refill_storage()
         elif cmd == "LocationInfo":
             self._consume_location_info(args)
         elif cmd in {"Retrieved", "SetReply"}:
-            key = self._launcher_hints_key()
-            if (cmd == "Retrieved" and key in args.get("keys", {})) or (
-                cmd == "SetReply" and args.get("key") == key
-            ):
-                self._emit_launcher_hints("DATA_RECEIVED" if cmd == "Retrieved" else "UPDATED")
+            self._handle_hint_update(cmd, args)
         elif cmd == "ConnectionRefused":
-            self.reset_room_session_authority("connection_refused")
-            reasons = args.get("errors", [])
-            if not isinstance(reasons, list | tuple):
-                reasons = [reasons]
-            self._report_launcher_connection_failure(
-                'Archipelago rejected the room login.',
-                code="connection_refused",
-                reason_codes=reasons,
-                technical_message="ConnectionRefused: " + ", ".join(map(str, reasons)),
-            )
+            self._connection_refused(args)
         elif cmd == "RoomUpdate" and "checked_locations" in args:
-            self.server_checked_locations_ready = isinstance(args.get("checked_locations"), list | tuple | set | frozenset)
-            if self.server_checked_locations_ready:
-                self.checked_locations.update(args["checked_locations"])
-                if any(stage["completion_id"] in args["checked_locations"] for stage in STAGES.values()):
-                    self._schedule_item_delivery("mission_complete")
-                self.snapshot_fast_travel_eligibility(refresh=True)
-            self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
-            self.session_tasks.start(lambda: self._reconcile_server_checks("server_checked_update"))
-            self.session_tasks.start(self.check_mission_challenge_locations)
-            self.session_tasks.start(lambda: self.evaluate_campaign_goal("server checked update"))
+            self._handle_checked_locations(args)
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
             self.deathlink.observe_echo(data.get("time"), self.last_death_link)
-
 
     def _fail_placement_scout(self, message):
         if not self.location_setup.fail(message):
@@ -2992,9 +592,8 @@ class DoomEternalContext(CommonContext):
             message, code="malformed_server_data", technical_message=message
         )
 
-
     async def _scout_active_locations(self):
-        result = await self.location_setup.scout(self.check_publication())
+        result = await self.location_setup.scout(self.checks.check_publication())
         if not result.current:
             return
         if result.error:
@@ -3002,14 +601,12 @@ class DoomEternalContext(CommonContext):
             return
         self._try_complete_location_scouts()
 
-
     def _consume_location_info(self, args):
         error = self.location_setup.consume(args, frozenset(self.locations_info))
         if error:
             self._fail_placement_scout(error)
             return
         self._try_complete_location_scouts()
-
 
     def _try_complete_location_scouts(self):
         if not self.location_setup.ready_to_resolve:
@@ -3024,25 +621,24 @@ class DoomEternalContext(CommonContext):
         self.location_setup.resolved()
         self._complete_connected(placements)
 
-
     def _complete_connected(self, placements):
         self.server_checked_locations_ready = True
-        self.session_tasks.start(lambda: self.onboard_bootstrap("on_connect"))
+        self.session_tasks.start(lambda: self.items.onboard_bootstrap("on_connect"))
         self.session_tasks.start(lambda: self._reconcile_server_checks("server_connected"))
-        self.session_tasks.start(self.check_mission_challenge_locations)
-        self.session_tasks.start(lambda: self.evaluate_campaign_goal("server connected"))
+        self.session_tasks.start(self.saves.check_mission_challenge_locations)
+        self.session_tasks.start(lambda: self.checks.evaluate_campaign_goal("server connected"))
         if self._item_delivery_wakeup:
-            self._schedule_item_delivery("connected")
-        balance = self._ammo_refill_balance_payload()
-        emit_launcher_event(
+            self.items._schedule_item_delivery("connected")
+        balance = self.items._ammo_refill_balance_payload()
+        bridge_config.emit_launcher_event(
             "connected",
             seed_name=self.room_seed_name,
             endpoint=str(getattr(self, "server_address", "") or ""),
             team=self.team,
             slot=self.slot,
             player_names=dict(self.player_names),
-            item_names={item: self.item_names.lookup_in_game(item, self.game) for item in ITEM_ID_TO_COMMAND},
-            slot_data=getattr(self, "_connected_slot_data", {}),
+            item_names={item: self.item_names.lookup_in_game(item, self.game) for item in bridge_items.ITEM_ID_TO_COMMAND},
+            slot_data=self._connected_slot_data,
             missing_locations=sorted(self.missing_locations),
             checked_locations=sorted(self.checked_locations),
             placements=placements,
@@ -3068,2555 +664,314 @@ class DoomEternalContext(CommonContext):
         )
         if packet_accepted and packet_start_index == 0:
             self._item_history_received = True
-        log_item_event(
+        bridge_config.log_item_event(
             "ITEM_PACKET_OBSERVATION",
             packet_start_index=packet_start_index,
             packet_count=packet_item_count,
             authoritative_count=authoritative_count,
-            boundary_before=getattr(self, "items_processed", 0),
-            boundary_after=getattr(self, "items_processed", 0),
+            boundary_before=getattr(self.items, "items_processed", 0),
+            boundary_after=getattr(self.items, "items_processed", 0),
             received_count=authoritative_count,
-            processed_count=getattr(self, "items_processed", 0),
+            processed_count=getattr(self.items, "items_processed", 0),
             state_key=getattr(self, "state_key", None) or "unresolved",
             success=packet_accepted,
             packet_received_monotonic_ns=packet_received_ns,
         )
-        self._schedule_item_delivery("packet")
+        self.items._schedule_item_delivery("packet")
         self._schedule_ammo_refill_overflow_normalization("received_items")
 
     async def _reconcile_server_checks(self, trigger):
         try:
-            await self.reconcile_checked_automap_cleanup(trigger)
-            await self.reconcile_fast_travel_unlock(trigger)
+            await self.checks.reconcile_checked_automap_cleanup(trigger)
+            await self.checks.reconcile_fast_travel_unlock(trigger)
         except StaleNativeResult:
             return
 
-    def _schedule_item_delivery(self, trigger):
-        """Coalesce packet wakeups into one event-loop delivery runner."""
-        exit_event = getattr(self, "exit_event", None)
-        if exit_event is not None and exit_event.is_set():
-            return
-        self._item_delivery_wakeup = True
-        task = getattr(self, "_item_delivery_task", None)
-        if task is None or task.done():
-            self._item_delivery_task = asyncio.get_running_loop().create_task(
-                self._run_scheduled_item_delivery()
-            )
-
-    async def _run_scheduled_item_delivery(self):
-        try:
-            while self._item_delivery_wakeup:
-                self._item_delivery_wakeup = False
-                await self.process_pending_item_receipts("packet")
-                if self._item_delivery_waiting_for_state:
-                    return
-        except StaleNativeResult:
-            return
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("[Tracking] ITEM_DELIVERY_RUNNER_CRASH")
-
-    def _packet_received_timestamp(self, receipt_index):
-        return self.receipt_session.packet_timestamp(receipt_index)
-
-    def _packet_receipt_is_live_tail(self, receipt_index):
-        return self.receipt_session.packet_is_live_tail(receipt_index)
-
-
-    async def process_pending_item_receipts(self, trigger):
-        _, error = await self._owner_reconcile(read_gameplay_save_evidence())
-        return error is None
-
-    def observation_slot_for_source(self, source):
-        if isinstance(source, PrimarySaveSelection):
-            return source.slot_directory
-        try:
-            parent = Path(source).parent.name
-        except (TypeError, ValueError):
-            parent = ""
-        if re.fullmatch(r"(?:GAME|DLC[12]|HORDE)-AUTOSAVE\d+", parent):
-            return parent
-        return self.active_save_slot or "<synthetic>"
-
-    def select_save_observation_slot(self, slot_directory):
-        """Select a slot without trusting legacy observed=true persistence."""
-        if not self.save_observer.select_observation_slot(slot_directory):
-            return
-        self.save_checks.reset_observations()
-
-    @property
-    def selected_observation_slot(self):
-        return self.save_observer.observation_slot
-
-    @property
-    def mission_select_observation_map(self):
-        return self.save_observer.mission_select.map_name
-
-    @property
-    def mission_select_observation_epoch(self):
-        return self.save_observer.mission_select.epoch
-
-    @property
-    def active_save_slot(self):
-        return self.save_observer.selection.slot
-
-    @property
-    def active_save_path(self):
-        return self.save_observer.selection.path
-
-    @property
-    def active_save_token(self):
-        return self.save_observer.selection.token
-
-    @property
-    def active_native_evidence_epoch(self):
-        return self.save_observer.selection.native_evidence_epoch
-
-    @property
-    def active_save_proof_authoritative(self):
-        return self.save_observer.readiness.authoritative
-
-    @property
-    def active_save_proof_slot(self):
-        return self.save_observer.readiness.slot
-
-    @property
-    def active_save_proof_evidence_epoch(self):
-        return self.save_observer.readiness.evidence_epoch
-
-    @property
-    def active_save_proof_load_epoch(self):
-        return self.save_observer.readiness.load_epoch
-
-    @property
-    def runtime_observers_frozen(self):
-        return self.save_observer.readiness.frozen
-
-    def has_authoritative_save_proof(self):
-        lease = getattr(self, "runtime_observation_lease", None)
-        return self.save_observer.has_authoritative_proof(
-            lease_present=lease is not None,
-            gameplay_loaded_ns=getattr(lease, "gameplay_loaded_ns", None),
-        )
-
-    def invalidate_active_save_proof(self):
-        """Clear proof authority at a gameplay/process lifecycle boundary."""
-        self.save_observer.invalidate_proof()
-
-    async def ingest_visible_runtime_lifecycle(self, evidence=None, lifecycle_markers=None):
-        """Accept fresh FirstThink markers as live-map and load-epoch authority."""
-        lease = getattr(self, "runtime_observation_lease", None)
-        evidence_epoch = getattr(evidence, "epoch", None)
-        if evidence_epoch is not None:
-            self.runtime_lifecycle.record_native_epoch(evidence_epoch)
-        if lease is not None and not lease.process_probe():
-            return False
-
-        markers = (
-            lifecycle_markers
-            if lifecycle_markers is not None
-            else discover_active_map_markers()
-        )
-        if not markers:
-            return (await self.advance_known_map_materialization(evidence))
-        newest_mtime, newest_path = markers[-1]
-        started = getattr(lease, "started_ns", None) if lease else None
-        action = self.runtime_lifecycle.authored_timestamp_action(newest_mtime, started)
-        if action == "ignore":
-            return (await self.advance_known_map_materialization(evidence))
-        if action == "native_fallback":
-            return (await self.advance_known_map_materialization(evidence))
-        marker_data = parse_active_map_marker(newest_path, newest_mtime)
-        if marker_data is None:
-            self.invalidate_map_identity("malformed_marker")
-            return False
-        self.invalidate_active_save_proof()
-        self.fast_travel.invalidate(clear_submitted=True)
-        self.save_observer.clear_mission_select()
-        self.runtime_lifecycle.clear_map()
-        self.runtime_lifecycle.clear_pending_marker()
-        marker_data = self.runtime_lifecycle.authored_marker_proposal(
-            marker_data, newest_mtime, gameplay_evidence_mtime_ns(), evidence_epoch,
-            evidence_state=getattr(evidence, "state", None),
-        )
-        if lease is not None:
-            lease.observe_gameplay_loaded(newest_mtime)
-        self.accept_map_identity(marker_data, evidence_epoch)
-        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
-        for _, marker_path in markers:
-            cleanup_active_map_marker_file(marker_path)
-        return True
-
-    async def advance_known_map_materialization(self, evidence):
-        """Advance epoch from a fresh native load edge or transition."""
-        cached = getattr(self, "cached_map_identity", None)
-        if cached is None or cached.get("native_scope") or cached.get("materialization_suspended"):
-            evidence = evidence or read_gameplay_save_evidence()
-            if (await self._recover_native_materialization(evidence)):
-                return True
-            if cached and cached.get("native_scope"):
-                return False
-        decision = self.runtime_lifecycle.classify_native_load(evidence, MATERIALIZATION_MAPS)
-        if decision is None:
-            return False
-        evidence_epoch = decision.evidence_epoch
-        if decision.action == "bind":
-            self.runtime_lifecycle.bind_materialization_evidence(evidence_epoch)
-            logger.info(
-                "[MAP] MATERIALIZATION_GENERATION_BOUND map=%s evidence_epoch=%s "
-                "source=first_same_map_evidence provisional=%s",
-                cached.get("map_key", "<unknown>"),
-                evidence_epoch,
-                str(bool(getattr(evidence, "provisional", False))).lower(),
-            )
-            return False
-        if decision.action == "suspend":
-            return self.suspend_map_materialization(
-                cached, evidence_epoch, "provisional_same_map_load_edge"
-            )
-        evidence_mtime = gameplay_evidence_mtime_ns()
-        marker_data = self.runtime_lifecycle.native_marker_proposal(decision, evidence_mtime)
-        if marker_data is None:
-            return False
-        epoch = marker_data["gameplay_epoch"]
-
-        lease = getattr(self, "runtime_observation_lease", None)
-        if lease is not None:
-            lease.observe_gameplay_loaded(evidence_mtime)
-        self.invalidate_active_save_proof()
-        self.fast_travel.invalidate(clear_submitted=True)
-        if decision.action != "reload":
-            self.save_observer.clear_mission_select()
-        self.accept_map_identity(marker_data, evidence_epoch)
-        self.snapshot_fast_travel_eligibility(marker_data=marker_data)
-        self.advance_automap_cleanup_epoch()
-        if decision.action == "reload":
-            logger.info(
-                "[MAP] MATERIALIZATION_EPOCH_SECONDARY map=%s epoch=%s "
-                "source=native_same_map_load_edge evidence_provisional=%s",
-                marker_data.get("map_key", "<unknown>"), epoch,
-                bool(getattr(evidence, "provisional", False)),
-            )
-        else:
-            event = "MAP_INITIALIZE_EVIDENCE" if decision.action == "initialize" else "MAP_TRANSITION_EVIDENCE"
-            logger.info(
-                "[MAP] %s map=%s epoch=%s runtime_map=%s",
-                event, decision.map_key, epoch, decision.runtime_map,
-            )
-        return True
-
-    def suspend_map_materialization(self, cached, evidence_epoch, reason):
-        """Suspend map authority until a fresh authored marker reacquires context."""
-        if cached.get("materialization_suspended"):
-            return False
-        self.invalidate_active_save_proof()
-        self.runtime_lifecycle.suspend_marker(evidence_epoch, reason)
-        self.runtime_lifecycle.record_lease_publication(None, False)
-        self.runtime_lifecycle.clear_context()
-        logger.info(
-            "[MAP] MATERIALIZATION_SUSPENDED map=%s evidence_epoch=%s reason=%s",
-            cached.get("map_key", "<unknown>"), evidence_epoch, reason,
-        )
-        return True
-
-    def activate_save_selection(self, selected):
-        old_slot = self.active_save_slot
-        path_changed = str(selected.path) != self.active_save_path
-        if old_slot != selected.slot_directory or path_changed:
-            logger.info(
-                "SAVE_SLOT_ACTIVE old=%s new=%s path=%s",
-                old_slot or "<none>",
-                selected.slot_directory,
-                selected.path,
-            )
-        self.save_observer.update_selection(
-            slot=selected.slot_directory, path=str(selected.path), token=selected.mtime_ns,
-        )
-        self.save_observer.activate_slot(selected.slot_directory)
-        self.select_save_observation_slot(selected.slot_directory)
-
-    def invalidate_save_observation_slot(self, slot_directory):
-        """Discard local authority when a slot directory has been recreated."""
-        self.save_observer.invalidate_observation_slot(slot_directory)
-        self.select_save_observation_slot(slot_directory)
-
-    def log_save_proof_rejected(
-        self, reason, evidence_slot=None, marker_map=None, candidate_slot=None,
-        candidate_mtime=None, active_slot=None,
-    ):
-        rejection = (
-            reason,
-            evidence_slot or "<none>",
-            marker_map or "<none>",
-            candidate_slot or "<none>",
-            candidate_mtime or 0,
-            active_slot or self.active_save_slot or "<none>",
-        )
-        if rejection == getattr(self, "last_save_proof_rejection", None):
-            return
-        self.last_save_proof_rejection = rejection
-        logger.info(
-            "SAVE_PROOF_REJECTED reason=%s evidence_slot=%s marker_map=%s "
-            "candidate_slot=%s candidate_mtime=%s active_slot=%s",
-            *rejection,
-        )
-        logger.info(
-            "SAVE_SLOT_REJECTED slot=%s reason=%s path=%s",
-            candidate_slot or "<none>",
-            reason,
-            candidate_slot or "<none>",
-        )
-
-    def invalidate_map_identity(self, reason, *, clear_pending=True):
-        self.reset_transient_effects(reason)
-        if getattr(self, "last_marker_reject_reason", None) != reason:
-            logger.info("[MAP] MAP_IDENTITY_MARKER_REJECTED reason=%s", reason)
-            self.last_marker_reject_reason = reason
-        self.runtime_lifecycle.clear_map()
-        self.runtime_lifecycle.record_lease_publication(None, False)
-        if reason == "game_not_running":
-            self.runtime_lifecycle.clear_context(clear_log=True)
-        if clear_pending:
-            self.runtime_lifecycle.clear_pending_marker()
-        self.save_observer.clear_mission_select()
-        self.fast_travel.invalidate(clear_submitted=False)
-        return None
-
-    def store_pending_map_identity(self, marker_data):
-        self.runtime_lifecycle.stage_marker(marker_data)
-        self.save_observer.set_frozen(True)
-        if getattr(self, "last_pending_marker_mtime", None) != marker_data["mtime_ns"]:
-            self.last_pending_marker_mtime = marker_data["mtime_ns"]
-            logger.info(
-                "[MAP] MAP_IDENTITY_MARKER_PENDING map=%s runtime_map=%s "
-                "source=map_start_event epoch=%s",
-                marker_data["map_key"],
-                marker_data["runtime_map"],
-                marker_data["gameplay_epoch"],
-            )
-        return self.pending_map_identity
-
-    def accept_map_identity(self, marker_data, evidence_epoch=None):
-        previous = getattr(self, "cached_map_identity", None)
-        if isinstance(previous, Mapping) and any(
-            previous.get(key) != marker_data.get(key)
-            for key in ("map_key", "runtime_map", "gameplay_epoch")
-        ):
-            self.reset_transient_effects("map_transition")
-            self.fast_travel.invalidate(clear_submitted=True)
-        marker_data = self.runtime_lifecycle.accept_marker(marker_data, evidence_epoch)
-        materialized_epoch = marker_data.get("gameplay_epoch")
-        published = True
-        self.runtime_lifecycle.record_lease_publication(materialized_epoch, published)
-        self.level_ready.queue(materialized_epoch, marker_data.get("path"))
-        marker_mtime = marker_data.get("mtime_ns", 0)
-        if self.runtime_lifecycle.observe_marker_timestamp(marker_mtime, evidence_epoch):
-            self.last_marker_reject_reason = None
-            logger.info(
-                "[MAP] MAP_IDENTITY_MARKER_ACCEPTED map=%s runtime_map=%s "
-                "source=map_start_event epoch=%s",
-                marker_data["map_key"],
-                marker_data["runtime_map"],
-                marker_data["gameplay_epoch"],
-            )
-        return marker_data
-
-    async def read_active_map_identity(self, evidence=None):
-        lease = getattr(self, "runtime_observation_lease", None)
-        (await self.ingest_visible_runtime_lifecycle(evidence=evidence))
-        if lease is not None and not lease.process_probe():
-            self.invalidate_active_save_proof()
-            return self.invalidate_map_identity("game_not_running")
-
-        cached = self.cached_map_identity
-        if not isinstance(cached, Mapping):
-            if evidence is not None and getattr(evidence, "state", None) != "gameplay":
-                self.invalidate_active_save_proof()
-                return self.invalidate_map_identity("menu")
-            return None
-        if cached.get("materialization_suspended"):
-            return None
-        if cached.get("native_scope"):
-            return cached if (await self.runtime_effects_ready(evidence)) else None
-        marker_mtime = cached.get("mtime_ns", 0)
-        if lease is not None and lease.started_ns and marker_mtime < lease.started_ns:
-            return self.invalidate_map_identity("stale_marker")
-        if evidence is not None and getattr(evidence, "state", None) != "gameplay":
-            self.invalidate_active_save_proof()
-            hold_signature = (
-                marker_mtime,
-                getattr(evidence, "state", None),
-                bool(getattr(evidence, "provisional", False)),
-            )
-            if hold_signature != getattr(self, "last_map_identity_hold_signature", None):
-                self.last_map_identity_hold_signature = hold_signature
-                logger.info(
-                    "[MAP] MAP_IDENTITY_HELD map=%s epoch=%s evidence_state=%s",
-                    cached.get("map_key", "<unknown>"),
-                    cached.get("gameplay_epoch", "<unknown>"),
-                    getattr(evidence, "state", "<unknown>"),
-                )
-            return self.accept_map_identity(cached, getattr(evidence, "epoch", None))
-        self.last_map_identity_hold_signature = None
-        return self.accept_map_identity(cached, getattr(evidence, "epoch", None))
-
-    def log_save_proof_accepted(
-        self, slot, map_name, epoch, duration_token, details_token, proof="non_provisional_fresh_map_match"
-    ):
-        logger.info(
-            "SAVE_PROOF_ACCEPTED slot=%s map=%s epoch=%s game_duration_token=%s "
-            "game_details_token=%s proof=%s",
-            slot,
-            map_name,
-            epoch,
-            duration_token,
-            details_token,
-            proof,
-        )
-
-    async def checkpoint_recovery_ready(self, link=None):
-        try:
-            link = link or await self._native_game_link_async()
-            await self.synchronize_stage_restart(link)
-            recovery = await self._blocking_native_worker().call(
-                save_files.read_checkpoint_recovery, config, link._process_identity, link.namespace,
-                process=link._process_identity)
-        except (RuntimeError, OSError, ValueError) as error:
-            recovery = CheckpointRecovery(CheckpointRecoveryState.BLOCKED, str(error))
-        previous = getattr(self, "_checkpoint_recovery", None)
-        if recovery != previous:
-            logger.info("[Campaign] Checkpoint recovery state=%s reason=%s", recovery.state.value, recovery.reason)
-            if recovery.token is not None and recovery.token != getattr(previous, "token", None):
-                self.death_observer.reset()
-                self._death_baseline_pending = True
-                self.save_observer.invalidate_proof()
-        self._checkpoint_recovery = recovery
-        if recovery.state != CheckpointRecoveryState.READY:
-            self._death_baseline_pending = True
-            self.save_observer.invalidate_proof()
-            return False
-        return True
-
-    async def synchronize_stage_restart(self, link):
-        data = getattr(self, "_connected_slot_data", None) or {}
-        if data.get("runtime", {}).get("difficulty", {}).get("death_policy") != "restart_stage":
-            return
-        from doom_eap.runtime.stage_restart import activity_events
-
-        current = await self._blocking_native_worker().call(
-            save_files.read_stage_restart, config, link._process_identity, link.namespace,
-            process=link._process_identity)
-        identity = (link._process_identity, link.namespace)
-        prior_identity, previous = getattr(self, "_stage_restart_activity", (None, None))
-        previous = previous if prior_identity == identity else None
-        stage = next((row["title"] for row in self.campaign_projection()["rows"]
-                      if current and STAGES[row["stage"]]["access_id"] == current["stage_id"]), player_text("stage_restart", "stage"))
-        for event in activity_events(previous, current, stage):
-            logger.info("[Campaign] Restart %s: %s", event["status"], stage)
-            emit_launcher_event("stage_restart", **event)
-        if current is not None:
-            self._stage_restart_activity = identity, current
-
-    async def _admitted_campaign_root(self):
-        try:
-            link = (await self._native_game_link_async())
-            if not await self.checkpoint_recovery_ready(link):
-                return None
-            native_root = (await self._native_call(link, 'admitted_save_root'))
-            self.save_observer.bind_ap_provider(link.namespace, native_root)
-            return native_root
-        except (RuntimeError, OSError, ValueError) as error:
-            reason = str(error)
-            if getattr(self, "_last_ap_save_refusal", None) != reason:
-                logger.info("[Campaign] Save observation unavailable: %s", reason)
-                self._last_ap_save_refusal = reason
-            return None
-
-    async def admitted_campaign_save(self, filename="game_duration.dat"):
-        native_root = await self._admitted_campaign_root()
-        return save_files.admitted_ap_save(STEAM_REMOTE_DIR, native_root, filename) if native_root else None
-
-    def campaign_projection(self):
-        return self.unified_campaign.snapshot(self.checked_locations, self.items_received)
-
-    async def synchronize_campaign_menu(self):
-        if not getattr(self, "server_checked_locations_ready", False) or not hasattr(self, "unified_campaign"):
-            return
-        from doom_eap.runtime.campaign_menu import CampaignMenu
-        if not hasattr(self, "_campaign_menu"):
-            self._campaign_menu = CampaignMenu()
-        try:
-            projection = self.campaign_projection()
-            owned = self.received_item_ids()
-            gate_checks = {name: int(location) for location, name in DOOM_LOCATION_NAMES.items()
-                           if name.endswith(" - Slayer Gate Complete")}
-            for row in projection["rows"]:
-                gate_key = next((item for item, map_key in GATE_KEY_TO_MAP.items()
-                                 if row["stage"] == map_key), None)
-                row["slayer_gate"] = gate_key is not None and row["revealed"]
-                row["gate_key"] = row["slayer_gate"] and gate_key in owned
-                row["gate_complete"] = row["slayer_gate"] and gate_checks.get(
-                    row["title"] + " - Slayer Gate Complete") in self.session_state.get("physical_slayer_gates", ())
-            (await self.synchronize_fortress_phase(projection))
-            from doom_eap.runtime.mission_presentation import MissionPresentations
-            if not hasattr(self, "_mission_presentations"):
-                self._mission_presentations = MissionPresentations(REPO_ROOT,
-                                                                    MISSION_CHALLENGE_ENTRIES)
-            link = (await self._native_game_link_async())
-            facts = self.check_observation()
-            pending = self.physical_checks.pending(facts)
-            generation = self._connected_slot_data["native_generation_fingerprint"]
-            projection["summaries"] = {
-                row["stage"]: self._mission_presentations.snapshot(
-                    link.namespace, generation, row["stage"], revealed=row["revealed"], facts=facts, pending=pending)
-                for row in projection["rows"]
-            }
-            placements = {entry["location_id"]: entry for entry in resolve_placement_records(
-                self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot
-            )}
-            projection["hub_summary"] = self._mission_presentations.snapshot(
-                link.namespace, generation, "hub", revealed=True, facts=facts, pending=pending)
-            projection["challenge_rewards"] = {
-                row["stage"]: self._mission_presentations.challenge_snapshot(
-                    link.namespace, generation, row["stage"], revealed=row["revealed"], facts=facts,
-                    placements=placements, aggregates=ALL_MISSION_CHALLENGES_ENTRIES)
-                for row in projection["rows"]
-            }
-            projection["masteries"] = self._mission_presentations.mastery_snapshot(
-                facts, placements, WEAPON_MASTERY_ENTRIES)
-            projection['encounter_rewards'] = {row['stage']: self._mission_presentations.encounter_snapshot(
-                row['stage'], revealed=row['revealed'], facts=facts, placements=placements, pending=pending)
-                for row in projection['rows']}
-            ratings = {key: {"skull_tier": row["skulls"]} for key, row in
-                       self._connected_slot_data.get("stage_profiles", {}).items()}
-            projection["ratings_version"] = 2
-            projection["ratings"] = {row["stage"]: ratings[row["stage"]]
-                                     for row in projection["rows"]
-                                     if row["revealed"] and row["stage"] in ratings}
-            result = await self._blocking_native_worker().call(
-                self._campaign_menu.synchronize, link, projection, process=link._process_identity)
-            from doom_eap.runtime.presentation_hints import PresentationHints
-            hints = getattr(self, "_presentation_hints", None)
-            if hints is None or hints.namespace != link.namespace:
-                state = self.session_state.setdefault("presentation_hints", {}).setdefault(link.namespace, {})
-                self._presentation_hints = hints = PresentationHints(link.namespace, state, self.persist_session_state)
-            hint_scope = (self.room_seed_name, self.team, self.slot, generation)
-            confirmed_scope, confirmed = getattr(self, "_presentation_hints_confirmed", (None, set()))
-            allowed = {entry["location_id"] for entry in
-                       (*MISSION_CHALLENGE_ENTRIES, *ALL_MISSION_CHALLENGES_ENTRIES, *WEAPON_MASTERY_ENTRIES)}
-            await hints.synchronize(result.get("hint_intents", []), allowed & facts.server_locations,
-                                    confirmed if confirmed_scope == hint_scope else set(),
-            self.send_msgs if self.server and self.server.socket.open and not self.server.socket.closed else None,
-            self._launcher_hints_key())
-            selected = result["selected_stage"]
-            if selected:
-                self.unified_campaign.select(selected, projection)
-            status = (result["committed_revision"], result["rendered_revision"], selected, result["loaded_stage"])
-            if getattr(self, "_campaign_menu_status", None) != status:
-                logger.info("[Campaign] Native menu committed=%s rendered=%s selected=%s loaded=%s", *status)
-                self._campaign_menu_status = status
-            self._campaign_menu_refusal = None
-        except (RuntimeError, OSError, ValueError, KeyError) as error:
-            reason = str(error)
-            if getattr(self, "_campaign_menu_refusal", None) != reason:
-                logger.info("[Campaign] Native menu pending: %s", reason)
-                self._campaign_menu_refusal = reason
-
-    async def synchronize_fortress_phase(self, projection):
-        """Project server chronology in the current Fortress load."""
-        evidence = read_gameplay_save_evidence()
-        if canonical_map_name(self.current_map_name) != "game/hub/hub" or not (await self.runtime_effects_ready(evidence)):
-            return
-        lease = (await self._active_materialization_lease())
-        if lease is None:
-            return
-        phase = projection["fortress_phase"]
-        await self._send_runtime_command(f"ai_ScriptCmdEnt ap_fortress_phase_{phase} activate",
-                                         coalesce_key=f"fortress-{lease}-{phase}", materialization_lease=lease)
-
-    async def update_save_slot_lifecycle(self):
-        """Keep an authoritative slot through transient samples; prove switches."""
-        evidence = read_gameplay_save_evidence()
-        admitted = (await self.admitted_campaign_save())
-        if admitted is None:
-            return None
-        if evidence is not None and evidence.state == "gameplay":
-            from doom_eap.contracts.save_observation import admitted_evidence_matches
-            link = (await self._native_game_link_async())
-            facts = getattr(link, "save_admission", {})
-            if not admitted_evidence_matches(evidence, admitted, link.namespace, link.pid, facts):
-                self.save_observer.set_frozen(True)
-                self.log_save_proof_rejected("provider_process_evidence_mismatch",
-                    evidence_slot=evidence.slot_directory, candidate_slot=admitted.slot_directory,
-                    candidate_mtime=admitted.mtime_ns, active_slot=self.active_save_slot, marker_map=evidence.map_name)
-                return None
-        (await self.ingest_visible_runtime_lifecycle(evidence=evidence))
-        marker = (await self.read_active_map_identity(evidence=evidence))
-        marker_map = marker["runtime_map"] if marker else None
-        marker_context = classify_runtime_context(marker_map) if marker_map else None
-        evidence_context = None
-        if (
-            evidence
-            and evidence.state == "gameplay"
-            and getattr(evidence, "native_safe", False)
-            and getattr(evidence, "map_name", None)
-        ):
-            evidence_context = classify_runtime_context(evidence.map_name)
-        expected_prefix = "GAME-"  # physical ap save family is independent of content
-
-        active_family_mismatch, prior_evidence_epoch = self.save_observer.observe_expected_family(expected_prefix)
-
-        if marker_map and evidence and getattr(evidence, "map_name", None):
-            if (
-                marker_context is not None
-                and evidence_context is not None
-                and marker_context.identity != evidence_context.identity
-            ):
-                self._record_context_evidence_rejection(
-                    "mission_select_save_details",
-                    marker_context.identity,
-                    evidence_context.identity,
+    def _abandon_previous_room(self, previous_state_key):
+        if previous_state_key and previous_state_key != self.state_key:
+            abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
+            if abandoned:
+                bridge_config.logger.warning(
+                    "[DeathLink] Cleared room-bound receive events after slot change: %s.",
+                    ", ".join(event_id[:12] for event_id in abandoned),
                 )
 
-        evidence_slot = evidence.slot_directory if (evidence and getattr(evidence, "slot_directory", None)) else None
-        if expected_prefix and evidence_slot and not evidence_slot.startswith(expected_prefix):
-            evidence_slot = None
-        evidence_epoch = evidence.epoch if (evidence and getattr(evidence, "epoch", None) is not None) else None
-
-        candidates = [admitted]
-        for selected in candidates:
-            if self.save_observer.observe_candidate(selected):
-                logger.info(
-                    "SAVE_SLOT_CANDIDATE slot=%s path=%s mtime_ns=%s",
-                    selected.slot_directory,
-                    selected.path,
-                    selected.mtime_ns,
-                )
-
-        lease = getattr(self, "runtime_observation_lease", None)
-        lease_epoch = lease.gameplay_loaded_ns if (lease and getattr(lease, "gameplay_loaded_ns", None)) else None
-
-        proof_evidence_epoch = (
-            evidence_epoch
-            if evidence_epoch is not None
-            else getattr(self, "active_save_proof_evidence_epoch", None)
-        )
-        proof_load_epoch = lease_epoch
-
-        newest = admitted
-        active = admitted if admitted.slot_directory == self.active_save_slot else None
-        candidate_slot = newest.slot_directory if newest else None
-        candidate_mtime = newest.mtime_ns if newest else 0
-
-        provisional_family_switch = self.save_observer.permits_provisional_family_switch(
-            evidence, marker_absent=marker is None, context_known=evidence_context is not None,
-            expected_prefix=expected_prefix, active_family_mismatch=active_family_mismatch,
-            newest=newest, active=active, evidence_epoch=evidence_epoch,
-            prior_evidence_epoch=prior_evidence_epoch,
-        )
-
-        def fail_proof(reason):
-            self.save_observer.set_frozen(True)
-            self.save_observer.clear_mission_select()
-            self.log_save_proof_rejected(
-                reason,
-                evidence_slot=evidence_slot,
-                marker_map=marker_map,
-                candidate_slot=candidate_slot,
-                candidate_mtime=candidate_mtime,
-                active_slot=self.active_save_slot,
-            )
-            return None
-
-        decision = self.save_observer.select_candidate(
-            evidence=evidence, marker_present=marker is not None,
-            evidence_slot=evidence_slot, expected_prefix=expected_prefix,
-            newest=newest, active=active,
-            process_running=lease is None or lease.process_probe(),
-            load_epoch=proof_load_epoch,
-            mission_select_map=self.mission_select_observation_map,
-            provisional_family_switch=provisional_family_switch,
-        )
-        if decision.action == "reject":
-            if decision.reason == "game_not_running" and self.last_observer_lease_block != "game_not_running":
-                logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=game_not_running")
-                self.last_observer_lease_block = "game_not_running"
-            return fail_proof(decision.reason)
-        if decision.action == "continue":
-            self.save_observer.update_selection(path=str(decision.continued.path))
-            if decision.reset_observation_slot:
-                self.invalidate_save_observation_slot(decision.continued.slot_directory)
-            self.save_observer.continue_selection(decision.continued)
-            (await self.reconcile_fast_travel_unlock("save_proof"))
-            return decision.continued
-
-        selected = admitted if admitted and admitted.slot_directory == decision.target_slot else None
-        if selected is None:
-            return fail_proof("no_gameplay_evidence")
-
-        details = read_game_details_for_selection(selected)
-        if not details:
-            return fail_proof("no_game_details")
-
-        active_map = marker_map or (
-            canonical_map_name(evidence.map_name)
-            if provisional_family_switch and evidence
-            else None
-        )
-        if not active_map:
-            return fail_proof("map_marker_unavailable")
-        continue_target_map = canonical_map_name(details.get("mapName", ""))
-        marker_context = classify_runtime_context(active_map)
-        details_context = classify_runtime_context(continue_target_map)
-        cross_campaign_details_lag = bool(
-            marker_context is not None
-            and details_context is not None
-            and marker_context.campaign != details_context.campaign
-        )
-        if cross_campaign_details_lag:
-            self._record_context_evidence_rejection(
-                "cross_campaign_save_details_lag",
-                marker_context.identity,
-                details_context.identity,
-            )
-        mission_select_required = self.save_observer.requires_mission_select(
-            active_map, continue_target_map,
-            cross_campaign_details_lag=cross_campaign_details_lag,
-            challenge_maps=MISSION_CHALLENGE_RUNTIME_MAPS,
-        )
-        if lease is not None:
-            try:
-                evidence_mtime_ns = Path(GAMEPLAY_SAVE_EVIDENCE_PATH).stat().st_mtime_ns
-            except OSError:
-                evidence_mtime_ns = marker["mtime_ns"] if marker else 0
-            live, reason = (False, "mission_select_required") if mission_select_required else lease.validate(
-                evidence_mtime_ns=evidence_mtime_ns,
-                evidence_state=evidence.state if evidence else "gameplay",
-                current_map=active_map,
-            )
-            mission_select_live = False
-            if not live:
-                if mission_select_required:
-                    mission_select_live, reason = lease.validate_mission_select(
-                        evidence_mtime_ns=evidence_mtime_ns or (marker["mtime_ns"] if marker else 0),
-                        evidence_state=evidence.state if evidence else "gameplay",
-                        current_map=active_map,
-                        mission_map=active_map,
-                        save_mtime_ns=selected.mtime_ns,
-                    )
-                if mission_select_live:
-                    if self.save_observer.accept_mission_select(active_map, lease.gameplay_loaded_ns):
-                        logger.info(
-                            "[OBSERVER] MISSION_SELECT_LEASE_ACCEPTED slot=%s map=%s "
-                            "load_epoch=%s save_mtime_ns=%s",
-                            selected.slot_directory,
-                            active_map,
-                            lease.gameplay_loaded_ns,
-                            selected.mtime_ns,
-                        )
-                else:
-                    self.save_observer.clear_mission_select()
-            elif live:
-                self.save_observer.clear_mission_select()
-            if not live and not mission_select_live:
-                if reason != self.last_observer_lease_block:
-                    logger.info("[OBSERVER] LIVE_LEASE_BLOCKED reason=%s", reason)
-                    self.last_observer_lease_block = reason
-                return fail_proof(reason)
-            self.last_observer_lease_block = None
-
-        proof = self.save_observer.plan_proof(
-            selected, proof_evidence_epoch=proof_evidence_epoch, evidence_epoch=evidence_epoch,
-        )
-
-        details_token = details.get("_mtime_ns", selected.mtime_ns)
-
-        if proof.action == "reject":
-            return fail_proof(proof.reason)
-
-        if proof.action == "activate":
-
-            # save_proof_accepted must precede save_slot_active
-            self.log_save_proof_accepted(
-                selected.slot_directory,
-                active_map,
-                proof_evidence_epoch,
-                selected.mtime_ns,
-                details_token,
-                proof=(
-                    "provisional_cross_campaign_load_edge"
-                    if provisional_family_switch
-                    else "non_provisional_fresh_map_match"
-                ),
-            )
-            self.activate_save_selection(selected)
-            self.save_observer.update_selection(native_evidence_epoch=proof_evidence_epoch)
-            self.save_observer.accept_proof(selected.slot_directory, proof_evidence_epoch, proof_load_epoch)
-            if provisional_family_switch:
-                evidence_mtime = gameplay_evidence_mtime_ns()
-                materialization_epoch = build_materialization_epoch(
-                    evidence_epoch, evidence_mtime
-                )
-                if lease is not None:
-                    lease.observe_gameplay_loaded(evidence_mtime)
-                marker_data = self.runtime_lifecycle.new_map_proposal(
-                    _materialization_map_key(active_map), active_map, evidence_epoch,
-                    evidence_mtime, materialization_epoch,
-                )
-                self.accept_map_identity(marker_data, evidence_epoch)
-                self.snapshot_fast_travel_eligibility(marker_data=marker_data)
-                self.advance_automap_cleanup_epoch()
-                logger.info(
-                    "[MAP] MAP_TRANSITION_EVIDENCE map=%s epoch=%s runtime_map=%s "
-                    "source=provisional_cross_campaign_load_edge",
-                    marker_data["map_key"], materialization_epoch, active_map,
-                )
-            self.arm_final_sin_completion_candidate(
-                selected, details, active_map, proof_load_epoch
-            )
-            (await self.reconcile_fast_travel_unlock("save_proof"))
-            return selected
-        else:
-            if not self.mission_select_observation_map:
-                self.save_observer.clear_mission_select()
-            if proof.new_evidence:
-                self.log_save_proof_accepted(
-                    selected.slot_directory,
-                    active_map,
-                    evidence_epoch,
-                    selected.mtime_ns,
-                    details_token,
-                    proof="non_provisional_fresh_map_match",
-                )
-                if proof.reset_observation_slot:
-                    self.invalidate_save_observation_slot(selected.slot_directory)
-                self.save_observer.update_selection(native_evidence_epoch=evidence_epoch, token=selected.mtime_ns)
-
-            self.save_observer.accept_proof(selected.slot_directory, proof_evidence_epoch, proof_load_epoch)
-            self.arm_final_sin_completion_candidate(
-                selected, details, active_map, proof_load_epoch
-            )
-            (await self.reconcile_fast_travel_unlock("save_proof"))
-            return selected
-
-    async def observe_active_game_details(self):
-        selected = (await self.update_save_slot_lifecycle())
-        return read_game_details_for_selection(selected) if selected else None
-
-    def get_ap_state_key(self):
-        if not getattr(self, "server", None) or not getattr(self, "auth", None) or not getattr(self, "state_key", None):
-            return None
-        return self.state_key
-
-    def migrate_revision_bound_session(self, sessions, state_key):
-        """Adopt one pre-stable revision-bound session without trusting it blindly."""
-        candidates = sorted(
-            key for key in sessions
-            if isinstance(key, str)
-            and key.startswith(f"{state_key}:")
-            and isinstance(sessions.get(key), dict)
-        )
-        if not candidates:
-            return None
-
-        selected = candidates[-1]
-        if len(candidates) > 1 and self.items_received:
-            compatible = []
-            for candidate in candidates:
-                session = sessions[candidate]
-                history = session.get("receipt_history")
-                processed = session.get("processed_items", 0)
-                ok, _ = validate_receipt_history_prefix(
-                    self.items_received, processed, history
-                )
-                if ok:
-                    compatible.append(candidate)
-            if len(compatible) == 1:
-                selected = compatible[0]
-            else:
-                log_item_event(
-                    "ITEM_STATE_INCOMPATIBLE",
-                    reason="multiple_revision_sessions",
-                    state_key=state_key,
-                    candidates=candidates,
-                    compatible=compatible,
-                    boundary_before=0,
-                    boundary_after=0,
-                    success=False,
-                    bridge_revision=BRIDGE_REVISION,
-                )
-
-        sessions[state_key] = sessions.pop(selected)
-        log_item_event(
-            "ITEM_STATE_MIGRATION",
-            reason="bridge_revision_removed_from_session_identity",
-            from_state_key=selected,
-            state_key=state_key,
-            boundary_before=sessions[state_key].get("processed_items", 0),
-            boundary_after=sessions[state_key].get("processed_items", 0),
-            session_count=1,
-            success=True,
-            bridge_revision=BRIDGE_REVISION,
-        )
-        return selected
-
-    async def check_and_update_event_session(self):
-        current_key = self.get_ap_state_key()
-        if not current_key:
-            return False
+    def _start_location_scouts(self, args, slot_data):
+        self.server_checked_locations_ready = False
         try:
-            identity = await self._query_process_identity()
-        except StaleNativeResult:
-            return False
-        if not identity or current_key != self.get_ap_state_key():
-            return False
-
-        session_file = Path(INV_DUMP_DIR) / "ap_event_session.json"
-        old_key = None
-        if session_file.exists():
-            try:
-                data = json.loads(session_file.read_text(encoding="utf-8"))
-                old_key = data.get("ap_state_key")
-            except Exception:
-                pass
-
-        if old_key != current_key:
-            quarantine_reason = "session_changed" if old_key else "unbound_preexisting"
-            self.quarantine_unbound_physical_events(
-                old_state_key=old_key,
-                new_state_key=current_key,
-                reason=quarantine_reason,
-            )
-            tmp = session_file.with_name(f".ap_event_session.{uuid.uuid4().hex}.tmp")
-            tmp.write_text(
-                json.dumps({"ap_state_key": current_key, "updated_at": time.time()}, indent=2) + "\n",
-                encoding="utf-8",
-            )
-            os.replace(tmp, session_file)
-            logger.info("[Session] Persisted new physical event state key: %s (old: %s)", current_key, old_key)
-        return True
-
-    def quarantine_unbound_physical_events(
-        self, old_state_key=None, new_state_key=None, reason="session_changed"
-    ):
-        paths = set(check_event_files()) | {
-            os.path.join(INV_DUMP_DIR, filename) for filename in PUBLISHER_MAP_EVENT_FILENAMES}
-        for path in sorted(paths):
-            quarantine_event_file(
-                path,
-                old_state_key=old_state_key,
-                new_state_key=new_state_key,
-                reason=reason,
-            )
-            if os.path.exists(path):
-                raise RuntimeError("Unbound event could not be quarantined: " + path)
-
-    def initialize_item_state(self, slot_data):
-        self.reset_room_session_authority("initialize_item_state")
-        if getattr(self, "_item_state_error", None):
-            self._block_item_state(self._item_state_error)
-            return
-        self.item_state_ready = False
-        initialization_boundary_before = getattr(self, "items_processed", 0)
-        previous_state_key = self.state_key
-        try:
-            self.client_state = load_client_state()
-        except ClientStateLoadError as error:
-            self._block_item_state(error)
-            return
-        self.receipt_session.begin_rebind()
-        effective_seed_name = self.room_seed_name or self.seed_name
-        generation = slot_data.get("native_generation_fingerprint") if isinstance(slot_data, dict) else None
-        if (
-            not isinstance(effective_seed_name, str)
-            or not re.fullmatch(r"[A-Za-z0-9_.-]+", effective_seed_name)
-            or isinstance(self.team, bool)
-            or not isinstance(self.team, int)
-            or self.team < 0
-            or isinstance(self.slot, bool)
-            or not isinstance(self.slot, int)
-            or self.slot < 0
-            or not isinstance(generation, str)
-            or re.fullmatch(r"[0-9a-f]{64}", generation) is None
-        ):
-            logger.warning(
-                "[State] Slot identity incomplete or unsafe; refusing session state reuse."
-            )
-            self.state_key = ""
-            self.session_state = default_session_state()
-            self.receipt_session.restore_boundary(0)
-            self.item_state_ready = False
-            self.receipt_session.clear_packet_ranges()
-            log_item_event(
-                "ITEM_STATE_SESSION_INIT",
-                state_key="unresolved",
-                state_key_status="unresolved",
-                reason="invalid_slot_identity",
-                boundary_before=initialization_boundary_before,
-                boundary_after=0,
-                received_count=len(self.items_received),
-                processed_count=0,
-                success=False,
-            )
-            return
-        sessions = self.client_state["sessions"]
-        self.state_key, migrated_from = migrate_legacy_session_key(
-            sessions,
-            seed_name=effective_seed_name,
-            team=self.team,
-            slot=self.slot,
-            generation=generation,
-        )
-        if previous_state_key != self.state_key:
-            self.receipt_session.clear_packet_ranges()
-        if self.state_key is None:
-            logger.warning(
-                "[State] Slot identity incomplete or unsafe; refusing session state reuse."
-            )
-            self.state_key = ""
-            self.session_state = default_session_state()
-            self.receipt_session.restore_boundary(0)
-            self.item_state_ready = False
-            self.receipt_session.clear_packet_ranges()
-            log_item_event(
-                "ITEM_STATE_SESSION_INIT",
-                state_key="unresolved",
-                state_key_status="unresolved",
-                reason="session_key_unresolved",
-                boundary_before=initialization_boundary_before,
-                boundary_after=0,
-                received_count=len(self.items_received),
-                processed_count=0,
-                success=False,
-            )
-            return
-        if self.state_key not in sessions:
-            self.migrate_revision_bound_session(sessions, self.state_key)
-        if migrated_from is not None:
-            migrated_session = sessions.get(self.state_key)
-            migrated_boundary = (
-                migrated_session.get("processed_items", 0)
-                if isinstance(migrated_session, dict)
-                else 0
-            )
-            log_item_event(
-                "ITEM_STATE_MIGRATION",
-                from_state_key=migrated_from,
-                state_key=self.state_key,
-                reason="legacy_session_identity",
-                boundary_before=initialization_boundary_before,
-                boundary_after=migrated_boundary,
-                session_count=len(sessions),
-                processed_count=migrated_boundary,
-                success=True,
-            )
-            logger.info(
-                "[State] STATE_MIGRATED from=%s to=%s reason=legacy_session",
-                migrated_from,
-                self.state_key,
-            )
-        existing_session = sessions.get(self.state_key)
-        if not isinstance(existing_session, dict):
-            existing_session = default_session_state()
-        self.session_state = normalize_session_state(existing_session)
-        self._bind_delivery_backend()
-        from doom_eap.runtime.weapon_points import namespace_id
-        self.killsanity.bind_resolved(
-            self.session_state, namespace_id(effective_seed_name, self.team, self.slot, generation),
-            slot_data["killsanity"],
-        )
-        self.goals.bind(self.state_key, self.session_state)
-        masteries = mastery_entries_for_counts(WEAPON_MASTERY_ENTRIES, slot_data["runtime"]["mastery_requirement_counts"])
-        self.save_checks.bind({entry["signal"]["unlockable"]: entry for entry in masteries})
-        self.publisher_dispatch.bind(self.session_state.setdefault("publisher_acknowledgements", {}))
-        self.save_observer.bind_baselines(SaveObserverBaselineStore(self.session_state))
-        self.session_state.setdefault("cultist_autosave_path", None)
-        self.session_state.setdefault("save_slot_observations", {})
-        self.checked_visuals.rebind()
-        self.fast_travel.rebind()
-        self.session_state.pop("automap_cleanup", None)
-        self.session_state.pop("fast_travel_delivered", None)
-        sessions[self.state_key] = self.session_state
-        self.receipt_session.restore_boundary(0)
-        self.session_state.pop("deathlinked", None)
-        self.deathlink.bind(self.state_key, self.session_state)
-        if self.death_observer.bind(namespace_id(effective_seed_name, self.team, self.slot, generation)):
-            self._death_baseline_pending = True
-        raw_save_observations = self.session_state.get("save_slot_observations", {})
-        self.session_state["save_slot_observations"] = self.save_observer.restore_slot_observations(raw_save_observations)
-        self.session_state.pop("sticky_mastery_observed", None)
-        self.session_state.pop("weapon_masteries_observed", None)
-        self.item_state_ready = True
-        self.reconnect_resync_attempted = False
-        self.bootstrap.bind(self.session_state["bootstrap"])
-        try:
-            save_client_state(
-                self.client_state,
-                reason="item_state_initialize",
-                boundary=self.items_processed,
-                boundary_before=initialization_boundary_before,
-            )
-        except Exception as error:
-            self._block_item_state(error)
-            log_item_event(
-                "ITEM_STATE_SESSION_INIT",
-                state_key=self.state_key,
-                state_key_status="resolved",
-                reason="state_save_failed",
-                detail=str(error),
-                boundary_before=initialization_boundary_before,
-                boundary_after=self.items_processed,
-                received_count=len(self.items_received),
-                processed_count=self.items_processed,
-                success=False,
-            )
-            return
-        log_item_event(
-            "ITEM_STATE_SESSION_INIT",
-            state_key=self.state_key,
-            state_key_status="resolved",
-            reason="initialized",
-            boundary_before=initialization_boundary_before,
-            boundary_after=self.items_processed,
-            received_count=len(self.items_received),
-            processed_count=self.items_processed,
-            success=True,
-        )
-        logger.info(
-            f"[State] Loaded {self.items_processed} processed items for "
-            f"{self.state_key}."
-        )
-        self._room_session_authoritative = True
-        self.session_tasks.start(self.check_and_update_event_session)
-
-    def native_game_link(self):
-        identity = doom_process_identity()
-        return self._native_game_link_for_identity(identity)
-
-    def _native_game_link_for_identity(self, identity):
-        from doom_eap.runtime.weapon_points import SentinelWeaponPoints, namespace_id
-        if not identity or not identity.startswith("windows:"):
-            raise RuntimeError("Sentinel requires a qualified Windows game process")
-        namespace = (namespace_id(self.room_seed_name, self.team, self.slot, self._connected_slot_data["native_generation_fingerprint"])
-                     if self.room_seed_name and self._connected_slot_data else "0" * 64)
-        probe = Path(os.environ.get("SENTINEL_TRANSPORT_RELAY", DEATH_PROBE))
-        key = (identity, namespace, str(probe))
-        if getattr(self, "_native_link_key", None) != key:
-            if getattr(self, "_native_link", None) is not None:
-                self._native_link.close()
-            command, environment = (), None
-            if os.name != "nt":
-                from doom_eap.runtime.proton import runtime
-                command, environment = runtime(config)
-            self._native_link = SentinelWeaponPoints(
-                probe, int(identity.split(":")[1]), namespace,
-                command_prefix=command, environment=environment,
-                diagnostic=lambda evidence: log_item_event("ITEM_NATIVE_PROBE_RESPONSE", **evidence))
-            self._native_link_key = key
-            self._native_link._process_identity = identity
-        return self._native_link
-
-    async def request_support_condump(self):
-        link = await self._native_game_link_async()
-        result = await self._native_call(link, "request", 52)
-        return result.get("outcome") == 1
-
-    def _native_work_identity(self):
-        return (self.state_key, self.room_seed_name, self.team, self.slot, id(self.session_state),
-                self.runtime_lifecycle.capture_work(), self.receipt_session.capture(self.state_key),
-                self._connected_slot_data.get("native_generation_fingerprint"), self.exit_event.is_set())
-
-    def _blocking_native_worker(self):
-        from doom_eap.runtime.native_worker import NativeWorker
-        if not hasattr(self, "_native_worker"):
-            self._native_worker = NativeWorker(self._native_work_identity, doom_process_identity)
-        return self._native_worker
-
-    async def _query_process_identity(self):
-        def query():
-            identity = doom_process_identity()
-            return identity if identity and doom_process_identity() == identity else None
-
-        return await self._blocking_native_worker().call(query)
-
-    async def _native_game_link_async(self):
-        identity = await self._query_process_identity()
-        return await self._blocking_native_worker().call(self._native_game_link_for_identity, identity, process=identity)
-
-    async def _native_call(self, link, method, *args, **kwargs):
-        return await self._blocking_native_worker().call(
-            getattr(link, method), *args, process=getattr(link, "_process_identity", None), **kwargs)
-
-    async def _observe_native_inventory(self, port, **kwargs):
-        link = await self._native_game_link_async()
-        return await self._blocking_native_worker().call(
-            port.observe_inventory, **kwargs, link=link, process=link._process_identity)
-
-
-    def _has_received_frag(self):
-        if 7770011 in self.session_state.get("deferred_frag_items", {}).values():
-            return False
-        return any(item.item == 7770011 for item in self.items_received[:self.items_processed]) or any(
-            fact.item_id == 7770011 and fact.quantity for fact in self.receipt_session.starting_ownership
-        )
-
-
-    async def _current_link_process(self, link):
-        identity = await self._query_process_identity()
-        if identity != link._process_identity:
-            raise StaleNativeResult("Game process changed before saving special preference")
-        return identity
-
-    async def _synchronize_special_preference(self, link, result):
-        if not result.get("flags", 0) & 4096 or not result.get("native_state_known", 0) & 8:
-            return
-        preferences = config.setdefault("special_selection", {})
-        if not isinstance(preferences, dict):
-            raise ValueError("special_selection configuration must be a namespace mapping")
-        process = (await self._current_link_process(link), link.namespace)
-        if getattr(self, "_special_preference_process", None) != process:
-            saved = preferences.get(link.namespace)
-            if type(saved) is int and saved in (1, 2) and saved != result["native_selected"]:
-                result = (await self._native_call(link, 'select_special_weapon', saved))
-            self._special_preference_process = process
-        selected = result["native_selected"]
-        if selected in (1, 2) and preferences.get(link.namespace) != selected:
-            preferences[link.namespace] = selected
-            save_config()
-            log_item_event("ITEM_SPECIAL_PREFERENCE_SAVED", namespace=link.namespace,
-                           selected=selected, source="core_policy", config_path=str(CONFIG_FILE))
-
-
-    def _block_item_state(self, error):
-        self._item_state_error = str(error)
-        self.item_state_ready = False
-        self.item_delivery_blocked = True
-        message = f'Item delivery blocked by local client state: {error!s}. Check the state file and restart the bridge.'
-        self.item_delivery_blocked_info = {"reason": "client_state_error", "message": message}
-        logger.error("[State] %s", message)
-        emit_launcher_event("item_history_status", status="blocked", **self.item_delivery_blocked_info)
-        self.reset_room_session_authority("client_state_error")
-
-
-    def persist_session_state(self):
-        if getattr(self, "_item_state_error", None):
-            raise RuntimeError(self._item_state_error)
-        if not self.item_state_ready:
-            return
-        try:
-            client_state_store().commit_session(
-                self.client_state, self.session_state, processed_items=self.items_processed,
-                cultist_autosave_path=self.cultist_autosave_path,
-                received_deathlink_event_ids=self.deathlink.seen_events,
-                save_slot_observations=self.save_observer.observation_document,
-            )
-        except Exception as error:
-            self._block_item_state(error)
-            raise
-
-
-    @property
-    def items_processed(self):
-        return self.receipt_session.processed_boundary
-
-    def received_rune_count(self):
-        return sum(item_id in REVISION_ONE_RUNE_IDS for item_id in self.receipt_session.ownership_item_ids(receipt_item_ids(self.items_received), ITEM_ID_TO_COMMAND))
-
-    def received_item_ids(self, processed_only=False):
-        items = self.items_received[: self.items_processed] if processed_only else self.items_received
-        return frozenset(self.receipt_session.ownership_item_ids(receipt_item_ids(items), ITEM_ID_TO_COMMAND))
-
-    def _processed_receipt_ids(self):
-        return processed_receipt_counts(self.session_state)
-
-    def _record_processed_receipt(self, network_item):
-        return record_processed_receipt(self.session_state, network_item)
-
-    def validate_item_history_prefix(self):
-        if not getattr(self, "_item_history_received", True):
-            raise ValueError('waiting for the full server item history')
-        compatible, detail = validate_session_receipt_prefix(
-            self.session_state,
-            self.items_received,
-            self.items_processed,
-        )
-        log_item_event(
-            "ITEM_HISTORY_COMPATIBILITY",
-            status="compatible" if compatible else "incompatible",
-            reason=detail,
-            boundary=self.items_processed,
-            received_count=len(self.items_received),
-            history_fingerprint=receipt_history_fingerprint(self.items_received),
-            state_key=getattr(self, "state_key", None),
-            bridge_revision=BRIDGE_REVISION,
-            mapping_revision=ITEM_MAPPING_REVISION,
-        )
-        if not compatible:
-            blocked = {
-                "reason": "history_incompatible",
-                "boundary": self.items_processed,
-                "received_count": len(self.items_received),
-                "state_key": getattr(self, "state_key", None),
-                "message": (player_text("activity", "history_incompatible")),
-            }
-            if getattr(self, "item_delivery_blocked_info", None) != blocked:
-                self.item_delivery_blocked = True
-                self.item_delivery_blocked_info = blocked
-                emit_launcher_event("item_history_status", status="blocked", **blocked)
-            raise ValueError(f'received-item history is incompatible: {detail!s}')
-        if (getattr(self, "item_delivery_blocked_info", None) or {}).get("reason") == "history_incompatible":
-            self.item_delivery_blocked = False
-            self.item_delivery_blocked_info = None
-            emit_launcher_event("item_history_status", status="ready", message=player_text("activity", "history_ready"))
-        return True
-
-    def observe_received_item_history(self):
-        """Record authoritative ownership summary without delivering effects."""
-        self.validate_item_history_prefix()
-        observation = observe_received_items(
-            self.items_received,
-            self.items_processed,
-            self._processed_receipt_ids(),
-        )
-        history = copy.deepcopy(self.session_state.get("receipt_history"))
-        changed = project_receipt_history(
-            self.session_state, self.items_received, self.items_processed, observation,
-        )
-        if changed:
-            try:
-                self.persist_session_state()
-            except Exception:
-                if history is None:
-                    self.session_state.pop("receipt_history", None)
-                else:
-                    self.session_state["receipt_history"] = history
-                raise
-        return observation
-
-
-    async def _manual_reconcile_inventory_unlocked(self, *, observation=None, selected_item_ids=None):
-        return await self._owner_reconcile(read_gameplay_save_evidence(), selected=selected_item_ids)
-
-    async def manual_reconcile_inventory(self, *, observation=None):
-        return (await self._manual_reconcile_inventory_unlocked(observation=observation))
-
-    async def manual_reconcile_inventory_async(self, *, observation=None, domain="all", item_id=None):
-        from doom_eap.contracts.inventory_domain import selected_persistent_items
-        return await self._owner_reconcile(read_gameplay_save_evidence(), selected=selected_persistent_items(domain, item_id))
-
-
-    async def observe_rune_native_state(self):
-        """Read distinct Rune surfaces only from lifecycle-proven active save."""
-        if not self.has_authoritative_save_proof() or not self.active_save_slot:
-            return None, 'authoritative active-save proof required'
-        lease = getattr(self, "runtime_observation_lease", None)
-        evidence_epoch = getattr(lease, "gameplay_loaded_ns", None)
-        if evidence_epoch is None:
-            evidence_epoch = self.active_native_evidence_epoch or "unknown"
-        return RuneNativeState.from_game_details(
-            (await self.observe_active_game_details()),
-            save_slot=self.active_save_slot,
-            evidence_epoch=evidence_epoch,
-        ), None
-
-    async def observe_owned_rune_plan(self):
-        if not self.item_state_ready:
-            return None, 'item state is not ready'
-        native, error = (await self.observe_rune_native_state())
-        if error:
-            return None, error
-        try:
-            from doom_eap.runtime.rune_reconciliation import compile_rune_reconciliation_plan, rune_item_perk_mapping
-            plan = compile_rune_reconciliation_plan(
-                self.received_item_ids(), native, rune_item_perk_mapping(ITEM_ID_TO_COMMAND, SUPPORT_RUNE_IDS),
-                expected_rune_item_ids=SUPPORT_RUNE_IDS,
-            )
+            active = self.location_setup.begin(args, bridge_config._doom_location_ids(), milestone_ids(slot_data["killsanity"]))
         except ValueError as error:
-            return None, str(error)
-        return plan, None
-
-
-    async def observe_rune_diagnostic_lines(self):
-        native, error = (await self.observe_rune_native_state())
-        authority = "authoritative"
-        if error:
-            candidate = (await self.observe_active_game_details())
-            if not isinstance(candidate, dict):
-                return [
-                    "Rune diagnostic unavailable: "
-                    f"authority=observational repair_allowed=no reason={error}"
-                ]
-            native = RuneNativeState.from_game_details(
-                candidate,
-                save_slot=self.active_save_slot or getattr(self, "selected_observation_slot", None) or "candidate",
-                evidence_epoch=getattr(self, "active_native_evidence_epoch", None) or "unknown",
-            )
-            authority = "observational"
-        plan, plan_error = (await self.observe_owned_rune_plan())
-        owned_perks = (
-            ", ".join(sorted(entry.perk for entry in plan.entries)) or "-"
-            if plan is not None
-            else f"unavailable ({plan_error})"
-        )
-        slots = (*native.equipped_slots, None, None, None)
-        lines = [
-            f"Rune authority={authority} repair_allowed={'yes' if authority == 'authoritative' else 'no'} "
-            f"reason={plan_error or error or 'active-save proof'} slot={native.save_slot} "
-            f"epoch={native.evidence_epoch} map={self.current_map_name or '-'}",
-            f"AP-owned Rune perks: {owned_perks} | "
-            f"available: {', '.join(sorted(native.available_perks)) or '-'} | "
-            f"active: {', '.join(sorted(native.active_perks)) or '-'} | "
-            f"registered: {', '.join(sorted(native.registered_runes)) or '-'}",
-            f"Rune slots: 0={slots[0] or '-'} | 1={slots[1] or '-'} | "
-            f"2={slots[2] or '-'} | "
-            f"page={native.page_unlocked if native.page_unlocked is not None else 'unknown'} | "
-            f"active_save={native.save_slot} | epoch={native.evidence_epoch}",
-        ]
-        if plan_error:
-            lines.append(f"Plan: blocked ({plan_error})")
+            self._fail_placement_scout(str(error))
+            return
+        self.locations_info.clear()
+        if not active:
+            self._try_complete_location_scouts()
         else:
-            lines.append(
-                f"Plan: {plan.status}; noops={len(plan.noops)} "
-                f"repair_candidates={len(plan.repairs)}"
-            )
-        return lines
+            self.session_tasks.start(self._scout_active_locations)
+        self.ammo_requests.reset()
 
-    @property
-    def automap_cleanup_epoch(self):
-        return self.checked_visuals.epoch
-
-    @property
-    def automap_cleanup_status(self):
-        return self.checked_visuals.status
-
-    def advance_automap_cleanup_epoch(self):
-        marker = self.runtime_lifecycle.map_identity.cached_marker
-        return self.checked_visuals.advance_epoch(marker.get("gameplay_epoch") if marker else None)
-
-    @property
-    def fast_travel_epoch_state(self):
-        return self.fast_travel.epoch_state
-
-    @property
-    def fast_travel_eligibility_snapshot(self):
-        return self.fast_travel.eligibility
-
-    async def reconcile_fast_travel_unlock(self, trigger):
-        return await self.fast_travel.reconcile(
-            trigger, map_identity=self.runtime_lifecycle.map_identity,
-            room_identity=self.get_ap_state_key(), state_key=self.state_key,
-            runtime_ready=(await self.runtime_effects_ready()), item_ready=self.item_state_ready,
-            rpc_ready=True, send=self._send_runtime_command,
-        )
-
-    def snapshot_fast_travel_eligibility(self, marker_data=None, *, refresh=False):
-        return self.fast_travel.capture(
-            self.runtime_lifecycle.map_identity, self.get_ap_state_key(),
-            getattr(self, "checked_locations", None), marker_data, refresh=refresh,
-        )
-
-    async def process_level_ready(self, newest_path=None):
-        """Adapt native observations and apply the ordered effects of an accepted job."""
-        evidence = read_gameplay_save_evidence()
-        (await self.read_active_map_identity(evidence=evidence))
-        self.snapshot_fast_travel_eligibility()
-        marker = self.cached_map_identity
-        epoch = marker.get("gameplay_epoch") if isinstance(marker, Mapping) else None
-        if not self.level_ready.can_start(epoch):
-            return False
-        if not self.level_ready.observe_readiness(epoch, (await self.runtime_effects_ready(evidence)), getattr(evidence, "state", None)):
-            return False
-        slot_data = getattr(self, "_connected_slot_data", {})
-        active_context = self._refresh_runtime_context(slot_data)
-        use_dlc = slot_data.get("runtime", slot_data).get("use_dlc_content")
-        admission = self.level_ready.start(
-            epoch, active_context, use_dlc, self.dlc_evidence if use_dlc else None,
-            newest_path or marker.get("path"),
-        )
-        if admission.job is None:
-            logger.info("MATERIALIZATION_BLOCKED reason=%s", admission.block)
-            return False
-        job = admission.job
-        receipt_token = self.receipt_session.capture(self.state_key)
+    def _handle_connected(self, args, slot_data, admission):
+        self.items._receive_owner_storage("Connected", args)
+        self._item_history_received = False
+        self._room_session_established = True
+        self._launcher_connection_loss_reported = False
+        self._connected_slot_data = slot_data
+        previous_state_key = self.state_key
+        self.items.initialize_item_state(slot_data)
+        if self._item_state_error:
+            return
+        self._abandon_previous_room(previous_state_key)
         try:
-            if job.settle_inventory:
-                logger.info("[Context] TAG_INVENTORY_SETTLE epoch=%s delay_ms=%s",
-                            epoch, int(TAG_INVENTORY_SETTLE_SECONDS * 1000))
-                await asyncio.sleep(TAG_INVENTORY_SETTLE_SECONDS)
-                if not self.receipt_session.is_current(receipt_token, self.state_key) or not self.level_ready.is_current(job):
-                    return False
-                evidence = read_gameplay_save_evidence()
-                (await self.read_active_map_identity(evidence=evidence))
-                if not self.level_ready.observe_resume(
-                    job, self.runtime_lifecycle.map_identity, (await self.runtime_effects_ready(evidence)), settled=True,
-                ):
-                    return False
-            if self.level_ready.needs_preparation(job, "cleanup_epoch"):
-                self.advance_automap_cleanup_epoch()
-                self.level_ready.prepared(job, "cleanup_epoch")
-            if self.level_ready.needs_preparation(job, "cleanup"):
-                (await self.reconcile_checked_automap_cleanup("level_ready"))
-                self.level_ready.prepared(job, "cleanup")
-            await self.check_mission_challenge_locations()
-            if not self.receipt_session.is_current(receipt_token, self.state_key) or not self.level_ready.is_current(job):
-                return False
-            evidence = read_gameplay_save_evidence()
-            (await self.read_active_map_identity(evidence=evidence))
-            if not self.level_ready.observe_resume(job, self.runtime_lifecycle.map_identity, (await self.runtime_effects_ready(evidence))):
-                return False
-            _, context_error = (await self._context_materialize_inventory(evidence, trigger="level_ready"))
-            if context_error is ReconciliationBlock.NATIVE_APPLICATION_PENDING:
-                self.level_ready.wait(job, "native_materialization_pending")
-                return False
-            if context_error:
-                self.level_ready.wait(job, context_error)
-                return False
-            (await self.reconcile_fast_travel_unlock("level_ready"))
-            self.level_ready.complete(job)
-            return True
-        finally:
-            self.level_ready.finish(job)
-
-    @property
-    def pending_level_ready(self):
-        return self.level_ready.pending
-
-    @property
-    def completed_level_ready_epochs(self):
-        return self.level_ready.completed
-
-
-    async def reconcile_checked_automap_cleanup(self, trigger):
-        if self.server_checked_locations_ready:
-            checked = frozenset(getattr(self, "checked_locations", ()))
-            try:
-                link = (await self._native_game_link_async())
-                result = (await self._native_call(link, 'publish_checked_locations', checked, time.time_ns()))
-                publication = (result.get("pid"), result.get("process_created"),
-                               result.get("lifecycle_generation"), checked)
-                if publication != self._native_automap_published:
-                    log_item_event(
-                        "ITEM_AUTOMAP_SNAPSHOT_ACCEPTED", trigger=trigger, decision="accepted_publication",
-                        snapshot_revision=result.get("revision"), lifecycle_generation=result.get("lifecycle_generation"),
-                        checked_count=len(checked), native_fault=result.get("native_fault"),
-                        namespace=result.get("namespace"), process_id=result.get("pid"),
-                        process_created=result.get("process_created"), request_id=result.get("request_id"),
-                        native_build=result.get("build_id"),
-                        state_key=getattr(self, "state_key", None),
-                    )
-                    self._native_automap_published = publication
-            except (RuntimeError, OSError, ValueError) as error:
-                log_item_event(
-                    "ITEM_AUTOMAP_SNAPSHOT_DEFERRED", trigger=trigger, decision="publication_unconfirmed",
-                    reason="native_snapshot_not_accepted", detail=str(error), checked_count=len(checked),
-                    state_key=getattr(self, "state_key", None),
-                )
-        return await self.checked_visuals.reconcile(
-            trigger, map_identity=self.runtime_lifecycle.map_identity,
-            room_identity=self.get_ap_state_key(), state_key=self.state_key,
-            checked=getattr(self, "checked_locations", None),
-            checked_ready=self.server_checked_locations_ready,
-            runtime_ready=(await self.runtime_effects_ready()), rpc_ready=True, send=self._send_runtime_command,
-        )
-
-    def record_local_automap_cleanup_ownership(self, location_id, event_paths):
-        try:
-            event_mtime = max(Path(path).stat().st_mtime_ns for path in event_paths)
-        except (OSError, ValueError):
-            return False
-        return self.checked_visuals.record_local_ownership(
-            location_id, map_identity=self.runtime_lifecycle.map_identity,
-            room_identity=self.get_ap_state_key(), event_mtime=event_mtime,
-        )
-
-    def bootstrap_actions(self):
-        return self.bootstrap.actions
-
-    def bootstrap_action_state(self, action_name, revision=None):
-        return self.bootstrap.action_state(action_name, revision)
-
-    def _bootstrap_ownership(self):
-        return BootstrapOwnership(frozenset(self.received_item_ids()), self.received_rune_count() > 0)
-
-    def bootstrap_eligible(self, action_name):
-        return self.bootstrap.eligible(action_name, self._bootstrap_ownership())
-
-    def bootstrap_ineligibility_reason(self, action_name):
-        return self.bootstrap.ineligibility_reason(action_name, self._bootstrap_ownership())
-
-    async def enqueue_bootstrap(self, action_name, trigger):
-        return await self.bootstrap.enqueue(
-            action_name, trigger, ownership=self._bootstrap_ownership(), current_map=self.current_map_name,
-            state_key=self.state_key, send=self._send_runtime_command, persist=self.persist_session_state,
-        )
-
-    async def onboard_bootstrap(self, trigger):
-        await self.bootstrap.onboard(
-            trigger, ownership=self._bootstrap_ownership(), map_identity=self.runtime_lifecycle.map_identity,
-            state_key=self.state_key, item_ready=self.item_state_ready, rpc_ready=True,
-            send=self._send_runtime_command,
-            persist=self.persist_session_state,
-        )
-
-    def onboarding_status_lines(self):
-        lines = [
-            f"Bootstrap revision: {BOOTSTRAP_REVISION}",
-            f"Current map: {self.current_map_name or 'unknown'}",
-        ]
-        for action_name in BOOTSTRAP_ACTIONS:
-            state = self.bootstrap_action_state(action_name)
-            status = state.get("status", "pending")
-            eligible = self.bootstrap_eligible(action_name)
-            reason = "eligible" if eligible else self.bootstrap_ineligibility_reason(action_name)
-            lines.append(
-                f"v2 {action_name}: eligible={'yes' if eligible else 'no'}, "
-                f"state={status}, trigger={state.get('trigger') or '-'}, "
-                f"map={state.get('last_map') or '-'}, reason={reason}"
+            self.unified_campaign = UnifiedCampaign(admission, self.session_state, self.persist_session_state)
+        except ValueError as error:
+            message = f'Estado local incompatÃƒÂ­vel com a campanha: {error!s}'
+            bridge_config.logger.error("[State] Connected campaign rejected: %s", error)
+            self._report_launcher_connection_failure(
+                message, code="campaign_state_incompatible", technical_message=message,
             )
-        lines.append(f"Technical log: {BRIDGE_LOG_DIR}")
-        return lines
+            return
+        self.goals.connected(self.persist_session_state)
+        self.items._refresh_runtime_context(slot_data)
+        self.deathlink.configure(slot_data["runtime"]["death_link"]["enabled"], slot_data["runtime"]["death_link"]["mode"])
+        bridge_config.logger.info(
+            "[DeathLink] enabled=%s receive_policy=native mode=%s",
+            self.deathlink.enabled,
+            self.deathlink.mode,
+        )
+        self.receipt_session.configure_starting_ownership(slot_data)
+        self._death_link_task = self.session_tasks.start(
+            lambda: self.update_death_link(self.deathlink.enabled)
+        )
+        self._start_location_scouts(args, slot_data)
 
+    def _connection_refused(self, args):
+        self.reset_room_session_authority("connection_refused")
+        reasons = args.get("errors", [])
+        if not isinstance(reasons, list | tuple):
+            reasons = [reasons]
+        self._report_launcher_connection_failure(
+            'Archipelago rejected the room login.',
+            code="connection_refused",
+            reason_codes=reasons,
+            technical_message="ConnectionRefused: " + ", ".join(map(str, reasons)),
+        )
 
-    def progressive_stage(self, item_id, item_index, *, excluded_receipt_indices=None):
-        """Resolve finite progressive stage from effective authoritative ownership."""
-        if (
-            isinstance(item_index, bool)
-            or not isinstance(item_index, int)
-            or item_index < 0
+    def _handle_hint_update(self, cmd, args):
+        key = self._launcher_hints_key()
+        if (cmd == "Retrieved" and key in args.get("keys", {})) or (
+            cmd == "SetReply" and args.get("key") == key
         ):
-            return 0
-        if excluded_receipt_indices is None:
-            if self.items_received:
-                observation = self.observe_received_item_history()
-                excluded_receipt_indices = {
-                    receipt.index for receipt in observation.duplicates
-                }
-            else:
-                excluded_receipt_indices = set()
-        return progressive_receipt_stage(
-            receipt_item_ids(self.items_received), item_id, item_index,
-            frozenset(excluded_receipt_indices), ITEM_ID_TO_COMMAND.get(item_id),
-            starting_count=self.receipt_session.resolved_starting_count(item_id),
-        )
-
-    def _fresh_receipt_owned_count(
-        self, item_id, item_index, boundary=None, excluded_receipt_indices=None
-    ):
-        """Count only current authoritative receipts eligible for receipt feedback."""
-        boundary = (
-            getattr(self, "items_processed", 0)
-            if boundary is None
-            else boundary
-        )
-        if excluded_receipt_indices is None:
-            excluded_receipt_indices = set()
-        return fresh_receipt_owned_count(
-            receipt_item_ids(self.items_received), item_id, item_index, boundary,
-            frozenset(excluded_receipt_indices),
-        )
-
-    def item_activation_commands(self, item_id, item_index, *, intent=HISTORICAL_OWNERSHIP,
-            include_notification=None, classification=None, fresh_receipt_boundary=None,
-            excluded_receipt_indices=None, suppress_local_toast=True):
-        request = ReceiptIntent(item_id, item_index, intent, include_notification, classification, suppress_local_toast)
-        network_item = (self.items_received[item_index] if isinstance(item_index, int) and not isinstance(item_index, bool)
-                        and 0 <= item_index < len(self.items_received) else None)
-        facts = ReceiptFeedbackFacts(
-            self._fresh_receipt_owned_count(item_id, item_index, fresh_receipt_boundary, excluded_receipt_indices),
-            self.items_processed if fresh_receipt_boundary is None else fresh_receipt_boundary,
-            getattr(network_item, "location", None), getattr(self, "server_checked_locations_ready", False),
-            frozenset(getattr(self, "checked_locations", ()) or ()),
-            frozenset(getattr(self, "locations_info", {}) or {}), self.location_setup.received_ids & DOOM_LOCATION_NAMES.keys(),
-        )
-        stage = (self.progressive_stage(item_id, item_index, excluded_receipt_indices=excluded_receipt_indices)
-                 if requires_progressive_observation(request, ITEM_ID_TO_COMMAND) else None)
-        plan = compile_receipt_plan(request, facts, stage, ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES, ITEM_CLASSIFICATIONS)
-        return (list(plan.commands) if plan.commands is not None else None), plan.description
-
-
-    def delivery_item_name(self, item_id):
-        if item_id in ACCESS_IDS:
-            return STAGES[ACCESS_IDS[item_id]]["name"] + " Access"
-        identity = ITEM_CLASSIFICATION_IDENTITY.get(item_id)
-        if identity is not None:
-            return identity["name"]
-        return player_text("activity", "unknown_item_id", item_id=str(item_id))
-
-
-    def delivery_notification_commands(self, item_id, item_index):
-        if not ENABLE_ITEM_NOTIFICATIONS:
-            return ()
-        commands, _ = self.item_activation_commands(item_id, item_index, intent=NEW_RECEIPT, include_notification=True,
-                                                     fresh_receipt_boundary=item_index)
-        return tuple(command for command in commands or () if command.startswith("ai_ScriptCmdEnt ap_notify_item_"))
-
-
-    @property
-    def death_link_enabled(self):
-        return self.deathlink.enabled
-
-    @property
-    def death_link_mode(self):
-        return self.deathlink.mode
-
-    def on_deathlink(self, data: dict):
-        super().on_deathlink(data)
-        event_id = self.deathlink.receive(data, self.persist_session_state)
-        if event_id is None:
-            return
-        source = _bounded_event_text(str(data.get("source") or player_text("deathlink", "source_fallback")), 128)
-        cause = _bounded_event_text(str(data.get("cause") or ""), 512)
-        emit_launcher_event(
-            "deathlink",
-            direction="received",
-            event_id=event_id,
-            source=source,
-            cause=cause,
-            message=cause or player_text("deathlink", "received", source=str(source)),
-        )
-
-
-    async def queue_received_deathlink(self):
-        try:
-            ready = (not self.runtime_observers_frozen and self.has_authoritative_save_proof()
-                     and (await self.runtime_effects_ready()))
-            if not self.deathlink.receiving:
-                return
-            identity = await self._query_process_identity()
-            link = self._native_game_link_for_identity(identity) if identity else None
-            session = copy.copy(self.deathlink)
-            before = copy.deepcopy(self.deathlink._receiver.__dict__)
-            session._receiver = copy.deepcopy(self.deathlink._receiver)
-            def require_link():
-                if link is None:
-                    raise RuntimeError("Sentinel requires a qualified Windows game process")
-                return link
-            publication = DeathLinkPublication(require_link, session.active_event, session.mode)
-            await self._blocking_native_worker().call(
-                session.advance, ready, publication, process=identity)
-            if self.deathlink._receiver.__dict__ == before:
-                self.deathlink._receiver.__dict__.update(session._receiver.__dict__)
-        except RuntimeError as error:
-            logger.info("[DeathLink] Native receive pending: %s", error)
-
-    async def check_game_duration_death(self):
-        selected = (await self.update_save_slot_lifecycle())
-        if not selected:
-            # The durable-save path is available but deliberately frozen until
-            # native gameplay evidence promotes a slot. Do not fall back to a
-            # newest-mtime game.details reader while in menus.
-            return True
-        path = selected.path
-        if self.save_observer.duration_is_current(selected):
-            return True
-
-        receipt_token = self.receipt_session.capture(self.state_key)
-        observation_token = self.save_observer.capture_observation()
-
-        def observation_current():
-            return (
-                self.receipt_session.is_current(receipt_token, self.state_key)
-                and self.save_observer.observation_is_current(observation_token)
-            )
-
-        try:
-            snapshot = await asyncio.to_thread(probe_game_duration, path)
-        except Exception as error:
-            if not observation_current():
-                return True
-            self.death_observer.probe_failed(error)
-            return False
-
-        current = await self.admitted_campaign_save()
-        if not observation_current() or current != selected:
-            return True
-        self.death_observer.probe_succeeded()
-        self.save_observer.accept_duration(selected)
-        self.observe_weapon_masteries(snapshot["mastery_records"], selected)
-        self.observe_mission_challenges(
-            snapshot["mission_challenge_records"], selected
-        )
-        marker = (await self.read_active_map_identity())
-        event_identity = self.death_observer.observe_checkpoint(
-            snapshot, selected, self.active_save_proof_load_epoch,
-            marker["runtime_map"] if marker else "unknown",
-        )
-        if event_identity is None:
-            return True
-        self.reset_transient_effects("death_boundary")
-        logger.info(
-            "[DeathLink] LOCAL_DEATH_OBSERVED event_identity=%s",
-            event_identity,
-        )
-        if not self.death_link_enabled:
-            logger.info(
-                "[DeathLink] DEATHLINK_OUTBOUND_SUPPRESSED reason=death_link_disabled"
-            )
-            return True
-
-        await self.report_local_death()
-        return True
-
-    def save_check_observations(self):
-        scope = SaveCheckBinding(
-            str(self.room_seed_name or getattr(self, "seed_name", None) or self.state_key or "unknown"),
-            int(getattr(self, "team", 0) or 0), int(getattr(self, "slot", 0) or 0), self.state_key,
-            OBSERVER_REGISTRY_REVISION, frozenset(getattr(self, "checked_locations", set())),
-            self.item_state_ready, self.client_state.get("sessions", {}).get(self.state_key) is self.session_state,
-        )
-        return SaveCheckObservations(self.save_observer, scope, self.persist_session_state, logger)
-
-    def observe_weapon_masteries(self, records, path):
-        slot_directory = self.observation_slot_for_source(path)
-        self.select_save_observation_slot(slot_directory)
-        self.save_checks.observe_masteries(records, path, slot_directory, self.save_check_observations(),
-            authoritative=self.has_authoritative_save_proof())
-
-    def observe_mission_challenges(self, records, path):
-        slot_directory = self.observation_slot_for_source(path)
-        self.select_save_observation_slot(slot_directory)
-        if not self.server_checked_locations_ready:
-            return  # Do not consume the first complete baseline before checked Locations arrive.
-        self.save_checks.observe_challenges(records, path, slot_directory,
-            self.mission_select_observation_map, self.mission_select_observation_epoch, self.save_check_observations(),
-            authoritative=self.has_authoritative_save_proof(),
-            first_sample_locations=frozenset(self.server_locations) - frozenset(self.checked_locations))
-
-    def observe_sticky_mastery(self, snapshot, path):
-        """Observe one Sticky Bombs native mastery record."""
-        record = {
-            "numUnlockableRules": STICKY_MASTERY_ENTRY["signal"]["numUnlockableRules"],
-            "rule_0_statDuration": STICKY_MASTERY_ENTRY["signal"]["rule_0_statDuration"],
-            **snapshot,
-        }
-        self.observe_weapon_masteries(
-            {STICKY_UNLOCKABLE.decode("ascii"): record}, path
-        )
-
-    def save_check_readiness(self):
-        return SaveCheckReadiness(self.item_state_ready, self.has_authoritative_save_proof(), self.active_save_slot)
-
-    async def check_weapon_mastery_location(self, entry):
-        await self.save_checks.check_mastery(entry, self.save_check_readiness(),
-            self.check_observation(), self.check_publication())
-
-    async def check_weapon_mastery_locations(self):
-        token = self.receipt_session.capture(self.state_key)
-        for entry in WEAPON_MASTERY_ENTRIES:
-            await self.check_weapon_mastery_location(entry)
-            if not self.receipt_session.is_current(token, self.state_key):
-                return
-
-    async def check_mission_challenge_location(self, entry):
-        await self.save_checks.check_challenge(entry, self.save_check_readiness(),
-            self.check_observation(), self.check_publication())
-
-    async def check_mission_challenge_locations(self):
-        (await self.ingest_visible_runtime_lifecycle())
-        token = self.receipt_session.capture(self.state_key)
-        for entry in MISSION_CHALLENGE_ENTRIES:
-            await self.check_mission_challenge_location(entry)
-            if not self.receipt_session.is_current(token, self.state_key):
-                return
-        await self.check_all_mission_challenges_location()
-
-    async def check_all_mission_challenges_location(self):
-        await self.save_checks.check_aggregates(self.save_check_readiness(),
-            self.check_observation(), self.check_publication())
-
-    async def check_sticky_mastery_location(self):
-        await self.check_weapon_mastery_location(STICKY_MASTERY_ENTRY)
-
-    async def check_game_details_death(self):
-        details = (await self.observe_active_game_details())
-        if self.death_observer.observe_details(details):
-            logger.info("[DeathLink] LOCAL_DEATH_OBSERVED source=game.details path=%s", details.get("_path"))
-            await self.report_local_death()
-
-    async def report_local_death(self):
-        from types import SimpleNamespace
-        event, mode = self.deathlink.active_event, self.deathlink.mode
-        cancellations = []
-        publication = SimpleNamespace(cancel=cancellations.append)
-        await self.deathlink.report_local_death(self.auth, self.send_death, publication,
-            grace=load_config().get("death_link_grace", 0), persist=self.persist_session_state)
-        for state_key in cancellations:
-            try:
-                link = await self._native_game_link_async()
-                publication = DeathLinkPublication(lambda link=link: link, event, mode)
-                await self._blocking_native_worker().call(
-                    publication.cancel, state_key, process=link._process_identity)
-            except (RuntimeError, OSError) as error:
-                logger.warning("[DeathLink] Native cancellation unavailable: %s", error)
-
-    @staticmethod
-    def goal_objective_ids(slot_data, server_locations):
-        return GOAL_POLICY.objective_ids(slot_data, server_locations)
-
-    @property
-    def goal_dispatch_sent(self):
-        return self.goals.sent
-
-    @property
-    def cultist_autosave_path(self):
-        return self.goals.cultist_path
-
-    def check_observation(self):
-        return CheckObservation(
-            frozenset(getattr(self, "checked_locations", None) or ()),
-            frozenset(self.locations_checked), frozenset(self.server_locations),
-            bool(getattr(self, "server_checked_locations_ready", False)),
-            bool(self.server and self.server.socket and not self.server.socket.closed),
-        )
-
-    def check_publication(self):
-        return CheckPublication(self.send_msgs, self.locations_checked.add, ClientStatus.CLIENT_GOAL)
-
-    async def evaluate_campaign_goal(self, source_description):
-        campaign = getattr(self, "unified_campaign", None)
-        admitted = campaign.goal_admitted(self.checked_locations, self.items_received) if campaign else None
-        admission_missing = tuple(
-            key for key in campaign.plan["sequence"]
-            if key != campaign.plan["goal_stage"] and STAGES[key]["completion_id"] not in self.checked_locations
-        ) if campaign else ()
-        observation = DoomEternalContext.check_observation(self)
-        slot_data = getattr(self, "_connected_slot_data", {})
-        threshold_ids, threshold = GOAL_POLICY.threshold(slot_data)
-        return await self.goals.evaluate(
-            source_description,
-            GOAL_POLICY.objective_ids(slot_data, observation.server_locations),
-            observation, DoomEternalContext.check_publication(self),
-            admitted=admitted, admission_missing=admission_missing,
-            threshold_ids=threshold_ids, threshold=threshold,
-        )
-
-    async def execute_publisher(self, publisher, trigger_strategy, source_description):
-        self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
-        return await self.publisher_dispatch.execute(
-            publisher, trigger_strategy, source_description,
-            DoomEternalContext.check_publication(self), self.persist_session_state,
-        )
-
-    async def send_mission_complete(self, location_id, source_description, report_goal=False):
-        if report_goal:
-            return await DoomEternalContext.evaluate_campaign_goal(
-            self, source_description
-        )
-        self.publisher_dispatch.observe_protocol(DoomEternalContext.check_observation(self))
-        return await self.publisher_dispatch.mission(
-            location_id, source_description, DoomEternalContext.check_publication(self), self.persist_session_state,
-        )
-
-    async def send_campaign_goal(self, source_description):
-        return await DoomEternalContext.evaluate_campaign_goal(
-            self, source_description
-        )
-
-    async def check_campaign_goal_event(self):
-        """Consume independent map files and native transition triggers."""
-        if not (await self.check_and_update_event_session()):
-            return False
-        receipt_token = self.receipt_session.capture(self.state_key)
-        observed = False
-        quarantine_root = Path(INV_DUMP_DIR) / "quarantine"
-        for trigger_key, publishers in PUBLISHER_ENGINE.publishers_by_trigger.items():
-            if trigger_key[0] != "map_event_file":
-                continue
-            filename = trigger_key[1]
-            trigger = next(
-                item
-                for publisher in publishers
-                for item in publisher.triggers_for("map_event_file")
-                if item["filename"] == filename
-            )
-            path = Path(INV_DUMP_DIR) / filename
-            if not path.exists():
-                continue
-            observed = True
-            try:
-                valid, contents, digest = read_map_event(path, trigger["marker"])
-            except OSError as error:
-                logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", filename, error)
-                continue
-            if not valid:
-                quarantine_malformed_event(
-                    path,
-                    key=",".join(publisher.key for publisher in publishers),
-                    contents=contents,
-                    sha256=digest,
-                    quarantine_root=quarantine_root,
-                )
-                logger.warning(
-                    "[PUBLISHER] EVENT_MALFORMED key=%s filename=%s sha256=%s",
-                    ",".join(publisher.key for publisher in publishers),
-                    filename,
-                    digest,
-                )
-                continue
-            completed = []
-            for publisher in publishers:
-                completed.append(await DoomEternalContext.execute_publisher(
-                    self,
-                    publisher,
-                    "map_event_file",
-                    f"map event {filename}",
-                ))
-                if not self.receipt_session.is_current(receipt_token, self.state_key):
-                    return observed
-            if all(completed):
-                try:
-                    path.unlink()
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    logger.warning(
-                        "[PUBLISHER] EVENT_CLEANUP_RETRY key=%s filename=%s error=%s",
-                        ",".join(publisher.key for publisher in publishers),
-                        filename,
-                        error,
-                    )
-
-        for path in goal_event_files():
-            observed = True
-            try:
-                event = parse_goal_transition_event(path, include_raw=True)
-            except OSError as error:
-                logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", os.path.basename(path), error)
-                continue
-            if event is None:
-                try:
-                    raw = Path(path).read_text(encoding="utf-8", errors="replace")
-                except OSError as error:
-                    logger.warning("[PUBLISHER] EVENT_READ_RETRY filename=%s error=%s", os.path.basename(path), error)
-                    continue
-                digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
-                quarantine_malformed_event(
-                    Path(path),
-                    key="native_transition",
-                    contents=raw,
-                    sha256=digest,
-                    quarantine_root=quarantine_root,
-                )
-                logger.warning(
-                    "[PUBLISHER] EVENT_MALFORMED key=native_transition filename=%s sha256=%s",
-                    os.path.basename(path),
-                    digest,
-                )
-                continue
-            matching = PUBLISHER_ENGINE.observe("native_transition", event)
-            if not matching:
-                logger.info(
-                    "[PUBLISHER] TRANSITION_IGNORED from=%s to=%s reason=no_contract",
-                    event["from_map"],
-                    event["to_map"],
-                )
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-                continue
-            completed = []
-            for publisher in matching:
-                completed.append(
-                    await DoomEternalContext.execute_publisher(
-                        self,
-                        publisher,
-                        "native_transition",
-                        f"native transition {event['from_map']} -> {event['to_map']}",
-                    )
-                )
-                if not self.receipt_session.is_current(receipt_token, self.state_key):
-                    return observed
-            if all(completed):
-                try:
-                    os.remove(path)
-                except FileNotFoundError:
-                    pass
-                except OSError as error:
-                    logger.warning(
-                        "[PUBLISHER] EVENT_CLEANUP_RETRY key=native_transition "
-                        "filename=%s error=%s",
-                        os.path.basename(path),
-                        error,
-                    )
-        return observed
-
-    def clear_final_sin_completion_candidate(self, reason):
-        self.goals.clear_candidate(reason)
-
-    def arm_final_sin_completion_candidate(self, selected, details, runtime_map, load_epoch):
-        self.goals.arm_candidate(selected, details, runtime_map, load_epoch)
-
-    async def evaluate_final_sin_completion_candidate(self):
-        candidate = self.goals.candidate
-        if candidate is None:
-            return False
-        if not self.goals.candidate_slot_allowed(self.active_save_proof_authoritative, self.active_save_proof_slot):
-            return False
-        selected = (await self.admitted_campaign_save())
-        if selected and selected.slot_directory != candidate["slot"]:
-            selected = None
-        details = read_game_details_for_selection(selected) if selected else None
-        decision = self.goals.observe_candidate(selected, details)
-        if decision == "publish":
-            token = self.goals.candidate_token()
-            publisher = next(item for item in PUBLISHERS if item.key == "final_sin_mission_complete")
-            published = await DoomEternalContext.execute_publisher(
-                self, publisher, "save_fallback", "Final Sin Mission Select completed edge",
-            )
-            if published:
-                self.goals.acknowledge_candidate(token)
-            return published
-        if decision == "pending":
-            lease = getattr(self, "runtime_observation_lease", None)
-            if lease is not None and not lease.process_probe():
-                self.goals.clear_candidate("game_process_ended")
-        return False
-
-    async def check_campaign_goal_save_fallback(self):
-        receipt_token = self.receipt_session.capture(self.state_key)
-        if await self.evaluate_final_sin_completion_candidate():
-            return
-        if not self.receipt_session.is_current(receipt_token, self.state_key):
-            return
-        marker = (await self.read_active_map_identity(evidence=read_gameplay_save_evidence()))
-        active_map = canonical_map_name(marker["runtime_map"]) if marker else ""
-        if not active_map:
-            return
-        details = (await self.observe_active_game_details())
-        if not details:
-            return
-        intent = self.goals.observe_completion(details, self.persist_session_state)
-        if intent is not None:
-            key, source = intent
-            for publisher in (item for item in PUBLISHERS if item.key == key):
-                await DoomEternalContext.execute_publisher(self, publisher, "save_fallback", source)
-
-    async def check_campaign_goal(self):
-        receipt_token = self.receipt_session.capture(self.state_key)
-        if not self.item_state_ready:
-            await self.check_campaign_goal_event()
-            return
-
-        await self.check_campaign_goal_event()
-        if not self.receipt_session.is_current(receipt_token, self.state_key):
-            return
-        await self.check_campaign_goal_save_fallback()
-        if not self.receipt_session.is_current(receipt_token, self.state_key):
-            return
-        await self.evaluate_campaign_goal("central objective evaluator")
-
-    async def check_rpc_autopause(self):
-        evidence = read_gameplay_save_evidence()
-        marker = (await self.read_active_map_identity(evidence=evidence))
-
-        if marker is None:
-            self.bootstrap.observe_supported_map(None)
-            self.runtime_lifecycle.project_current_map(None)
-            return
-        map_name = marker["runtime_map"]
-
-        self.runtime_lifecycle.project_current_map(marker)
-        if getattr(evidence, "state", None) != "gameplay":
-            return
-        self.snapshot_fast_travel_eligibility()
-        (await self.reconcile_fast_travel_unlock("map_ready"))
-        if self.bootstrap.observe_supported_map(map_name):
-            await self.onboard_bootstrap("on_supported_map_load")
-
-    async def _present_killsanity(self, tracker, link):
-        try:
-            await tracker.present(link, getattr(self, "killsanity_counter_visible", True),
-                                  run=lambda method, *args: self._native_call(link, "publish_combat_progress", *args))
-            self._killsanity_presentation_error = None
-        except StaleNativeResult:
-            return
-        except Exception as error:
-            signature = str(error)
-            if signature != getattr(self, "_killsanity_presentation_error", None):
-                logger.warning("[Killsanity] Presentation pending: %s", error)
-                self._killsanity_presentation_error = signature
-        return True
-
-    async def check_killsanity(self, game_running):
-        tracker = self.killsanity
-        if not tracker.enabled or not self.item_state_ready:
-            return
-        identity = (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch)
-        link = None
-        try:
-            if game_running:
-                link = (await self._native_game_link_async())
-                if link.namespace != tracker.namespace:
-                    return
-                snapshot = await self._native_call(link, "observe_combat", set(CONTEXT_BY_MAP))
-                if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
-                    return
-                tracker.consume(snapshot, self.persist_session_state)
-            self._killsanity_observation_error = None
-        except StaleNativeResult:
-            return
-        except Exception as error:
-            signature = str(error)
-            if signature != getattr(self, "_killsanity_observation_error", None):
-                logger.warning("[Killsanity] Observation pending: %s", error)
-                self._killsanity_observation_error = signature
-        if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
-            return
-        if game_running and link is not None:
-            if not await DoomEternalContext._present_killsanity(self, tracker, link):
-                return
-        if identity != (self.state_key, id(self.session_state), tracker.namespace, tracker._epoch):
-            return
-        try:
-            await tracker.publish(self.check_observation(), self.check_publication())
-        except Exception as error:
-            logger.warning("[Killsanity] Milestone publication pending: %s", error)
-
-    async def prime_death_baseline(self):
-        if not getattr(self, '_death_baseline_pending', False):
-            return
-        token = self.receipt_session.capture(self.state_key)
-        try:
-            root = await self._admitted_campaign_root()
-            if root is None or not self.receipt_session.is_current(token, self.state_key):
-                return
-            path = STEAM_REMOTE_DIR / root / 'GAME-AUTOSAVE0' / 'game_duration.dat'
-            try:
-                path.stat()
-            except FileNotFoundError:
-                self.death_observer.start_empty_slot('GAME-AUTOSAVE0')
-                self._death_baseline_pending = False
-                return
-            selected = save_files.admitted_ap_save(STEAM_REMOTE_DIR, root)
-            if selected is None:
-                return
-            snapshot = await asyncio.to_thread(probe_game_duration, selected.path)
-            current = await self.admitted_campaign_save()
-            if (current != selected
-                    or not self.receipt_session.is_current(token, self.state_key)):
-                return
-            # this read establishes history; live save proof still controls death publication.
-            self.death_observer.observe_checkpoint(snapshot, selected, 0, 'session_baseline')
-            self._death_baseline_pending = False
-        except Exception as error:
-            if str(error) != getattr(self, '_death_baseline_error', None):
-                logger.warning('[DeathLink] Initial save baseline pending: %s', error)
-                self._death_baseline_error = str(error)
-
-    async def death_monitor_loop(self):
-        while not self.exit_event.is_set():
-            if not self.item_state_ready:
-                await asyncio.sleep(0.25)
-                continue
-            await self.prime_death_baseline()
-            (await self.check_rpc_autopause())
-            (await self.queue_received_deathlink())
-            game_running = bool(await self._query_process_identity())
-            await self.check_killsanity(game_running)
-            if not game_running:
-                await asyncio.sleep(1.0)
-                continue
-            work_token = self.runtime_lifecycle.capture_work()
-            used_duration = False
-            if not DEATH_PROBE.is_file() and not getattr(self, "_save_probe_missing_logged", False):
-                logger.warning("[Challenge] SAVE_PROBE_UNAVAILABLE reason=helper_missing path=%s", DEATH_PROBE)
-                self._save_probe_missing_logged = True
-            if death_probe_available():
-                used_duration = await self.check_game_duration_death()
-            if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                continue
-            if not used_duration:
-                await self.check_game_details_death()
-            if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                continue
-            await self.check_weapon_mastery_locations()
-            if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                continue
-            await self.check_mission_challenge_locations()
-            if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                continue
-            self._consume_ammo_refill_request_file()
-            sleep_duration = 0.05 if self.deathlink.receiving else 1.0
-            await asyncio.sleep(sleep_duration)
-
-    async def flush_check_event_files(self):
-        get_key = getattr(self, "get_ap_state_key", None)
-        state_key = get_key() if get_key else None
-        if not state_key or not (await self.check_and_update_event_session()):
-            return
-
-        event_paths_by_location = {}
-        unknown_event_paths = []
-        for path in check_event_files():
-            if os.path.basename(path) in PUBLISHER_MAP_EVENT_FILENAMES:
-                continue
-            location_id = extract_location_id_from_event(path)
-            if location_id is None:
-                unknown_event_paths.append(path)
-                continue
-            event_paths_by_location.setdefault(location_id, []).append(path)
-
-        for path in unknown_event_paths:
-            logger.warning(
-                "[Trigger] Could not identify AP event location from "
-                f"{os.path.basename(path)}; leaving file in place."
-            )
-
-        facts = self.check_observation()
-        if not _record_physical_gates(self, event_paths_by_location, facts):
-            return
-        pending_locations = []
-        for location_id, paths in event_paths_by_location.items():
-            disposition = self.physical_checks.disposition(location_id, facts, self.item_state_ready)
-            if disposition == "acknowledged":
-                for path in paths:
-                    _remove_acknowledged_event(path)
-                continue
-            if disposition == "quarantine":
-                logger.warning(
-                    "[Trigger] AP event location %s not in connected slot; quarantining.",
-                    location_id,
-                )
-                for path in paths:
-                    quarantine_event_file(
-                        path,
-                        old_state_key=state_key,
-                        new_state_key=state_key,
-                        reason="location_not_in_connected_slot",
-                    )
-                continue
-            if disposition == "outside_slot":
-                logger.warning(
-                    "[Trigger] AP event location %s is not part of the connected slot; leaving file in place.",
-                    location_id,
-                )
-                continue
-            if disposition == "submit":
-                self.record_local_automap_cleanup_ownership(location_id, paths)
-                pending_locations.append(location_id)
-
-        await self.physical_checks.publish(pending_locations, self.check_publication())
-
-    @property
-    def last_processed_event_id(self):
-        return self.physical_checks.last_event
-
-    async def physical_check_loop(self):
-        while not self.exit_event.is_set():
-            try:
-                if self.item_state_ready and self.server and self.server.socket and not self.server.socket.closed:
-                    await self.flush_check_event_files()
-            except StaleNativeResult:
-                continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("[Trigger] Check publication interrupted; retrying")
-                await asyncio.sleep(1.0)
-            await asyncio.sleep(0.1)
-
-    async def _ingest_tracker_markers(self, evidence, markers):
-        newest_path = None
-        if markers:
-            _, newest_path = markers[-1]
-            try:
-                (await self.ingest_visible_runtime_lifecycle(
-                    evidence=evidence,
-                    lifecycle_markers=markers,
-                ))
-            except StaleNativeResult:
-                return False, newest_path
-            except Exception as exc:
-                logger.error(
-                    "[RPC] Auto-RPC failed to consume telemetry ready file %s: %s",
-                    newest_path,
-                    exc,
-                )
-            for _mtime, path in markers:
-                try:
-                    os.remove(path)
-                except OSError:
-                    pass
-        return True, newest_path
-
-    async def tracker_loop(self):
-        logger.info(
-            "[Tracking] Starting Doom Eternal runtime tracking loop "
-            "(polling every 4 seconds)."
-        )
-        logger.info(
-            "[RPC] Auto-RPC waits for telemetry-ready, then the native memory "
-            "gate permits execution only in safe gameplay. Check delivery prefers "
-            "native ap_event files over telemetry polls."
-        )
-        self.last_heartbeat_timestamp = time.time()
-        self.heartbeat_iteration_count = 0
-
-        while not self.exit_event.is_set():
-            self.last_heartbeat_timestamp = time.time()
-            if not self.item_state_ready:
-                await asyncio.sleep(0.25)
-                continue
-            if not (await self._query_process_identity()):
-                self.invalidate_map_identity("game_not_running")
-                await asyncio.sleep(4.0)
-                continue
-            self.heartbeat_iteration_count += 1
-            if self.heartbeat_iteration_count % 15 == 0:
-                logger.info(
-                    "[Tracking] TRACKER_HEARTBEAT active_slot=%s map=%s items_processed=%d/%d",
-                    self.active_save_slot or "<none>",
-                    self.current_map_name or "<none>",
-                    self.items_processed,
-                    len(self.items_received),
-                )
-
-                (await self._publish_native_ammo_refill("tracker"))
-            if self.server and self.server.socket and not self.server.socket.closed:
-                newest_path = None
-                try:
-                    await self.checkpoint_recovery_ready()
-                    evidence = read_gameplay_save_evidence()
-                    if getattr(evidence, "state", None) == "not_running":
-                        self.reset_transient_effects("game_exit")
-                    else:
-                        await self.transient_effect_manager.tick(self._observe_transient_runtime())
-                    markers = discover_telemetry_markers()
-                    ingested, newest_path = await self._ingest_tracker_markers(evidence, markers)
-                    if not ingested:
-                        continue
-                    self._refresh_runtime_context(
-                        getattr(self, "_connected_slot_data", {}), evidence
-                    )
-                    if getattr(evidence, "state", None) == "gameplay":
-                        await self.onboard_bootstrap("on_reconnect")
-                        (await self.reconcile_checked_automap_cleanup("connect_or_reconnect"))
-                except StaleNativeResult:
-                    continue
-                except Exception as exc:
-                    logger.warning("[Tracking] Error during reconnection reconciliation: %s", exc)
-
-                work_token = self.runtime_lifecycle.capture_work()
-                level_ready = await self.process_level_ready(newest_path)
-                if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                    continue
-                if not level_ready:
-                    await self.check_mission_challenge_locations()
-                    if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                        continue
-                    (await self.reconcile_fast_travel_unlock("readiness"))
-                await self.process_pending_item_receipts("tracker")
-                if not self.runtime_lifecycle.work_is_current(work_token) or self.exit_event.is_set():
-                    continue
-
-                await self.check_campaign_goal()
-                await self.synchronize_campaign_menu()
-
-            await asyncio.sleep(4.0)
-
-    async def death_monitor_supervisor(self):
-        while not self.exit_event.is_set():
-            try:
-                await self.death_monitor_loop()
-                return
-            except StaleNativeResult:
-                continue
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("[DeathLink] Monitor interrupted; retrying")
-                await asyncio.sleep(1.0)
-
-    async def tracker_supervisor(self):
-        logger.info("[Supervisor] TRACKER_STARTED")
-        self.tracker_alive = True
-        self.tracker_restart_count = getattr(self, "tracker_restart_count", 0)
-        self.last_tracker_error = getattr(self, "last_tracker_error", None)
-        self.last_heartbeat_timestamp = time.time()
-        self.tracker_backoff = getattr(self, "tracker_backoff", 1.0)
-        self.last_error_fingerprint = getattr(self, "last_error_fingerprint", None)
-        self.consecutive_same_error_count = getattr(self, "consecutive_same_error_count", 0)
-        self.tracker_degraded = getattr(self, "tracker_degraded", False)
-
-        while not self.exit_event.is_set():
-            try:
-                await self.tracker_loop()
-                break
-            except StaleNativeResult:
-                continue
-            except asyncio.CancelledError:
-                logger.info("[Supervisor] TRACKER_STOPPED (clean shutdown)")
-                self.tracker_alive = False
-                raise
-            except Exception as exc:
-                self.tracker_restart_count += 1
-                tb = traceback.format_exc()
-                fingerprint = _tracker_error_fingerprint(exc)
-                if fingerprint == self.last_error_fingerprint:
-                    self.consecutive_same_error_count += 1
-                    self.tracker_backoff = min(30.0, self.tracker_backoff * 2.0)
-                else:
-                    self.last_error_fingerprint = fingerprint
-                    self.consecutive_same_error_count = 1
-                    self.tracker_backoff = 1.0
-
-                self.last_tracker_error = f"{type(exc).__name__}: {exc}"
-                self.tracker_degraded = True
-                if self.consecutive_same_error_count <= 2:
-                    logger.error(
-                        "[Supervisor] TRACKER_CRASH type=%s msg=%s ap_state_key=%s "
-                        "current_map=%s active_save_slot=%s last_processed_event=%s "
-                        "last_heartbeat_age=%.1fs traceback:\n%s",
-                        type(exc).__name__,
-                        str(exc),
-                        self.get_ap_state_key(),
-                        self.current_map_name,
-                        self.active_save_slot,
-                        getattr(self, "last_processed_event_id", None),
-                        time.time() - (self.last_heartbeat_timestamp or time.time()),
-                        tb,
-                    )
-                logger.info(
-                    "[Supervisor] TRACKER_RESTART count=%d backoff=%.1fs consecutive_errors=%d fingerprint=%s",
-                    self.tracker_restart_count,
-                    self.tracker_backoff,
-                    self.consecutive_same_error_count,
-                    fingerprint,
-                )
-                await asyncio.sleep(self.tracker_backoff)
+            self._emit_launcher_hints("DATA_RECEIVED" if cmd == "Retrieved" else "UPDATED")
+
+    command_processor: type = DoomCommandProcessor
+
+    game = bridge_config.GAME_NAME
+
+    items_handling = 0b011 if bridge_config._CONTENT_IDENTITY["slot_data_schema_version"] == 7 else 0b111
+
+    max_size = 64 * 1024 * 1024
+
+    def __init__(self, server_address, password):
+        super().__init__(server_address, password)
+        self.checks = bridge_checks.CheckRuntime(self)
+        self.items = bridge_items.ItemRuntime(self)
+        self.saves = bridge_saves.SaveRuntime(self)
+        self.dev_session_id = uuid.uuid4().hex[:8]
+        self.dev_counter = 0
+        self.dev_last_action = None
+        self.dev_last_correlation = None
+        self.tracking_task = None
+        self._item_delivery_lock = asyncio.Lock()
+        self._item_delivery_task = None
+        self._item_delivery_wakeup = False
+        self._item_delivery_waiting_for_state = False
+        self.receipt_session = ReceiptSession()
+        self.room_delivery = None
+        self._room_session_authoritative = False
+        self._ammo_projection_active = False
+        self._ammo_projection_confirmed = None
+        self.ammo_requests = AmmoRequestPump(self.items.request_ammo_refill, self.exit_event, bridge_config.logger)
         self.tracker_alive = False
+        self.tracker_restart_count = 0
+        self.last_tracker_error = None
+        self.last_heartbeat_timestamp = None
+        self.item_state_ready = False
+        self._slot_validation_task = None
+        self._pending_slot_packages = []
+        self.reconnect_resync_attempted = False
+        self.client_state = {"version": CLIENT_STATE_VERSION, "sessions": {}}
+        self.state_key = ""
+        self.base_directory = bridge_config.DOOM_BASE_DIR
+        self.transient_effect_manager = TransientEffectManager(TransientPublication(self.items._send_runtime_command), os.getpid())
+        self.session_state = {}
+        self.goals = GoalProgress(CAMPAIGN_GOAL_CONTRACT["runtime_map"], bridge_config.CULTIST_BASE_MAP, bridge_config.logger)
+        self.publisher_dispatch = PublisherDispatch(bridge_checks.PUBLISHERS, self.goals, bridge_config.logger)
+        self.physical_checks = PhysicalChecks(bridge_config.logger)
+        self.level_ready = LevelReady(bridge_config.logger)
+        self.session_tasks = SessionTasks()
+        self.location_setup = LocationSetup(bridge_config.logger)
+        self.protocol_feed = ProtocolFeed()
+        self.save_checks = SaveChecks(bridge_saves.WEAPON_MASTERY_BY_UNLOCKABLE, bridge_saves.MISSION_CHALLENGE_BY_UNLOCKABLE, bridge_saves.MISSION_CHALLENGE_RUNTIME_MAP_BY_UNLOCKABLE, bridge_saves.ALL_MISSION_CHALLENGES_ENTRIES, bridge_config.logger)
+        self.death_observer = DeathObservation(bridge_config.logger)
+        self.killsanity = Killsanity(bridge_config.logger)
+        self.killsanity_counter_visible = bridge_config.config.get("killsanity_counter_visible", True) is True
+        self.save_observer = SaveObserver()
+        self.inventory_observation_port: InventoryObservationPort = SentinelInventoryObservation(self, bridge_config.logger, bridge_config.log_item_event)
+        self.runtime_observation_lease = RuntimeObservationLease()
+        self.save_observer.clear_mission_select()
+        self.last_observer_lease_block = None
+        # Pending lethal commands stay process-local. Seen event identities persist per
+        # room so reconnect/transport replay cannot create a second logical event.
+        self.deathlink = DeathLinkSession(DeathLinkReceiver(
+            wait_timeout=bridge_config.DEATHLINK_RECEIVE_TIMEOUT,
+            confirm_timeout=bridge_config.DEATHLINK_CONFIRM_TIMEOUT,
+            retry_interval=bridge_config.DEATHLINK_KILL_INTERVAL,
+            total_timeout=bridge_config.DEATHLINK_TOTAL_TIMEOUT,
+            late_suppression_grace=bridge_config.DEATHLINK_LATE_SUPPRESSION_GRACE,
+            max_attempts=bridge_config.DEATHLINK_MAX_ATTEMPTS,
+            mode=DEFAULT_DEATH_LINK_MODE,
+        ), DEATHLINK_MESSAGES, bridge_config.emit_launcher_event, bridge_config.logger)
+        self.room_seed_name = None
+        self._connected_slot_data = {}
+        self.runtime_lifecycle = RuntimeLifecycle()
+        self.dlc_evidence = evaluate_dlc_availability(None)
+        self.bootstrap = Bootstrap(bridge_config.logger)
+        self.checked_visuals = CheckedVisuals(bridge_checks.KNOWN_CATALOG_MAPS, bridge_checks.AUTOMAP_VISUALS_BY_MAP, uuid.uuid4().hex[:8], bridge_config.logger)
+        self._native_automap_published = None
+        self.server_checked_locations_ready = False
+        self.fast_travel = FastTravel(bridge_checks.KNOWN_CATALOG_MAPS, bridge_checks.FAST_TRAVEL_MAP_KEYS, bridge_config.FAST_TRAVEL_MISSION_COMPLETE_IDS, bridge_config.logger)
+        self._launcher_connection_failure_reported = False
+        self._room_session_established = False
+        self._launcher_connection_loss_reported = False
 
-    
 
-async def _launcher_inventory_resync(ctx, control):
-    correlation = _resync_correlation(ctx)
+def log_mission_bridge_identity():
+    from doom_eap.runtime import inventory
+
+    executable = Path(sys.executable).resolve()
     try:
-        plan, error = await ctx.manual_reconcile_inventory_async(
-            domain=control.get("domain", "all"), item_id=control.get("item_id"))
-    except Exception as error:
-        logger.warning("[Resync] Manual inventory resync failed: %s", error)
-        emit_launcher_event("inventory_resync", status="error",
-            message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT), **correlation)
-        return
-    if error or plan is None:
-        emit_launcher_event(
-            "inventory_resync",
-            status="error",
-            message=_bounded_event_text(str(error or 'manual inventory resync returned no plan'), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
-            **_resync_correlation(ctx),
+        executable_sha256 = hashlib.sha256(executable.read_bytes()).hexdigest()
+    except OSError as error:
+        executable_sha256 = f"unavailable:{type(error).__name__}"
+    bridge_config.logger.info("BRIDGE_REVISION=%s", bridge_config.BRIDGE_REVISION)
+    bridge_config.logger.info("BRIDGE_FILE=%s", bridge_config.BRIDGE_FILE)
+    bridge_config.logger.info("BRIDGE_SHA256=%s", bridge_config.BRIDGE_SHA256)
+    bridge_config.logger.info("BRIDGE_EXECUTABLE_SHA256=%s", executable_sha256)
+    bridge_config.logger.info("BRIDGE_PROTOCOL=%s", bridge_config.BRIDGE_PROTOCOL)
+    bridge_config.logger.info("GAME_NAME=%s", bridge_config.GAME_NAME)
+    bridge_config.logger.info("TRANSITION_HANDLER=%s", bridge_config.TRANSITION_HANDLER)
+    bridge_config.log_item_event(
+        "ITEM_WORKER_RUNTIME_IDENTITY",
+        frozen=bool(getattr(sys, "frozen", False)),
+        executable=str(executable),
+        executable_sha256=executable_sha256,
+        application_dir=str(bridge_config.APPLICATION_DIR),
+        modules={
+            __name__: {
+                "origin": __spec__.origin if __spec__ else None,
+                "loader": type(__loader__).__name__,
+                "methods": {
+                    name: hashlib.sha256(getattr(bridge_items.ItemRuntime, name).__code__.co_code).hexdigest()
+                    for name in (
+                        "process_pending_item_receipts",
+                        "native_game_link",
+                    )
+                },
+            },
+            inventory.__name__: {
+                "origin": inventory.__spec__.origin if inventory.__spec__ else None,
+                "loader": type(inventory.__loader__).__name__,
+                "methods": {
+                    "SentinelWeaponPoints._run": hashlib.sha256(
+                        inventory.SentinelWeaponPoints._run.__code__.co_code
+                    ).hexdigest(),
+                },
+            },
+        },
+    )
+
+
+async def amain(launch_args=None):
+    bridge_config.start_bridge_logger()
+    bridge_config.log_effective_runtime_paths()
+    Utils.init_logging("DoomEternalClient")
+    parser = get_base_parser()
+    parser.add_argument('--name', default=None, help="Player name no Archipelago")
+    args = parser.parse_args(launch_args)
+    args.password = args.password or os.environ.get("DOOM_AP_PASSWORD")
+
+    ctx = DoomEternalContext(args.connect, args.password)
+    ctx.auth = args.name
+    ctx.connection_diagnostics = ConnectionDiagnostics(APCommonClient.websockets, ctx)
+    APCommonClient.websockets = ctx.connection_diagnostics
+    loop_monitor = asyncio.create_task(ctx.connection_diagnostics.monitor_loop(), name="bridge loop diagnostics")
+    if await ctx.items._query_process_identity():
+        bridge_checks.cleanup_active_map_markers()
+        bridge_checks.cleanup_ammo_refill_request_files()
+        bridge_checks.cleanup_telemetry_dumps()
+    ctx.tracking_task = asyncio.create_task(ctx.checks.tracker_supervisor())
+    ctx.death_task = asyncio.create_task(ctx.checks.death_monitor_supervisor())
+    ctx.physical_check_task = asyncio.create_task(ctx.checks.physical_check_loop())
+
+    log_mission_bridge_identity()
+    bridge_config.emit_launcher_event("client_started")
+    bridge_config.logger.info("=== DOOM ETERNAL ARCHIPELAGO CLIENT ===")
+    if not args.connect or not args.name:
+        bridge_config.logger.info(
+            "Use the GUI connection fields, or pass --connect and --name "
+            "on the command line."
         )
     else:
-        emit_launcher_event("inventory_resync", status="observed" if plan.commands else "noop",
-                            command_count=len(plan.commands), **_resync_correlation(ctx))
+        bridge_config.logger.info(f"Auto-connecting to {args.connect} as {args.name}...")
+        bridge_config.emit_launcher_event("connecting")
+
+    if bridge_config.LAUNCHER_EVENTS_ENABLED:
+        original_process_server_cmd = APCommonClient.process_server_cmd
+
+        async def launcher_process_server_cmd(client_ctx, package):
+            # CommonClient handles ConnectionRefused before calling on_package,
+            # and raises away its machine-readable reason. The launcher owns the
+            # retry UX, so preserve that packet before CommonClient can flatten it.
+            if package.get("cmd") == "ConnectionRefused":
+                client_ctx.on_package("ConnectionRefused", package)
+                return
+            await original_process_server_cmd(client_ctx, package)
+
+        APCommonClient.process_server_cmd = launcher_process_server_cmd
+
+    APCommonClient.server_loop = server_loop
+    ctx.server_task = asyncio.create_task(server_loop(ctx), name="server loop")
+    ctx.server_task.add_done_callback(lambda task: report_server_stop(ctx, task))
+
+    if gui_enabled:
+        raise RuntimeError("DOOM Eternal bridge worker requires --nogui")
+    ctx.input_task = asyncio.create_task(launcher_control_loop(ctx), name="Launcher control")
+
+    await ctx.exit_event.wait()
+    bridge_config.emit_launcher_event("client_stopping")
+    ctx.reset_room_session_authority("bridge_shutdown")
+    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task, loop_monitor]
+    tasks.extend(_pending_delivery_tasks(ctx))
+    for task in tasks:
+        task.cancel()
+    await ctx.session_tasks.close()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    await ctx.items.close_room_delivery()
+    await ctx.shutdown()
+    await ctx.items._publish_owner_ammo_refill()
+    await ctx.session_tasks.close()
+    if hasattr(ctx, "_native_worker"):
+        if getattr(ctx, "_native_link", None) is not None:
+            await ctx._native_worker.call(ctx._native_link.close)
+        ctx._native_worker.close()
+    await ctx.connection_diagnostics.close()
+    APCommonClient.websockets = ctx.connection_diagnostics.websockets
 
 
-def _resync_correlation(ctx):
-    from dataclasses import asdict
-    if ctx.room_delivery is not None:
-        return {"room": asdict(ctx.room_delivery.key), "command_ids": list(ctx.room_delivery.planned_ids)}
-    return {}
+def launch(*launch_args):
+    colorama.init()
+    asyncio.run(amain(launch_args))
+    colorama.deinit()
 
 
 async def launcher_control_loop(ctx):
@@ -5627,7 +982,7 @@ async def launcher_control_loop(ctx):
         except asyncio.CancelledError:
             raise
         except (OSError, ValueError) as error:
-            logger.warning("[Launcher] Control input closed: %s", error)
+            bridge_config.logger.warning("[Launcher] Control input closed: %s", error)
             ctx.exit_event.set()
             return
 
@@ -5645,65 +1000,11 @@ async def launcher_control_loop(ctx):
         try:
             control = json.loads(line[len("AP_CONTROL "):])
         except json.JSONDecodeError:
-            emit_launcher_event("chat_send_failed", message='Invalid launcher control message')
+            bridge_config.emit_launcher_event("chat_send_failed", message='Invalid launcher control message')
             continue
         if not isinstance(control, dict):
             continue
-        await ctx.handle_delivery_control(control)
-        if control.get("type") == "killsanity_counter_visibility":
-            if type(control.get("visible")) is bool:
-                ctx.killsanity_counter_visible = control["visible"]
-            continue
-        if control.get("type") == "core_runtime_reload":
-            updated = load_config()
-            for key in ("core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"):
-                if key in updated:
-                    config[key] = updated[key]
-                else:
-                    config.pop(key, None)
-            ctx._native_link_key = None
-            refresh_death_probe_proton()
-            emit_launcher_event("core_runtime_bound", path=config.get("core_runtime_manifest") or config.get("selected_core_runtime_manifest"))
-            continue
-        if control.get("type") == "support_condump":
-            try:
-                queued = await ctx.request_support_condump()
-            except Exception as error:
-                logger.warning("[Support] Diagnostic condump request failed: %s", error)
-                emit_launcher_event("support_condump", status="error", message=str(error))
-            else:
-                status = "queued" if queued else "unavailable"
-                emit_launcher_event("support_condump", status=status)
-            continue
-        if control.get("type") == "inventory_resync":
-            task = getattr(ctx, "_inventory_resync_task", None)
-            if task is None or task.done():
-                ctx._inventory_resync_task = asyncio.create_task(_launcher_inventory_resync(ctx, control))
-            continue
-        if control.get("type") == "ammo_refill":
-            try:
-                await ctx.request_ammo_refill()
-            except Exception as error:
-                logger.warning("[Ammo Refill] Launcher request failed: %s", error)
-                emit_launcher_event(
-                    "ammo_refill",
-                    status="error",
-                    message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
-                )
-            continue
-        if control.get("type") != "say":
-            continue
-
-        text = control.get("text")
-        if not isinstance(text, str) or not text.strip():
-            continue
-        try:
-            await ctx.send_launcher_chat(text)
-        except Exception as error:
-            logger.warning("[Launcher] Chat send failed: %s", error)
-            emit_launcher_event("chat_send_failed", message=str(error))
-        else:
-            emit_launcher_event("chat_sent", text=text)
+        await _dispatch_launcher_control(ctx, control)
 
 
 def report_server_stop(ctx, task):
@@ -5719,18 +1020,38 @@ def report_server_stop(ctx, task):
         # CommonClient owns reconnect and outage reporting after an established session.
         return
     if error is not None:
-        emit_launcher_event(
+        bridge_config.emit_launcher_event(
             "error",
             code="server_loop_failed",
             message=f"{type(error).__name__}: {error}",
         )
     else:
-        emit_launcher_event("disconnected")
+        bridge_config.emit_launcher_event("disconnected")
 
 
-def _tracker_error_fingerprint(error):
-    lineno = error.__traceback__.tb_lineno if error.__traceback__ else 0
-    return f"{type(error).__name__}:{error}:{lineno}"
+async def server_loop(ctx, address=None):
+    if ctx.server and ctx.server.socket:
+        APCommonClient.logger.error("Already connected")
+        return
+    address = ctx.server_address if address is None else address
+    if not address:
+        APCommonClient.logger.info("Please connect to an Archipelago server.")
+        return
+    ctx.cancel_autoreconnect()
+    address, server_url = _server_url(ctx, address)
+
+    def reconnect_hint():
+        return ", type /connect to reconnect" if ctx.server_address else ""
+
+    try:
+        address, socket = await _connect_socket(ctx, address, server_url)
+        await _receive_server(ctx, address, server_url, reconnect_hint, socket)
+    except (WebSocketException, OSError, ValueError, RuntimeError) as error:
+        APCommonClient.logger.debug("Archipelago connection failed", exc_info=True)
+        ctx.handle_connection_loss(_connection_loss_message(error, reconnect_hint))
+    finally:
+        await ctx.connection_closed()
+        _schedule_reconnect(ctx)
 
 
 def _pending_delivery_tasks(ctx):
@@ -5744,87 +1065,171 @@ def _pending_delivery_tasks(ctx):
     return tasks
 
 
-async def amain(launch_args=None):
-    start_bridge_logger()
-    log_effective_runtime_paths()
-    Utils.init_logging("DoomEternalClient")
-    parser = get_base_parser()
-    parser.add_argument('--name', default=None, help="Player name no Archipelago")
-    args = parser.parse_args(launch_args)
-    args.password = args.password or os.environ.get("DOOM_AP_PASSWORD")
-
-    ctx = DoomEternalContext(args.connect, args.password)
-    ctx.auth = args.name
-    ctx.connection_diagnostics = ConnectionDiagnostics(APCommonClient.websockets, ctx)
-    APCommonClient.websockets = ctx.connection_diagnostics
-    loop_monitor = asyncio.create_task(ctx.connection_diagnostics.monitor_loop(), name="bridge loop diagnostics")
-    if await ctx._query_process_identity():
-        cleanup_active_map_markers()
-        cleanup_ammo_refill_request_files()
-        cleanup_telemetry_dumps()
-    ctx.tracking_task = asyncio.create_task(ctx.tracker_supervisor())
-    ctx.death_task = asyncio.create_task(ctx.death_monitor_supervisor())
-    ctx.physical_check_task = asyncio.create_task(ctx.physical_check_loop())
-
-    log_mission_bridge_identity()
-    emit_launcher_event("client_started")
-    logger.info("=== DOOM ETERNAL ARCHIPELAGO CLIENT ===")
-    if not args.connect or not args.name:
-        logger.info(
-            "Use the GUI connection fields, or pass --connect and --name "
-            "on the command line."
+async def _launcher_inventory_resync(ctx, control):
+    correlation = _resync_correlation(ctx)
+    try:
+        plan, error = await ctx.items.manual_reconcile_inventory_async(
+            domain=control.get("domain", "all"), item_id=control.get("item_id"))
+    except (OSError, RuntimeError, ValueError, WebSocketException) as error:
+        bridge_config.logger.warning("[Resync] Manual inventory resync failed: %s", error)
+        bridge_config.emit_launcher_event("inventory_resync", status="error",
+            message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT), **correlation)
+        return
+    if error or plan is None:
+        bridge_config.emit_launcher_event(
+            "inventory_resync",
+            status="error",
+            message=_bounded_event_text(str(error or 'manual inventory resync returned no plan'), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+            **_resync_correlation(ctx),
         )
     else:
-        logger.info(f"Auto-connecting to {args.connect} as {args.name}...")
-        emit_launcher_event("connecting")
-
-    if LAUNCHER_EVENTS_ENABLED:
-        original_process_server_cmd = APCommonClient.process_server_cmd
-
-        async def launcher_process_server_cmd(client_ctx, package):
-            # CommonClient handles ConnectionRefused before calling on_package,
-            # and raises away its machine-readable reason. The launcher owns the
-            # retry UX, so preserve that packet before CommonClient can flatten it.
-            if package.get("cmd") == "ConnectionRefused":
-                client_ctx.on_package("ConnectionRefused", package)
-                return
-            await original_process_server_cmd(client_ctx, package)
-
-        APCommonClient.process_server_cmd = launcher_process_server_cmd
-    from doom_eap.runtime.server_connection import server_loop as bridge_server_loop
-    APCommonClient.server_loop = bridge_server_loop
-    ctx.server_task = asyncio.create_task(bridge_server_loop(ctx), name="server loop")
-    ctx.server_task.add_done_callback(lambda task: report_server_stop(ctx, task))
-
-    if gui_enabled:
-        raise RuntimeError("DOOM Eternal bridge worker requires --nogui")
-    ctx.input_task = asyncio.create_task(launcher_control_loop(ctx), name="Launcher control")
-
-    await ctx.exit_event.wait()
-    emit_launcher_event("client_stopping")
-    ctx.reset_room_session_authority("bridge_shutdown")
-    tasks = [ctx.tracking_task, ctx.death_task, ctx.physical_check_task, ctx.input_task, loop_monitor]
-    tasks.extend(_pending_delivery_tasks(ctx))
-    for task in tasks:
-        task.cancel()
-    await ctx.session_tasks.close()
-    await asyncio.gather(*tasks, return_exceptions=True)
-    await ctx.close_room_delivery()
-    await ctx.shutdown()
-    await ctx._publish_native_ammo_refill("bridge_shutdown")
-    await ctx.session_tasks.close()
-    if hasattr(ctx, "_native_worker"):
-        if getattr(ctx, "_native_link", None) is not None:
-            await ctx._native_worker.call(ctx._native_link.close)
-        ctx._native_worker.close()
-    await ctx.connection_diagnostics.close()
-    APCommonClient.websockets = ctx.connection_diagnostics.websockets
+        bridge_config.emit_launcher_event("inventory_resync", status="observed" if plan.commands else "noop",
+                            command_count=len(plan.commands), **_resync_correlation(ctx))
 
 
-def launch(*launch_args):
-    colorama.init()
-    asyncio.run(amain(launch_args))
-    colorama.deinit()
+def _resync_correlation(ctx):
+    from dataclasses import asdict
+    if ctx.room_delivery is not None:
+        return {"room": asdict(ctx.room_delivery.key), "command_ids": list(ctx.room_delivery.planned_ids)}
+    return {}
+
+
+async def _handle_delivery_control(ctx, control):
+    if await handle_delivery_control(getattr(ctx, "delivery_coordinator", None), control, bridge_config.emit_launcher_event):
+        ctx.items._schedule_item_delivery("resolution")
+
+
+async def _dispatch_launcher_control(ctx, control):
+    await _handle_delivery_control(ctx, control)
+    match control.get("type"):
+        case "killsanity_counter_visibility":
+            if type(control.get("visible")) is bool:
+                ctx.killsanity_counter_visible = control["visible"]
+        case "core_runtime_reload":
+            _reload_core_runtime(ctx, control)
+        case "support_condump":
+            await _support_condump(ctx, control)
+        case "inventory_resync":
+            task = getattr(ctx, "_inventory_resync_task", None)
+            if task is None or task.done():
+                ctx._inventory_resync_task = asyncio.create_task(_launcher_inventory_resync(ctx, control))
+        case "ammo_refill":
+            await _launcher_refill(ctx, control)
+        case "say":
+            await _launcher_say(ctx, control)
+
+
+def _reload_core_runtime(ctx, control):
+    updated = bridge_config.load_config()
+    for key in ("core_runtime_manifest", "selected_core_runtime_manifest", "proton_executable", "proton_compat_data_dir"):
+        if key in updated:
+            bridge_config.config[key] = updated[key]
+        else:
+            bridge_config.config.pop(key, None)
+    ctx._native_link_key = None
+    bridge_config.refresh_death_probe_proton()
+    bridge_config.emit_launcher_event("core_runtime_bound", path=bridge_config.config.get("core_runtime_manifest") or bridge_config.config.get("selected_core_runtime_manifest"))
+
+
+async def _support_condump(ctx, control):
+    try:
+        queued = await ctx.checks.request_support_condump()
+    except (OSError, RuntimeError, ValueError, WebSocketException) as error:
+        bridge_config.logger.warning("[Support] Diagnostic condump request failed: %s", error)
+        bridge_config.emit_launcher_event("support_condump", status="error", message=str(error))
+    else:
+        status = "queued" if queued else "unavailable"
+        bridge_config.emit_launcher_event("support_condump", status=status)
+
+
+async def _launcher_refill(ctx, control):
+    try:
+        await ctx.items.request_ammo_refill()
+    except (OSError, RuntimeError, ValueError, WebSocketException) as error:
+        bridge_config.logger.warning("[Ammo Refill] Launcher request failed: %s", error)
+        bridge_config.emit_launcher_event(
+            "ammo_refill",
+            status="error",
+            message=_bounded_event_text(str(error), ARCHIPELAGO_EVENT_PLAIN_LIMIT),
+        )
+
+
+async def _launcher_say(ctx, control):
+    text = control.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return
+    try:
+        await ctx.send_launcher_chat(text)
+    except (OSError, RuntimeError, ValueError, WebSocketException) as error:
+        bridge_config.logger.warning("[Launcher] Chat send failed: %s", error)
+        bridge_config.emit_launcher_event("chat_send_failed", message=str(error))
+    else:
+        bridge_config.emit_launcher_event("chat_sent", text=text)
+
+
+def _server_url(ctx, address):
+    if ctx._messagebox_connection_loss:
+        ctx._messagebox_connection_loss.dismiss()
+        ctx._messagebox_connection_loss = None
+    address = f"ws://{address}" if "://" not in address else address.replace("archipelago://", "ws://")
+    server_url = urllib.parse.urlparse(address)
+    if server_url.username:
+        ctx.username = urllib.parse.unquote(server_url.username)
+    if server_url.password:
+        ctx.password = urllib.parse.unquote(server_url.password)
+    return address, server_url
+
+
+async def _receive_server(ctx, address, server_url, reconnect_hint, socket):
+    if ctx.ui is not None:
+        ctx.ui.update_address_bar(server_url.netloc)
+    ctx.server = APCommonClient.Endpoint(socket)
+    APCommonClient.logger.info("Connected")
+    ctx.server_address = address
+    ctx.current_reconnect_delay = ctx.starting_reconnect_delay
+    ctx.disconnected_intentionally = False
+    async for data in ctx.server.socket:
+        for msg in APCommonClient.decode(data):
+            await APCommonClient.process_server_cmd(ctx, msg)
+    APCommonClient.logger.warning("Disconnected from multiworld server%s", reconnect_hint())
+
+
+async def _connect_socket(ctx, address, server_url):
+    while True:
+        APCommonClient.logger.info("Connecting to Archipelago server at %s", address)
+        try:
+            socket = await APCommonClient.websockets.connect(
+                address, port=server_url.port or 38281, ping_timeout=None, ping_interval=None,
+                ssl=APCommonClient.get_ssl_context() if address.startswith("wss://") else None,
+                max_size=ctx.max_size)
+            return address, socket
+        except APCommonClient.websockets.InvalidMessage:
+            if not address.startswith("ws://"):
+                raise
+            address = "wss://" + address[len("ws://"):]
+
+
+def _schedule_reconnect(ctx):
+    if (ctx.server_address and ctx.username and not ctx.disconnected_intentionally
+            and not ctx.exit_event.is_set()):
+        APCommonClient.logger.info("... automatically reconnecting in %s seconds", ctx.current_reconnect_delay)
+        assert ctx.autoreconnect_task is None
+        ctx.autoreconnect_task = asyncio.create_task(APCommonClient.server_autoreconnect(ctx), name="server auto reconnect")
+    ctx.current_reconnect_delay *= 2
+
+
+def _connection_loss_message(error, reconnect_hint):
+    if isinstance(error, APCommonClient.websockets.InvalidMessage):
+        return "Lost connection to the multiworld server due to InvalidMessage" + reconnect_hint()
+    if isinstance(error, ConnectionRefusedError):
+        return "Connection refused by the server. May not be running Archipelago on that address or port."
+    if isinstance(error, APCommonClient.websockets.InvalidURI):
+        return "Failed to connect to the multiworld server (invalid URI)"
+    if isinstance(error, asyncio.TimeoutError):
+        return "Failed to connect to the multiworld server. Connection timed out."
+    if isinstance(error, OSError):
+        return "Failed to connect to the multiworld server"
+    return "Lost connection to the multiworld server" + reconnect_hint()
 
 
 if __name__ == '__main__':

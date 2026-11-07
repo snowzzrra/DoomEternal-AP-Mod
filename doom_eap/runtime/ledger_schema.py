@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Union, get_args, get_origin, get_type_hints
 from uuid import uuid4
 
-from .ledger_records import (
+from doom_eap.runtime.ledger import (
     AmmoChange,
     AmmoKind,
     AmmoOperation,
@@ -529,6 +529,7 @@ def _backup(connection: sqlite3.Connection, path: Path, version: int) -> None:
 
 def _run_migrations(connection: sqlite3.Connection, version: int, latest: int, create: bool) -> None:
     connection.execute("BEGIN IMMEDIATE")
+    completed = False
     try:
         for number in range(version + 1, latest + 1):
             _MIGRATIONS[number](connection)
@@ -539,6 +540,7 @@ def _run_migrations(connection: sqlite3.Connection, version: int, latest: int, c
         if connection.execute("PRAGMA foreign_key_check").fetchone() is not None:
             raise SchemaError("migration damaged database references")
         connection.commit()
-    except BaseException:
-        connection.rollback()
-        raise
+        completed = True
+    finally:
+        if not completed:
+            connection.rollback()

@@ -1,14 +1,15 @@
-"""Persist Ammo Refill spending and recovery; the delivery coordinator executes paid effects."""
+from __future__ import annotations
 
 import asyncio
 import json
+import os
 import time
-from dataclasses import replace
+from collections import deque
+from dataclasses import dataclass, replace
 from uuid import uuid4
 
-from . import sentinel_protocol_generated as codec
-from .ammo_refill import AMMO_REFILL_CAPACITY, AMMO_REFILL_CONFIRMATION_TIMEOUT
-from .ledger import (
+from doom_eap.runtime import sentinel_protocol_generated as codec
+from doom_eap.runtime.ledger import (
     AmmoChange,
     AmmoKind,
     AmmoOperation,
@@ -20,6 +21,39 @@ from .ledger import (
     ReplayPolicy,
     RevisionConflict,
 )
+
+AMMO_REFILL_ITEM_ID = 7770024
+AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
+AMMO_REFILL_CAPACITY = 3
+AMMO_REFILL_CONFIRMATION_TIMEOUT = 15
+AMMO_REFILL_COMMANDS = ("give ammo", "judgementMeter_Set 3")
+AMMO_UNAVAILABLE_MESSAGES = {
+    "placement_connected": 'Disconnected from Archipelago; reconnect before using Ammo Refill',
+    "item_state_ready": 'Ammo Refill unavailable: waiting for items from Archipelago',
+    "connected": 'Disconnected from Archipelago; reconnect before using Ammo Refill',
+    "namespace_match": "Ammo Refill unavailable: waiting for the current room's game session",
+    "marker_valid": 'Ammo Refill unavailable: waiting for the current level to finish preparing',
+    "lease_match": 'Ammo Refill unavailable: waiting for the current level to finish preparing',
+    "native_safe": 'Ammo Refill unavailable: return to DOOM and unpause before trying again',
+    "runtime_effects_ready": 'Ammo Refill unavailable: waiting for the active save and game session',
+}
+
+
+@dataclass(frozen=True)
+class AmmoCommandScope:
+    state_key: str
+    current_map: str | None
+    save_slot: str | None
+    crucible_active: bool
+    materialization_lease: str | None = None
+
+
+def active_crucible(special_mode, processed_ids):
+    if special_mode in {"the_crucible", "The Crucible"}:
+        return 7770007 in processed_ids
+    if special_mode in {"progressive_special_weapon", "Progressive Special Weapon"}:
+        return 7770901 in processed_ids
+    return False
 
 
 class LedgerAmmoRefill:
@@ -189,3 +223,108 @@ class LedgerAmmoRefill:
             await self.delivery.ammo(changes=(change,))
             row = await self.ledger.ammo_operation(self.room, operation_id)
             return await self._publish(row)
+
+
+class AmmoStorage:
+    def __init__(self, send):
+        self._send = send
+        self._replies = {}
+
+
+    async def exchange(self, packet, timeout):
+        key = packet["keys"][0] if packet["cmd"] == "Get" else packet["key"]
+        expected = ("Retrieved" if packet["cmd"] == "Get" else "SetReply", key)
+        future = asyncio.get_running_loop().create_future()
+        if expected in self._replies:
+            raise RuntimeError("Ammo storage request already pending")
+        self._replies[expected] = future
+        try:
+            await asyncio.wait_for(self._send([packet]), timeout)
+            return await asyncio.wait_for(future, timeout)
+        finally:
+            del self._replies[expected]
+
+    def receive(self, cmd, args):
+        if cmd == "Retrieved":
+            values = args.get("keys", {})
+        elif cmd == "SetReply":
+            values = {args.get("key"): args.get("value")}
+        else:
+            return
+        for key, value in values.items():
+            future = self._replies.get((cmd, key))
+            if future is not None and not future.done():
+                future.set_result(value)
+
+    async def create(self, key, value, timeout):
+        return await self.exchange({"cmd": "Set", "key": key, "default": value,
+                                    "operations": [], "want_reply": True}, timeout)
+
+    async def read(self, key, timeout):
+        return await self.exchange({"cmd": "Get", "keys": [key]}, timeout)
+
+    async def counter(self, key, timeout):
+        value = await self.read(key, timeout)
+        if value is None:
+            return 0
+        if type(value) is not int or value < 0:
+            raise ValueError("Invalid ammo total")
+        return value
+
+    async def maximum(self, key, value, timeout):
+        reply = await self.exchange({"cmd": "Set", "key": key, "default": 0,
+                                     "operations": [{"operation": "max", "value": value}],
+                                     "want_reply": True}, timeout)
+        if type(reply) is not int or reply < value:
+            raise ValueError("Ammo total was refused")
+        return reply
+
+
+class AmmoRequestPump:
+    """Remove request files once and supervise serial semantic requests for one room."""
+    def __init__(self, request, exit_event, logger):
+        self._request = request
+        self._exit_event, self._logger = exit_event, logger
+        self._queue = deque()
+        self._task = None
+        self._generation = 0
+
+    def reset(self):
+        self._generation += 1
+        self._queue.clear()
+        if self._task is not None:
+            self._task.cancel()
+            self._task = None
+
+    async def _run(self, generation):
+        try:
+            while self._queue and not self._exit_event.is_set() and generation == self._generation:
+                if self._exit_event.is_set() or generation != self._generation:
+                    break
+                self._queue.popleft()
+                await self._request()
+        except asyncio.CancelledError:
+            raise
+        except (OSError, RuntimeError, ValueError):
+            self._logger.exception("[Ammo Refill] Request queue failed")
+        finally:
+            if generation == self._generation:
+                self._task = None
+
+    def consume(self, paths):
+        accepted = []
+        for path in paths:
+            try:
+                os.remove(path)
+            except FileNotFoundError:
+                continue
+            except OSError as error:
+                self._logger.warning("[Ammo Refill] Request removal failed for %s: %s", path, error)
+                continue
+            accepted.append(path)
+        if not accepted:
+            return False
+        self._queue.extend(accepted)
+        if self._task is None or self._task.done():
+            self._task = asyncio.get_running_loop().create_task(self._run(self._generation))
+        return True
