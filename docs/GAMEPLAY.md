@@ -21,6 +21,37 @@ generation. The launcher shows the tasks you still need during play.
 
 **Campaign Difficulty** controls the game's difficulty. **Logic Difficulty** controls
 the equipment Archipelago expects you to have before a fight. These are separate choices.
+In Relaxed and Standard logic, missions from the second half of the seed expect a way to
+get armor back: Flame Belch, or Super Shotgun with Meat Hook and Meat Hook Mastery.
+
+**Ultra-Nightmare** plays on Nightmare with one difference from the game's own mode: a
+death with no Extra Life and no Saving Throw left restarts the current mission (or Master
+Level) from its beginning, not the whole campaign. Your inventory stays as it was at
+death, and checks you already sent stay sent. Quitting, going back to the menu or a crash
+continue from the last checkpoint as usual. A lethal DeathLink counts as a death.
+
+## Master Levels
+
+**Include Master Levels** adds the six standard Master Levels (Cultist Base, ARC Complex,
+Taras Nabad, Super Gore Nest, Mars Core and World Spear). Each one has its own Access item,
+can appear in any seed regardless of the Mission Pool, and keeps its original enemies:
+the Enemy Randomizer and Killsanity don't apply there. Their checks are the Mission
+Complete, the large hidden pickups and, depending on Arena Checks, each arena you clear.
+The goal **Complete N Master Levels** asks for N different ones; the extra requirement
+**Complete all Master Levels** asks for all of them.
+
+## Checks
+
+Besides the usual pickups, secrets and challenges:
+
+- **Arena Checks** gives a check for each arena you clear: every campaign mission, DLC
+  mission and Master Level, only DLC missions and Master Levels (default), only one of the
+  two, or none. When a level brings you back to an arena with a new fight, that fight is
+  a check of its own.
+- In the DLC missions, Soulspheres, Mega Armors and BFG ammo pickups are checks.
+- **Useful Fortress Rewards** sets how many of the Fortress battery room rewards hold a
+  progression or useful item (75% by default). In a multiworld, the rest can hold filler
+  or traps from other games, never your own.
 
 ## Enemies
 

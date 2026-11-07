@@ -57,10 +57,13 @@ kill rewards, DeathLink and inventory recovery. The options table below might he
 | Mission Count | All | Choose how many missions to play in Random Mission Order or Mission Access as Items. | 6–19; All |
 | Mission Order | Random Mission Order | Choose how you unlock missions. | Vanilla Order; Random Mission Order; Mission Access as Items |
 | Starting Missions | 1 | Choose how many missions are open at the start in Mission Access as Items. | 1–3 |
-| Goal | Acquire the Unmaykr | Choose what you need to do to win. | Acquire the Unmaykr; Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga |
+| Goal | Acquire the Unmaykr | Choose what you need to do to win. | Acquire the Unmaykr; Kill the Icon of Sin; Kill the Dark Lord; Complete the Full Saga; Complete N Master Levels |
 | Goal Mission as Item | Off | Unlock your goal's boss mission by finding its Access item in Mission Access as Items. | Off; On |
 | Full Saga Final Boss | Randomized | Choose the last boss for the Complete the Full Saga goal. | Randomized; Icon of Sin; Davoth |
-| Additional Victory Requirements | none | Choose extra tasks to finish before you win. | any of 7 |
+| Additional Victory Requirements | none | Choose extra tasks to finish before you win. | any of 8 |
+| Include Master Levels | Off | Include every qualified standard Master Level, each with its own Access item. | Off; On |
+| Master Level Count | 1 | Choose how many distinct Master Levels to finish for Complete N Master Levels. | 1–6 |
+| Arena Checks | DLC + Master Levels | Choose which levels give a check for each arena you clear. | All Levels; DLC + Master Levels; Only DLC Levels; Only Master Levels; No Levels |
 | Include Slayer Gates | On | Earn Archipelago items by completing Slayer Gates and find their keys among shuffled items. | Off; On |
 | Include Secret Encounters | On | Earn Archipelago items by completing the optional timed Secret Encounters. | Off; On |
 | Include Weapon Mastery Challenges | On | Earn Archipelago items by completing the 13 weapon mastery challenges. | Off; On |
@@ -77,6 +80,7 @@ kill rewards, DeathLink and inventory recovery. The options table below might he
 | Trap Percentage | 10 | Choose the percentage of extra item rewards that become traps. | 0–100 |
 | Enabled Traps | 14 selected | Pick the traps that other players can send you. | any of 14 |
 | Trap Weights | none | Choose how often each selected trap appears. | per-item values |
+| Useful Fortress Rewards | 75 | Choose how many Fortress battery room rewards hold something useful. | 0–100 |
 | **Enemies** | | | |
 | Enemy Randomizer | On | Randomize the enemies you fight and vary their health, damage and size. | Off; On |
 | Enemy Preset | Slayer's Path | Choose a starting setup for enemy randomization. | UAC Patrol; Sentinel Training; Slayer's Path; Hell's Vanguard; Icon's Wrath; Gore Nest; Gladiator's Gauntlet; Cultist Chaos; Oops! All Imps; Piñata Party; Custom |
@@ -99,7 +103,7 @@ kill rewards, DeathLink and inventory recovery. The options table below might he
 | Kills per Check | 100 | Send one check at each multiple of this many enemy deaths. | 1–1000 |
 | Kill Rewards | Auto | Choose how many kill rewards to add to your campaign. | 1–2000; Auto |
 | **Difficulty** | | | |
-| Campaign Difficulty | Ultra Violence | Choose the game's combat difficulty for your campaign. | I'm Too Young To Die; Hurt Me Plenty; Ultra Violence; Nightmare |
+| Campaign Difficulty | Ultra Violence | Choose the game's combat difficulty for your campaign. | I'm Too Young To Die; Hurt Me Plenty; Ultra Violence; Nightmare; Ultra-Nightmare |
 | Logic Difficulty | Standard | Choose how much equipment Archipelago expects you to have before a fight. | Relaxed; Standard; Expert |
 | Progressive Difficulty | On | Make randomized fights grow harder as you progress through the campaign. | Off; On |
 | Enhanced Melee Damage | Off | Make normal punches deal more damage, giving you another way to fight at close range. | Off; On |
@@ -246,7 +250,7 @@ Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis 
   discoverability, and community testing.
 - Complete documentation, diagnostics, support tooling, and release-candidate
   validation.
-- Hard Mode and Master Levels.
+- Master Levels, Ultra-Nightmare and Arena Checks.
 
 ### 1.0
 

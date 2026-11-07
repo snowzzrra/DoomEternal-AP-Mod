@@ -149,6 +149,15 @@ installer keeps failing, use the [manual steps](#windows-manual-installation).
 This happens if the launcher was closed during installation. Let the installer
 window finish (press a key when it asks), then choose **INSTALL AGAIN**.
 
+**It says another DoomEAP session is running**
+Another launcher or player profile still has its session open. Close that launcher (or
+disconnect it) and try again. A session started by this launcher closes on its own
+before installing.
+
+**It says the client folder is missing**
+The download wasn't extracted completely. Extract the whole ZIP into a new folder and
+open the launcher from there.
+
 **The game starts but doesn't connect**
 Keep the launcher open and connected to the room. On Linux, check the Steam launch
 option you pasted. Then try **Help → CHECK SETUP**.

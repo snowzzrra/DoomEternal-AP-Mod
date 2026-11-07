@@ -156,8 +156,13 @@ Core's native code instead.
 
 The map files also get the automap markers, the Kill Reward counters and the
 randomized enemies, but checks and deliveries all follow this pattern: map entity →
-console command → file or Core → bridge. Anything that fires a relay can be a check,
-which is why new check kinds (arena clears, for example) are mostly compiler work.
+console command → file or Core → bridge. Anything that fires a relay can be a check.
+Arena Checks work that way: `content/catalog/arena_checks.json` lists each real arena
+(its encounter managers and the script point where the last wave ends), and the
+compiler hooks an `AP_CHECK_ARENA_<id>` relay to that point. A suppression entity
+keeps a confirmed arena from firing again after a checkpoint reload. Master Levels
+(`content/catalog/master_levels.json`) reuse the same pickups, arenas and Mission
+Complete checks on their own map layers.
 
 A few decisions shape everything else. Knowing why they were made saves you from
 undoing them by accident.
@@ -209,14 +214,22 @@ removed. A half-hooked game is worse than a game with the feature off.
 | APWorld | `slot_data.py`, `slot_data_contract.py` | Builds and validates the room data sent to the client |
 | Content | `content/maps/`, `content/catalog/` | Authored map data: locations, events, enemies, onboarding |
 | Content | `tools/content/`, `tools/maps/` | Compilers: catalogs, generated projections, room mods |
-| Launcher | `launcher_controller.py`, `events.py`, `presenters/`, `ui/` | App logic, typed events, what each screen shows, Qt views |
+| Launcher | `launcher_controller.py`, `events.py`, `presenters/`, `ui/` | App logic, typed events, what each screen shows, Qt views (`ui/app_window.py` is the main window) |
+| Launcher | `launcher_platform.py`, `launcher_injector.py` | Game and Steam paths, hotkeys; running EternalModInjector and its prerequisites |
+| Launcher | `launcher_doctor.py`, `launcher_support.py` | Diagnostics; the support report ZIP |
 | Launcher | `installation.py`, `install_journal.py`, `installation_adapters.py` | Install transaction and the Windows/Linux injector runners |
 | Launcher | `campaign_resources.py`, `resource_bank.py` | Enemy resource banks and campaign resources after injection |
 | Launcher | `launcher_session.py`, `checkpoint.py` | Room session, AP save, backup and checkpoint recovery states |
-| Runtime | `bridge_client.py` | Connection to the AP server; receives items, sends checks |
-| Runtime | `ledger.py`, `ledger_records.py`, `ledger_schema.py` | What was received and what happened to it, durable |
-| Runtime | `inventory.py`, `inventory_observation.py` | What you own vs. what the game shows |
-| Runtime | `delivery.py`, `delivery_runtime.py`, `delivery_plans.py` | Deciding what to send and recording the result |
+| Runtime | `bridge_client.py` | The session: connection to the AP server, commands, startup and shutdown |
+| Runtime | `bridge_config.py` | Bridge identity, settings, game and save paths, Proton |
+| Runtime | `bridge_checks.py` | Checks and locations: event files written by the game, placements, check visuals |
+| Runtime | `bridge_items.py` | Received items and how each one reaches the game |
+| Runtime | `bridge_saves.py` | Reading the game's save files: masteries, challenges, deaths |
+| Runtime | `ledger.py`, `ledger_schema.py` | What was received and what happened to it, durable; the schema is the persisted format |
+| Runtime | `delivery.py` | Deciding what to send and recording the result |
+| Runtime | `inventory.py` | What you own vs. what the game shows, and reconciling the two |
+| Runtime | `ammo.py`, `deathlink.py`, `campaign.py` | Ammo and refills; DeathLink; campaign menu, mission progress, goal and fast travel |
+| Runtime | `observers.py` | Watching the game: level ready, event publishers |
 | Runtime | `native_transport.py` | Persistent pipe to Core (through a relay under Proton) |
 | Shared | `doom_eap/contracts/` | Typed data at boundaries: room data, Core distribution, evidence |
 | Shared | `data/strings/`, `doom_eap/strings.py` | Every player-facing text |
@@ -234,7 +247,7 @@ to accept them: "placement set is incomplete". Rooms without Kill Rewards were f
 (which item sits where) for every location the server says exists
 (`_normalize_placements` in `launcher/launcher_core.py`). The APWorld includes Kill
 Reward locations in the room's placement digest. The bridge asks the server for
-placements in `runtime/location_setup.py`, and that's where the answer was:
+placements in `LocationSetup` (`runtime/bridge_checks.py`), and that's where the answer was:
 `begin()` removed the Kill Reward IDs from the list it asked about. Two of the three
 parties expected them; one left them out.
 
@@ -377,13 +390,41 @@ Add `--check` to any of the Python generators to verify without writing.
 
 ### Function complexity
 
-`python -m tools.validation.function_complexity` measures every Python function:
-cognitive complexity up to 15, cyclomatic up to 10. Generated files are skipped.
-Functions that were already over the limit are listed with their numbers in
-`tools/validation/complexity_exceptions_mod.txt` (and `..._apworld.txt`, checked
-with `--apworld-root ../Archipelago/worlds/doometernal`). A listed function may get
-simpler, never more complex. When you bring one under the limit, delete its line or
-run with `--update`. Core has the same gate with `tools/complexity_exceptions.txt`.
+`python -m tools.validation.function_complexity` measures every Python function, tests
+and generated files included: cognitive complexity up to 15, cyclomatic up to 10. Add
+`--apworld-root ../Archipelago/worlds/doometernal` to check the APWorld. There is no
+exception list: a function over the limit fails the check. Core has the same gate, with
+cognitive 20 and cyclomatic 15 for its native code.
+
+### Running the checks
+
+Every push runs, in `.github/workflows/ci.yml`:
+
+```sh
+python ../Sentinel-Core/tools/generate_protocol.py --check
+python -m tools.content.project_transport_protocol --check --core-root ../Sentinel-Core
+python ../Archipelago/worlds/doometernal/sync_version.py --check --mod-root .
+python -m tools.content.compile_options_schema --check
+python -m tools.content.compile_player_strings --check
+python -m tools.content.compile_start_inventory_catalog --check
+python -m tools.content.compile_content_catalog --source-only --check
+python -m tools.validation.authorial --check-authorial
+python -m tools.validation.player_literals
+python -m tools.validation.function_complexity
+python -m tools.validation.function_complexity --apworld-root ../Archipelago/worlds/doometernal
+python -m ruff check doom_eap tools tests scripts
+python -m ruff check ../Archipelago/worlds/doometernal
+python -m pytest tests -m "not integration and not slow" -q
+```
+
+plus the APWorld's fast tests, the report service test, `git diff --check` and a Windows
+build of the native client from the Core source. The CI checks out Core on the branch
+with the same name as yours, so push Core first when both change.
+
+Tests marked `integration` (real map generation or patching) and `slow` run in the
+release workflow; run them yourself with `-m integration` or `-m slow` when you change
+generation or the compiler. Checks that need your own game files or the frozen room
+resources are part of the release, not of every push.
 
 ## Glossary
 

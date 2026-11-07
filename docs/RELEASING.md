@@ -24,7 +24,9 @@ records exactly which commits and files built it
 (`ROOM_RESOURCES_PROVENANCE.json`) and carries a fingerprint. The APWorld and the
 launcher both check it, so a room generated against one compiler is never built
 with another. Whenever the compiler or the authored content changes, rebuild the
-bundle; the `--check` below tells you when it's stale.
+bundle; the `--check` below tells you when it's stale. Only the current version's
+bundle lives in the tree; older ones are in the git history and in their releases.
+The provenance records file hashes; it is not proof that something ran in the game.
 
 **Sentinel Core ships on its own.** Core is the DLL inside the game. It has its own
 version (2.x for this mod line), its own tests and its own distribution. The
@@ -102,12 +104,26 @@ runs a headless launcher check, checks the room bundle and writes
 `build/final-release/`. `-SkipValidation` skips the broad test suite; only use it
 when you already have a full test run recorded for exactly these sources.
 
+`./scripts/build/windows_release.ps1 -RebuildRoomResources -StagedMod <staged mod>` does
+the same rebuild in one go and first runs the full data audit against your retail files (`python -m tools.validation.validate_data --apworld-root
+../Archipelago/worlds/doometernal`) before it builds the resources. That audit needs
+`vanillamaps/`, `vanilla_decls/` and `../Tools/VanillaEntities/`, so it runs on your
+machine, not in CI.
+
 ## 5. Linux and CI
 
-`.github/workflows/cross-platform-build.yml` builds both launchers, the Windows
-native client (Linux players run it under Proton) and the APWorld, from the exact
-commits you select for the mod, the APWorld and Core. `scripts/pipeline.sh release --build`
-does the same build locally on Linux.
+There are two workflows. `.github/workflows/ci.yml` runs on every push (see
+[Running the checks](DEVELOPMENT.md#running-the-checks)). The release workflow,
+`.github/workflows/cross-platform-build.yml`, is started by hand with the commits you
+select for the mod, the APWorld and Core (full SHAs). Its six jobs resolve those
+sources, run the preflight (frozen resources, the full generation profile, the
+APWorld's full suite), build the APWorld, build and qualify the Windows native client
+(Linux players run it under Proton) with the native gates and no skips, build both
+launchers with their self-test, and assemble the final ZIPs with their checksums.
+`scripts/pipeline.sh release --build` does the same build locally on Linux.
+
+In Sentinel Core, `windows.yml` builds and tests every push; qualifying and uploading a
+Core distribution only happens when the workflow is started with an explicit version.
 
 To assemble a package from existing build outputs:
 
