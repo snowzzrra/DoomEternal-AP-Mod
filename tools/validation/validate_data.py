@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from doom_eap.content.arena_checks import arena_automap_classification, arena_manifest
 from doom_eap.content.automap_visual_registry import build_authorial_registry, load_automap_visual_registry
+from doom_eap.content.compiler_identity import first_party_text_bytes
 from doom_eap.content.content_catalog import load_content_catalog, physical_manifest
 from doom_eap.content.item_classification import load_item_classification_identity
 from doom_eap.content.map_registry import load_map_registry, validation_plan
@@ -28,7 +29,6 @@ from doom_eap.contracts.foundation import (
     load_primitive_registry,
     validate_primitive_registry,
 )
-from doom_eap.content.compiler_identity import first_party_text_bytes
 from doom_eap.runtime.observers import BOOTSTRAP_ENTITY_PREFIXES
 from tools.content.compile_start_inventory_catalog import compile_catalog
 from tools.decls.devinv_builder import load_devinv_mapping

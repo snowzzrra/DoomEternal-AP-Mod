@@ -10,9 +10,9 @@ from pathlib import Path
 
 from doom_eap.content.arena_checks import arena_location_kinds, arena_location_rules, arena_manifest
 from doom_eap.content.campaign_stages import campaign_stages
+from doom_eap.content.compiler_identity import first_party_text_bytes
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog, physical_manifest
 from doom_eap.content.killsanity_plan import build_campaign_kill_budget
-from doom_eap.content.compiler_identity import first_party_text_bytes
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = Path(os.environ.get("ARCHIPELAGO_SOURCE", MOD_ROOT.parent / "Archipelago"))

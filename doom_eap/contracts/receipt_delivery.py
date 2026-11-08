@@ -1,16 +1,13 @@
 """Immutable receipt planning and publication facts; no runtime discovery."""
 
-from dataclasses import dataclass
-from typing import Protocol
-
 import hashlib
 import json
 import re
-
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Protocol
+
 from doom_eap.contracts.runtime_context import RuntimeContext
-from dataclasses import dataclass
 
 NEW_RECEIPT = "new_receipt"
 HISTORICAL_OWNERSHIP = "historical_ownership"

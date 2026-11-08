@@ -18,17 +18,18 @@ from doom_eap.content.item_classification import (
 )
 from doom_eap.content.mastery_requirements import mastery_entries_for_counts
 from doom_eap.contracts.challenge_registry import canonical_map_name
-from doom_eap.contracts.receipt_delivery import build_materialization_epoch, stable_command_key
 from doom_eap.contracts.foundation import compile_item_delivery_plan
-from doom_eap.contracts.receipt_delivery import SUPPORT_RUNE_IDS
 from doom_eap.contracts.receipt_delivery import (
     HISTORICAL_OWNERSHIP,
     NEW_RECEIPT,
     PRESENTATION_REPAIR,
     RECONCILIATION_REPAIR,
+    SUPPORT_RUNE_IDS,
     ReceiptFeedbackFacts,
     ReceiptIntent,
     ReceiptPlan,
+    build_materialization_epoch,
+    stable_command_key,
 )
 from doom_eap.contracts.save_observation import CheckpointRecoveryState
 from doom_eap.runtime import bridge_checks, bridge_config, bridge_saves

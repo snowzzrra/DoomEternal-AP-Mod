@@ -18,7 +18,6 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from doom_eap.contracts.receipt_delivery import stable_command_key
 from doom_eap.contracts.foundation import (
     MASTERY_ITEM_BITS,
     DeliveryCommand,
@@ -26,18 +25,22 @@ from doom_eap.contracts.foundation import (
 )
 from doom_eap.contracts.foundation import compile_item_delivery_plan as compile_item_delivery_plan
 from doom_eap.contracts.inventory_domain import (
+    AUTHORED_TAG_PREREQUISITES,
     MAX_CAPACITY_TIER,
     MISSING,
     OWNED,
     PERMANENT_PERK_ITEM_IDS,
     UNKNOWN,
+    CompletionUpgrade,
     Currency,
     CurrencyGrant,
     CurrencyGrantResult,
     CurrencyObservation,
     CurrencyOutcome,
     CurrencyValue,
+    DerivedOwnershipFact,
     EffectExpectation,
+    EffectiveOwnership,
     EffectProof,
     EvidenceScope,
     InventoryEffect,
@@ -51,33 +54,26 @@ from doom_eap.contracts.inventory_domain import (
     NativeEffectEvidence,
     PerkStages,
     ProgressionObservation,
+    ReceiptSessionToken,
     SaveReadiness,
     SlayerKey,
+    StartingMaterializationFact,
     SuitStage,
 )
 from doom_eap.contracts.receipt_delivery import (
     GATE_KEY_TO_MAP,
-    SUPPORT_RUNE_IDS,
-    TAG_SPECIAL_CAPABILITY,
-    MaterializationScope,
-    context_item_ids,
-    support_rune_commands,
-)
-from doom_eap.contracts.inventory_domain import (
-    CompletionUpgrade,
-    DerivedOwnershipFact,
-    EffectiveOwnership,
-    ReceiptSessionToken,
-    StartingMaterializationFact,
-)
-from doom_eap.contracts.receipt_delivery import (
     HISTORICAL_OWNERSHIP,
     NEW_RECEIPT,
     PRESENTATION_REPAIR,
     RECONCILIATION_REPAIR,
+    SUPPORT_RUNE_IDS,
+    TAG_SPECIAL_CAPABILITY,
+    MaterializationScope,
+    context_item_ids,
+    stable_command_key,
+    support_rune_commands,
 )
 from doom_eap.contracts.runtime_context import RuntimeContext, canonical_map_name
-from doom_eap.contracts.inventory_domain import AUTHORED_TAG_PREREQUISITES
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.runtime.ledger import CommandState, NetworkReceipt, Resolution
 from doom_eap.runtime.native_transport import NativeTransport, TransportError, WireError

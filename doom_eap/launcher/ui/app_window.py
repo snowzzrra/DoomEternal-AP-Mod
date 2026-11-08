@@ -97,11 +97,10 @@ from .doom_style import DoomBackground, animations_enabled, fade_page
 from .doom_style import DoomButton as QPushButton
 from .help_view import HelpView
 from .items_view import ItemsView
-from .language_button import LanguageButton
 from .play_view import PlayView
 from .player_file_view import PlayerFileView
 from .report_view import ReportDialog
-from .settings_view import SettingsView
+from .settings_view import LanguageButton, SettingsView
 from .strings import configure_language, failure_text, installer_instruction, record_failure
 from .strings import text as player_text
 

@@ -20,10 +20,14 @@ from typing import Any, ClassVar
 from websockets.exceptions import WebSocketException
 
 from doom_eap.content import slot_data_contract
-from doom_eap.contracts.receipt_delivery import CheckObservation, CheckPublicationPort
-from doom_eap.contracts.receipt_delivery import build_materialization_epoch, valid_materialization_epoch
 from doom_eap.contracts.core_distribution import version_key
 from doom_eap.contracts.publisher_contracts import publisher_acknowledged
+from doom_eap.contracts.receipt_delivery import (
+    CheckObservation,
+    CheckPublicationPort,
+    build_materialization_epoch,
+    valid_materialization_epoch,
+)
 from doom_eap.contracts.runtime_context import (
     ContextResolution,
     DlcEvidence,

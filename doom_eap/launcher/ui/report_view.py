@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from doom_eap.launcher.launcher_support import sanitize_support_value
-from ..launcher_reporting import github_issue_url, report_text
-
 import os
 import subprocess
 import webbrowser
@@ -27,6 +24,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from doom_eap.launcher.launcher_support import sanitize_support_value
+
+from ..launcher_reporting import github_issue_url, report_text
 from .doom_style import DoomButton as QPushButton
 from .strings import record_failure
 from .strings import text as player_text

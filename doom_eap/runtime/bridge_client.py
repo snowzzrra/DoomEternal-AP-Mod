@@ -15,11 +15,10 @@ import colorama
 from websockets.exceptions import WebSocketException
 
 from doom_eap.content.killsanity_plan import milestone_ids
-from doom_eap.contracts.goal_policy import CAMPAIGN_GOAL_CONTRACT
 from doom_eap.contracts.challenge_registry import canonical_map_name
 from doom_eap.contracts.foundation import compile_item_delivery_plan, load_foundation_contracts, load_primitive_registry
-from doom_eap.contracts.inventory_domain import InventoryObservationPort
-from doom_eap.contracts.inventory_domain import DEFAULT_DEATH_LINK_MODE
+from doom_eap.contracts.goal_policy import CAMPAIGN_GOAL_CONTRACT
+from doom_eap.contracts.inventory_domain import DEFAULT_DEATH_LINK_MODE, InventoryObservationPort
 from doom_eap.runtime import bridge_checks, bridge_config, bridge_items, bridge_saves
 from doom_eap.runtime.ammo import AmmoRequestPump
 from doom_eap.runtime.bridge_checks import CheckedVisuals, LocationSetup, PhysicalChecks, resolve_placement_records

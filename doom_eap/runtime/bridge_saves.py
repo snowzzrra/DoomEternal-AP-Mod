@@ -16,8 +16,7 @@ from typing import Protocol
 from websockets.exceptions import WebSocketException
 
 from doom_eap.contracts.challenge_registry import aggregate_ready, load_challenge_registry
-from doom_eap.contracts.receipt_delivery import build_materialization_epoch
-from doom_eap.contracts.receipt_delivery import GATE_KEY_TO_MAP
+from doom_eap.contracts.receipt_delivery import GATE_KEY_TO_MAP, build_materialization_epoch
 from doom_eap.contracts.runtime_context import canonical_map_name
 from doom_eap.contracts.save_observation import (
     CheckpointRecovery,

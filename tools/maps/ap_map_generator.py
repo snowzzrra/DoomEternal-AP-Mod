@@ -6,12 +6,12 @@ import os
 import re
 from pathlib import Path
 
+from doom_eap.content.content_catalog import load_ap_visual_contract
 from doom_eap.content.item_classification import (
     load_item_classifications,
     notification_entity_name,
     notification_style_for_item,
 )
-from doom_eap.content.content_catalog import load_ap_visual_contract
 from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
     MASTERY_ITEM_BITS,

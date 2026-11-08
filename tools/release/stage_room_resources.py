@@ -59,8 +59,8 @@ def _prepare_authorial_tree_generated(manifests, maps, registry, root, staged):
 
 
 def _prepare_authorial_tree_is_relative_to(compressor, output, root):
-    if not output.is_relative_to(root / "build") or output == root / "build":
-        raise ValueError("Authorial output must be isolated beneath repository build/")
+    if not any(root / name in output.parents for name in ("build", ".tmp")):
+        raise ValueError("Authorial output must be isolated beneath repository build/ or .tmp/")
     if output.exists():
         raise FileExistsError(f"Authorial output already exists: {output}")
     fingerprint, _ = compute_room_resource_input_fingerprint(root)

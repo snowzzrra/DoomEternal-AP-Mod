@@ -23,18 +23,18 @@ from doom_eap.content.automap_visual_registry import (
     index_automap_visual_registry,
     load_automap_visual_registry,
 )
-from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
 from doom_eap.content.content_catalog import load_publisher_contracts
-from doom_eap.contracts.receipt_delivery import CheckObservation
-from doom_eap.contracts.receipt_delivery import (
-    CHECKED_VISUAL_HIDE,
-    MAP_ENTITY_SAFE,
-    stable_command_key,
-    valid_materialization_epoch,
-)
+from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
 from doom_eap.contracts.foundation import load_foundation_contracts
 from doom_eap.contracts.goal_policy import GoalPolicy
 from doom_eap.contracts.publisher_contracts import PublisherEngine
+from doom_eap.contracts.receipt_delivery import (
+    CHECKED_VISUAL_HIDE,
+    MAP_ENTITY_SAFE,
+    CheckObservation,
+    stable_command_key,
+    valid_materialization_epoch,
+)
 from doom_eap.contracts.runtime_context import canonical_map_name, catalog_map_key
 from doom_eap.runtime import bridge_config, bridge_saves
 from doom_eap.runtime.campaign import STAGES

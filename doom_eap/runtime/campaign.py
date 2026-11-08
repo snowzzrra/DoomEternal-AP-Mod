@@ -18,8 +18,13 @@ from websockets.exceptions import WebSocketException
 from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
 from doom_eap.content.killsanity_plan import resolved_rewards
 from doom_eap.content.slot_data_contract import SlotData
-from doom_eap.contracts.receipt_delivery import CheckObservation, CheckPublicationPort
-from doom_eap.contracts.receipt_delivery import FAST_TRAVEL_UNLOCK, MAP_ENTITY_SAFE, stable_command_key
+from doom_eap.contracts.receipt_delivery import (
+    FAST_TRAVEL_UNLOCK,
+    MAP_ENTITY_SAFE,
+    CheckObservation,
+    CheckPublicationPort,
+    stable_command_key,
+)
 from doom_eap.contracts.runtime_context import canonical_map_name, catalog_map_key
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.strings import text as player_text

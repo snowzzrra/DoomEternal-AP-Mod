@@ -1,16 +1,11 @@
-"""Persistent inventory observation contracts, domains, and lifecycle states."""
-
-from dataclasses import dataclass
-
-from dataclasses import dataclass
+"""Persistent inventory, item eligibility and ownership facts."""
 
 import json
-from pathlib import Path
-from typing import Any
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from typing import Protocol
+from pathlib import Path
+from typing import Any, Protocol
 
 # observation states
 OWNED = "owned"
@@ -515,9 +510,7 @@ TAG_PAID_NORMAL_MOD_UPGRADES = frozenset({
     "perk/player/weapons/chaingun/energy_shell_dash_smash",
 })
 
-# Separate from the 28 paid WUP nodes. The supported patch2 declaration marks
-# this authored weak-point modifier componentSave=false; retain it independently
-# of purchases until a separate engine requirement change is justified.
+# patch2 marks this required weak-point perk componentSave=false, separate from paid upgrades
 TAG_REQUIRED_ENGINE_PERKS = frozenset({
     "perk/player/weapons/shotgun/pop_rocket_weakpoint_hit",
 })

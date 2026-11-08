@@ -1,4 +1,4 @@
-"""Pure release goal objective selection from supplied authored catalog facts."""
+"""Campaign goal events and objective selection from authored catalog facts."""
 
 import json
 from pathlib import Path
