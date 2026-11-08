@@ -8,7 +8,7 @@ import os
 import pickle
 import re
 import time
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from copy import deepcopy
 from ctypes import wintypes
 from dataclasses import dataclass, replace
@@ -20,8 +20,8 @@ from typing import Any, ClassVar
 from websockets.exceptions import WebSocketException
 
 from doom_eap.content import slot_data_contract
-from doom_eap.contracts.check_observation import CheckObservation, CheckPublicationPort
-from doom_eap.contracts.command_publication import build_materialization_epoch, valid_materialization_epoch
+from doom_eap.contracts.receipt_delivery import CheckObservation, CheckPublicationPort
+from doom_eap.contracts.receipt_delivery import build_materialization_epoch, valid_materialization_epoch
 from doom_eap.contracts.core_distribution import version_key
 from doom_eap.contracts.publisher_contracts import publisher_acknowledged
 from doom_eap.contracts.runtime_context import (
@@ -501,34 +501,6 @@ class PublisherDispatch:
         return all(results)
 
 
-    async def mission(self, location_id, source_description, publication, persist):
-        matching = next(
-            (
-                publisher
-                for publisher in self._publishers
-                if any(
-                    effect["strategy"] == "location_check"
-                    and effect["location_id"] == location_id
-                    for effect in publisher.effects
-                )
-            ),
-            None,
-        )
-        if matching is None:
-            return False
-        generation = self._generation
-        results = []
-        for index, effect in enumerate(matching.effects):
-            if effect["strategy"] == "preserved_native_target":
-                continue
-            results.append(
-                await self.send_publisher_effect(matching, index, effect, source_description, publication, persist)
-            )
-            if generation != self._generation:
-                return False
-        return bool(results) and all(results)
-
-
     def _record_goal_effect(self, publisher, effect_index, effect, effect_key, persist):
         if self._goals.sent:
             self._in_flight.discard(effect_key)
@@ -915,7 +887,7 @@ def admit_slot_data(slot_data, *, placements=None):
     return resolved
 
 
-def classify_runtime_context(runtime_map: str, *, base_maps: Iterable[str] = ()) -> RuntimeContext | None:
+def classify_runtime_context(runtime_map: str) -> RuntimeContext | None:
     """Classify exact technical map identities; never infer from map catalogs."""
     if not isinstance(runtime_map, str):
         return None
@@ -925,7 +897,7 @@ def classify_runtime_context(runtime_map: str, *, base_maps: Iterable[str] = ())
     return None
 
 
-def resolve_context_evidence(marker_map, evidence_map, *, materialization_suspended, base_maps=()):
+def resolve_context_evidence(marker_map, evidence_map, *, materialization_suspended):
     """Supply authored context data to the lifecycle selection policy."""
     return RuntimeLifecycle.resolve_context(
         marker_map, evidence_map, materialization_suspended=materialization_suspended,

@@ -15,14 +15,12 @@ from typing import Protocol
 
 from doom_eap.content.item_classification import (
     load_item_classification_identity,
-    normalize_network_classification,
-    notification_style_for_item,
 )
 from doom_eap.content.mastery_requirements import mastery_entries_for_counts
 from doom_eap.contracts.challenge_registry import canonical_map_name
-from doom_eap.contracts.command_publication import build_materialization_epoch, stable_command_key
-from doom_eap.contracts.foundation import compile_item_delivery_plan, load_foundation_contracts
-from doom_eap.contracts.materialization import SUPPORT_RUNE_IDS
+from doom_eap.contracts.receipt_delivery import build_materialization_epoch, stable_command_key
+from doom_eap.contracts.foundation import compile_item_delivery_plan
+from doom_eap.contracts.receipt_delivery import SUPPORT_RUNE_IDS
 from doom_eap.contracts.receipt_delivery import (
     HISTORICAL_OWNERSHIP,
     NEW_RECEIPT,
@@ -36,7 +34,7 @@ from doom_eap.contracts.save_observation import CheckpointRecoveryState
 from doom_eap.runtime import bridge_checks, bridge_config, bridge_saves
 from doom_eap.runtime.ammo import AMMO_REFILL_ITEM_ID, AmmoCommandScope, active_crucible
 from doom_eap.runtime.bridge_saves import SaveObserverBaselineStore
-from doom_eap.runtime.campaign import ACCESS_IDS, STAGES
+from doom_eap.runtime.campaign import STAGES
 from doom_eap.runtime.delivery import RoomDelivery
 from doom_eap.runtime.inventory import (
     AP_RECEIPT_FEEDBACK,
@@ -104,50 +102,6 @@ def compile_receipt_plan(request: ReceiptIntent, facts: ReceiptFeedbackFacts, st
         return ReceiptPlan(None, str(error))
     commands = [command.command for command in plan.commands]
     return ReceiptPlan(tuple(commands), plan.description)
-
-
-def base_special_receipt_allowed(item_id, campaign, special_mode):
-    if campaign != "Base":
-        return False
-    if special_mode in {"the_crucible", "The Crucible"}:
-        return item_id == 7770007
-    if special_mode in {"progressive_special_weapon", "Progressive Special Weapon"}:
-        return item_id == 7770901
-    if special_mode in {"progressive_sentinel_hammer", "Progressive Sentinel Hammer"}:
-        return item_id == 7770902
-    return False
-
-
-def received_item_classification(item_id, network_classification):
-    """Use the packaged identity when a compatible server reports stale flags."""
-    if item_id not in ITEM_CLASSIFICATIONS:
-        raise ValueError(f"item {item_id} has no packaged classification")
-    expected = ITEM_CLASSIFICATIONS[item_id]
-    if network_classification is None:
-        classification = expected
-    else:
-        classification = int(network_classification)
-        normalized = normalize_network_classification(item_id, classification)
-        expected_normalized = normalize_network_classification(item_id, expected)
-        if normalized != expected_normalized:
-            bridge_config.logger.warning(
-                "[To Game] CLASSIFICATION_MISMATCH item_id=%s server_flags=%s "
-                "packaged_flags=%s mapping_revision=%s; using packaged identity",
-                item_id, classification, expected, bridge_config.ITEM_MAPPING_REVISION,
-            )
-    notification_style_for_item(item_id, expected)
-    return expected
-
-
-def is_item_delivery_activation(command):
-    return command.strip().startswith(f"ai_ScriptCmdEnt {bridge_config.RPC_ENTITY_PREFIX}_")
-
-
-def delegated_rpc_command(item_id, command_index=None):
-    entity_name = f"{bridge_config.RPC_ENTITY_PREFIX}_{item_id}"
-    if command_index is not None:
-        entity_name = f"{entity_name}_{command_index}"
-    return f"ai_ScriptCmdEnt {entity_name} activate"
 
 
 class ItemRuntime:
@@ -228,7 +182,6 @@ class ItemRuntime:
                 command,
                 coalesce_key=command_id,
                 state_key=self.ctx.state_key,
-                room_scoped=False,
             ):
                 return None
             bridge_config.logger.info(
@@ -773,12 +726,6 @@ class ItemRuntime:
     def bootstrap_ineligibility_reason(self, action_name):
         return self.ctx.bootstrap.ineligibility_reason(action_name, self._bootstrap_ownership())
 
-    async def enqueue_bootstrap(self, action_name, trigger):
-        return await self.ctx.bootstrap.enqueue(
-            action_name, trigger, ownership=self._bootstrap_ownership(), current_map=self.ctx.runtime_lifecycle.map_identity.current_map,
-            state_key=self.ctx.state_key, send=self._send_runtime_command, persist=self.ctx.persist_session_state,
-        )
-
     async def onboard_bootstrap(self, trigger):
         await self.ctx.bootstrap.onboard(
             trigger, ownership=self._bootstrap_ownership(), map_identity=self.ctx.runtime_lifecycle.map_identity,
@@ -861,14 +808,6 @@ class ItemRuntime:
         plan = compile_receipt_plan(request, facts, stage, ITEM_ID_TO_COMMAND, ITEM_REPLAY_POLICIES, ITEM_CLASSIFICATIONS)
         return (list(plan.commands) if plan.commands is not None else None), plan.description
 
-    def delivery_item_name(self, item_id):
-        if item_id in ACCESS_IDS:
-            return STAGES[ACCESS_IDS[item_id]]["name"] + " Access"
-        identity = ITEM_CLASSIFICATION_IDENTITY.get(item_id)
-        if identity is not None:
-            return identity["name"]
-        return player_text("activity", "unknown_item_id", item_id=str(item_id))
-
     def delivery_notification_commands(self, item_id, item_index):
         if not bridge_config.ENABLE_ITEM_NOTIFICATIONS:
             return ()
@@ -913,13 +852,11 @@ class ItemRuntime:
         """Bind exact runtime context without consulting location projections."""
         use_dlc = bool(slot_data.get("runtime", slot_data).get("use_dlc_content"))
         self.ctx.dlc_evidence = evaluate_dlc_availability(bridge_config.DOOM_BASE_DIR if use_dlc else None)
-        base_maps = load_foundation_contracts()["active_maps"].values()
         marker = getattr(self.ctx.runtime_lifecycle.map_identity, "cached_marker", None) or {}
         evidence_map = getattr(evidence, "map_name", "")
         resolution = resolve_context_evidence(
             marker.get("runtime_map", ""), evidence_map,
             materialization_suspended=bool(marker.get("materialization_suspended")),
-            base_maps=base_maps,
         )
         context = resolution.context
         source = resolution.source
@@ -1116,8 +1053,7 @@ class TransientRuntime:
 
 
 class TransientPublicationPort(Protocol):
-    def publish_scope(self, scope: str | None): ...
-    async def send(self, cvar: str, command: str, state_key: str, scope: str, *, room_scoped: bool, receipt_index=None) -> bool: ...
+    async def send(self, cvar: str, command: str, state_key: str, scope: str, *, receipt_index=None) -> bool: ...
 
 
 class TransientEffectManager:
@@ -1143,7 +1079,6 @@ class TransientEffectManager:
             if self._bound_baseline is not None:
                 self._active.clear()
                 self._reset_pending = False
-                self._publication.publish_scope(None)
             self._bound_baseline = binding
         session_namespace = hashlib.sha256(str(state_key).encode("utf-8")).hexdigest()[:16]
         identity = "|".join(
@@ -1173,13 +1108,12 @@ class TransientEffectManager:
             ("g_infiniteAmmo", f"g_infiniteAmmo {infinite_ammo}"),
         ]
 
-    async def _emit(self, now: float, runtime, *, room_scoped: bool = True, receipt_index=None) -> bool:
+    async def _emit(self, now: float, runtime, *, receipt_index=None) -> bool:
         scope = self._scope(runtime)
         if scope is None or not runtime.ready:
             return False
-        self._publication.publish_scope(scope)
         for cvar, command in self._commands(now):
-            if not await self._publication.send(cvar, command, runtime.state_key, scope, room_scoped=room_scoped, receipt_index=receipt_index):
+            if not await self._publication.send(cvar, command, runtime.state_key, scope, receipt_index=receipt_index):
                 return False
         return True
 
@@ -1227,16 +1161,12 @@ class TransientEffectManager:
         self._active.clear()
         self._scope_generation += 1
         self._reset_pending = True
-        self._publication.publish_scope(None)
         if runtime.ready:
-            if await self._emit(time.monotonic(), runtime, room_scoped=False):
+            if await self._emit(time.monotonic(), runtime):
                 self._reset_pending = False
 
 
-def transient_baseline_ready(base_directory: str | os.PathLike[str]) -> bool:
-    base = Path(base_directory)
-    data = _read_key_value_file(base / TRANSIENT_EFFECT_BASELINE_FILE)
-    health = _read_key_value_file(base / "ap_rpc_health.state")
+def transient_baseline_ready(data, health) -> bool:
     if data.get("state") != "ready" or not data.get("attachment_epoch", "").isdigit():
         return False
     if data.get("pid") != health.get("pid") or health.get("state") != "ready":
@@ -1250,23 +1180,23 @@ def transient_baseline_ready(base_directory: str | os.PathLike[str]) -> bool:
 
 
 def read_transient_runtime(base_directory, state_key, native_ready):
-
-    return TransientRuntime(state_key, _baseline_binding(base_directory),
-                            bool(native_ready and transient_baseline_ready(base_directory)))
+    base = Path(base_directory)
+    data = _read_key_value_file(base / TRANSIENT_EFFECT_BASELINE_FILE)
+    health = _read_key_value_file(base / "ap_rpc_health.state")
+    return TransientRuntime(state_key, _baseline_binding(data, health),
+                            bool(native_ready and transient_baseline_ready(data, health)))
 
 
 class TransientPublication:
     def __init__(self, send):
         self._send = send
 
-    async def send(self, cvar, command, state_key, scope, *, room_scoped, receipt_index=None):
+    async def send(self, cvar, command, state_key, scope, *, receipt_index=None):
         command_id = (f"temporary-{receipt_index}-{cvar}" if receipt_index is not None
                       else stable_command_key("effect", state_key, scope, cvar, command))
-        return await self._send(command, coalesce_key=command_id, state_key=state_key,
+        return await self._send(command, coalesce_key=command_id,
                                 receipt_index=receipt_index)
 
-    def publish_scope(self, scope: str | None) -> None:
-        self.scope = scope
 
 
 def _local_placement_checked(facts):
@@ -1299,10 +1229,7 @@ def _read_key_value_file(path: Path) -> dict[str, str]:
     return result
 
 
-def _baseline_binding(base_directory: str | os.PathLike[str]) -> tuple[str, str] | None:
-    base = Path(base_directory)
-    data = _read_key_value_file(base / TRANSIENT_EFFECT_BASELINE_FILE)
-    health = _read_key_value_file(base / "ap_rpc_health.state")
+def _baseline_binding(data, health) -> tuple[str, str] | None:
     if data.get("state") != "ready" or health.get("state") != "ready":
         return None
     pid = data.get("pid")

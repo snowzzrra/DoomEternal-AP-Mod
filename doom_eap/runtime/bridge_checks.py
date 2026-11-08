@@ -24,9 +24,9 @@ from doom_eap.content.automap_visual_registry import (
     load_automap_visual_registry,
 )
 from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
-from doom_eap.content.publisher_loader import load_publisher_contracts
-from doom_eap.contracts.check_observation import CheckObservation
-from doom_eap.contracts.command_publication import (
+from doom_eap.content.content_catalog import load_publisher_contracts
+from doom_eap.contracts.receipt_delivery import CheckObservation
+from doom_eap.contracts.receipt_delivery import (
     CHECKED_VISUAL_HIDE,
     MAP_ENTITY_SAFE,
     stable_command_key,
@@ -35,7 +35,7 @@ from doom_eap.contracts.command_publication import (
 from doom_eap.contracts.foundation import load_foundation_contracts
 from doom_eap.contracts.goal_policy import GoalPolicy
 from doom_eap.contracts.publisher_contracts import PublisherEngine
-from doom_eap.contracts.runtime_context import canonical_map_name
+from doom_eap.contracts.runtime_context import canonical_map_name, catalog_map_key
 from doom_eap.runtime import bridge_config, bridge_saves
 from doom_eap.runtime.campaign import STAGES
 from doom_eap.runtime.deathlink import DeathLinkPublication
@@ -477,15 +477,6 @@ class CheckRuntime:
         return await self.ctx.publisher_dispatch.execute(
             publisher, trigger_strategy, source_description,
             self.check_publication(), self.ctx.persist_session_state,
-        )
-
-    async def send_mission_complete(self, location_id, source_description, report_goal=False):
-        if report_goal:
-            return await self.evaluate_campaign_goal(source_description
-        )
-        self.ctx.publisher_dispatch.observe_protocol(self.check_observation())
-        return await self.ctx.publisher_dispatch.mission(
-            location_id, source_description, self.check_publication(), self.ctx.persist_session_state,
         )
 
     async def check_campaign_goal_event(self):
@@ -1117,10 +1108,10 @@ class CheckRuntime:
             rpc_ready=True, send=self.ctx.items._send_runtime_command,
         )
 
-    def snapshot_fast_travel_eligibility(self, marker_data=None, *, refresh=False):
+    def snapshot_fast_travel_eligibility(self, marker_data=None):
         return self.ctx.fast_travel.capture(
             self.ctx.runtime_lifecycle.map_identity, self.ctx.get_ap_state_key(),
-            getattr(self.ctx, "checked_locations", None), marker_data, refresh=refresh,
+            getattr(self.ctx, "checked_locations", None), marker_data,
         )
 
     async def _prepare_level_inventory(self, job, receipt_token):
@@ -1371,20 +1362,6 @@ class CheckRuntime:
         self.ctx.save_observer.clear_mission_select()
         self.ctx.fast_travel.invalidate(clear_submitted=False)
         return None
-
-    def store_pending_map_identity(self, marker_data):
-        self.ctx.runtime_lifecycle.stage_marker(marker_data)
-        self.ctx.save_observer.set_frozen(True)
-        if getattr(self.ctx, "last_pending_marker_mtime", None) != marker_data["mtime_ns"]:
-            self.ctx.last_pending_marker_mtime = marker_data["mtime_ns"]
-            bridge_config.logger.info(
-                "[MAP] MAP_IDENTITY_MARKER_PENDING map=%s runtime_map=%s "
-                "source=map_start_event epoch=%s",
-                marker_data["map_key"],
-                marker_data["runtime_map"],
-                marker_data["gameplay_epoch"],
-            )
-        return self.ctx.runtime_lifecycle.map_identity.pending_marker
 
     def accept_map_identity(self, marker_data, evidence_epoch=None):
         previous = getattr(self.ctx.runtime_lifecycle.map_identity, "cached_marker", None)
@@ -1743,11 +1720,6 @@ class CheckedVisuals:
     def status(self):
         return MappingProxyType(dict(self._status))
 
-    def _catalog_map_key(self, runtime_map):
-        normalized = canonical_map_name(runtime_map)
-        matches = [key for key, value in self._catalog_maps.items() if value == normalized]
-        return matches[0] if len(matches) == 1 else None
-
     def advance_epoch(self, epoch):
         """Start map-safe checked-visual reconciliation for the current level epoch."""
         previous_epoch = self._epoch
@@ -1822,7 +1794,7 @@ class CheckedVisuals:
             return False
         epoch = marker.get("gameplay_epoch")
         map_key = marker.get("map_key")
-        if map_key != self._catalog_map_key(marker.get("runtime_map", "")):
+        if map_key != catalog_map_key(self._catalog_maps, marker.get("runtime_map", "")):
             return False
         entry = self._visuals.get(map_key or "", {}).get(location_id)
         if not valid_materialization_epoch(epoch) or not entry:
@@ -1942,7 +1914,7 @@ class CheckedVisuals:
         if not marker_map or marker_map != current_map:
             return None
         map_name = marker_map
-        map_key = self._catalog_map_key(map_name)
+        map_key = catalog_map_key(self._catalog_maps, map_name)
         if marker.get("map_key") != map_key:
             return None
         return epoch, map_name, map_key

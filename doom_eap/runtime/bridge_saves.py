@@ -16,8 +16,8 @@ from typing import Protocol
 from websockets.exceptions import WebSocketException
 
 from doom_eap.contracts.challenge_registry import aggregate_ready, load_challenge_registry
-from doom_eap.contracts.command_publication import build_materialization_epoch
-from doom_eap.contracts.materialization import GATE_KEY_TO_MAP
+from doom_eap.contracts.receipt_delivery import build_materialization_epoch
+from doom_eap.contracts.receipt_delivery import GATE_KEY_TO_MAP
 from doom_eap.contracts.runtime_context import canonical_map_name
 from doom_eap.contracts.save_observation import (
     CheckpointRecovery,
@@ -714,14 +714,6 @@ def active_primary_save(filename="game_duration.dat"):
     return candidates[0] if candidates else None
 
 
-def primary_save_for_slot(slot_directory, filename="game_duration.dat"):
-
-    for selected in primary_save_candidates(bridge_config.STEAM_REMOTE_DIR, bridge_config.STEAM_ID3, filename):
-        if selected.slot_directory == slot_directory:
-            return selected
-    return None
-
-
 def mastery_save_selection():
     return active_primary_save("game_duration.dat")
 
@@ -796,20 +788,6 @@ def read_mission_challenge_records(payload):
     return records
 
 
-def read_sticky_mastery_record(payload):
-    """Compatibility view retaining Sticky's exact runtime-PASS record shape."""
-    record = read_unlockable_record(payload, STICKY_MASTERY_ENTRY)
-    if record is None:
-        raise ValueError("Sticky native record is missing")
-    return {
-        key: record[key]
-        for key in (
-            "rule_0_statname", "rule_0_statCount", "rule_0_satisfied",
-            "unlockableIsUnlocked",
-        )
-    }
-
-
 def read_checkpoint_deaths(unpacked: bytes) -> int | None:
     marker = b"numCheckpointDeaths\x01"
     idx = unpacked.find(marker)
@@ -849,16 +827,6 @@ def probe_game_duration(path):
     return snapshot
 
 
-def read_game_details():
-    """Compatibility view; runtime observers use lifecycle-proven selections."""
-
-    path = active_slot_file("game.details")
-    if not path:
-        return None
-    selected = PrimarySaveSelection(path.parent.name, path.parent / "game_duration.dat", 0)
-    return read_game_details_for_selection(selected, bridge_config.STEAM_ID3, bridge_config.logger)
-
-
 class SaveRuntime:
     def __init__(self, context):
         self.ctx = context
@@ -889,17 +857,6 @@ class SaveRuntime:
             self.ctx.save_observer.mission_select.map_name, self.ctx.save_observer.mission_select.epoch, self.save_check_observations(),
             authoritative=self.has_authoritative_save_proof(),
             first_sample_locations=frozenset(self.ctx.server_locations) - frozenset(self.ctx.checked_locations))
-
-    def observe_sticky_mastery(self, snapshot, path):
-        """Observe one Sticky Bombs native mastery record."""
-        record = {
-            "numUnlockableRules": STICKY_MASTERY_ENTRY["signal"]["numUnlockableRules"],
-            "rule_0_statDuration": STICKY_MASTERY_ENTRY["signal"]["rule_0_statDuration"],
-            **snapshot,
-        }
-        self.observe_weapon_masteries(
-            {STICKY_UNLOCKABLE.decode("ascii"): record}, path
-        )
 
     def save_check_readiness(self):
         return SaveCheckReadiness(self.ctx.item_state_ready, self.has_authoritative_save_proof(), self.ctx.save_observer.selection.slot)

@@ -18,9 +18,9 @@ from websockets.exceptions import WebSocketException
 from doom_eap.content.item_classification import ITEM_CLASSIFICATION_TRAP
 from doom_eap.content.killsanity_plan import resolved_rewards
 from doom_eap.content.slot_data_contract import SlotData
-from doom_eap.contracts.check_observation import CheckObservation, CheckPublicationPort
-from doom_eap.contracts.command_publication import FAST_TRAVEL_UNLOCK, MAP_ENTITY_SAFE, stable_command_key
-from doom_eap.contracts.runtime_context import canonical_map_name
+from doom_eap.contracts.receipt_delivery import CheckObservation, CheckPublicationPort
+from doom_eap.contracts.receipt_delivery import FAST_TRAVEL_UNLOCK, MAP_ENTITY_SAFE, stable_command_key
+from doom_eap.contracts.runtime_context import canonical_map_name, catalog_map_key
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.strings import text as player_text
 from tools.maps.notification_formatting import item_receipt_text
@@ -32,13 +32,6 @@ STAGES = {stage["id"]: stage for stage in json.loads(
 ACCESS_IDS = {stage["access_id"]: key for key, stage in STAGES.items()}
 FAST_TRAVEL_RETRY_BASE_SECONDS = 1.0
 FAST_TRAVEL_RETRY_MAX_SECONDS = 8.0
-
-
-def validate_plan(slot_data):
-    from doom_eap.runtime.observers import admit_slot_data
-
-    admit_slot_data(slot_data)
-    return slot_data["campaign"]
 
 
 class UnifiedCampaign:
@@ -387,17 +380,8 @@ class FastTravel:
         self._submitted.clear()
 
     @property
-    def epoch_state(self):
-        return MappingProxyType(dict(self._epoch_state)) if self._epoch_state is not None else None
-
-    @property
     def eligibility(self):
         return self._eligibility
-
-    def _catalog_map_key(self, runtime_map):
-        normalized = canonical_map_name(runtime_map)
-        matches = [key for key, value in self._catalog_maps.items() if value == normalized]
-        return matches[0] if len(matches) == 1 else None
 
     def _fast_travel_transition(self, event, *, reason=None, trigger=None):
         """Emit one lifecycle transition for current Fast Travel epoch."""
@@ -441,7 +425,7 @@ class FastTravel:
             return "map_epoch_mismatch"
         accepted_map_key = accepted.get("map_key")
         accepted_runtime_map = canonical_map_name(accepted.get("runtime_map", ""))
-        canonical_key = self._catalog_map_key(accepted_runtime_map)
+        canonical_key = catalog_map_key(self._catalog_maps, accepted_runtime_map)
         if not isinstance(accepted_map_key, str):
             accepted_map_key = canonical_key
         if accepted_map_key != canonical_key:
@@ -548,7 +532,7 @@ class FastTravel:
             return True
         return False
 
-    def capture(self, map_identity, room_identity, checked, marker_data=None, *, refresh=False):
+    def capture(self, map_identity, room_identity, checked, marker_data=None):
         """Freeze eligibility at epoch entry; later checks cannot create a replay."""
         if not isinstance(marker_data, Mapping):
             marker_data = (
@@ -565,7 +549,7 @@ class FastTravel:
 
         identity = room_identity
         runtime_map = canonical_map_name(marker_data.get("runtime_map", ""))
-        map_key = self._catalog_map_key(runtime_map)
+        map_key = catalog_map_key(self._catalog_maps, runtime_map)
         if marker_data.get("map_key") != map_key:
             return None
         mission_id = self._mission_ids.get(map_key)

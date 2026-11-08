@@ -15,11 +15,11 @@ import colorama
 from websockets.exceptions import WebSocketException
 
 from doom_eap.content.killsanity_plan import milestone_ids
-from doom_eap.contracts.campaign_goal_contract import CAMPAIGN_GOAL_CONTRACT
+from doom_eap.contracts.goal_policy import CAMPAIGN_GOAL_CONTRACT
 from doom_eap.contracts.challenge_registry import canonical_map_name
 from doom_eap.contracts.foundation import compile_item_delivery_plan, load_foundation_contracts, load_primitive_registry
 from doom_eap.contracts.inventory_domain import InventoryObservationPort
-from doom_eap.contracts.item_contracts import DEFAULT_DEATH_LINK_MODE
+from doom_eap.contracts.inventory_domain import DEFAULT_DEATH_LINK_MODE
 from doom_eap.runtime import bridge_checks, bridge_config, bridge_items, bridge_saves
 from doom_eap.runtime.ammo import AmmoRequestPump
 from doom_eap.runtime.bridge_checks import CheckedVisuals, LocationSetup, PhysicalChecks, resolve_placement_records
@@ -248,7 +248,7 @@ class DoomCommandProcessor(ClientCommandProcessor):
         self.output(f"Queued allowlisted entity: {correlation}; effect unconfirmed.")
 
     async def _cmd_doom_test_bootstrap(self, action_name: str = ""):
-        """Activate a historical bootstrap without touching persisted state."""
+        """Record a diagnostic command without simulating receipts or changing bootstrap state."""
         if action_name == "suit_page":
             self.output("No active Suit Page bootstrap candidate.")
             self.output("The v2 stat-only candidate failed runtime validation.")
@@ -556,7 +556,7 @@ class DoomEternalContext(CommonContext):
             self.checked_locations.update(args["checked_locations"])
             if any(stage["completion_id"] in args["checked_locations"] for stage in STAGES.values()):
                 self.items._schedule_item_delivery("mission_complete")
-            self.checks.snapshot_fast_travel_eligibility(refresh=True)
+            self.checks.snapshot_fast_travel_eligibility()
         self.publisher_dispatch.observe_protocol(self.checks.check_observation())
         self.session_tasks.start(lambda: self._reconcile_server_checks("server_checked_update"))
         self.session_tasks.start(self.saves.check_mission_challenge_locations)
@@ -615,8 +615,12 @@ class DoomEternalContext(CommonContext):
             placements = resolve_placement_records(
                 self.location_setup.received_ids, self.locations_info, self.slot_info, self.protocol_names(), self.slot
             )
-        except Exception as error:
+        except (ValueError, KeyError) as error:
             self._fail_placement_scout(f"Placement resolution failed: {error}")
+            return
+        except Exception as error:
+            bridge_config.logger.exception("Unexpected placement resolution failure")
+            self._fail_placement_scout(f"Unexpected placement resolution failure: {type(error).__name__}: {error}")
             return
         self.location_setup.resolved()
         self._complete_connected(placements)
@@ -678,7 +682,6 @@ class DoomEternalContext(CommonContext):
             packet_received_monotonic_ns=packet_received_ns,
         )
         self.items._schedule_item_delivery("packet")
-        self._schedule_ammo_refill_overflow_normalization("received_items")
 
     async def _reconcile_server_checks(self, trigger):
         try:

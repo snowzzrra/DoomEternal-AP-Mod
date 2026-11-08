@@ -22,7 +22,7 @@ from doom_eap.contracts.inventory_domain import (
     NativeEffectEvidence,
     SaveReadiness,
 )
-from doom_eap.contracts.materialization import SUPPORT_RUNE_IDS, MaterializationScope
+from doom_eap.contracts.receipt_delivery import SUPPORT_RUNE_IDS, MaterializationScope
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.runtime.ammo import AMMO_REFILL_CAPACITY, AmmoCommandScope, AmmoStorage, LedgerAmmoRefill
 from doom_eap.runtime.campaign import ACCESS_IDS, STAGES
@@ -731,7 +731,7 @@ class RoomDelivery:
         scope = await bridge.items._native_materialization_scope(evidence, link=link)
         if scope is None:
             return False
-        identity = dict(pid=link.pid, process_created=int(scope[3]), instance_id=UUID(scope[4]).bytes, generation=scope[6])
+        identity = dict(pid=link.pid, process_created=int(scope[3]), instance_id=list(UUID(scope[4]).bytes), generation=scope[6])
         if self.transport is None or self.transport.scope != identity:
             await self._transport(link, identity)
         else:
@@ -748,7 +748,7 @@ class RoomDelivery:
         if epoch is not None and epoch.state is SaveEpochState.PREPARED:
             raise Conflict("New save preparation was interrupted; restore or finish the archived restart")
         save_id = f"{epoch.epoch_id if epoch else 'initial'}:{scope[1]}"
-        candidate = Context(str(uuid4()), self.binding, link.pid, scope[3], str(UUID(bytes=identity["instance_id"])),
+        candidate = Context(str(uuid4()), self.binding, link.pid, scope[3], str(UUID(bytes=bytes(identity["instance_id"]))),
                             self.bridge.runtime_lifecycle.snapshot.campaign, scope[-1], save_id, str(scope[6]), scope[6],
                             str(UUID(bytes=bytes(admission["save_binding"]))))
         if self.coordinator is None or not self.coordinator._same_context(candidate):

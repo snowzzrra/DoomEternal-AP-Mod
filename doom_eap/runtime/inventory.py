@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from doom_eap.contracts.command_publication import stable_command_key
+from doom_eap.contracts.receipt_delivery import stable_command_key
 from doom_eap.contracts.foundation import (
     MASTERY_ITEM_BITS,
     DeliveryCommand,
@@ -55,7 +55,7 @@ from doom_eap.contracts.inventory_domain import (
     SlayerKey,
     SuitStage,
 )
-from doom_eap.contracts.materialization import (
+from doom_eap.contracts.receipt_delivery import (
     GATE_KEY_TO_MAP,
     SUPPORT_RUNE_IDS,
     TAG_SPECIAL_CAPABILITY,
@@ -63,7 +63,7 @@ from doom_eap.contracts.materialization import (
     context_item_ids,
     support_rune_commands,
 )
-from doom_eap.contracts.ownership import (
+from doom_eap.contracts.inventory_domain import (
     CompletionUpgrade,
     DerivedOwnershipFact,
     EffectiveOwnership,
@@ -77,7 +77,7 @@ from doom_eap.contracts.receipt_delivery import (
     RECONCILIATION_REPAIR,
 )
 from doom_eap.contracts.runtime_context import RuntimeContext, canonical_map_name
-from doom_eap.contracts.tag_prerequisites import AUTHORED_TAG_PREREQUISITES
+from doom_eap.contracts.inventory_domain import AUTHORED_TAG_PREREQUISITES
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.runtime.ledger import CommandState, NetworkReceipt, Resolution
 from doom_eap.runtime.native_transport import NativeTransport, TransportError, WireError
@@ -144,7 +144,6 @@ class ReceiptSession:
 
     def __init__(self, *, processed_boundary=0):
         self._generation = 0
-        self._pending = set()
         self._processed_boundary = processed_boundary
         self._starting_ownership = ()
         self._packet_ranges = deque(maxlen=PACKET_TIMING_RANGE_LIMIT)
@@ -170,12 +169,6 @@ class ReceiptSession:
             ))
         return start_index, accepted
 
-    def packet_timestamp(self, receipt_index):
-        for start, end, timestamp_ns, _live in reversed(self._packet_ranges):
-            if start <= receipt_index < end:
-                return timestamp_ns
-        return None
-
     def packet_is_live_tail(self, receipt_index):
         for start, end, _timestamp_ns, live in reversed(self._packet_ranges):
             if start <= receipt_index < end:
@@ -184,12 +177,6 @@ class ReceiptSession:
 
     def clear_packet_ranges(self):
         self._packet_ranges.clear()
-
-    def prune_processed_packets(self):
-        self._packet_ranges = deque(
-            (entry for entry in self._packet_ranges if entry[1] > self._processed_boundary),
-            maxlen=PACKET_TIMING_RANGE_LIMIT,
-        )
 
     @property
     def starting_ownership(self):
@@ -225,20 +212,12 @@ class ReceiptSession:
 
     def begin_rebind(self):
         self._generation += 1
-        self._pending.clear()
 
     def capture(self, state_key):
         return ReceiptSessionToken(state_key, self._generation)
 
     def is_current(self, token, state_key):
         return token.state_key == state_key and token.generation == self._generation
-
-    def was_observed(self, key):
-        return key in self._pending
-
-    def note_observation(self, key):
-        self._pending.add(key)
-
 
 @dataclass(frozen=True)
 class ReplayPolicy:
@@ -535,29 +514,6 @@ def processed_receipt_counts(session):
     }
 
 
-def record_processed_receipt(session, network_item):
-    """Record one occurrence; boundary advancement remains a distinct operation."""
-    history = session.setdefault("receipt_history", {})
-    item_ids = history.setdefault("receipt_item_ids", [])
-    if not isinstance(item_ids, list):
-        item_ids = []
-        history["receipt_item_ids"] = item_ids
-    item_ids.append(network_item.item)
-    receipt_id = receipt_identity(network_item)
-    if receipt_id is None:
-        return
-    receipt_counts = history.setdefault("receipt_counts", {})
-    if not isinstance(receipt_counts, dict):
-        receipt_counts = {}
-        history["receipt_counts"] = receipt_counts
-    receipt_counts[receipt_id] = receipt_counts.get(receipt_id, 0) + 1
-    receipt_ids = history.setdefault("receipt_ids", [])
-    if not isinstance(receipt_ids, list):
-        receipt_ids = []
-        history["receipt_ids"] = receipt_ids
-    receipt_ids.append(receipt_id)
-
-
 def validate_session_receipt_prefix(session, received_items, boundary):
     history = session.setdefault("receipt_history", {})
     return validate_receipt_history_prefix(received_items, boundary, history)
@@ -595,18 +551,6 @@ def project_receipt_boundary(session, processed_items):
         history = {}
         session["receipt_history"] = history
     history["processed_boundary"] = processed_items
-
-
-def reset_receipt_history(session):
-    session["processed_items"] = 0
-    session["receipt_history"] = {
-        "processed_boundary": 0,
-        "highest_observed_index": -1,
-        "receipt_ids": [],
-        "receipt_counts": {},
-        "receipt_item_ids": [],
-        "owned_item_ids": [],
-    }
 
 
 def validate_receipt_history_prefix(
@@ -751,34 +695,6 @@ def load_policy_registry(
     return parsed
 
 
-def compile_reconciliation_plan(
-    received_item_ids: Iterable[int], definitions: Mapping[int, Any],
-    registry: Mapping[int, ReplayPolicy], slot_identity: str, epoch: int,
-    *, include_manual_replay: bool = False,
-) -> ReconciliationPlan:
-
-
-    _validate_replay_identity(slot_identity, epoch, include_manual_replay)
-    if set(registry) != set(definitions):
-        raise ValueError("reconciliation registry does not exactly cover active items")
-    received_history = _replay_history(received_item_ids)
-    counts = Counter(received_history)
-    unknown = sorted(set(counts) - set(registry))
-    if unknown:
-        raise ValueError("received item has no policy: " + ", ".join(map(str, unknown)))
-    _validate_replay_definitions(counts, definitions, registry)
-    result = compare_inventory(
-        InventoryOwnership(received_history), definitions=dict(definitions), policies=registry,
-        replay_identity=(slot_identity, epoch), include_manual_replay=include_manual_replay,
-    )
-    plan = result.reconciliation
-    assert plan is not None
-    command_keys = [command.command_key for command in plan.commands]
-    if len(command_keys) != len(set(command_keys)):
-        raise ValueError("reconciliation compiled duplicate command keys")
-    return plan
-
-
 class ReconciliationBlock(str, Enum):
     RUNTIME_NOT_READY = 'runtime effects are not level-ready'
     NATIVE_APPLICATION_PENDING = 'materialization queued; awaiting native application'
@@ -801,24 +717,6 @@ class MaterializationPlanError(ValueError):
     def __init__(self, message, *, blocked=True):
         super().__init__(message)
         self.blocked = blocked
-
-
-def compile_materialization_plan(
-    ownership, context, scope, item_definitions, replay_policies, special_mode,
-    *, observation: InventoryObservation | None = None, selected_item_ids=None,
-):
-
-
-    result = compare_inventory(
-        InventoryOwnership(ownership.reconciliation_item_ids, ownership.blood_punch_upgrades),
-        definitions=item_definitions, policies=replay_policies,
-        observation=observation, context=context, scope=scope, special_mode=special_mode,
-        selected_item_ids=selected_item_ids,
-    )
-    if not result.reconciliation.commands and result.unresolved_item_ids:
-        raise MaterializationPlanError("empty plan has unresolved native observations: "
-                                       + ", ".join(map(str, result.unresolved_item_ids)))
-    return result.materialization
 
 
 def authored_effects_allowed(*, evidence, campaign, epoch, lease, process_running,
@@ -935,52 +833,6 @@ class RuneReconciliationPlan:
     @property
     def noops(self) -> tuple[RunePlanEntry, ...]:
         return tuple(entry for entry in self.entries if entry.disposition == "noop")
-
-
-def compile_rune_reconciliation_commands(
-    plan: RuneReconciliationPlan,
-    slot_identity: str,
-    epoch: int | str,
-) -> tuple[Any, ...]:
-    """Compile one existing generated effect activation per repair candidate."""
-    if not isinstance(slot_identity, str) or not slot_identity:
-        raise ValueError("Rune reconciliation requires slot identity")
-    if isinstance(epoch, bool) or not isinstance(epoch, int | str):
-        raise ValueError("Rune reconciliation requires an evidence epoch")
-    return tuple(
-        ReconciliationCommand(
-            item_id=entry.item_id,
-            name=entry.perk.rsplit("/", 1)[-1],
-            policy="rune_visual_repair",
-            stage=0,
-            command_key=f"rune-reconcile-{slot_identity}-e{epoch}-item{entry.item_id}",
-            command=f"ai_ScriptCmdEnt ap_rpc_v3_{entry.item_id} activate",
-            description="reapply one AP-owned Rune perk without changing equipped slots",
-        )
-        for entry in plan.repairs
-    )
-
-
-def with_rune_reconciliation_commands(
-    plan: RuneReconciliationPlan,
-    slot_identity: str,
-    epoch: int | str,
-) -> RuneReconciliationPlan:
-    return RuneReconciliationPlan(
-        entries=plan.entries,
-        fingerprint=plan.fingerprint,
-        status=plan.status,
-        commands=compile_rune_reconciliation_commands(plan, slot_identity, epoch),
-    )
-
-
-def rune_plan_already_recorded(
-    state: Mapping[str, Any], plan: RuneReconciliationPlan
-) -> bool:
-    return (
-        state.get("fingerprint") == plan.fingerprint
-        and state.get("status") == plan.status
-    )
 
 
 def rune_item_perk_mapping(
@@ -1245,20 +1097,6 @@ class SentinelInventoryObservation:
         self.logger = logger
         self.log_event = log_event
         self.last_logged = None
-
-    async def observe_native(self, transport, namespace, save_binding, **snapshot):
-        state_key = self.context.state_key
-        progression = await transport.observe(54, namespace, save_binding)
-        currencies = await _native_currencies(transport, namespace, save_binding)
-        if self.context.state_key != state_key:
-            return None
-        if currencies and not all(fact.before_scope == currencies[0].before_scope
-                                  and fact.after_scope == currencies[0].after_scope for fact in currencies):
-            return None
-        combined = _combine_currencies(currencies) if currencies else None
-        return self.observe_inventory(**snapshot,
-                                      progression=None if progression is None else progression_observation(progression),
-                                      currencies=combined)
 
     def _native_inventory(self, link):
         link = link or self.context.items.native_game_link()
@@ -2104,49 +1942,6 @@ def _parse_replay_policy(raw_id, entry):
     return ReplayPolicy(item_id, name, policy, receipt_feedback)
 
 
-def _validate_replay_identity(slot_identity, epoch, include_manual_replay):
-    if (
-        not isinstance(slot_identity, str)
-        or not slot_identity
-        or re.fullmatch(r"[A-Za-z0-9_.:-]+", slot_identity) is None
-        or isinstance(epoch, bool)
-        or not isinstance(epoch, int)
-        or epoch < 0
-        or not isinstance(include_manual_replay, bool)
-    ):
-        raise ValueError("reconciliation requires slot identity and non-negative epoch")
-
-
-def _replay_history(received_item_ids):
-    try:
-        received_history = tuple(received_item_ids)
-        if any(
-            isinstance(item_id, bool) or not isinstance(item_id, int)
-            for item_id in received_history
-        ):
-            raise ValueError("received item history contains a non-integer item ID")
-    except TypeError as error:
-        raise ValueError("received item history is not hashable") from error
-    return received_history
-
-
-def _validate_replay_definitions(counts, definitions, registry):
-    for item_id in counts:
-        policy = registry[item_id]
-        if not isinstance(policy, ReplayPolicy) or policy.policy not in SUPPORTED_POLICIES:
-            raise ValueError(f"unsupported policy for item {item_id}: {getattr(policy, 'policy', None)!r}")
-        if policy.policy == SPECIAL_PROGRESSIVE:
-            _validate_progressive_definition(item_id, definitions[item_id])
-
-
-def _validate_progressive_definition(item_id, definition):
-    if not isinstance(definition, Mapping) or definition.get("type") not in {"progressive_perk", "progressive_item"}:
-        raise ValueError(f"progressive item {item_id} has an invalid definition")
-    perks = definition.get("perks")
-    if not isinstance(perks, list) or not perks:
-        raise ValueError(f"progressive item {item_id} has no configured stages")
-
-
 def _authored_epoch_allowed(evidence, epoch, lease):
     return (evidence is not None and evidence.state == "gameplay" and evidence.native_safe
             and isinstance(epoch, str) and lease == epoch)
@@ -2733,7 +2528,7 @@ def _delivery_items(inventory, special, runes, progress, context):
 
 
 def _rune_items(result):
-    from doom_eap.contracts.materialization import SUPPORT_RUNE_IDS
+    from doom_eap.contracts.receipt_delivery import SUPPORT_RUNE_IDS
 
     items = {}
     for ids, field in ((NORMAL_RUNES, "owned_normal_after"), (sorted(SUPPORT_RUNE_IDS), "owned_support_after")):
@@ -2747,20 +2542,6 @@ def _currency_value(result, suffix, valid):
     if not result["flags"] & valid:
         return CurrencyValue()
     return CurrencyValue(result[f"balance_{suffix}"], result[f"gained_{suffix}"])
-
-
-async def _native_currencies(transport, namespace, save_binding):
-    currencies = []
-    for currency in Currency:
-        result = await transport.observe(53, namespace, save_binding, currency=currency)
-        if result is not None:
-            currencies.append(currency_observation(result))
-    return currencies
-
-
-def _combine_currencies(currencies):
-    return CurrencyObservation(currencies[0].before_scope, currencies[0].after_scope,
-                               {key: value for fact in currencies for key, value in fact.values.items()})
 
 
 def _item(item_id, value, *, stage=0, source="sentinel_inventory"):

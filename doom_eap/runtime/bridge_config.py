@@ -12,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from doom_eap.contracts.materialization import SUPPORT_RUNE_IDS
+from doom_eap.contracts.receipt_delivery import SUPPORT_RUNE_IDS
 from doom_eap.runtime.connection_diagnostics import timed_sync_call
 from doom_eap.runtime.inventory import CLIENT_STATE_VERSION, ClientStateStore, atomic_write_json, migrate_client_state
 from doom_eap.strings import text as player_text
