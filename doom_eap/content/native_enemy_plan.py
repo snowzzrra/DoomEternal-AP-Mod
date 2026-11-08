@@ -1,8 +1,5 @@
 """Freeze body recipes while native commands retain encounter scheduling."""
 
-import json
-from importlib.resources import files
-
 import hashlib
 import json
 import math
@@ -239,8 +236,6 @@ def _secret_timers_costs(catalog, key, maps, record, timers):
 
 
 def _secret_timers(maps, catalog):
-    from .native_enemy_plan import load_secret_encounter_timers
-
     timers = {}
     for key, record in load_secret_encounter_timers()["maps"].items():
         _secret_timers_costs(catalog, key, maps, record, timers)

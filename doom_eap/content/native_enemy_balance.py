@@ -121,8 +121,8 @@ def _encounters(profile, *, mobile=False, objective_budgets=False):
     if 'encounters' in profile:
         if not mobile:
             return profile['encounters']
-        from .native_enemy_safety import AMBIENT_ENCOUNTERS
         from .native_enemy_plan import load_secret_encounter_timers
+        from .native_enemy_safety import AMBIENT_ENCOUNTERS
         secret = {row['manager'] for row in load_secret_encounter_timers()['maps'].get(
             profile['map_key'], {}).get('timers', [])}
         result = []

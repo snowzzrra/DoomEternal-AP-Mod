@@ -13,7 +13,6 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hints
 
-
 __all__ = (
     "CATALOG_DEPENDENCIES",
     "MAX_COLLECTION",
