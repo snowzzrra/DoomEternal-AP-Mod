@@ -378,8 +378,8 @@ def validate_source_layout(root: Path, catalog: ContentCatalog | None = None) ->
             raise ValueError(f"impossible source layout: manifest {spec.key}")
 
 
-def stale_package_paths(root: Path) -> list[str]:
-    """Return stale room markers from source contract inputs, not build output."""
+def stale_source_paths() -> list[str]:
+    """Return stale room markers from source contract inputs."""
     source_root = Path(__file__).resolve().parents[2]
     from tools.release.build_cache import validate_source_contract
 

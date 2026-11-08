@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 from doom_eap.content.map_registry import load_map_registry
-from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.compiler_identity import first_party_text_bytes
 from doom_eap.strings import GAME_LOCALES, load_catalog
 from tools.release.prebuilt_room_resources import compute_room_resource_input_fingerprint
 from tools.release.room_payloads import canonical_json

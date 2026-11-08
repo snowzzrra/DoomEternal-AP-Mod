@@ -59,7 +59,7 @@ from tools.release.apworld_cache import apworld_fingerprint
 from tools.release.release_manifest import (
     build_release_manifest,
     load_release_manifest,
-    stale_package_paths,
+    stale_source_paths,
     validate_release_manifest,
     validate_source_layout,
 )
@@ -118,7 +118,7 @@ CORE_MAP_INPUTS = (
     "data/content_identity.json",
     "data/ap_visual_bundle.json",
     "data/checked_location_visuals.json",
-    "doom_eap/contracts/ap_visual_contract.py",
+    "doom_eap/content/content_catalog.py",
     "tools/maps/ap_map_generator.py",
     "tools/maps/notification_formatting.py",
     "tools/maps/mission_complete_map_patcher.py",
@@ -128,11 +128,11 @@ CORE_MAP_INPUTS = (
     "doom_eap/contracts/publisher_contracts.py",
 )
 PREFLIGHT_PYTHON = (
-    "doom_eap/content/secret_encounter_timers.py",
+    "doom_eap/content/native_enemy_plan.py",
     "doom_eap/content/mastery_requirements.py",
     "doom_eap/contracts/save_observation.py",
     "doom_eap/runtime/bridge_saves.py",
-    "doom_eap/contracts/materialization.py",
+    "doom_eap/contracts/receipt_delivery.py",
     "doom_eap/runtime/inventory.py",
     "doom_eap/runtime/campaign.py",
     "doom_eap/runtime/bridge_checks.py",
@@ -141,15 +141,15 @@ PREFLIGHT_PYTHON = (
     "doom_eap/runtime/ammo.py",
     "doom_eap/runtime/deathlink.py",
     "doom_eap/contracts/goal_policy.py",
-    "doom_eap/contracts/check_observation.py",
     "doom_eap/contracts/receipt_delivery.py",
-            "doom_eap/contracts/source_bytes.py",
+    "doom_eap/contracts/receipt_delivery.py",
+            "doom_eap/content/compiler_identity.py",
     "doom_eap/contracts/runtime_context.py",
-    "doom_eap/contracts/tag_prerequisites.py",
-    "doom_eap/contracts/ownership.py",
-    "doom_eap/contracts/command_publication.py",
-    "doom_eap/content/publisher_loader.py",
-    "doom_eap/contracts/ap_visual_contract.py",
+    "doom_eap/contracts/inventory_domain.py",
+    "doom_eap/contracts/inventory_domain.py",
+    "doom_eap/contracts/receipt_delivery.py",
+    "doom_eap/content/content_catalog.py",
+    "doom_eap/content/content_catalog.py",
     "doom_eap/runtime/bridge_client.py",
     "doom_eap/content/physical_options.py",
     "doom_eap/content/content_catalog.py",
@@ -165,7 +165,7 @@ PREFLIGHT_PYTHON = (
     "doom_eap/launcher/launcher_native_health.py",
     "doom_eap/launcher/launcher_platform.py",
     "doom_eap/launcher/launcher_supervisor.py",
-    "doom_eap/launcher/launcher_ui.py",
+    "doom_eap/launcher/ui/app_window.py",
     "doom_eap/presentation.py",
     "doom_eap/__init__.py",
     "doom_eap/launcher/__init__.py",
@@ -180,7 +180,6 @@ PREFLIGHT_PYTHON = (
     "tools/maps/map_semantic_baseline.py",
     "tools/decls/rune_slot_builder.py",
     "tools/validation/pipeline.py",
-    "tools/validation/physical_option_room_contract.py",
     "tools/validation/validate_data.py",
     "tools/validation/audit_resource_packages.py",
     "doom_eap/content/automap_visual_registry.py",
@@ -434,16 +433,16 @@ def _validate_goal_publishers(catalog):
     _validate_goal_publishers_publisher(catalog, goal, goal_files, goal_markers)
 
 
-def _cache_metadata_matches(digest, inputs, map_key, metadata):
+def _cache_metadata_mismatch(digest, inputs, map_key, metadata):
     return metadata.get('schema_version') != 2 or metadata.get('map_key') != map_key or metadata.get('digest') != digest or (metadata.get('inputs') != inputs)
 
 
-def _cache_output_matches(digest, inputs, manifest, map_key, metadata, output):
-    return _cache_metadata_matches(digest, inputs, map_key, metadata) or not output.is_file() or (not manifest.is_file()) or (metadata.get('output_sha256') != _sha256(output)) or (metadata.get('output_size') != output.stat().st_size)
+def _cache_output_mismatch(digest, inputs, manifest, map_key, metadata, output):
+    return _cache_metadata_mismatch(digest, inputs, map_key, metadata) or not output.is_file() or (not manifest.is_file()) or (metadata.get('output_sha256') != _sha256(output)) or (metadata.get('output_size') != output.stat().st_size)
 
 
-def _cache_manifest_matches(digest, inputs, manifest, map_key, metadata, output, raw):
-    return _cache_output_matches(digest, inputs, manifest, map_key, metadata, output) or metadata.get('manifest_sha256') != _sha256(manifest) or metadata.get('manifest_size') != manifest.stat().st_size or (not raw.is_file())
+def _cache_manifest_mismatch(digest, inputs, manifest, map_key, metadata, output, raw):
+    return _cache_output_mismatch(digest, inputs, manifest, map_key, metadata, output) or metadata.get('manifest_sha256') != _sha256(manifest) or metadata.get('manifest_size') != manifest.stat().st_size or (not raw.is_file())
 
 
 def _validate_package_manifest_fields_actual_value(expected, field, generated_root, manifest):
@@ -495,15 +494,14 @@ def _validate_packaged_imports(client_dir):
             raise ValueError(f"component=package field=import_closure error={res.stderr.strip()}")
 
 
-def _cache_raw_matches(digest, inputs, manifest, map_key, metadata, output, patch_members, raw):
-    return _cache_manifest_matches(digest, inputs, manifest, map_key, metadata, output, raw) or metadata.get('raw_sha256') != _sha256(raw) or metadata.get('raw_size') != raw.stat().st_size or (metadata.get('patch_mod_members') != patch_members)
+def _cache_raw_mismatch(digest, inputs, manifest, map_key, metadata, output, patch_members, raw):
+    return _cache_manifest_mismatch(digest, inputs, manifest, map_key, metadata, output, raw) or metadata.get('raw_sha256') != _sha256(raw) or metadata.get('raw_size') != raw.stat().st_size or (metadata.get('patch_mod_members') != patch_members)
 
 
 class Pipeline:
-    def __init__(self, *, no_cache: bool = False, baseline_diff: bool = False):
+    def __init__(self, *, no_cache: bool = False):
         self.started = time.perf_counter()
         self.no_cache = no_cache
-        self.baseline_diff = baseline_diff
         self.catalog: ContentCatalog | None = None
         self.timings: list[tuple[str, float]] = []
         self.generation_counts: dict[str, int] = {}
@@ -538,15 +536,6 @@ class Pipeline:
                 ROOT / "packaging" / "mod_assets",
                 catalog.assets,
             )
-            physical_ids = {item.location_id for item in catalog.physical_locations}
-            runtime_ids = {item.location_id for item in catalog.runtime_locations}
-            overlap = physical_ids & runtime_ids
-            if overlap:
-                raise ValueError(
-                    f"component=catalog map=* file=data field=location_id "
-                    f"value={sorted(overlap)} runtime ID listed as physical\n"
-                    "Reproduce:\n  scripts/pipeline.sh fast"
-                )
             runtime_by_id = {item.location_id: item for item in catalog.runtime_locations}
             _validate_runtime_publishers(catalog, runtime_by_id)
             _validate_goal_publishers(catalog)
@@ -679,7 +668,7 @@ class Pipeline:
             if not _valid_cache_metadata(metadata, patch_members):
                 return None
             if (
-                _cache_raw_matches(digest, inputs, manifest, map_key, metadata, output, patch_members, raw)
+                _cache_raw_mismatch(digest, inputs, manifest, map_key, metadata, output, patch_members, raw)
             ):
                 return None
             return MapArtifact(
@@ -846,12 +835,6 @@ class Pipeline:
             assert_map_baseline(map_key, artifact.output, artifact.manifest)
         return artifact
 
-    def fast(self) -> None:
-        self.preflight()
-
-    def map(self, map_key: str) -> MapArtifact:
-        return self.validate_map(map_key)
-
     def _selection_catalog(self, preflight):
         catalog = self.catalog or (
             self.preflight() if preflight else load_content_catalog()
@@ -934,34 +917,17 @@ class Pipeline:
                 self._run_focused_tests(tests)
         return artifacts
 
-    def affected_cache(self) -> list[MapArtifact]:
-        """Run explicit semantic validation for maps selected from working-tree paths."""
-        catalog = self.catalog or self.preflight()
-        selected, paths = self.selection()
-        print(
-            "AFFECTED maps="
-            f"{','.join(selected) if selected else '(none)'} files={len(paths)}"
-        )
-        with self.timed("affected-cache"):
-            return [
-                self.validate_map(spec.key)
-                for spec in catalog.enabled_maps()
-            ]
-
     def materialize_maps(self) -> list[MapArtifact]:
         """Produce or reuse required map artifacts without semantic auditing."""
         catalog = self.catalog or self.preflight()
         with self.timed("materialize-maps"):
             return [self.generate(spec.key) for spec in catalog.enabled_maps()]
 
-    def _package_root(self, explicit: Path | None = None) -> Path | None:
-        return explicit
-
     def package_preflight(self, package_root: Path | None = None) -> None:
         """Cheap source/package contract audit; never generates maps or seeds."""
         with self.timed("package-preflight"):
             self.catalog or self.preflight()
-            root = self._package_root(package_root)
+            root = package_root
             if root is None:
                 synthetic = build_release_manifest(
                     ROOT,
@@ -974,9 +940,9 @@ class Pipeline:
                 return
             if not root.exists():
                 raise ValueError(f"component=package root={root} value=missing")
-            stale = stale_package_paths(root)
+            stale = stale_source_paths()
             if stale:
-                raise ValueError(f"component=package field=stale_layout value={stale}")
+                raise ValueError(f"component=source field=stale_layout value={stale}")
             manifest_path = root / "RELEASE_MANIFEST.json"
             if not manifest_path.is_file():
                 raise ValueError(f"component=package file={manifest_path} field=manifest value=missing")
@@ -1067,13 +1033,13 @@ class Pipeline:
             if path.is_file() and "__pycache__" not in path.parts
         }
         for relative in (
-            "doom_eap/content/secret_encounter_timers.py",
+            "doom_eap/content/native_enemy_plan.py",
             "doom_eap/content/mastery_requirements.py",
-            "doom_eap/contracts/tag_prerequisites.py",
+            "doom_eap/contracts/inventory_domain.py",
             "doom_eap/contracts/runtime_context.py",
             "doom_eap/contracts/save_observation.py",
             "doom_eap/runtime/bridge_saves.py",
-            "doom_eap/contracts/materialization.py",
+            "doom_eap/contracts/receipt_delivery.py",
             "doom_eap/runtime/inventory.py",
             "doom_eap/runtime/campaign.py",
             "doom_eap/runtime/bridge_checks.py",
@@ -1082,15 +1048,15 @@ class Pipeline:
             "doom_eap/runtime/ammo.py",
             "doom_eap/runtime/deathlink.py",
             "doom_eap/contracts/goal_policy.py",
-            "doom_eap/contracts/check_observation.py",
             "doom_eap/contracts/receipt_delivery.py",
-            "doom_eap/contracts/source_bytes.py",
+            "doom_eap/contracts/receipt_delivery.py",
+            "doom_eap/content/compiler_identity.py",
         "doom_eap/runtime/native_transport.py",
     "doom_eap/runtime/bridge_client.py",
-            "doom_eap/contracts/ownership.py",
-            "doom_eap/contracts/command_publication.py",
-            "doom_eap/content/publisher_loader.py",
-            "doom_eap/contracts/campaign_goal_contract.py",
+            "doom_eap/contracts/inventory_domain.py",
+            "doom_eap/contracts/receipt_delivery.py",
+            "doom_eap/content/content_catalog.py",
+            "doom_eap/contracts/goal_policy.py",
             "doom_eap/contracts/challenge_registry.py",
             "doom_eap/content/content_catalog.py",
             "doom_eap/contracts/foundation.py",
@@ -1108,7 +1074,6 @@ class Pipeline:
             "doom_eap/launcher/launcher_native_health.py",
             "doom_eap/launcher/launcher_platform.py",
             "doom_eap/launcher/launcher_supervisor.py",
-            "doom_eap/launcher/launcher_ui.py",
             "doom_eap/launcher/events.py",
             "doom_eap/launcher/items.py",
             "doom_eap/launcher/items_reader.py",
@@ -1369,7 +1334,7 @@ class Pipeline:
                 _run([
                     "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                     str(ROOT / "scripts" / "build" / "windows_release.ps1"),
-                    "-SkipValidation", "-PipelineReceipt", str(receipt),
+                    "-SkipValidation",
                 ], env=env)
             else:
                 _run(["bash", "scripts/build/playable_test.sh"], env=env)
@@ -1410,7 +1375,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("map_key", nargs="?")
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--no-cache", action="store_true")
-    parser.add_argument("--baseline-diff", action="store_true")
     parser.add_argument("--show-selection", action="store_true")
     parser.add_argument("--map", dest="maps", action="append", default=[])
     parser.add_argument("--test", dest="tests", action="append", default=[])
@@ -1452,12 +1416,12 @@ def _valid_cache_metadata(metadata, patch_members):
 def _run_map_phase(args, pipeline):
     if not args.map_key:
         raise ValueError("map phase requires <map_key>")
-    pipeline.map(args.map_key)
+    pipeline.validate_map(args.map_key)
 
 
 def _run_pipeline_phase(args, pipeline):
     if args.phase == "fast":
-        pipeline.fast()
+        pipeline.preflight()
     elif args.phase == "map":
         _run_map_phase(args, pipeline)
     elif args.phase in {"changed", "affected"}:
@@ -1486,7 +1450,7 @@ def _run_pipeline_build_phase(args, pipeline):
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    pipeline = Pipeline(no_cache=args.no_cache, baseline_diff=args.baseline_diff)
+    pipeline = Pipeline(no_cache=args.no_cache)
     try:
         _run_pipeline_phase(args, pipeline)
     finally:

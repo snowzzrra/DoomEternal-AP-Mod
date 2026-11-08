@@ -14,7 +14,7 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from typing import Any
 
-from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.compiler_identity import first_party_text_bytes
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = ROOT.parent / "Archipelago"

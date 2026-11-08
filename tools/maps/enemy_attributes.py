@@ -77,23 +77,6 @@ def _edit_span(block):
     return match.end() - 1, find_matching_brace(block, match.end() - 1)
 
 
-def _value_span(block, path):
-    opening, end = _edit_span(block)
-    start = opening + 1
-    end -= 1
-    for name in path:
-        member = _member(block[start:end], name)
-        if member is None:
-            raise ValueError("Frozen event path is absent: " + ".".join(path))
-        relative_start, relative_end, is_object = member
-        if not is_object:
-            raise ValueError("Frozen event path is not an object: " + ".".join(path))
-        opening = start + relative_start
-        end = find_matching_brace(block, opening)
-        start = opening + 1
-    return opening, end
-
-
 def _edit(block, path, value):
     opening, end = _edit_span(block)
     body = _set(block[opening + 1:end - 1], path, value)

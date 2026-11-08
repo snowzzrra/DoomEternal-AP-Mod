@@ -100,11 +100,7 @@ def notification_text(
 ) -> str:
     notification_key(item_id, definition, stage=stage)
     name = _sanitized_name(item_name)
-    progressive_count = _progressive_stage_count(item_id, definition, stage)
-    if progressive_count is not None:
-        if stage is None:
-            raise ValueError("progressive notification stage is required")
-    elif isinstance(definition, dict) and definition.get("type") == "currency":
+    if stage is None and isinstance(definition, dict) and definition.get("type") == "currency":
         count = definition.get("count", 1)
         if not isinstance(count, int) or count <= 0:
             raise ValueError("currency notification count must be positive")
@@ -120,14 +116,11 @@ def major_notification_text(
     locale: str = "english",
 ) -> str:
     """Return localized major receipt text: ``<ITEM> RECEIVED``."""
-    notification_text(item_id, definition, item_name, stage=stage)
+    name = notification_text(item_id, definition, item_name, stage=stage)
     if locale not in GAME_LOCALES:
         raise ValueError(f"unsupported notification locale: {locale}")
-    name = _sanitized_name(item_name)
-    progressive_count = _progressive_stage_count(item_id, definition, stage)
-    if progressive_count is not None:
-        if stage is None:
-            raise ValueError("progressive notification stage is required")
+    if stage is not None:
+        progressive_count = len(definition["perks"])
         if name.startswith("Progressive "):
             name = name[len("Progressive "):]
         name = f'{name} ({stage + 1!s}/{progressive_count!s})'
@@ -158,12 +151,12 @@ def placement_sent_key(location_id: int) -> str:
     return f"{PLACEMENT_SENT_KEY_PREFIX}{location_id}"
 
 
-def _placement_identity(placement: Any) -> tuple[str, str, bool, bool]:
+def _placement_identity(placement: Any) -> tuple[str, str, bool]:
     if not isinstance(placement, dict):
         raise ValueError("placement presentation requires a placement record")
     item_name = _sanitized_name(str(placement.get("item_name", "")))
     recipient_name = _sanitized_name(str(placement.get("recipient_name", "")))
-    return item_name, recipient_name, bool(placement.get("local")), bool(placement.get("trap"))
+    return item_name, recipient_name, bool(placement.get("local"))
 
 
 def location_sent_text(placement: Any, *, locale: str = "english") -> str:
@@ -172,7 +165,7 @@ def location_sent_text(placement: Any, *, locale: str = "english") -> str:
     Local checks report ``FOUND YOUR <ITEM>``; remote checks report
     ``SENT <ITEM> TO <RECIPIENT>``.
     """
-    item_name, recipient_name, local, _trap = _placement_identity(placement)
+    item_name, recipient_name, local = _placement_identity(placement)
     if local:
         return load_catalog().text('notifications', 'local_found', locale=GAME_LOCALES[locale], item=item_name.upper())
     return load_catalog().text('notifications', 'sent_to_player', locale=GAME_LOCALES[locale], item=item_name.upper(), recipient=recipient_name.upper())

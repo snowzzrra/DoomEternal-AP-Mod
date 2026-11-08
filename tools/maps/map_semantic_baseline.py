@@ -35,24 +35,6 @@ def _canonical_hash(value: Any) -> str:
     ).hexdigest()
 
 
-def _field_count(text: str, field: str) -> int:
-    return len(re.findall(rf"\b{re.escape(field)}\s*=", text))
-
-
-def _publisher_payload(catalog: ContentCatalog, map_key: str) -> list[dict]:
-    return [
-        {
-            "key": publisher.key,
-            "triggers": [dict(trigger) for trigger in publisher.triggers],
-            "effects": [dict(effect) for effect in publisher.effects],
-            "dedupe_scope": publisher.dedupe_scope,
-            "fallback_policy": publisher.fallback_policy,
-        }
-        for publisher in catalog.publishers
-        if publisher.map_key == map_key
-    ]
-
-
 def _asset_package_payload(catalog: ContentCatalog, map_key: str) -> dict:
     spec = catalog.map(map_key)
     return {
@@ -105,7 +87,6 @@ def _describe_generated_map_catalog(catalog, config_path, map_key):
         item.location_id for item in catalog.runtime_locations
         if item.mission_key == map_key
     )
-    set(runtime_ids)
     declared_physical = {
         item.location_id for item in catalog.physical_locations
         if item.map_key == map_key
@@ -123,7 +104,6 @@ def describe_generated_map(
 ) -> dict:
     data = path.read_bytes()
     text = data.decode("utf-8")
-    re.findall(r"\bentityDef\s+([^\s{]+)", text)
     event_ids = sorted({
         int(value) for value in re.findall(r"AP_CHECK_EVENT_(\d+)", text)
     })
@@ -225,7 +205,7 @@ def format_drift(
     lines.extend([
         "",
         "Reproduce:",
-        f"  scripts/pipeline.sh map {map_key} --baseline-diff",
+        f"  scripts/pipeline.sh map {map_key}",
     ])
     return "\n".join(lines)
 
@@ -246,7 +226,7 @@ def assert_map_baseline(
     if not path.exists():
         raise BaselineDrift(
             f"BASELINE MISSING map={map_key}\nReproduce:\n"
-            f"  scripts/pipeline.sh map {map_key} --baseline-diff"
+            f"  scripts/pipeline.sh map {map_key}"
         )
     expected = json.loads(path.read_text(encoding="utf-8"))
     diff = _diff(expected, actual)

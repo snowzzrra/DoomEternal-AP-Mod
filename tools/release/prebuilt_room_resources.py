@@ -6,6 +6,10 @@ the authorial/game-dependent build stage and the portable CI/release stage.
 
 from __future__ import annotations
 
+from pathlib import Path
+import shutil
+from doom_eap.content.compiler_identity import first_party_text_bytes
+
 import argparse
 import hashlib
 import json
@@ -15,7 +19,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from tools.release.source_bytes import SOURCE_BYTE_CONTRACT, compiler_source_bytes
+from doom_eap.content.compiler_identity import SOURCE_BYTE_CONTRACT, compiler_source_bytes
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -48,7 +52,6 @@ DEPENDENCY_FILES = (
     "tools/release/build_room_resources.py",
     "tools/release/build_string_table.py",
     "tools/release/stage_room_resources.py",
-    "tools/release/source_bytes.py",
 )
 
 CANONICAL_RESOURCE_FILENAMES = (
@@ -240,7 +243,7 @@ def export_prebuilt_room_resources(
     expected_version: str = ROOM_RESOURCES_VERSION,
 ) -> dict[str, Any]:
     """Validate frozen room resources and export them to target directory."""
-    from tools.release.room_resource_checkout import stage_room_resource_files
+    from tools.release.prebuilt_room_resources import stage_room_resource_files
 
     root = (repo_root or REPO_ROOT).resolve()
     target = target_dir.resolve()
@@ -364,3 +367,25 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+CHECKOUT_TEXT_FILES = frozenset({
+    "room_payload_manifest.json", "ROOM_RESOURCES_PROVENANCE.json", "SHA256SUMS.txt",
+})
+
+
+def stage_room_resource_files(source: Path, target: Path, repo_root: Path, filenames) -> None:
+    source, target, repo_root = source.resolve(), target.resolve(), repo_root.resolve()
+    checkout = repo_root / "packaging" / "room_resources"
+    if target == source or target.is_relative_to(checkout):
+        raise ValueError("Room resource staging must not overwrite a pinned checkout bundle")
+    # Only this first-party checkout role permits CRLF -> LF. Downloads, archives,
+    # binaries and compiler outputs retain exact bytes and strict integrity checks.
+    from_checkout = source.parent == checkout
+    target.mkdir(parents=True, exist_ok=True)
+    for filename in filenames:
+        original, staged = source / filename, target / filename
+        if from_checkout and filename in CHECKOUT_TEXT_FILES:
+            staged.write_bytes(first_party_text_bytes(original.read_bytes()))
+        else:
+            shutil.copy2(original, staged)

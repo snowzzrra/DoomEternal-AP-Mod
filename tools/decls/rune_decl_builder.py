@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Build the hash-locked existing Rune menu gate override.
-
-This is intentionally Rune-only. Challenge and Mastery DECL overrides are
-not part of the v0.2.2a safe baseline.
-"""
+"""Build Rune menu gate overrides from the authored Rune registry."""
 
 from __future__ import annotations
 

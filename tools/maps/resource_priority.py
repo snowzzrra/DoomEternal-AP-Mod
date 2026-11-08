@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -52,18 +51,3 @@ def resolve_owner(
         if isinstance(record, dict) and record.get("name") == runtime_map
     ]
     return _resolve_owner_map_index(data, map_indices, runtime_map)
-
-
-def resolve_owner_evidence(
-    runtime_map: str,
-    packagemapspec_path: Path | str,
-) -> dict[str, Any]:
-    path = Path(packagemapspec_path)
-    winner, priority = resolve_owner(runtime_map, path)
-    return {
-        "source": "packagemapspec",
-        "runtime_map": runtime_map,
-        "winner": winner,
-        "priority": priority,
-        "packagemapspec_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-    }

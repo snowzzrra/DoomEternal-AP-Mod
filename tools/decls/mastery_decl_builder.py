@@ -13,14 +13,6 @@ from doom_eap.contracts.challenge_registry import load_challenge_registry
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 OWNER = "gameresources"
-PERK_TO_GIVE = '\t\tperkToGive = "perk/player/weapons/shotgun/pop_rocket_more_bombs";\n'
-ADD_STATS = """\t\taddStats = {
-\t\t\tnum = 3;
-\t\t\titem[0] = "STAT_CURRENT_MASTERIES_AQUIRED";
-\t\t\titem[1] = "STAT_SHOTGUN_STICKY_BOMB_MASTERY_EARNED";
-\t\t\titem[2] = "STAT_SHOTGUN_MASTERED";
-\t\t}
-"""
 
 
 def _masteries() -> list[dict]:
@@ -31,10 +23,6 @@ def _locked_decl(entry: dict, kind: str) -> dict:
     return entry["decls"][kind]
 
 
-STICKY_DECLS = {
-    "unlockable": _locked_decl(_masteries()[0], "unlockable"),
-    "perk": _locked_decl(_masteries()[0], "perk"),
-}
 
 
 def _read_locked_source(entry: dict, kind: str) -> str:
@@ -126,10 +114,6 @@ def build_mastery_overrides(mod_root: Path, requirements: str = "Original") -> d
         "item_ids": [entry["item_id"] for entry in masteries],
         "written_paths": written_paths,
     }
-
-
-def build_sticky_overrides(mod_root: Path) -> dict:
-    return build_mastery_overrides(mod_root)
 
 
 def main() -> int:

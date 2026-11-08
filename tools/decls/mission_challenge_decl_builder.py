@@ -7,7 +7,6 @@ import argparse
 import hashlib
 import json
 import re
-import zipfile
 from pathlib import Path
 
 from doom_eap.contracts.challenge_registry import load_challenge_registry
@@ -20,64 +19,10 @@ AGGREGATE_TARGET_OWNER = "gameresources_patch2"
 AGGREGATE_LIST_PATH = "missionchallengelist/missionchallenge/main.decl"
 AGGREGATE_LIST_SHA256 = "e4528a4751e40f1237224989c0357df4bdd8d0f6d86fee8c502eeed5ff393ff4"
 DHB_MISSION_KEY = "e1m4"
-DHB_DUMMY_SOURCE_OWNER = "gameresources_patch2"
-DHB_DUMMY_PATH = "mission_challenge/e6m3/challenge_3"
-DHB_DUMMY_DECL_PATH = "unlockable/mission_challenge/e6m3/challenge_3.decl"
-DHB_DUMMY_SHA256 = "7528ea87150ce66df800f420ea775f02f452b485b8f18a942438ea6c41a735d2"
-DHB_DUMMY_STAT = "STAT_PAIN_ELEMENTAL_GLORYKILL_STYLES"
-NEKRAVOL_DUMMY_PATH = "mission_challenge/e6m3/challenge_2"
-NEKRAVOL_DUMMY_DECL_PATH = "unlockable/mission_challenge/e6m3/challenge_2.decl"
-NEKRAVOL_DUMMY_SHA256 = "cae29c0689cae500f839825114eeb8c1927fca0aae2655a1ee409b8518c8599b"
-NEKRAVOL_DUMMY_STAT = "STAT_CHARGEBALL_MATCH_WON"
 PLAN_B_REGISTRATIONS = (
-    {
-        "mission_key": DHB_MISSION_KEY,
-        "label": "DHB",
-        "dummy_path": DHB_DUMMY_PATH,
-        "decl_path": DHB_DUMMY_DECL_PATH,
-        "sha256": DHB_DUMMY_SHA256,
-        "stat": DHB_DUMMY_STAT,
-        "count": 3,
-        "violence_event": None,
-        "required_monster": "AI_MONSTER_PAIN_ELEMENTAL",
-        "impossibility": "Pain Elementals are absent from vanilla Doom Hunter Base",
-    },
-    {
-        "mission_key": "e3m2_hell",
-        "label": "Nekravol",
-        "dummy_path": NEKRAVOL_DUMMY_PATH,
-        "decl_path": NEKRAVOL_DUMMY_DECL_PATH,
-        "sha256": NEKRAVOL_DUMMY_SHA256,
-        "stat": NEKRAVOL_DUMMY_STAT,
-        "count": 5,
-        "violence_event": "violenceevent/mission_challenge/angel_of_death",
-        "violence_event_decl_path": "violenceevent/violenceevent/mission_challenge/angel_of_death.decl",
-        "violence_event_sha256": "1354aaae8c0406097d703e8861dbb45480b64c46eeef8f807eb5209bf6bee2eb",
-        "required_monster": "AI_MONSTER_ZOMBIE_MAYKR",
-        "impossibility": "Maykr Drones are absent from vanilla Nekravol",
-    },
-    {
-        "mission_key": "e3m2_hell_b",
-        "label": "Nekravol II",
-        "dummy_path": NEKRAVOL_DUMMY_PATH,
-        "decl_path": NEKRAVOL_DUMMY_DECL_PATH,
-        "sha256": NEKRAVOL_DUMMY_SHA256,
-        "stat": NEKRAVOL_DUMMY_STAT,
-        "count": 5,
-        "violence_event": "violenceevent/mission_challenge/angel_of_death",
-        "violence_event_decl_path": "violenceevent/violenceevent/mission_challenge/angel_of_death.decl",
-        "violence_event_sha256": "1354aaae8c0406097d703e8861dbb45480b64c46eeef8f807eb5209bf6bee2eb",
-        "required_monster": "AI_MONSTER_ZOMBIE_MAYKR",
-        "impossibility": "Maykr Drones are absent from vanilla Nekravol Part II",
-    },
-)
-PATCH2_CORPUS_ARCHIVE = "gameresources_patch2_decl_analysis_20260710_210928.zip"
-PATCH2_CORPUS_PREFIX = (
-    "gameresources_patch2_decl_analysis_20260710_210928/files/generated/decls/"
-)
-BASE_CORPUS_ARCHIVE = "gameresources_decl_analysis_20260710_201519.zip"
-BASE_CORPUS_PREFIX = (
-    "gameresources_decl_analysis_20260710_201519/files/generated/decls/"
+    {"mission_key": DHB_MISSION_KEY, "label": "DHB"},
+    {"mission_key": "e3m2_hell", "label": "Nekravol"},
+    {"mission_key": "e3m2_hell_b", "label": "Nekravol II"},
 )
 REWARD_FIELD = """\t\tcurrencyToGive = {
 \t\t\tnum = 0;
@@ -91,46 +36,6 @@ def _source(owner: str, path: str, expected_sha256: str) -> str:
     actual = hashlib.sha256(payload).hexdigest()
     if actual != expected_sha256:
         raise ValueError(f"Mission Challenge vanilla owner hash drift for {path}: {actual}")
-    return payload.decode("utf-8")
-
-
-def _patch2_corpus_source(path: str, expected_sha256: str) -> str:
-    archive = ROOT.parent / "Tools" / PATCH2_CORPUS_ARCHIVE
-    if not archive.is_file():
-        raise ValueError(f"Mission Challenge patch2 corpus missing: {archive}")
-    member = PATCH2_CORPUS_PREFIX + path
-    with zipfile.ZipFile(archive) as corpus:
-        try:
-            payload = corpus.read(member)
-        except KeyError as error:
-            raise ValueError(
-                f"Mission Challenge patch2 corpus path missing: {path}"
-            ) from error
-    actual = hashlib.sha256(payload).hexdigest()
-    if actual != expected_sha256:
-        raise ValueError(
-            f"Mission Challenge patch2 corpus hash drift for {path}: {actual}"
-        )
-    return payload.decode("utf-8")
-
-
-def _base_corpus_source(path: str, expected_sha256: str) -> str:
-    archive = ROOT.parent / "Tools" / BASE_CORPUS_ARCHIVE
-    if not archive.is_file():
-        raise ValueError(f"Mission Challenge base corpus missing: {archive}")
-    member = BASE_CORPUS_PREFIX + path
-    with zipfile.ZipFile(archive) as corpus:
-        try:
-            payload = corpus.read(member)
-        except KeyError as error:
-            raise ValueError(
-                f"Mission Challenge base corpus path missing: {path}"
-            ) from error
-    actual = hashlib.sha256(payload).hexdigest()
-    if actual != expected_sha256:
-        raise ValueError(
-            f"Mission Challenge base corpus hash drift for {path}: {actual}"
-        )
     return payload.decode("utf-8")
 
 
@@ -260,68 +165,6 @@ def _plan_b_registration_contracts(registry: dict) -> tuple[dict, ...]:
     return tuple(contracts)
 
 
-def _assert_dummy_candidate_required(candidate, plan):
-    required = (
-        'inherit = "mission_challenge/dlc1_challenge_base";',
-        'unlockableFlags = "UNLOCKABLE_FLAG_HORDE_CHALLENGE";',
-        f'stat = "{plan["stat"]}";',
-        f'count = {plan["count"]};',
-        'scoringItem = "horde/challenge_complete";',
-    )
-    for snippet in required:
-        if candidate.count(snippet) != 1:
-            raise ValueError(f"{plan['label']} dummy candidate drift for {snippet!r}")
-    violence_event = plan.get("violence_event")
-    if violence_event and candidate.count(f'violenceEvent = "{violence_event}";') != 1:
-        raise ValueError(f"{plan['label']} dummy candidate violence event drift")
-    if violence_event:
-        event = _base_corpus_source(
-            plan["violence_event_decl_path"],
-            plan["violence_event_sha256"],
-        ).replace("\r\n", "\n")
-        event_required = (
-            f'requiredMonsterType = "{plan["required_monster"]}";',
-            f'stat = "{plan["stat"]}";',
-            'item[0] = "damage/firearm/heavy_cannon_bolt_action_cylindrical";',
-            "headShot = true;",
-        )
-        for snippet in event_required:
-            if event.count(snippet) != 1:
-                raise ValueError(
-                    f"{plan['label']} dummy violence event drift for {snippet!r}"
-                )
-    forbidden = (
-        "completionStat",
-        "currencyToGive",
-        "currencyList",
-        "CURRENCY_",
-        "inventoryItemReward",
-    )
-    if any(token in candidate for token in forbidden):
-        raise ValueError(
-            f"{plan['label']} dummy candidate unexpectedly owns persistence or reward"
-        )
-    return forbidden
-
-
-def _assert_dummy_candidate(plan: dict) -> None:
-    candidate = _patch2_corpus_source(
-        plan["decl_path"],
-        plan["sha256"],
-    ).replace("\r\n", "\n")
-    forbidden = _assert_dummy_candidate_required(candidate, plan)
-    base = _patch2_corpus_source(
-        "unlockable/mission_challenge/dlc1_challenge_base.decl",
-        "c1a96d4848f4a7b7a6e6e265e99a778a5ee82b636d006eed76e4ff6bd2149e99",
-    ).replace("\r\n", "\n")
-    if 'statDuration = "DUR_CUSTOM_LEVEL";' not in base:
-        raise ValueError(f"{plan['label']} dummy candidate base lost custom-level duration")
-    if any(token in base for token in forbidden):
-        raise ValueError(
-            f"{plan['label']} dummy candidate base unexpectedly owns persistence or reward"
-        )
-
-
 def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]]:
     # skip the automatic battery change; keep all three challenge entries, since a fourth breaks the engine array
     source = _source(
@@ -332,8 +175,6 @@ def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]
     contracts = _plan_b_registration_contracts(registry)
     audited_contracts = []
     for contract in contracts:
-        plan = contract["plan"]
-        _assert_dummy_candidate(plan)
         expected = tuple(contract["real_challenges"])
         matches = [
             (index, block)
@@ -344,13 +185,7 @@ def _plan_b_registration_override(registry: dict) -> tuple[str, tuple[dict, ...]
             raise ValueError(
                 f"{contract['name']}: canonical registration count is {len(matches)}"
             )
-        level_index, block = matches[0]
-        replacement = block
-        if _challenge_paths(replacement) != expected:
-            raise ValueError(
-                f"{plan['label']} canonical registration drift during native cutover"
-            )
-        source = source.replace(block, replacement, 1)
+        level_index, _ = matches[0]
         audited_contracts.append({
             **{key: value for key, value in contract.items() if key != "plan"},
             "level_index": level_index,

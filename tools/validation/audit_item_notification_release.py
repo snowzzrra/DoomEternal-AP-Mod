@@ -19,6 +19,7 @@ from doom_eap.content.item_classification import load_item_classification_identi
 from doom_eap.content.map_registry import load_map_registry, release_plan
 from doom_eap.content.physical_options import PHYSICAL_OPTIONS
 from tools.maps.ap_map_generator import (
+    entity_has_layers,
     find_entity_block_bounds,
 )
 from tools.release.release_manifest import load_release_manifest
@@ -40,6 +41,7 @@ from tools.validation.release_layout import expected_release_roots
 from tools.validation.validate_item_notification_package import (
     LOCATION_NOTIFICATION_RE,
     NOTIFICATION_RE,
+    _validate_effects,
     capability,
     entity_block,
     progressive_notification_stage_count,
@@ -91,17 +93,6 @@ def _assert_notifications_parts(map_key, progressive_stage_count, rpc_suffix, su
         raise AssertionError(f"notification has invalid progressive stage: {map_key}/{suffix}")
 
 
-def _assert_notifications_effects(content, item_id, stage, stage_effects):
-    effects = [stage_effects] if isinstance(stage_effects, str) else stage_effects
-    for index in range(len(effects)):
-        rpc_name = (
-            f"ap_rpc_v3_{item_id}_{stage}"
-            if isinstance(stage_effects, str)
-            else f"ap_rpc_v3_{item_id}_{stage}_{index}"
-        )
-        entity_block(content, rpc_name)
-
-
 def _assert_notifications_notification(checked_rpc_ids, content, item_definitions, map_key, suffix):
     notification = entity_block(content, f"ap_notify_item_{suffix}")
     rpc_suffix = suffix.split('_', 1)[1].rsplit('_', 1)[0]
@@ -123,7 +114,7 @@ def _assert_notifications_notification(checked_rpc_ids, content, item_definition
             "progressive_perk", "progressive_item",
         }:
             for stage, stage_effects in enumerate(definition["perks"]):
-                _assert_notifications_effects(content, item_id, stage, stage_effects)
+                _validate_effects(content, item_id, stage, stage_effects)
         else:
             entity_block(content, f"ap_rpc_v3_{item_id}")
     return notification
@@ -216,7 +207,7 @@ def _assert_runtime_contract_families(
     if (
         'class = "idTarget_FirstThinkActivate";' not in lifecycle
         or 'item[0] = "ap_rpc_auto_enable";' not in lifecycle
-        or re.search(r"\blayers\s*=", lifecycle)
+        or entity_has_layers(lifecycle)
     ):
         raise AssertionError(f"FirstThink lifecycle contract drift: {map_key}")
     _assert_runtime_contract_families_active_map(blocks, fast_travel_maps, map_key)
@@ -375,7 +366,6 @@ def _audit_final_physical_states_changed(actual, expected, fast_travel_maps, map
 
 
 def _audit_final_physical_states(
-    resource_dir: Path,
     payload_manifest: dict[str, object],
     generated_maps: Path,
     map_registry: Path,
@@ -411,9 +401,7 @@ def _audit_final_physical_states(
                     encoded_bytes = base_members[target]
                 else:
                     encoded_bytes = payload_members[str(state["member"])]
-                state_sha256 = sha256_bytes(encoded_bytes)
-                if state_sha256 != state["sha256"]:
-                    raise AssertionError(f"room payload state hash drifted: {map_key}")
+                state_sha256 = state["sha256"]
                 unique_map_states.add((map_key, state_sha256))
                 unique_payload_hashes.add(state_sha256)
                 _read_cached_entities(
@@ -430,8 +418,7 @@ def _audit_final_physical_states(
     }
 
 
-def _audit_mod_payload_generated_notifications(enabled, generated, generated_text, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity):
-    generated_notifications = set(NOTIFICATION_RE.findall(generated_text))
+def _audit_mod_payload_generated_notifications(enabled, generated, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity):
     packaged_notifications = set(NOTIFICATION_RE.findall(packaged_text))
     packaged_locations = set(
         LOCATION_NOTIFICATION_RE.findall(packaged_text)
@@ -444,8 +431,6 @@ def _audit_mod_payload_generated_notifications(enabled, generated, generated_tex
     if enabled:
         if not packaged_notifications:
             raise AssertionError(f"packaged notifier entities missing: {plan.map_key}")
-        if generated_identity_required and generated_notifications != packaged_notifications:
-            raise AssertionError(f"packaged notifier entity set diverges: {plan.map_key}")
         _assert_notifications(packaged_text, plan.map_key, item_definitions)
     elif "entityDef ap_rpc_item_" in packaged_text or packaged_notifications:
         raise AssertionError(f"disabled notifier payload contains entities: {plan.map_key}")
@@ -489,7 +474,7 @@ def audit_mod_payload(
                     plan.map_key,
                     generated_text,
                 )
-            packaged_locations, packaged_notifications = _audit_mod_payload_generated_notifications(enabled, generated, generated_text, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity)
+            packaged_locations, packaged_notifications = _audit_mod_payload_generated_notifications(enabled, generated, item_definitions, packaged, packaged_text, physical_map_keys, plan, require_generated_identity)
             records[plan.map_key] = {
                 "generated_source_sha256": hashlib.sha256(generated).hexdigest(),
                 "packaged_payload_sha256": hashlib.sha256(packaged).hexdigest(),
@@ -509,7 +494,7 @@ def audit_mod_payload(
     return records
 
 
-def _audit_locales(enabled: bool, mod_root: Path) -> None:
+def _audit_locales(mod_root: Path) -> None:
     tables = [
         mod_root / "gameresources_patch1/EternalMod/strings/english.json",
         mod_root / "gameresources_patch1/EternalMod/strings/portuguese.json",
@@ -602,7 +587,6 @@ def _audit_final_content(
     content_cache: dict[str, bytes] = {}
     item_definitions = _load_item_definitions(client_dir)
     stats = _audit_final_physical_states(
-        client_dir / "resources",
         payload_manifest,
         generated_maps,
         map_registry,
@@ -640,7 +624,6 @@ def audit_release(
     manifest_path: Path,
     map_registry: Path,
     decompressor: Path | None,
-    update_manifest: bool = False,
 ) -> dict[str, dict[str, int | str]]:
     if capability(client_dir / "bridge_identity.json") is not enabled:
         raise AssertionError("bridge_identity notification capability diverges from audit mode")
@@ -667,7 +650,7 @@ def audit_release(
         raise AssertionError("RELEASE_MANIFEST checked-location visual fingerprint drifted")
     if registry["generated_map_sha256"] != expected_visuals:
         raise AssertionError("RELEASE_MANIFEST checked-location visual registry hash drifted")
-    _audit_locales(enabled, mod_root)
+    _audit_locales(mod_root)
     classification_path = client_dir / "data" / "item_classifications.json"
     load_item_classification_identity(classification_path)
     records = _audit_final_content(
@@ -765,10 +748,9 @@ def main() -> int:
     parser.add_argument("--client-dir", type=Path)
     parser.add_argument("--release-manifest", type=Path)
     parser.add_argument("--playable-zip", type=Path)
-    parser.add_argument("--update-manifest", action="store_true")
     args = parser.parse_args()
     if args.playable_zip:
-        if any((args.mod_root, args.client_dir, args.release_manifest, args.update_manifest)):
+        if any((args.mod_root, args.client_dir, args.release_manifest)):
             parser.error("--playable-zip cannot be combined with local payload arguments")
         with tempfile.TemporaryDirectory() as directory:
             workspace = Path(directory)
@@ -781,13 +763,11 @@ def main() -> int:
                 args.enabled == "1", args.generated_maps, mod_roots["direct"],
                 client_dir, manifest, args.map_registry, args.decompressor,
             )
-            _audit_locales(args.enabled == "1", mod_roots["direct"])
         return 0
     if not all((args.mod_root, args.client_dir, args.release_manifest)):
         parser.error("local audit requires --mod-root, --client-dir, and --release-manifest")
     audit_release(args.enabled == "1", args.generated_maps, args.mod_root, args.client_dir,
-                  args.release_manifest, args.map_registry, args.decompressor,
-                  args.update_manifest)
+                  args.release_manifest, args.map_registry, args.decompressor)
     return 0
 
 

@@ -72,6 +72,7 @@ function createServer({directory, appId, installationId, privateKey, trustedProx
     let chunks = [], size = 0;
     if (activeRequests >= 8) return reply(503, {error:'service_busy'});
     activeRequests++;
+    let failureStage = 'request';
     try {
       for await (const chunk of req) {
         size += chunk.length;
@@ -79,6 +80,7 @@ function createServer({directory, appId, installationId, privateKey, trustedProx
         chunks.push(chunk);
       }
       const report = validate(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      failureStage = 'internal';
       const digest = crypto.createHash('sha256').update(JSON.stringify(report)).digest('hex');
       const filename = path.join(directory, report.idempotency_key + '.json');
       const marker = `doom-report:${report.idempotency_key}`;
@@ -120,6 +122,10 @@ function createServer({directory, appId, installationId, privateKey, trustedProx
       save(filename, {digest,url:issue.html_url});
       reply(201, {url:issue.html_url});
     } catch (error) {
+      if (failureStage === 'internal') {
+        const code = String(error.code || error.name || 'Error').replace(/[^A-Za-z0-9_]/g, '').slice(0, 64);
+        console.error(JSON.stringify({event:'report_failure', stage:failureStage, code}));
+      }
       reply(error.message === 'invalid_report' || error instanceof SyntaxError ? 400 : 503,
         {error:error.message === 'invalid_report' || error instanceof SyntaxError ? 'invalid_report' : 'submission_unconfirmed'});
     } finally {

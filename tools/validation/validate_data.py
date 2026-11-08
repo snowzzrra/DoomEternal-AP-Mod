@@ -28,7 +28,7 @@ from doom_eap.contracts.foundation import (
     load_primitive_registry,
     validate_primitive_registry,
 )
-from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.compiler_identity import first_party_text_bytes
 from doom_eap.runtime.observers import BOOTSTRAP_ENTITY_PREFIXES
 from tools.content.compile_start_inventory_catalog import compile_catalog
 from tools.decls.devinv_builder import load_devinv_mapping
@@ -45,7 +45,6 @@ from tools.maps.ap_map_generator import (
     generate_map,
     generate_pickup_notification,
     generate_rpc_command_entities,
-    generate_target_relay,
     validate_target_policies,
 )
 from tools.maps.automap_baseline_guard import assert_separate_automap_helper_guard, find_check_source
@@ -291,22 +290,6 @@ def collect_duplicate_ids(values: dict[str, int]) -> dict[int, list[str]]:
     }
 
 
-def validate_id_namespaces(
-    item_ids: dict[str, int], location_ids: dict[str, int]
-) -> list[str]:
-    errors: list[str] = []
-
-    duplicate_item_ids = collect_duplicate_ids(item_ids)
-    for item_id, item_names in sorted(duplicate_item_ids.items()):
-        errors.append(f"Duplicate AP item ID {item_id}: {item_names}")
-
-    duplicate_location_ids = collect_duplicate_ids(location_ids)
-    for location_id, location_names in sorted(duplicate_location_ids.items()):
-        errors.append(f"Duplicate AP location ID {location_id}: {location_names}")
-
-    return errors
-
-
 def entity_scalar(block: str, property_name: str) -> str | None:
     match = re.search(
         rf'\b{re.escape(property_name)}\s*=\s*"([^"]+)";', block
@@ -520,234 +503,6 @@ def validate_automap_family_registry(
     return errors
 
 
-def _validate_generated_automap_carriers_carrier(ap_check, carrier_bounds, errors, expected_visual_model, generated, location_id, reward_terms, source_block, trigger_bounds):
-    carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
-    trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
-    for field in ("inherit", "class"):
-        if entity_scalar(carrier, field) != entity_scalar(source_block, field):
-            errors.append(f"Automap source metadata drift for {location_id}/{field}")
-    if entity_scalar(carrier, "automapPropertiesDecl") != "default":
-        errors.append(f"Automap AP marker drift for {location_id}")
-    if f'model = "{expected_visual_model}";' not in carrier:
-        errors.append(f"Automap carrier lacks AP visual for {location_id}")
-    if extract_target_names(carrier):
-        errors.append(f"Automap carrier retained vanilla targets for {location_id}")
-    if any(term in carrier for term in reward_terms):
-        errors.append(f"Automap carrier retains reward edge for {location_id}")
-    expected = [*extract_target_names(source_block), ap_check]
-    if extract_target_names(trigger) != expected:
-        errors.append(f"Automap functional target drift for {location_id}")
-    if extract_target_names(trigger).count(ap_check) != 1:
-        errors.append(f"Automap AP check multiplicity drift for {location_id}")
-
-
-def _validate_persistent_carrier(ap_check, entity_name, errors, expected_visual_model, generated, location_id, policy, reward_terms, source_block):
-    if policy.get("native_automap_contract"):
-        carrier_bounds = find_entity_block_bounds(generated, entity_name)
-        if carrier_bounds is None:
-            errors.append(
-                f"Native Automap prototype missing for {location_id}"
-            )
-            return
-        carrier = generated[carrier_bounds[0]:carrier_bounds[1]]
-        if "useableComponentDecl" not in carrier:
-            errors.append(
-                f"Native Automap lifecycle stripped for {location_id}"
-            )
-        if "fxDecl" in carrier or "updateFX" in carrier:
-            errors.append(f"Native Automap fire FX retained for {location_id}")
-        expected = [*extract_target_names(source_block), ap_check]
-        if extract_target_names(carrier) != expected:
-            errors.append(f"Native Automap AP target drift for {location_id}")
-        errors.append(
-            f"Native Automap prototype runtime pending for {location_id}: "
-            "zero-XP reward cut, removal, marker transition, and reload "
-            "have no runtime PASS"
-        )
-        return
-    carrier_bounds = find_entity_block_bounds(generated, entity_name)
-    trigger_bounds = find_entity_block_bounds(
-        generated, f"ap_independent_{entity_name}"
-    )
-    if carrier_bounds is None or trigger_bounds is None:
-        errors.append(f"Automap carrier missing for {location_id}/{entity_name}")
-        return
-    _validate_generated_automap_carriers_carrier(ap_check, carrier_bounds, errors, expected_visual_model, generated, location_id, reward_terms, source_block, trigger_bounds)
-    errors.append(
-        "Automap lifecycle unresolved for "
-        f"{location_id}/{entity_name}: reward-free carrier has no "
-        "proven physical-removal/FX-shutdown/collected-marker writer"
-    )
-
-
-def _validate_generic_carrier(ap_check, entity_name, errors, family_name, generated, location_id, policy):
-    visual = policy.get("independent_visual", {})
-    completion_targets = policy.get("completion_targets", [])
-    if visual and completion_targets:
-        visual_name = visual.get("entity_name")
-        cleanup_name = visual.get("cleanup_entity")
-        visual_bounds = find_entity_block_bounds(generated, visual_name)
-        cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
-        check_bounds = find_entity_block_bounds(generated, ap_check)
-        if not all((visual_bounds, cleanup_bounds, check_bounds)):
-            errors.append(
-                f"Generic Automap prototype graph missing for {location_id}"
-            )
-            return
-        cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
-        check = generated[check_bounds[0]:check_bounds[1]]
-        if extract_target_names(cleanup) != [visual_name]:
-            errors.append(
-                f"Generic Automap cleanup escaped visual for {location_id}"
-            )
-        if cleanup_name not in extract_target_names(check):
-            errors.append(
-                f"Generic Automap live cleanup is disconnected for {location_id}"
-            )
-        errors.append(
-            f"Generic Automap prototype runtime pending for {location_id}: "
-            "visual/marker removal and checked-state reload bootstrap "
-            "have no runtime PASS"
-        )
-        return
-    errors.append(
-        f"Automap marker unresolved for {location_id}/{entity_name}: "
-        f"{family_name} collected state is coupled to an unsafe native interaction"
-    )
-
-
-def _validate_praetor_carrier(ap_check, entity_name, errors, expected_visual_model, generated, location_id):
-    trigger_name = f"ap_independent_{entity_name}"
-    visual_name = f"ap_location_visual_{location_id}"
-    cleanup_name = f"ap_remove_location_visual_{location_id}"
-    trigger_bounds = find_entity_block_bounds(generated, trigger_name)
-    visual_bounds = find_entity_block_bounds(generated, visual_name)
-    cleanup_bounds = find_entity_block_bounds(generated, cleanup_name)
-    if not all((trigger_bounds, visual_bounds, cleanup_bounds)):
-        errors.append(f"Generic AP pickup graph missing for {location_id}")
-        return
-    if find_entity_block_bounds(generated, entity_name) is not None:
-        errors.append(f"Native Praetor owner retained for {location_id}")
-    trigger = generated[trigger_bounds[0]:trigger_bounds[1]]
-    visual = generated[visual_bounds[0]:visual_bounds[1]]
-    cleanup = generated[cleanup_bounds[0]:cleanup_bounds[1]]
-    if extract_target_names(trigger) != [ap_check, cleanup_name]:
-        errors.append(f"Generic AP target drift for {location_id}")
-    if extract_target_names(cleanup) != [visual_name]:
-        errors.append(f"Generic AP visual cleanup drift for {location_id}")
-    if f'model = "{expected_visual_model}";' not in visual:
-        errors.append(f"Generic AP visual missing for {location_id}")
-    for forbidden in (
-        "progress/praetor_token", "idInteractable_GiveItems",
-        "useableComponentDecl", "currencyList",
-        "CURRENCY_PRAETOR_UPGRADE", "praetor_suit_token.md6",
-    ):
-        if forbidden in trigger or forbidden in visual:
-            errors.append(
-                f"Native Praetor behavior retained for {location_id}: "
-                f"{forbidden}"
-            )
-
-
-def _generated_automap_family(inherit, registry):
-    return next((name for name, value in registry.items() if any(inherit.startswith(prefix) for prefix in value['match'].get('inherit_prefixes', []))), None)
-
-
-def _validate_generated_pickup_carrier(ap_check, assets, config, default_visual_model, errors, exact_families, generated, location_id, registry, reward_terms, vanilla):
-    entity_name = ap_check.removeprefix("AP_CHECK_").lower()
-    policy = config.get("target_policies", {}).get(entity_name, {})
-    visual_policy = policy.get("independent_visual", {})
-    visual_asset = assets.get(visual_policy.get("asset"), {})
-    expected_visual_model = visual_asset.get(
-        "model",
-        visual_policy.get("model", default_visual_model),
-    )
-    if policy.get("native_entity_contract") is not None:
-        return
-    source_bounds = find_entity_block_bounds(vanilla, entity_name)
-    if source_bounds is None:
-        return
-    source_block = vanilla[source_bounds[0]:source_bounds[1]]
-    inherit = entity_scalar(source_block, "inherit") or ""
-    family_name = exact_families.get(location_id) or _generated_automap_family(inherit, registry)
-    family = registry.get(family_name, {})
-    if family.get("carrier_mode") == "persistent_native_idprop2":
-        return _validate_persistent_carrier(ap_check, entity_name, errors, expected_visual_model, generated, location_id, policy, reward_terms, source_block)
-    elif family_name in {"sentinel_crystals", "modbots", "runes"}:
-        return _validate_generic_carrier(ap_check, entity_name, errors, family_name, generated, location_id, policy)
-    elif family_name in {
-        "ability_progression", "weapons_equipment",
-        "independent_ice_trigger", "independent_rocket_trigger",
-    }:
-        errors.append(
-            f"Automap marker missing for {location_id}/{entity_name}: "
-            f"{family_name} has no proven generic marker lifecycle"
-        )
-    elif inherit.startswith("progress/praetor_token"):
-        return _validate_praetor_carrier(ap_check, entity_name, errors, expected_visual_model, generated, location_id)
-
-
-def _validate_generated_map_carriers(errors, exact_families, generated_dir, items, map_key, registry, reward_terms, source):
-    if not source.get("enabled", True):
-        return
-    config = read_json(ROOT / source["level_config"])
-    vanilla = (ROOT / "vanillamaps" / source["source_file"]).read_text(
-        encoding="utf-8"
-    )
-    output = generated_dir / f"{map_key}.entities"
-    manifest = generated_dir / f"{map_key}.json"
-    try:
-        generate_map(
-            ROOT / "vanillamaps" / source["source_file"], output,
-            ROOT / source["level_config"], manifest, items,
-        )
-    except (OSError, ValueError) as exc:
-        errors.append(f"Automap carrier generation failed for {map_key}: {exc}")
-        return
-    generated = output.read_text(encoding="utf-8")
-    assets = {
-        asset["key"]: asset for asset in config.get("assets", [])
-    }
-    default_asset = assets.get(config.get("default_visual_asset"), {})
-    default_visual_model = default_asset.get(
-        "model", "art/pickups/question_mark_a.lwo"
-    )
-    if "ap_remove_native_automap_" in generated:
-        errors.append(f"Automap carrier marker removal reappeared in {map_key}")
-    secret_count = len(config.get("secret_encounters", []))
-    if generated.count('automapPropertiesDecl = "automap_encounter_secret";') < secret_count:
-        errors.append(
-            f"Automap secret marker coverage drift in {map_key}: "
-            f"expected at least {secret_count} native markers"
-        )
-    for ap_check, location_id in config.get("entities", {}).items():
-        _validate_generated_pickup_carrier(ap_check, assets, config, default_visual_model, errors, exact_families, generated, location_id, registry, reward_terms, vanilla)
-
-
-def validate_generated_automap_carriers() -> list[str]:
-    """Check carrier fields and target graphs in generated maps."""
-    errors: list[str] = []
-    registry = read_json(AUTOMAP_FAMILY_REGISTRY_PATH)["families"]
-    exact_families = {
-        location_id: family_name
-        for family_name, family in registry.items()
-        for location_id in family.get("match", {}).get("location_ids", [])
-    }
-    sources = read_json(MAP_SOURCES_PATH)["maps"]
-    items = read_json(ROOT / "data" / "items.json")
-    reward_terms = (
-        "useableComponentDecl", "triggerDef", "canBePossessed", "equipOnPickup",
-        "forceEquip", "currencyList", "itemList", "inventory", "useStat",
-        "onUseCodexEntry", "progressionCategory", "clipModelInfo",
-        "pickup_statIncreases", "use_statIncreases", "spawn_statIncreases",
-    )
-    with tempfile.TemporaryDirectory() as tmpdir:
-        generated_dir = Path(tmpdir)
-        for map_key, source in sources.items():
-            _validate_generated_map_carriers(errors, exact_families, generated_dir, items, map_key, registry, reward_terms, source)
-    return errors
-
-
 def _validate_automap_prototypes_only_entity_name(ap_check, config, errors, generated, location_id):
     entity_name = ap_check.removeprefix("AP_CHECK_").lower()
     if entity_name in {
@@ -848,7 +603,7 @@ def _main_deprecated_id(commands, errors, item_ids, reserved_item_ids):
     for deprecated_id in (7770019, 7770057):
         if deprecated_id not in reserved_item_ids:
             errors.append(f"Deprecated item ID {deprecated_id} is not reserved")
-        if deprecated_id in item_ids:
+        if deprecated_id in item_ids.values():
             errors.append(f"Deprecated item ID {deprecated_id} reappeared as an active AP item")
         if deprecated_id in commands:
             errors.append(f"Deprecated item ID {deprecated_id} reappeared as an AP command")
@@ -1599,7 +1354,7 @@ def _validate_map_commands(commands, errors):
 
 
 def _validate_check_relays_relay(errors):
-    relay = generate_target_relay("AP_CHECK_VALIDATION", 7770999, "")
+    relay = generate_event_relay("AP_CHECK_VALIDATION", 7770999, "")
     secret_relay = generate_event_relay(
         "AP_CHECK_SECRET_VALIDATION", 7770998, "", include_notification=False
     )

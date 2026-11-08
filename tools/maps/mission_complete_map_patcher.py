@@ -407,18 +407,6 @@ def _patch_sentinel_prime_end(
     }
 
 
-def _patch_declared_terminal(
-    map_key: str,
-    owner: str,
-    publishers: tuple[PublisherContract, ...],
-    generated_map: Path,
-) -> dict:
-    text = generated_map.read_text(encoding="utf-8")
-    result, audit = _patch_declared_terminal_text(map_key, owner, publishers, text)
-    generated_map.write_text(result, encoding="utf-8", newline="")
-    return audit
-
-
 def _patch_declared_terminal_text_block(bounds, map_key, owner, publishers, text):
     block = text[bounds[0]:bounds[1]]
     before = extract_target_names(block)

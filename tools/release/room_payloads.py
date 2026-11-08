@@ -35,11 +35,6 @@ class MapLocalStatePlan:
     def base_options(self) -> dict[str, bool]:
         return {key: False for key in map_physical_option_keys(self.map_key)}
 
-    @property
-    def replacement_states(self) -> tuple[dict[str, bool], ...]:
-        return tuple(state for state in self.states if any(state.values()))
-
-
 def plan_map_local_states(
     map_keys: tuple[str, ...],
 ) -> tuple[MapLocalStatePlan, ...]:

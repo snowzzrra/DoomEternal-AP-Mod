@@ -177,7 +177,7 @@ def _validate_overrides_from_mod_root_decls(candidate, errors):
             )
 
 
-def _validate_overrides_from_mod_root_plan_b_contracts(blocks, dummy_paths, errors, plan_b_contracts, registry):
+def _validate_overrides_from_mod_root_plan_b_contracts(blocks, errors, plan_b_contracts):
     for contract in plan_b_contracts:
         label = contract["name"]
         matches = [
@@ -189,22 +189,12 @@ def _validate_overrides_from_mod_root_plan_b_contracts(blocks, dummy_paths, erro
             errors.append(f"{label} packaged registration count is {len(matches)}")
             continue
         registered = _challenge_paths(matches[0][1])
-        approved = (*contract["real_challenges"], contract["dummy"]["path"])
+        approved = tuple(contract["real_challenges"])
         if registered != approved:
             errors.append(f"{label} packaged registration is {registered}, expected {approved}")
 
-    dummy_registry_owners = [
-        entry for entry in registry["mission_challenges"]
-        if entry["completion_owner"]["path"].removesuffix(".decl") in dummy_paths
-        or entry["signal"].get("unlockable") in dummy_paths
-    ]
-    if dummy_registry_owners:
-        errors.append("Plan B dummy challenge acquired AP location ownership")
-
-
-def _validate_overrides_from_mod_root_dummy_paths(blocks, errors, plan_b_contracts, registry):
-    dummy_paths = {contract["dummy"]["path"] for contract in plan_b_contracts}
-    _validate_overrides_from_mod_root_plan_b_contracts(blocks, dummy_paths, errors, plan_b_contracts, registry)
+def _validate_overrides_from_mod_root_children(blocks, errors, plan_b_contracts, registry):
+    _validate_overrides_from_mod_root_plan_b_contracts(blocks, errors, plan_b_contracts)
     for contract in plan_b_contracts:
         aggregate = next(
             entry for entry in registry["all_mission_challenges"]
@@ -214,7 +204,7 @@ def _validate_overrides_from_mod_root_dummy_paths(blocks, errors, plan_b_contrac
             entry["location_id"] for entry in registry["mission_challenges"]
             if entry["mission_key"] == contract["mission_key"]
         )
-        expected_count = 2 if contract["mission_key"] == "e3m2_hell" else 3
+        expected_count = 3
         if tuple(aggregate["signal"]["children"]) != real_ids or len(real_ids) != expected_count:
             errors.append(
                 f"{contract['name']} AP aggregate children include anything except {expected_count} real challenges"
@@ -232,7 +222,7 @@ def _validate_overrides_from_mod_root_blocks(aggregate_source, errors, mod_root,
     )
     if tuple(contract["mission_key"] for contract in plan_b_contracts) != expected_plan_b_missions:
         errors.append("Plan B registration scope is not exactly DHB, Nekravol, and Nekravol II")
-    _validate_overrides_from_mod_root_dummy_paths(blocks, errors, plan_b_contracts, registry)
+    _validate_overrides_from_mod_root_children(blocks, errors, plan_b_contracts, registry)
 
     if re.search(
         r"\bcompletionUnlock\b|warehouseofflinecontainer|CURRENCY_SENTINEL_BATTERY",
@@ -289,8 +279,7 @@ def validate_overrides_from_mod_root(
     expected_aggregate, plan_b_contracts = _plan_b_registration_override(registry)
     if aggregate_source != expected_aggregate:
         errors.append(
-            "Aggregate main.decl differs from canonical patch2 outside approved "
-            "Plan B fourth-challenge registrations"
+            "Aggregate main.decl differs from canonical patch2 registrations"
         )
 
     _validate_overrides_from_mod_root_blocks(aggregate_source, errors, mod_root, plan_b_contracts, registry)
@@ -361,8 +350,7 @@ def _validate_vanilla_source_equivalence_aggregate_source_file(entries, errors, 
         ).replace("\r\n", "\n")
         if aggregate_override != expected_aggregate:
             errors.append(
-                "Aggregate main.decl differs from canonical patch2 outside approved "
-                "Plan B fourth-challenge registrations"
+                "Aggregate main.decl differs from canonical patch2 registrations"
             )
 
     return errors

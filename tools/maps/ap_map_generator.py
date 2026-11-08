@@ -11,7 +11,7 @@ from doom_eap.content.item_classification import (
     notification_entity_name,
     notification_style_for_item,
 )
-from doom_eap.contracts.ap_visual_contract import load_ap_visual_contract
+from doom_eap.content.content_catalog import load_ap_visual_contract
 from doom_eap.contracts.foundation import (
     ITEM_NOTIFICATION_PREFIX,
     MASTERY_ITEM_BITS,
@@ -630,7 +630,7 @@ TARGET_POLICY_CONSUMERS = {
     "independent_size": "generate_independent_pickup_trigger",
     "independent_targets": "generate_independent_pickup_trigger",
     "independent_visual": "generate_inert_location_visual",
-    "completion_targets": "generate_target_relay",
+    "completion_targets": "generate_event_relay",
     "no_auto_visual": "generate_map visual branch",
     "no_auto_automap_helper": "generate_map automap helper branch",
     "independent_automap_properties_decl": "build_universal_physical_policy",
@@ -1255,8 +1255,6 @@ def _assert_sentinel_crystal_transform_ap_check_bounds(ap_check, content, locati
     if content.count(f"entityDef {ap_check} {{") != 1:
         raise ValueError(f"Sentinel Crystal AP check relay is not unique: {ap_check}")
     ap_check_bounds = find_entity_block_bounds(content, ap_check)
-    if ap_check_bounds is None:
-        raise ValueError(f"Sentinel Crystal AP check relay missing: {ap_check}")
     ap_check_block = content[ap_check_bounds[0]:ap_check_bounds[1]]
     ap_check_targets = extract_target_names(ap_check_block)
     if any(
@@ -1301,8 +1299,6 @@ def _assert_sentinel_crystal_transform_ap_check(check_ids, content, location_ids
             f"Sentinel Crystal AP visual is not unique: {matching_visuals[0]}"
         )
     visual_bounds = find_entity_block_bounds(content, matching_visuals[0])
-    if visual_bounds is None:
-        raise ValueError(f"Sentinel Crystal AP visual missing: {matching_visuals[0]}")
     return visual_bounds
 
 
@@ -1873,8 +1869,6 @@ def build_universal_physical_policy(
 
     independent_targets = [ap_check_id, cleanup_name]
 
-    think_match = re.search(r'\bthinkComponentDecl\s*=\s*"([^"]+)";', block)
-    think_match.group(1) if think_match else None
     return {
         "independent_ap_trigger": True,
         "independent_targets": independent_targets,
@@ -2073,17 +2067,6 @@ def generate_event_relay(
 \t}}
 }}
 """
-
-
-def generate_target_relay(
-    ap_check_id, location_id, spawn_pos_text, completion_targets=None,
-    include_notification=True,
-):
-    return generate_event_relay(
-        ap_check_id, location_id, spawn_pos_text,
-        include_notification=include_notification,
-        completion_targets=completion_targets,
-    )
 
 
 def generate_check_event(location_id):
@@ -2314,7 +2297,7 @@ def discover_map_group_unlocks(content):
     return sorted(set(results))
 
 
-def generate_fast_travel_relay(map_key, fast_travel_coords, vanilla_content):
+def generate_fast_travel_relay(fast_travel_coords, vanilla_content):
     """Emit ap_fast_travel_unlock relay + ap_fast_travel_unlock_native primitive.
 
     The relay activates all native idTarget_MapGroupUnlock entities
@@ -2530,7 +2513,7 @@ def _generate_rpc_command_entities_perks(blocks, command_value, item_id):
             ))
 
 
-def _generate_rpc_command_entities_relay_targets(command_value, item_id, required_entities):
+def _generate_rpc_command_entities_relay_targets(command_value, item_id):
     if not command_value:
         raise ValueError(f"Multi-command item {item_id} has no commands")
     relay_targets = []
@@ -2538,8 +2521,6 @@ def _generate_rpc_command_entities_relay_targets(command_value, item_id, require
     for idx, cmd in enumerate(command_value):
         cmd_entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}_{idx}"
         direct_bfg = int(item_id) == 7770006 and idx == 0 and cmd == "give weapon/player/bfg"
-        if command_requires_map_side_rpc(cmd):
-            required_entities.append(cmd_entity_name)
         relay_targets.append(cmd_entity_name)
         command_blocks.append(build_primitive(
             "weapon_grant_direct" if direct_bfg else "target_command",
@@ -2549,25 +2530,14 @@ def _generate_rpc_command_entities_relay_targets(command_value, item_id, require
     return command_blocks, relay_targets
 
 
-def _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback, required_entities):
+def _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback):
     if item_names and enable_notifications:
         if item_classifications is None:
             raise ValueError("item notifications require packaged classifications")
         for item_id, command_value in items_dict.items():
             _generate_rpc_command_entities_is_no_op(blocks, command_value, item_classifications, item_id, item_names, receipt_feedback)
 
-    generated = "".join(blocks)
-    missing_entities = [
-        entity_name
-        for entity_name in required_entities
-        if f"entityDef {entity_name} {{" not in generated
-    ]
-    if missing_entities:
-        raise ValueError(
-            "Map-side RPC entity missing for unsafe command(s): "
-            + ", ".join(sorted(missing_entities))
-        )
-    return generated
+    return "".join(blocks)
 
 
 def _append_structured_command(blocks, command_value, item_id):
@@ -2602,11 +2572,11 @@ def _append_structured_command(blocks, command_value, item_id):
     return
 
 
-def _append_command_entities(blocks, command_value, item_id, required_entities):
+def _append_command_entities(blocks, command_value, item_id):
     if isinstance(command_value, dict):
         return _append_structured_command(blocks, command_value, item_id)
     if isinstance(command_value, list):
-        command_blocks, relay_targets = _generate_rpc_command_entities_relay_targets(command_value, item_id, required_entities)
+        command_blocks, relay_targets = _generate_rpc_command_entities_relay_targets(command_value, item_id)
         blocks.append(build_primitive(
             "target_count_relay", f"{RPC_ENTITY_PREFIX}_{item_id}",
             {"targets": relay_targets},
@@ -2614,8 +2584,6 @@ def _append_command_entities(blocks, command_value, item_id, required_entities):
         blocks.extend(command_blocks)
     else:
         entity_name = f"{RPC_ENTITY_PREFIX}_{item_id}"
-        if command_requires_map_side_rpc(command_value):
-            required_entities.append(entity_name)
         blocks.append(build_primitive(
             "target_command", entity_name, {"command": command_value + ";"}
         ))
@@ -2643,12 +2611,11 @@ def generate_rpc_command_entities(
     if unsupported_feedback:
         raise ValueError(f"unsupported item receipt feedback: {unsupported_feedback}")
     blocks = []
-    required_entities = []
     for item_id, command_value in items_dict.items():
-        _append_command_entities(blocks, command_value, item_id, required_entities)
+        _append_command_entities(blocks, command_value, item_id)
 
     # Only non-no_op items generate independent notification entities.
-    generated = _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback, required_entities)
+    generated = _generate_rpc_command_entities_generated(blocks, enable_notifications, item_classifications, item_names, items_dict, receipt_feedback)
     return generated
 
 def generate_system_command_entities(map_key="", runtime_map=""):
@@ -2734,16 +2701,24 @@ def generate_context_marker_overlay(map_key, runtime_map, items_dict=None):
     )
 
 
+def entity_has_layers(block):
+    depth = 0
+    for match in re.finditer(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*[\s\S]*?\*/|[{}]|\blayers\b', block):
+        token = match.group()
+        if token == "layers" and depth == 1:
+            return True
+        depth += (token == "{") - (token == "}")
+    return False
+
+
 def validate_ap_lifecycle_entity(content, map_key):
     """Enforce exactly one unlayered AP lifecycle target in generated content."""
     name = f"{AP_LIFECYCLE_ENTITY_PREFIX}{map_key}"
     if content.count(f"entityDef {name} {{") != 1:
         raise ValueError(f"AP lifecycle entity count mismatch: {name}")
     bounds = find_entity_block_bounds(content, name)
-    if bounds is None:
-        raise ValueError(f"AP lifecycle entity missing: {name}")
     block = content[bounds[0]:bounds[1]]
-    if re.search(r"\blayers\s*=", block):
+    if entity_has_layers(block):
         raise ValueError(f"AP lifecycle entity must be unlayered: {name}")
     if extract_target_names(block) != ["ap_rpc_auto_enable"]:
         raise ValueError(f"AP lifecycle target mismatch: {name}")
@@ -2842,15 +2817,7 @@ def _apply_runtime_map_correctives_bounds(text):
 
     bounds = find_entity_block_bounds(text, "slayergate_progress_support_rune_mcity")
     if bounds:
-        block = text[bounds[0]:bounds[1]]
-        block = replace_targets_block(block, [])
-        block = re.sub(r"\binteraction\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-        block = re.sub(r"\btouchData\s*=\s*\{.*?\n\t\t\}", "", block, flags=re.DOTALL)
-        if "flags = {" in block:
-            if "flags = {\n\t\t\thide = true;" not in block:
-                block = re.sub(r"flags\s*=\s*\{", "flags = {\n\t\t\thide = true;", block, count=1)
-        else:
-            block = block.replace("edit = {\n", "edit = {\n\t\tflags = {\n\t\t\thide = true;\n\t\t}\n", 1)
+        block = _apply_runtime_map_correctives_block(bounds, text)
         text = text[:bounds[0]] + block + text[bounds[1]:]
     return text
 
@@ -3148,7 +3115,6 @@ def _physical_target_policy_location_id(ap_check_id, block, config_entities, def
     resolve_location_feedback_policy(
         location_feedback, ap_check_id, target_policy
     )
-    include_ap_feedback = True
     if not target_policy:
         target_policy = build_universal_physical_policy(
             ap_check_id,
@@ -3188,11 +3154,11 @@ def _physical_target_policy_location_id(ap_check_id, block, config_entities, def
         )
         generic.update(target_policy)
         target_policy = generic
-    return include_ap_feedback, location_id, target_policy
+    return location_id, target_policy
 
 
 def _physical_target_policy(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies):
-    include_ap_feedback, location_id, target_policy = _physical_target_policy_location_id(ap_check_id, block, config_entities, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
+    location_id, target_policy = _physical_target_policy_location_id(ap_check_id, block, config_entities, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
     _generate_map_visual(asset_specs, block, content, default_visual_asset, entity_name, preserve_rotation, preserve_visual_layers, target_policy)
     if (
         "native_entity_contract" in target_policy
@@ -3216,10 +3182,10 @@ def _physical_target_policy(ap_check_id, asset_specs, block, config_entities, co
         )
 
     audit_preserved_target_graph(content, entity_name, target_policy)
-    return include_ap_feedback, location_id, target_policy
+    return location_id, target_policy
 
 
-def _append_native_check(ap_check_id, block, entity_name, include_ap_feedback, location_id, modified_count, new_blocks, placement_by_id, target_policy):
+def _append_native_check(ap_check_id, block, entity_name, location_id, modified_count, new_blocks, placement_by_id, target_policy):
     native_contract = target_policy["native_entity_contract"]
     native = apply_native_entity_contract(block, native_contract)
     native = add_ap_check_target(
@@ -3236,20 +3202,18 @@ def _append_native_check(ap_check_id, block, entity_name, include_ap_feedback, l
         },
     )
     new_blocks.append("entity {" + native)
-    new_blocks.append(generate_target_relay(
+    new_blocks.append(generate_event_relay(
         ap_check_id,
         location_id,
         "",
         completion_targets=target_policy.get("completion_targets"),
-        include_notification=include_ap_feedback,
     ))
     visual = generate_inert_location_visual(block, target_policy)
     if visual:
         new_blocks.append(visual)
-    if include_ap_feedback:
-        new_blocks.append(
-            generate_pickup_notification(location_id, placement_by_id.get(location_id))
-        )
+    new_blocks.append(
+        generate_pickup_notification(location_id, placement_by_id.get(location_id))
+    )
     new_blocks.append(generate_check_event(location_id))
     modified_count += 1
     return modified_count
@@ -3288,7 +3252,7 @@ def _append_independent_check_sentinel_source(ap_check_id, block, entity_name, s
     return sentinel_source
 
 
-def _append_independent_check_visual(ap_check_id, block, config_entities, include_ap_feedback, location_id, manifest_data, new_blocks, placement_by_id, target_policy):
+def _append_independent_check_visual(ap_check_id, block, config_entities, location_id, manifest_data, new_blocks, placement_by_id, target_policy):
     visual = generate_inert_location_visual(block, target_policy)
     if visual:
         replacement_model = target_policy[
@@ -3305,28 +3269,24 @@ def _append_independent_check_visual(ap_check_id, block, config_entities, includ
     if secondary_location_id is not None:
         manifest_data[secondary_ap_check_id] = secondary_location_id
         completion_targets.append(secondary_ap_check_id)
-        if include_ap_feedback:
-            new_blocks.append(
-                generate_pickup_notification(
-                    secondary_location_id, placement_by_id.get(secondary_location_id)
-                )
+        new_blocks.append(
+            generate_pickup_notification(
+                secondary_location_id, placement_by_id.get(secondary_location_id)
             )
+        )
         new_blocks.append(generate_check_event(secondary_location_id))
-        new_blocks.append(generate_target_relay(
+        new_blocks.append(generate_event_relay(
             secondary_ap_check_id, secondary_location_id, "",
-            include_notification=include_ap_feedback,
         ))
-    new_blocks.append(generate_target_relay(
+    new_blocks.append(generate_event_relay(
         ap_check_id,
         location_id,
         "",
         completion_targets=completion_targets,
-        include_notification=include_ap_feedback,
     ))
-    if include_ap_feedback:
-        new_blocks.append(
-            generate_pickup_notification(location_id, placement_by_id.get(location_id))
-        )
+    new_blocks.append(
+        generate_pickup_notification(location_id, placement_by_id.get(location_id))
+    )
     return secondary_location_id
 
 
@@ -3344,7 +3304,7 @@ def _append_independent_check_cleanup(ap_check_id, sentinel_source, target_polic
         ]
 
 
-def _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, include_ap_feedback, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy):
+def _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy):
     sentinel_source = _append_independent_check_sentinel_source(ap_check_id, block, entity_name, sentinel_check_ids, sentinel_crystal_pairs, target_policy)
 
     manifest_data[ap_check_id] = location_id
@@ -3361,7 +3321,7 @@ def _append_independent_check(ap_check_id, asset_specs, block, config_entities, 
     new_blocks.append(
         generate_independent_pickup_trigger(entity_name, ap_check_id, block, target_policy)
     )
-    secondary_location_id = _append_independent_check_visual(ap_check_id, block, config_entities, include_ap_feedback, location_id, manifest_data, new_blocks, placement_by_id, target_policy)
+    secondary_location_id = _append_independent_check_visual(ap_check_id, block, config_entities, location_id, manifest_data, new_blocks, placement_by_id, target_policy)
     new_blocks.append(generate_check_event(location_id))
     modified_count += 1
     if secondary_location_id is not None:
@@ -3411,19 +3371,16 @@ def _compile_secret_checks(encounter_source, location_feedback, manifest_data, m
         location_feedback_policy(
             location_feedback, ap_check_id
         )
-        include_ap_feedback = True
         secret_blocks.append(
             generate_event_relay(
                 ap_check_id,
                 location_id,
                 "",
-                include_notification=include_ap_feedback,
             )
         )
-        if include_ap_feedback:
-            secret_blocks.append(
-                generate_pickup_notification(location_id, placement_by_id.get(location_id))
-            )
+        secret_blocks.append(
+            generate_pickup_notification(location_id, placement_by_id.get(location_id))
+        )
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
     return map_content, modified_count, secret_blocks
@@ -3469,17 +3426,17 @@ def _generate_map_descriptor_path(config_file, item_classifications):
 
 
 def _compile_physical_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, manifest_data, modified_count, new_blocks, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, target_policies):
-    include_ap_feedback, location_id, target_policy = _physical_target_policy(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
+    location_id, target_policy = _physical_target_policy(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_feedback, preserve_rotation, preserve_visual_layers, target_policies)
 
     if not target_policy.get("no_auto_automap_helper"):
         new_blocks.append(
             generate_automap_location_helper(block, location_id, policy=target_policy)
         )
     if "native_entity_contract" in target_policy and not target_policy.get("independent_ap_trigger"):
-        modified_count = _append_native_check(ap_check_id, block, entity_name, include_ap_feedback, location_id, modified_count, new_blocks, placement_by_id, target_policy)
+        modified_count = _append_native_check(ap_check_id, block, entity_name, location_id, modified_count, new_blocks, placement_by_id, target_policy)
         return modified_count
     if target_policy.get("independent_ap_trigger"):
-        modified_count = _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, include_ap_feedback, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy)
+        modified_count = _append_independent_check(ap_check_id, asset_specs, block, config_entities, content, default_visual_asset, default_visual_model, entity_name, location_id, manifest_data, modified_count, new_blocks, placement_by_id, sentinel_check_ids, sentinel_crystal_pairs, target_policy)
         return modified_count
     else:
         raise ValueError(f"Legacy non-independent physical check logic hit for {entity_name}")
@@ -3603,7 +3560,7 @@ def generate_map(
         + generate_bootstrap_entities(level_config.get("runtime_map", ""))
         + generate_system_command_entities(map_key=map_key, runtime_map=level_config.get("runtime_map", ""))
         + generate_ap_lifecycle_entity(map_key)
-        + (generate_fast_travel_relay(map_key, fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
+        + (generate_fast_travel_relay(fast_travel["maps"][map_key], source_metadata["content"]) if map_key in fast_travel["maps"] else "")
     )
     from tools.maps.master_levels import compile_master_pickups
     final_content, master_manifest = compile_master_pickups(

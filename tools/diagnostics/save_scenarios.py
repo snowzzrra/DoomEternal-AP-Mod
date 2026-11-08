@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -19,7 +20,8 @@ DEFAULT_ROOT = Path(
         Path.home() / ".local/state/doom-eternal-ap/test-saves",
     )
 ).expanduser()
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 KNOWN_SCENARIOS = (
     "HELL_ON_EARTH_SANDBOX",
     "EXULTIA_BEFORE_RUNE",
@@ -47,11 +49,33 @@ def checksums(root: Path) -> dict[str, str]:
     }
 
 
+def _windows_process_names():
+    names = set()
+    result = subprocess.run(
+        ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+         "Get-CimInstance Win32_Process -ErrorAction Stop | Select-Object Name,CommandLine | ConvertTo-Json -Compress"],
+        check=True, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15,
+    )
+    rows = json.loads(result.stdout)
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError("Cannot verify running processes before save restore")
+    for row in rows:
+        name = row["Name"].lower()
+        command = row.get("CommandLine")
+        if name.startswith("python") and not command:
+            raise RuntimeError("Cannot verify a Python process before save restore")
+        names.add(name)
+        names.add((command or "").lower())
+    return names
+
+
 def process_names() -> set[str]:
     names = set()
+    if os.name == "nt":
+        return _windows_process_names()
     proc = Path("/proc")
     if not proc.is_dir():
-        return names
+        raise RuntimeError("Cannot verify running processes before save restore")
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
@@ -66,38 +90,47 @@ def process_names() -> set[str]:
 
 
 def assert_runtime_stopped():
+    names = process_names()
     active = [
         marker
         for marker in ("doometernalx64vk.exe", "ap_client.exe", "bridge_client.py")
-        if any(marker in process for process in process_names())
+        if any(marker in process for process in names)
     ]
     if active:
         raise RuntimeError("Refusing save restore while runtime is active: " + ", ".join(active))
 
 
 def load_project_config() -> dict:
-    config_path = Path(os.environ.get("DOOM_AP_CONFIG_FILE", PROJECT_ROOT / "ap_config.json"))
+    application_dir = Path(os.environ.get("DOOM_AP_APPLICATION_DIR", PROJECT_ROOT)).expanduser()
+    config_path = Path(os.environ.get("DOOM_AP_CONFIG_FILE", application_dir / "ap_config.json")).expanduser()
     try:
-        return json.loads(config_path.read_text(encoding="utf-8"))
+        loaded = json.loads(config_path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
     except (OSError, json.JSONDecodeError):
         return {}
 
 
 def discover_save_base(explicit: str | None = None) -> Path:
+    from doom_eap.launcher.launcher_platform import doom_saved_games_base, select_saved_games_dir
+
     if explicit:
         path = Path(explicit).expanduser().resolve()
         if not path.is_dir():
             raise RuntimeError(f"Explicit save path is not a directory: {path}")
         return path
-    configured = load_project_config().get("save_games_dir")
-    candidates = []
-    if configured:
-        candidates.append(Path(configured).expanduser())
-    candidates.extend(Path.home().glob(".local/share/Steam/userdata/*/782330/remote"))
-    existing = [path.resolve() for path in candidates if path.is_dir()]
-    if not existing:
-        raise RuntimeError("No DOOM save base found; pass --path explicitly")
-    return max(existing, key=lambda path: path.stat().st_mtime_ns)
+    config = load_project_config()
+    game_root = Path(config["doom_base_dir"]).expanduser() if config.get("doom_base_dir") else None
+    if game_root is not None and game_root.name.lower() == "base":
+        game_root = game_root.parent
+    selection = select_saved_games_dir(
+        config.get("save_games_dir"),
+        known_base=doom_saved_games_base(game_root=game_root),
+        app_dir=Path(os.environ.get("DOOM_AP_APPLICATION_DIR", PROJECT_ROOT)).expanduser(),
+        game_root=game_root,
+    )
+    if selection.path is None:
+        raise RuntimeError(f"No DOOM save base found ({selection.reason}); pass --path explicitly")
+    return selection.path.resolve()
 
 
 def select_latest_save(save_base: Path) -> Path:

@@ -12,7 +12,7 @@ from doom_eap.content.arena_checks import arena_location_kinds, arena_location_r
 from doom_eap.content.campaign_stages import campaign_stages
 from doom_eap.content.content_catalog import ContentCatalog, load_content_catalog, physical_manifest
 from doom_eap.content.killsanity_plan import build_campaign_kill_budget
-from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.compiler_identity import first_party_text_bytes
 
 MOD_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_AP_ROOT = Path(os.environ.get("ARCHIPELAGO_SOURCE", MOD_ROOT.parent / "Archipelago"))
@@ -132,7 +132,7 @@ def render_stage_routes(catalog):
             '    return nullptr;\n}\n}\n')
 
 
-def _render_by_region(catalog, route, rows):
+def _render_by_region(catalog, route, rows, identity):
     by_region: dict[str, list[str]] = {}
     for name, _, region in rows:
         by_region.setdefault(region, []).append(name)
@@ -146,7 +146,6 @@ def _render_by_region(catalog, route, rows):
         "",
         "# This file has no timestamp: stable input yields a stable diff.",
     ]
-    identity = json.loads((catalog.root / "data" / "content_identity.json").read_text(encoding="utf-8"))
     lines.extend(
         [
             f"CONTENT_SCHEMA_VERSION = {identity['content_schema_version']!r}",
@@ -245,7 +244,9 @@ def _render_neutral(catalog, counts, lines, selected_map):
     return neutral
 
 
-def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
+def render(catalog: ContentCatalog, selected_map: str | None = None, *, identity=None) -> str:
+    if identity is None:
+        identity = json.loads((catalog.root / "data" / "content_identity.json").read_text(encoding="utf-8"))
     rows = _render_physical(catalog, selected_map)
     rows.extend(
         (item.name, item.location_id, item.region) for item in catalog.runtime_locations
@@ -254,7 +255,7 @@ def render(catalog: ContentCatalog, selected_map: str | None = None) -> str:
     rows.extend((item["name"], None, item["region"]) for item in route.get("virtual_locations", []))
     if len({name for name, _, _ in rows}) != len(rows):
         raise ValueError("generated APWorld locations are not unique")
-    lines, string = _render_by_region(catalog, route, rows)
+    lines, string = _render_by_region(catalog, route, rows, identity)
     lines.extend(
         [
             "}",
@@ -483,8 +484,8 @@ def _compile_catalog_json_name(catalog, output_root, write_artifact, write_bytes
     return build_authorial_registry, render_authorial_registry
 
 
-def _compile_catalog_rendered(catalog, check, map_key, output):
-    rendered = render(catalog, map_key)
+def _compile_catalog_rendered(catalog, check, map_key, output, identity):
+    rendered = render(catalog, map_key, identity=identity)
     changed_paths: list[Path] = []
     projection_payloads: dict[Path, bytes] = {}
 
@@ -560,15 +561,14 @@ def _compile_catalog(
     archipelago_source: Path = DEFAULT_AP_ROOT,
 ) -> tuple[Path, ...]:
     catalog = load_content_catalog()
-    changed_paths, projection_payloads, rendered, write_artifact = _compile_catalog_rendered(catalog, check, map_key, output)
+    identity_data = json.loads((catalog.root / "data" / "content_identity.json").read_text(encoding="utf-8"))
+    changed_paths, projection_payloads, rendered, write_artifact = _compile_catalog_rendered(catalog, check, map_key, output, identity_data)
 
     setup_guide, write_bytes_artifact = _compile_catalog_setup_guide(catalog, changed_paths, check, output, projection_payloads, rendered, write_artifact)
     setup_guide = setup_guide.replace("(GAMEPLAY.md)", "(https://github.com/snowzzrra/DoomEternal-AP-Mod/blob/main/docs/GAMEPLAY.md)")
     write_artifact(output.parent / "docs/setup_en.md", setup_guide)
     write_bytes_artifact(output.with_name("enemy_options.py"),
                          projected_module(catalog.root / "doom_eap/content/enemy_options.py", catalog.root))
-    write_bytes_artifact(output.with_name("fortress_economy.py"),
-                         (catalog.root / "doom_eap/content/fortress_economy.py").read_bytes())
     write_bytes_artifact(output.with_name("enemy_plan.py"),
                          (catalog.root / "doom_eap/content/enemy_plan.py").read_bytes())
     write_bytes_artifact(output.with_name("native_enemy_plan.py"),
@@ -605,8 +605,6 @@ def _compile_catalog(
                          (catalog.root / "content/catalog/enemy_species.json").read_bytes())
     write_bytes_artifact(catalog.root / "doom_eap/content/enemy_species.json",
                          (catalog.root / "content/catalog/enemy_species.json").read_bytes())
-    write_bytes_artifact(output.with_name("secret_encounter_timers.py"),
-                         (catalog.root / "doom_eap/content/secret_encounter_timers.py").read_bytes())
     write_bytes_artifact(output.with_name("secret_encounter_timers.json"),
                          (catalog.root / 'content/catalog/secret_encounter_timers.json').read_bytes())
     write_bytes_artifact(catalog.root / "doom_eap/content/secret_encounter_timers.json",
@@ -639,7 +637,9 @@ def _compile_catalog(
 
     slot_catalog = compile_slot_catalog(catalog, native, kill_catalog, item_ids)
     write_bytes_artifact(catalog.root / "doom_eap/content/slot_catalog.json", canonical_bytes(slot_catalog) + b"\n")
-    changed_paths.extend(project_contracts(catalog.root, output.parent, output_root, projection_payloads,
+    # the runtime staging under build/ is not part of a source-only check
+    staging = None if source_only else output_root
+    changed_paths.extend(project_contracts(catalog.root, output.parent, staging, projection_payloads,
                                          write_bytes_artifact, check=check))
 
     if source_only:
@@ -650,15 +650,12 @@ def _compile_catalog(
 
     _compile_catalog_build_authorial_registry(catalog, output_root, write_artifact, write_bytes_artifact)
 
-    identity_src = catalog.root / "data" / "content_identity.json"
-    identity_data = json.loads(identity_src.read_text(encoding="utf-8")) if identity_src.exists() else {}
-
     catalog_dict = {
         "maps": list(catalog.maps.keys()),
         "physical_locations_count": len(catalog.physical_locations),
-        "revision": identity_data.get("content_revision", "v0.3.5-alpha.2"),
+        "revision": identity_data["content_revision"],
         "runtime_locations_count": len(catalog.runtime_locations),
-        "schema_version": identity_data.get("content_schema_version", 2),
+        "schema_version": identity_data["content_schema_version"],
     }
     catalog_rendered = json.dumps(catalog_dict, indent=2, sort_keys=True) + "\n"
     staging_catalog = output_root / "catalog.json"

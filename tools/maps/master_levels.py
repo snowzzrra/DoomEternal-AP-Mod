@@ -9,10 +9,10 @@ from tools.maps.ap_map_generator import (
     find_entity_block_bounds,
     generate_automap_location_helper,
     generate_check_event,
+    generate_event_relay,
     generate_independent_pickup_trigger,
     generate_inert_location_visual,
     generate_pickup_notification,
-    generate_target_relay,
     replace_targets_block,
 )
 from tools.maps.mission_complete_map_patcher import _render_relay
@@ -50,7 +50,7 @@ def pickup_entities(source, pickup, stage, model, placements, notifications):
     result = generate_independent_pickup_trigger(pickup["source_entity"], check, source, policy)
     result += generate_inert_location_visual(source, policy)
     result += in_layer(generate_automap_location_helper(source, code, policy), stage["layers"][0])
-    result += generate_target_relay(check, code, "", completion_targets=policy["completion_targets"],
+    result += generate_event_relay(check, code, "", completion_targets=policy["completion_targets"],
                                     include_notification=notifications)
     result += generate_check_event(code)
     if notifications:
