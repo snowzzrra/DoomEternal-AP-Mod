@@ -100,6 +100,9 @@ The HUD displays the current total and next target below **Items Found**.
 and rounds down, up to 50 rewards. A fixed reward count can require mission replays.
 The estimate is conservative and does not guarantee that one playthrough reaches
 every target. Rewards beyond the reviewed finite budget cannot hold progression items.
+Logic sums the kill estimates of missions the player can reach and complete, plus 10%
+for ordinary encounter retries. This limit applies to both Auto and fixed reward counts.
+Fixed counts above the campaign's logical budget require Minimal accessibility.
 
 The native death hook and recovery behavior have offline tests. Testing still needs
 to confirm death coverage across enemy families and full campaigns in the game.

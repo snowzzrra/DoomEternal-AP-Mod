@@ -396,35 +396,52 @@ and generated files included: cognitive complexity up to 15, cyclomatic up to 10
 exception list: a function over the limit fails the check. Core has the same gate, with
 cognitive 20 and cyclomatic 15 for its native code.
 
-### Running the checks
+### Pillar tests
 
-Every push runs, in `.github/workflows/ci.yml`:
+The suite is built around a few tests that walk the real pipeline the way a player does.
+If one of them breaks, something a player would feel broke. They live in
+`tests/pillars/`, one file each:
 
-```sh
-python ../Sentinel-Core/tools/generate_protocol.py --check
-python -m tools.content.project_transport_protocol --check --core-root ../Sentinel-Core
-python ../Archipelago/worlds/doometernal/sync_version.py --check --mod-root .
-python -m tools.content.compile_options_schema --check
-python -m tools.content.compile_player_strings --check
-python -m tools.content.compile_start_inventory_catalog --check
-python -m tools.content.compile_content_catalog --source-only --check
-python -m tools.validation.authorial --check-authorial
-python -m tools.validation.player_literals
-python -m tools.validation.function_complexity
-python -m tools.validation.function_complexity --apworld-root ../Archipelago/worlds/doometernal
-python -m ruff check doom_eap tools tests scripts
-python -m ruff check ../Archipelago/worlds/doometernal
-python -m pytest tests -m "not integration and not slow" -q
+| Pillar | What it walks through |
+|---|---|
+| `test_room.py` | Real APWorld generation for three small presets (base campaign; Mission Access as Items with DLC, Master Levels, Arena Checks, Ultra-Nightmare and Killsanity; DLC only), the slot data contract, and the room compiled from the bundle in `packaging/room_resources/`, down to the check chain of a pickup, an arena and a Master Level |
+| `test_checks.py` | The game writes `ap_event_<id>.txt`; the real bridge sends that location to a fake AP server once, also after a repeated file or a bridge restart; the goal reaches the server |
+| `test_items.py` | The fake server sends a weapon, an upgrade, a trap and a filler; each goes through the ledger and the real pipe to a fake Core once, also after a reconnect and for items received offline |
+| `test_recovery.py` | An interrupted checkpoint write recovers to a valid generation; nothing received is lost or doubled |
+| `test_spending.py` | Ammo Refill and Fortress spending never debit twice across a restart |
+| `test_rooms.py` | Different rooms and profiles never share saves, ledger or spending |
+
+The APWorld has its own pillar (generation of the same presets, every sphere reachable,
+the pool conserved), and Sentinel Core marks its pillar CTests with the `pillar` label
+(the wire protocol for every command family, the two-generation checkpoints, the
+all-or-nothing hook install).
+
+Next to the pillars stay only tests for what they can't reach: the persisted save and
+ledger formats, public IDs, the slot data contract and the wire schema. When you add a
+feature, extend the pillar it belongs to; add a separate test only for one of those.
+
+The pillars need the sibling checkouts, the frozen room resources and the decompressor:
+
+```powershell
+$env:ARCHIPELAGO_SOURCE = "$PWD/../Archipelago"
+$env:DOOMEAP_ROOM_RESOURCES = "$PWD/packaging/room_resources/v0.8.0"
+$env:IDFILE_DECOMPRESSOR = "$PWD/../Tools/idFileDeCompressor"
+python -m pytest tests/pillars -q --basetemp .tmp/pillars
 ```
 
-plus the APWorld's fast tests, the report service test, `git diff --check` and a Windows
-build of the native client from the Core source. The CI checks out Core on the branch
-with the same name as yours, so push Core first when both change.
+The item and recovery pillars also use the native relay and a Core build
+(`SENTINEL_TRANSPORT_RELAY`, `SC_BUILD_DIR`); `.github/workflows/ci.yml` shows how
+they are built.
 
-Tests marked `integration` (real map generation or patching) and `slow` run in the
-release workflow; run them yourself with `-m integration` or `-m slow` when you change
-generation or the compiler. Checks that need your own game files or the frozen room
-resources are part of the release, not of every push.
+### Running the checks
+
+Every push runs `.github/workflows/ci.yml` on Windows: the generators in `--check` mode,
+the authored data and player-text checks, the report service test, the Mod and APWorld
+suites (pillars included), the Core `pillar` CTests, the complexity gates, ruff and
+`git diff --check`. Before pushing, run at least the generators you touched with
+`--check`, the pillars and the gates. The CI checks out Core on the branch with the same
+name as yours, so push Core first when both change, and make sure each Core commit
+builds on its own.
 
 ## Glossary
 

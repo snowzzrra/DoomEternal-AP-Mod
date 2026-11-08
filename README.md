@@ -1,12 +1,12 @@
 # DOOM Eternal Archipelago
 
-> [!CAUTION]
-> This project is a beta, not a finished 1.0 release. Windows and Linux/Proton
-> are supported.
-
-Found a bug? Use **Report a Problem** in the launcher or [open a GitHub issue](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
+> [!TIP]
+> This is still a beta. Found a bug? Use **Report a Problem** in the launcher or [open a GitHub issue](https://github.com/snowzzrra/DoomEternal-AP-Mod/issues/new/choose).
 
 [What gets randomized](#1-what-gets-randomized) · [Player options](#2-player-options) · [Installation](#3-installation) · [How it works](#4-how-it-works) · [Version scope](#5-version-scope) · [Credits](#6-credits) · [License](#7-license)
+
+> [!NOTE]
+> Want to buy me a coffee? No need! But do leave out your feedback. It's greatly appreciated.
 
 ## 1. What gets randomized
 
@@ -182,41 +182,30 @@ don't use AI-generated images.
 The language button changes the launcher only. Text inside the game follows the
 language set in DOOM Eternal, and the APWorld's own text stays in English.
 
-Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
-
 ## 5. Version scope
 
-## 0.1.1 — Runtime stabilization — DONE
+## 0.1.x — First version — DONE
 
 - Froze the initial route through Cultist Base.
 - Added RPC recovery, DeathLink, and Windows/Linux smoke coverage.
 
-### 0.1.2 — Windows client hotfix — DONE
+### 0.2.x — Campaign content expansion and systems foundation — DONE
 
-- Removed bundled proxy DLL aliases from the external client directory.
-- Fixed Windows native-client startup and release dependency validation.
-
-### 0.2.x — Campaign expansion and systems foundation — DONE
-
-- Expanded the playable campaign route mission by mission while generalizing
-  manifests, regions, mission completion, map checks, and per-map validation.
-- Established the native `.entities` generation pipeline and shared runtime
-  foundations used by locations, item delivery, and campaign options.
+- Add in more base content, such as Mastery and Mission Challenges, Secret Encounters and more.
+- Establish a foundational pipeline to create the .entities files needed for the .decl part of modding.
+- Create the first version of what this mod will later build upon.
 
 ### 0.3.x Alpha — Base campaign map expansion — DONE
 
-- `0.3.8`: Final Sin.
-- `0.3.9`: complete base-campaign regression, cleanup, documentation, and
-  release stabilization.
+- include remaining maps from base campaign, up until Final Sin.
+- Fix bugs during playtests in order to make a viable full AP run.
+- First true version of the mod, and prepare for Beta.
 
 ### 0.4.0 Beta — Installation, logic, and option architecture — DONE
 
-- Room-specific Windows and Linux/Proton launcher workflow.
-- Starting Weapon Choice, Random, and configurable starting inventory.
-- Hard, Soft, and Combat logic profiles.
-- Physical Chainsaw, Dash, and first Sentinel Battery options.
-- Reveal AP Locations on Automap, mission replay Fast Travel and single-burst DeathLink.
-- Help, setup check, Repair/Fix, support reports, resync, and room identity checks.
+- A launcher to setup mod installation automatically with one click.
+- More AP options, such as Starting Weapon and QoL features.
+- Streamlined Help tab, complete with a setup check and support reports to better help development.
 
 ### 0.5.0 Beta — The Full Saga — DONE
 
@@ -224,37 +213,31 @@ Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis 
   one 19-mission Archipelago world with global inventory and completion flow.
 - DLC-specific gear, mission logic, generation, runtime, and validation are in scope.
 
-### 0.5.1-3 Beta — Release Correctives
-
-- Base Campaign with DLC content packages Base locations only; room scope
-  follows `include_dlc_missions` exactly.
-- Windows pins EternalModInjector `2026-09-17` (GameBanana download `1819101`)
-  with direct sandbox support and no sandbox hold workaround.
-
 ### 0.6.x Beta — Random Mission Order + Sentinel Core — DONE
 
 - Develop Sentinel Core as an independent open-source native integration project for Archipelago.
-- Use Sentinel Core for native RPC and telemetry, with a separate distribution containing the verified Windows Core/bootstrap pair. Broader platform integration requires validation.
-- Turn mission access into Archipelago progression items.
-- Generate a valid starting mission and reachable randomized mission order.
+- Replace Meathook with the more AP-focused Sentinel Core, complete with an automatic updater.
+- Streamline all three campaigns into one, using a single menu and randomizing mission order in two different modes.
+- Validate logic so every single campaign order is valid, considering combat logic and the player's expected loadout.
 
 ### 0.7.x Beta — Enemizer — DONE
 
-- Randomize enemy placements and encounters while keeping the CR formula.
+- Randomize enemy placements and encounters in various different difficulty presets while respecting the player's expected loadout (CR).
 - Add Killsanity, which gives checks per each X configurable demons killed.
+- Add in some new checks in existing missions.
 
-### 0.8.x–0.9.x — Content freeze and polish — Current
+### 0.8.x–0.9.x — Minor features and polish — Current
 
-- Stabilize public IDs, contracts, and data formats for 1.0.
-- Focus on balance, installation, compatibility, save/reconnect behavior,
-  discoverability, and community testing.
-- Complete documentation, diagnostics, support tooling, and release-candidate
-  validation.
-- Master Levels, Ultra-Nightmare and Arena Checks.
+- Better documentation for future maintenance.
+- Clean up leftover code from previous versions, keeping everything as clean as possible.
+- Rework what needs to be reworked, and smooth out any new bugs.
+- Add more checks to DLC levels, keeping them on par with base campaign ones.
+- Add in vanilla Master Levels, Ultra-Nightmare(lite) difficulty and Arena Checks for every level.
 
-### 1.0
+### 1.0 — Final Release
 
-- Stable public release of the supported campaigns and systems.
+- As soon as stability is reached, release a final candidate.
+- Posterior updates should be hotfixes only.
 
 ## 6. Credits
 
@@ -265,9 +248,9 @@ Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis 
 - Zwip Zwap Zapony (from the Doom 2016+ Modding Discord server) for direct
   technical guidance, map/runtime research and the [Windows Mod Injector](https://gamebanana.com/tools/7475).
 - alby (from the Doom 2016+ Modding Discord server) for technical help, runtime
-  investigation, and safe-native-behavior
-  guidance.
-- KaitoKid (from the AP After Dark Discord server) for the very detailed logic guidance.
+  investigation, and .decl modding guidance.
+- KaitoKid (from the AP After Dark Discord server) for the very detailed logic guidance that
+  basically created this mod's idea of combat logic.
 - chrispy for creating
   [Meathook](https://github.com/brongo/m3337ho0o0ok), the RPC foundation DoomEAP
   was first built on.
@@ -280,16 +263,27 @@ Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis 
 - Kaiser_will and Friends for
   [KaiserCampaign](https://www.nexusmods.com/doometernal/mods/69), consulted as a
   research reference for pickup model rendering and map entity setup.
+- Negate The Stars for
+  [Melee Damage Restored](https://www.nexusmods.com/doometernal/mods/37), the idea
+  and the damage value behind the Enhanced Melee Damage option.
 - The DOOM Modding community for the wiki material, and general knowledge
   that made the map patches possible.
-- Meta (from the AP After Dark Discord server) for the Archipelago Logo model
+- Meta (from the AP After Dark Discord server) for the Archipelago Logo 3D model
   and overall very useful help.
 - FridgeDuck (from the AP After Dark Discord server) for the Doom Archipelago
   logo used by the AP client (both old and new) and the repository preview.
-- Doctor Pyro (from the AP After Dark Discord server) for overall immense help
-  in testing, catching dozens of bugs in each version. Thanks a lot for that.
 - [Lucas](https://www.behance.net/lucasmab) for the start screen and main
   menu logos, and launcher visuals feedback.
+- Flag icons from [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
+- Doctor Pyro (from the AP After Dark Discord server) for the immense help
+  in testing, always catching dozens of bugs in each version. Thanks a lot for that.
+- All familiar faces that participated in the original Doom Eternal AP thread
+  in the discord, constantly reporting bugs, offering suggestions and always there
+  to hype up every single update, even bug fixes. These include NovaAndrewM, Oscat,
+  Quartz, Zeforas, LuciusDivine and some other people already mentioned before. Lots
+  of other people showed up too! And I thank everyone for that.
+- And of course, thank you, stranger, for reading my ramblings and (hopefully) having fun
+  with my mod. You matter a lot.
 
 ## 7. License
 

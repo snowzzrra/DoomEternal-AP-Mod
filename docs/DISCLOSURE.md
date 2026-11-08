@@ -24,8 +24,6 @@ NO BIG DECISION IS MADE BY AI. I played more than 200 hours of Eternal SINCE THI
 
 As said before: if this increased, moderate usage, is something that bothers you, you are free to stick with v0.5.3. 
 
-AI was also used in the README file to organize it. English isn't my first language, this file is all human tho.
-
 ## Q) Do you own all of your code?
 
 Technically, not 100% of it. Meathook, the old DLL used, and created by the amazing chrispy, got obsolete and I had to replace it with a DLL of my own. Meathook did have several useful features that I couldn't afford to lose, so I asked chrispy publicaly and in their DMs if I could modify and publish it and they gave me permission, so Meathook's RPC feature is included inside Sentinel Core.
