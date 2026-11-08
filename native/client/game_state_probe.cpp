@@ -509,10 +509,6 @@ bool GameStateProbe::IsSafeForRpc() const {
     return safeForRpc_;
 }
 
-bool GameStateProbe::IsMapEntitySafe() const {
-    return mapEntitySafe_;
-}
-
 bool GameStateProbe::IsGameplayLoaded() const {
     return gameplayLoaded_;
 }

@@ -25,14 +25,6 @@ bool ContainsCaseInsensitive(const std::string& haystack, const std::string& nee
     return Lowercase(haystack).find(Lowercase(needle)) != std::string::npos;
 }
 
-bool IsLikelyWineDrivePath(const std::filesystem::path& path) {
-    const std::string value = path.string();
-    return value.size() >= 3
-        && std::isalpha(static_cast<unsigned char>(value[0])) != 0
-        && value[1] == ':'
-        && (value[2] == '\\' || value[2] == '/');
-}
-
 bool PathsEqual(const std::filesystem::path& left, const std::filesystem::path& right) {
     return AbsoluteOrOriginal(left).lexically_normal().string()
         == AbsoluteOrOriginal(right).lexically_normal().string();
@@ -70,8 +62,6 @@ RuntimePathInfo ResolveRuntimePathInfo(
     info.clientDir = info.executablePath.parent_path();
     info.workingDir = AbsoluteOrOriginal(workingDir);
     info.gameRootDir = AbsoluteOrOriginal(InferGameRoot(info.workingDir));
-    info.gameRootDllCandidate = info.gameRootDir / "XINPUT1_3.dll";
-    info.clientDllCandidate = info.clientDir / "XINPUT1_3.dll";
 
     AddUniquePath(info.configCandidates, info.clientDir / "ap_config.json");
     AddUniquePath(info.configCandidates, info.workingDir / "ap_config.json");
@@ -100,10 +90,7 @@ RuntimePathInfo ResolveRuntimePathInfo(
         info.probableProton = true;
         info.protonSignals.push_back("client_dir is separate from the game root");
     }
-    if (IsLikelyWineDrivePath(info.executablePath) || IsLikelyWineDrivePath(info.workingDir)) {
-        info.probableProton = true;
-        info.protonSignals.push_back("Wine-style drive path detected");
-    }
+
 
     return info;
 }
@@ -118,19 +105,4 @@ std::optional<std::filesystem::path> FindFirstExistingPath(
         }
     }
     return std::nullopt;
-}
-
-XinputDllSelection SelectXinputDllCandidate(const RuntimePathInfo& runtimePaths) {
-    std::error_code error;
-    if (std::filesystem::is_regular_file(runtimePaths.gameRootDllCandidate, error)) {
-        return {XinputDllMode::GameRoot, runtimePaths.gameRootDllCandidate};
-    }
-    error.clear();
-    if (
-        runtimePaths.probableProton
-        && std::filesystem::is_regular_file(runtimePaths.clientDllCandidate, error)
-    ) {
-        return {XinputDllMode::ClientLocalProton, runtimePaths.clientDllCandidate};
-    }
-    return {};
 }

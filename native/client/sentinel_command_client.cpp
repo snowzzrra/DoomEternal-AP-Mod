@@ -74,6 +74,7 @@ static bool BuildCommandPayload(const std::string& text, const sc_command_reques
     words >> first >> second >> third;
     if (checked.kind == SC_COMMAND_ACTIVATE) payload = g::command_activate_payload{second};
     else if (checked.kind == SC_COMMAND_ECHO) payload = g::command_echo_payload{text.substr(5)};
+    else if (checked.kind == SC_COMMAND_CONDUMP) payload = g::command_condump_payload{second};
     else if (checked.kind == SC_COMMAND_TRANSIENT_POLICY) {
         const uint32_t variable = first == "g_damageScaleAllToAI" ? 0 : first == "g_damageScaleAllToSlayer" ? 1 : 2;
         payload = g::command_transient_policy_payload{variable, second};

@@ -18,22 +18,9 @@ struct RuntimePathInfo {
     std::filesystem::path clientDir;
     std::filesystem::path workingDir;
     std::filesystem::path gameRootDir;
-    std::filesystem::path gameRootDllCandidate;
-    std::filesystem::path clientDllCandidate;
     std::vector<std::filesystem::path> configCandidates;
     bool probableProton = false;
     std::vector<std::string> protonSignals;
-};
-
-enum class XinputDllMode {
-    Missing,
-    GameRoot,
-    ClientLocalProton,
-};
-
-struct XinputDllSelection {
-    XinputDllMode mode = XinputDllMode::Missing;
-    std::filesystem::path selectedPath;
 };
 
 RuntimePathInfo ResolveRuntimePathInfo(
@@ -45,5 +32,3 @@ RuntimePathInfo ResolveRuntimePathInfo(
 std::optional<std::filesystem::path> FindFirstExistingPath(
     const std::vector<std::filesystem::path>& candidates
 );
-
-XinputDllSelection SelectXinputDllCandidate(const RuntimePathInfo& runtimePaths);

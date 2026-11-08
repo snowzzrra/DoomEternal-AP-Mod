@@ -156,11 +156,10 @@ void AmmoHotkeyHandler::CheckConfigFile() {
 }
 
 
-static std::string RefillRefusal(bool foreground, bool session, bool rpcReady, bool armed, bool safe) {
+static std::string RefillRefusal(bool foreground, bool session, bool rpcReady, bool safe) {
     if (!foreground) return "game_not_foreground";
     if (!session) return "session_unavailable";
     if (!rpcReady) return "rpc_unavailable";
-    if (!armed) return "rpc_disarmed";
     if (!safe) return "unsafe_gameplay";
     return {};
 }
@@ -169,7 +168,6 @@ void AmmoHotkeyHandler::Poll(
     DWORD doomPid,
     bool sessionActive,
     bool rpcTransportReady,
-    bool rpcArmed,
     bool safeForRpc,
     ExecuteCommandFunction executeConsoleCommand,
     int rpcLastTransportStatus
@@ -203,12 +201,12 @@ void AmmoHotkeyHandler::Poll(
     }
 
     const bool foreground = IsDoomForeground(doomPid);
-    LogPress(foreground, sessionActive, rpcTransportReady, rpcArmed, safeForRpc);
+    LogPress(foreground, sessionActive, rpcTransportReady, safeForRpc);
 
     latched_ = true;
     releaseStartTick_ = 0;
 
-    const std::string reason = RefillRefusal(foreground, sessionActive, rpcTransportReady, rpcArmed, safeForRpc);
+    const std::string reason = RefillRefusal(foreground, sessionActive, rpcTransportReady, safeForRpc);
     if (reason.empty()) {
         ExecuteRefill(executeConsoleCommand, rpcLastTransportStatus);
     } else if (log_) {
@@ -277,13 +275,12 @@ void AmmoHotkeyHandler::ExecuteRefill(ExecuteCommandFunction executeConsoleComma
         }
 }
 
-void AmmoHotkeyHandler::LogPress(bool foreground, bool session, bool rpcReady, bool armed, bool safe) {
+void AmmoHotkeyHandler::LogPress(bool foreground, bool session, bool rpcReady, bool safe) {
     if (log_) {
         log_("AMMO_HOTKEY_PRESS key=" + token_
             + " foreground=" + (foreground ? "true" : "false")
             + " session=" + (session ? "true" : "false")
             + " rpc_ready=" + (rpcReady ? "true" : "false")
-            + " rpc_armed=" + (armed ? "true" : "false")
             + " safe=" + (safe ? "true" : "false"));
     }
 }

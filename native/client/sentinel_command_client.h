@@ -2,7 +2,6 @@
 #include <windows.h>
 #include "sentinel_inspection.h"
 #include "protocol_v2.h"
-#include <functional>
 #include <string>
 
 enum ApRpcResult { AP_RPC_NONE, AP_RPC_PIPE_MISSING, AP_RPC_PIPE_BUSY,
@@ -12,9 +11,7 @@ const char* RpcCallResultName(ApRpcResult result);
 
 class SentinelCommandClient {
 public:
-    using LogCallback = std::function<void(const std::string&)>;
     void SetTargetProcess(DWORD pid);
-    DWORD TargetProcess() const { return pid_; }
     bool PollHealth();
     bool Ready() const { return ready_; }
     bool ExecuteConsoleCommand(const std::string& command);

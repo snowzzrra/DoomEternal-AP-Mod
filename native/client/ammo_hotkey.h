@@ -15,7 +15,6 @@ public:
         DWORD doomPid,
         bool sessionActive,
         bool rpcTransportReady,
-        bool rpcArmed,
         bool safeForRpc,
         ExecuteCommandFunction executeConsoleCommand,
         int rpcLastTransportStatus = 0
@@ -34,7 +33,7 @@ private:
     void DisableMissingConfig();
     void LogConfiguration();
     void UpdateLatch(DWORD now, bool isDown);
-    void LogPress(bool foreground, bool session, bool rpcReady, bool armed, bool safe);
+    void LogPress(bool foreground, bool session, bool rpcReady, bool safe);
     void ExecuteRefill(ExecuteCommandFunction executeConsoleCommand, int rpcLastTransportStatus);
 
     LogFunction log_;

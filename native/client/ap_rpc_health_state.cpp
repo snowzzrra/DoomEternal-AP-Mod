@@ -12,23 +12,10 @@ namespace {
 
 const char* kHealthStateFile = "ap_rpc_health.state";
 const char* kBaselineStateFile = "ap_effect_baseline.state";
-const size_t kDiagnosticLimit = 64;
 
 unsigned long long UnixTimestampMs() {
     return static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count());
-}
-
-std::string Bounded(std::string value) {
-    for (char& character : value) {
-        if (character == '\r' || character == '\n' || character == '=') {
-            character = '_';
-        }
-    }
-    if (value.size() > kDiagnosticLimit) {
-        value.resize(kDiagnosticLimit);
-    }
-    return value;
 }
 
 const char* ResultName(int result_code) {
@@ -40,6 +27,8 @@ const char* ResultName(int result_code) {
     case 4: return "delivered";
     case 5: return "exception";
     case 6: return "unknown";
+    case 7: return "effect_unknown";
+    case 8: return "refused";
     default: return "unsupported";
     }
 }
@@ -150,9 +139,9 @@ void ApRpcHealthStatePublisher::Publish(
         "timestamp_ms=" + std::to_string(now) + "\n"
         "freshness_ms=" + std::to_string(kFreshnessMs) + "\n"
         "sequence=" + std::to_string(sequence) + "\n"
-        "result=" + Bounded(ResultName(result_code)) + "\n"
+        "result=" + ResultName(result_code) + "\n"
         "result_code=" + std::to_string(result_code) + "\n"
-        "transport=" + Bounded(TransportName(transport_status)) + "\n"
+        "transport=" + TransportName(transport_status) + "\n"
         "transport_status=" + std::to_string(transport_status) + "\n";
     if (!WriteAtomically(path_, contents)) {
         return;

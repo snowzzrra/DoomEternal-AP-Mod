@@ -23,7 +23,6 @@ public:
 
     void Poll();
     bool IsSafeForRpc() const;
-    bool IsMapEntitySafe() const;
     bool IsGameplayLoaded() const;
     bool IsLoading() const;
     DWORD GetProcessId() const { return processId_; }

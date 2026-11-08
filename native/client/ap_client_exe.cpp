@@ -2,7 +2,6 @@
 #include <bcrypt.h>
 #include <io.h>
 #include <tlhelp32.h>
-#include <winver.h>
 #include <cstdlib>
 #include <climits>
 #include <stdio.h>
@@ -103,7 +102,7 @@ std::string TrimLine(std::string value) {
     return value;
 }
 
-std::string ReadTextFile(const std::filesystem::path& path) {
+std::string ReadBinaryFile(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     if (!input) {
         return {};
@@ -240,74 +239,6 @@ std::string DigestToHex(const std::array<unsigned char, 32>& digest) {
         output << std::setw(2) << static_cast<int>(byte);
     }
     return output.str();
-}
-
-std::string ReadBinaryFile(const std::filesystem::path& path) {
-    std::ifstream input(path, std::ios::binary);
-    if (!input) {
-        return {};
-    }
-    return std::string(
-        (std::istreambuf_iterator<char>(input)),
-        std::istreambuf_iterator<char>()
-    );
-}
-
-std::string FormatLocalFileTime(const FILETIME& fileTime) {
-    FILETIME localFileTime = {};
-    SYSTEMTIME localSystemTime = {};
-    if (!FileTimeToLocalFileTime(&fileTime, &localFileTime)
-            || !FileTimeToSystemTime(&localFileTime, &localSystemTime)) {
-        return "UNKNOWN";
-    }
-    char buffer[32] = {};
-    snprintf(
-        buffer,
-        sizeof(buffer),
-        "%04u-%02u-%02u %02u:%02u:%02u",
-        localSystemTime.wYear,
-        localSystemTime.wMonth,
-        localSystemTime.wDay,
-        localSystemTime.wHour,
-        localSystemTime.wMinute,
-        localSystemTime.wSecond
-    );
-    return buffer;
-}
-
-std::string FormatVersionNumber(DWORD ms, DWORD ls) {
-    std::ostringstream output;
-    output
-        << HIWORD(ms) << '.'
-        << LOWORD(ms) << '.'
-        << HIWORD(ls) << '.'
-        << LOWORD(ls);
-    return output.str();
-}
-
-std::string GetFixedFileVersion(const std::filesystem::path& path, bool productVersion) {
-    DWORD handle = 0;
-    const DWORD infoSize = GetFileVersionInfoSizeA(path.string().c_str(), &handle);
-    if (infoSize == 0) {
-        return "UNKNOWN";
-    }
-
-    std::vector<char> info(infoSize);
-    if (!GetFileVersionInfoA(path.string().c_str(), 0, infoSize, info.data())) {
-        return "UNKNOWN";
-    }
-
-    VS_FIXEDFILEINFO* fixedInfo = nullptr;
-    UINT fixedInfoSize = 0;
-    if (!VerQueryValueA(info.data(), "\\", reinterpret_cast<LPVOID*>(&fixedInfo), &fixedInfoSize)
-            || fixedInfo == nullptr
-            || fixedInfoSize < sizeof(VS_FIXEDFILEINFO)) {
-        return "UNKNOWN";
-    }
-
-    return productVersion
-        ? FormatVersionNumber(fixedInfo->dwProductVersionMS, fixedInfo->dwProductVersionLS)
-        : FormatVersionNumber(fixedInfo->dwFileVersionMS, fixedInfo->dwFileVersionLS);
 }
 
 
@@ -821,7 +752,7 @@ private:
             return std::nullopt;
         }
 
-        const std::string configContents = ReadTextFile(*configPath);
+        const std::string configContents = ReadBinaryFile(*configPath);
         if (configContents.empty()) {
             if (!loggedConfigurationFailure_) {
                 LogDebug(
@@ -1165,7 +1096,6 @@ private:
     RuntimePathInfo runtimePaths_;
     bool configured_ = false;
     bool loggedConfigurationFailure_ = false;
-    bool loggedRemoteFailure_ = false;
     std::string steamRemoteDir_;
     std::string nativeRoot_, namespace_;
     sentinel::Snapshot saveIdentity_{};
@@ -1310,7 +1240,7 @@ struct RpcWaitDiagnostics {
 static void WaitForRpc(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor, ApRpcHealthStatePublisher& healthStatePublisher) {
     g_ApRpcOwner = std::make_unique<SentinelCommandClient>();
     g_ApRpc = g_ApRpcOwner.get();
-    LogDebug("RPC_CLIENT_CREATED binding=Meathook");
+    LogDebug("RPC_CLIENT_CREATED binding=SentinelCore transport=V2Connection");
     RpcWaitDiagnostics wait;
     wait.Log("initial", gameStateProbe);
     while (!g_ApRpc->PollHealth()) {
@@ -1404,7 +1334,7 @@ static void LogGateChanges(bool rpcTransportReady, const GameStateProbe& gameSta
     }
 }
 
-[[noreturn]] static void RunClient(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor, ApRpcHealthStatePublisher& healthStatePublisher, bool meathookPreflightPassed) {
+[[noreturn]] static void RunClient(GameStateProbe& gameStateProbe, DWORD& moduleProbePid, const RuntimePathInfo& runtimePaths, MissionTransitionMonitor& missionTransitionMonitor, ApRpcHealthStatePublisher& healthStatePublisher, bool corePreflightPassed) {
     bool lastRpcEnabled = false;
     TransientBaseline transientBaseline;
     std::string lastGateReason;
@@ -1415,7 +1345,7 @@ static void LogGateChanges(bool rpcTransportReady, const GameStateProbe& gameSta
         const bool roomBound = admission.result == sentinel::ProbeResult::ok && (admission.admission.flags & SC_SAVE_SESSION_ACCEPTING);
 
         const bool rpcTransportReady =
-            meathookPreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
+            corePreflightPassed && g_ApRpc && g_ApRpc->PollHealth();
         transientBaseline.Poll(rpcTransportReady, gameStateProbe, healthStatePublisher);
         healthStatePublisher.PublishHealth(
             rpcTransportReady,
@@ -1427,7 +1357,6 @@ static void LogGateChanges(bool rpcTransportReady, const GameStateProbe& gameSta
             gameStateProbe.GetProcessId(),
             roomBound,
             rpcTransportReady,
-            true,
             gameStateProbe.IsSafeForRpc(),
             [](const std::string& command) {
                 if (!g_ApRpc) return false;
@@ -1486,16 +1415,16 @@ int main(int argc, char** argv) {
 
     GameStateProbe gameStateProbe(LogDebug);
     DWORD moduleProbePid = 0;
-    const bool meathookPreflightPassed = preflight.deliveryAllowed;
-    if (!meathookPreflightPassed) {
+    const bool corePreflightPassed = preflight.deliveryAllowed;
+    if (!corePreflightPassed) {
         healthStatePublisher.PublishHealth(false, AP_RPC_UNKNOWN, ERROR_FILE_NOT_FOUND);
         LogDebug(
-            "Meathook preflight failed. No valid XINPUT1_3.dll candidate was accepted. "
+            "Sentinel Core preflight failed. The sentinel_core.dll/msimg32.dll pair was not accepted. "
             "A valid install is required for native delivery."
         );
     } else {
         WaitForRpc(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor, healthStatePublisher);
     }
 
-    RunClient(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor, healthStatePublisher, meathookPreflightPassed);
+    RunClient(gameStateProbe, moduleProbePid, runtimePaths, missionTransitionMonitor, healthStatePublisher, corePreflightPassed);
 }
