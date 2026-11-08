@@ -1,9 +1,10 @@
 """Display preference state; controls retain their persistence handlers."""
 
+from dataclasses import dataclass
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import QComboBox, QFrame, QHBoxLayout, QScrollArea, QVBoxLayout, QWidget
 
-from ..presenters.settings_presenter import SettingsPresenter
 from .controls import _label
 from .strings import text
 
@@ -106,3 +107,14 @@ class SettingsView(QScrollArea):
         self.special.editor.style().unpolish(self.special.editor)
         self.special.editor.style().polish(self.special.editor)
         return model.conflict
+
+
+@dataclass(frozen=True)
+class SettingsModel:
+    conflict: bool
+
+
+class SettingsPresenter:
+    @staticmethod
+    def present(refill: str, special: str) -> SettingsModel:
+        return SettingsModel(bool(refill) and refill == special)

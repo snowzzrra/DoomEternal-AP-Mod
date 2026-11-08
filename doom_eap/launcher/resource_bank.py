@@ -322,13 +322,6 @@ def publish_resource_bank(source, target, info, *, journal=None):
     return receipt
 
 
-def write_resource_bank(selected, cache):
-    with tempfile.TemporaryDirectory(dir=Path(cache).parent, prefix='.doomeap-bank-') as directory:
-        source, info = plan_resource_bank(selected, directory)
-        target = Path(cache) / source.name
-        return target, publish_resource_bank(source, target, info)
-
-
 def mask_tables(mask):
     if len(mask) < 8:
         raise ValueError('Truncated native resource mask')

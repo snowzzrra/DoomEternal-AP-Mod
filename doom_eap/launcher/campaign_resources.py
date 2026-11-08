@@ -48,16 +48,9 @@ def verify_installed_resources(game_root: Path, receipt: dict) -> None:
 
 
 def resource_mapping_lines(mask: bytes, mapping: str) -> list[str]:
-    if len(mask) < 8:
-        raise ValueError('Truncated native resource mask')
-    offsets, position = set(), 8
-    for _ in range(_u32(mask, 4)):
-        if position + 12 > len(mask):
-            raise ValueError('Truncated native resource mask')
-        offsets.add(position)
-        position += 12 + 8 * _u32(mask, position + 8)
-    if position != len(mask):
-        raise ValueError('Invalid native resource mask boundary')
+    from .resource_bank import mask_tables
+
+    offsets = mask_tables(mask)
     result = []
     for line in mapping.splitlines(keepends=True):
         name, offset = line.rsplit(";", 1)

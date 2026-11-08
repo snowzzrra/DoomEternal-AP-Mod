@@ -992,7 +992,7 @@ class APSessionOwner:
             for pattern in ("ap_event_*.txt", "ap_active_map*.txt", "ap_telemetry*.txt", "ap_condump*.txt", "ap_event_session.json"):
                 sources.extend(local.glob(pattern))
             sources.extend(root.glob("ap_transition_*.evt"))
-            from doom_eap.content.publisher_loader import load_publisher_contracts
+            from doom_eap.content.content_catalog import load_publisher_contracts
             sources.extend(local / trigger["filename"] for publisher in load_publisher_contracts()
                            for trigger in publisher.triggers_for("map_event_file"))
 
@@ -1033,7 +1033,7 @@ class APSessionOwner:
                 finish_new_save(ledger, epoch_binding, token, applied=False)
 
     def restart_campaign(self, snapshot, config: dict) -> Path:
-        from doom_eap.contracts.command_publication import queue_session_namespace
+        from doom_eap.contracts.receipt_delivery import queue_session_namespace
         from doom_eap.runtime.inventory import (
             CLIENT_STATE_VERSION,
             ClientStateStore,

@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 
 from doom_eap.contracts.core_distribution import validate_manifest, verify_bytes, verify_runtime, version_key
-from doom_eap.launcher.launcher_injector import UrlDownloadTransport, probe_meathook
+from doom_eap.launcher.launcher_injector import UrlDownloadTransport, probe_core
 from doom_eap.launcher.launcher_platform import ProcessInspectionError, detect_doom_processes
 from doom_eap.launcher.ui.strings import text as player_text
 
@@ -241,7 +241,7 @@ class CoreRuntime:
         override = self._override_runtime(config)
         if override is not None:
             return override
-        installed = probe_meathook(game_root)
+        installed = probe_core(game_root)
         selected = config.get("selected_core_runtime_manifest")
         selected = self._verified_selection(selected, installed)
         hold = self._hold_installed_runtime(installed, config, refresh)

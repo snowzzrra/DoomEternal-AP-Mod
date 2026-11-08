@@ -123,7 +123,7 @@ def _backup_core_pair(root, incoming, backup):
     (backup / "record.json").write_text(json.dumps(record))
 
 def replace_pair(root, state_dir, incoming, *, journal=None):
-    from doom_eap.launcher.launcher_injector import probe_meathook
+    from doom_eap.launcher.launcher_injector import probe_core
     from doom_eap.launcher.launcher_platform import _atomic_write_bytes, detect_doom_processes, require_doom_closed
     require_doom_closed('replacing Core')
     directory = backup_root(root, state_dir)
@@ -138,7 +138,7 @@ def replace_pair(root, state_dir, incoming, *, journal=None):
             if detect_doom_processes():
                 raise RuntimeError('DOOM Eternal started while connection files were being replaced. Close the game before retrying recovery.')
             _atomic_write_bytes(root / name, incoming[name])
-        if not probe_meathook(root).ok:
+        if not probe_core(root).ok:
             raise RuntimeError('Game connection files could not be checked after installation. Close DOOM Eternal and select Help -> SAVE SUPPORT REPORT.')
     except (OSError, RuntimeError, ValueError):
         if not detect_doom_processes():

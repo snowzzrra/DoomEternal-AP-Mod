@@ -392,46 +392,6 @@ class PlayerFileView(QWidget):
         escaped = re.sub(r"(\*\*|__)(.+?)\1", r"<b>\2</b>", escaped)
         return re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<i>\1</i>", escaped)
 
-    @staticmethod
-    def _choice_purpose(key: str, fallback: object) -> str:
-        return {
-            "goal": player_text("launcher.player_file", "choose_your_victory_goal"),
-            "special_weapon": player_text(
-                "launcher.player_file", "special_weapon_help"
-            ),
-        }.get(key, str(fallback).split("\n\n", 1)[0])
-
-    @staticmethod
-    def _choice_description(key: str, value: object, label: str) -> str:
-        descriptions = {
-            ("goal", "acquire_the_unmaykr"): player_text(
-                "launcher.player_file", "claim_the_unmaykr_in_the_fortress_of_doom"
-            ),
-            ("goal", "kill_the_icon_of_sin"): player_text(
-                "launcher.player_file", "goal_icon_help"
-            ),
-            ("goal", "kill_the_dark_lord"): player_text(
-                "launcher.player_file", "defeat_the_dark_lord_in_the_ancient_gods_part_two"
-            ),
-            (
-                "goal",
-                "complete_the_full_saga",
-            ): player_text("launcher.player_file", "goal_full_saga_help"),
-            (
-                "special_weapon",
-                "progressive_special_weapon",
-            ): player_text("launcher.player_file", "special_weapon_sequence"),
-            ("special_weapon", "progressive_sentinel_hammer"): player_text(
-                "launcher.player_file", "sentinel_hammer_fully_upgraded_sentinel_hammer"
-            ),
-            ("special_weapon", "the_crucible"): player_text(
-                "launcher.player_file", "crucible_only_help"
-            ),
-        }
-        return descriptions.get(
-            (key, str(value)), player_text("launcher.player_file", "current_selection_value_0", value_0=f"{label}")
-        )
-
     def _option_widget(self, option):
         key, default = str(option["key"]), option.get("default")
         self.option_defaults[key] = default

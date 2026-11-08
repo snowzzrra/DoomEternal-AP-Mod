@@ -230,7 +230,7 @@ class WindowsModInjectorAdapter:
         launcher_injector.recover_injector_resources(game_root)
         launcher_injector.recover_stale_sandbox_hold(game_root, state_dir=self.state_dir, event_sink=self.event_sink)
         return launcher_injector.stage_windows_injector_toolchain(
-            self.dependency, game_root, state_dir=self.state_dir, journal=journal
+            self.dependency, game_root, journal=journal
         )
 
     def run(
@@ -618,5 +618,5 @@ class LinuxModManagerAdapter:
         if result.state != "applied":
             return result
         return launcher_injector.verify_mod_installation(
-            game_root, staged, result, platform_name="linux", event_sink=self.event_sink
+            game_root, staged, result, event_sink=self.event_sink
         )

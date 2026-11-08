@@ -19,12 +19,10 @@ import traceback
 import urllib.error
 import urllib.request
 import zipfile
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
 from enum import Enum
-from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Protocol
 
@@ -65,13 +63,6 @@ def restore_standard_streams(*, require_pipes=False):
             descriptor = msvcrt.open_osfhandle(handle, flags | os.O_BINARY)
             stream = os.fdopen(descriptor, mode, buffering=1, encoding='utf-8')
         setattr(sys, name, stream)
-
-
-@lru_cache(maxsize=32)
-def _sha256_file_identity(path: str, size: int, modified_ns: int, created_ns: int) -> str:
-    """Hash immutable file identity once; metadata changes invalidate the entry."""
-    del size, modified_ns, created_ns
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def create_secure_ssl_context(cafile: str | None = None) -> ssl.SSLContext:
@@ -158,7 +149,6 @@ class UrlDownloadTransport:
                     time.sleep(self.backoff_base * (2 ** (attempt - 1)))
                     continue
                 raise
-        raise RuntimeError('download attempts exhausted')
 
 
 class PrerequisiteStatus(str, Enum):
@@ -207,7 +197,7 @@ class RuntimePrerequisiteReport:
         return self.get("game")
 
 
-def probe_meathook(game_root: Path | None) -> PrerequisiteCheck:
+def probe_core(game_root: Path | None) -> PrerequisiteCheck:
     """Verify the Core runtime pair used by Game Link."""
     from ..contracts.core_distribution import read_manifest, verify_build_identity
     if game_root is None:
@@ -255,7 +245,7 @@ def probe_runtime_prerequisites(
                 key='game', status=PrerequisiteStatus.INVALID, message=str(error), details={'path': str(game_root)},
             ))
 
-    checks.append(probe_meathook(game_root))
+    checks.append(probe_core(game_root))
 
     if client_dir is not None:
         packaged_bridge = client_dir / "bridge_client.py"
@@ -408,8 +398,8 @@ def _core_file_error(path: Path, error: Exception) -> RuntimeError:
     return RuntimeError(message + ' No matching detection was found. Select Help -> SAVE SUPPORT REPORT.')
 
 
-def install_meathook(
-    game_root: Path, dependency_manager: DependencyManager, *, state_dir: Path | None = None,
+def install_core(
+    game_root: Path, *, state_dir: Path | None = None,
     consent: Callable[[DependencySpec], bool], local_artifact: Path | None = None, force_repair: bool = False,
     journal=None,
 ) -> GameLinkResult:
@@ -423,8 +413,8 @@ def install_meathook(
             journal.save()
         processes = detect_doom_processes()
         if processes:
-            if probe_meathook(root).ok and not force_repair:
-                installed = probe_meathook(root)
+            if probe_core(root).ok and not force_repair:
+                installed = probe_core(root)
                 return GameLinkResult("verified", installed.message, str(root / "sentinel_core.dll"), str(installed.details["sha256"]), "verified")
             detected = ", ".join('{value_0} (PID {value_1})'.format(value_0=f"{item['name']}", value_1=f"{item['pid']}") for item in processes)
             error = RuntimeError('Close DOOM Eternal before repairing its connection files. Detected: {value_0}'.format(value_0=f'{detected}'))
@@ -497,7 +487,7 @@ def _publish_core_pair(contents, manifest, root, state_dir, journal, owned_parti
 def _install_core_pair(root, state_dir, consent, local_artifact, force_repair, journal=None):
     """Install a verified local Core distribution without replacing foreign providers."""
     from ..contracts.core_distribution import verify_runtime
-    installed = probe_meathook(root)
+    installed = probe_core(root)
     if local_artifact is None:
         return _core_without_artifact(installed, root)
     manifest = local_artifact / "distribution.json" if local_artifact.is_dir() else local_artifact
@@ -750,10 +740,6 @@ class DependencyManager:
 
     is_contained_within = is_contained
     is_contained_in = is_contained
-
-    @classmethod
-    def contains_path(cls, root: Path | str, candidate: Path | str) -> bool:
-        return cls.is_contained(candidate, root)
 
     def _receipt_mismatch(self, receipt, spec, destination):
         if receipt.name != spec.name:
@@ -1906,7 +1892,6 @@ def stage_windows_injector_toolchain(
     dependency: InstalledDependency,
     game_root: Path,
     *,
-    state_dir: Path | None = None,
     journal=None,
 ) -> Path:
     """Safely install and verify the complete Windows EternalModInjector toolchain into game root."""
@@ -2008,78 +1993,6 @@ def _recover_sandbox_file(original, hold, tx_file, event_sink):
             )
 
 
-def _restore_sandbox_file(hold, original, tx_file, original_sha, original_size, event_sink):
-    if hold.is_file():
-        publish_file(hold, original, operation="sandbox_restore")
-        restored_size = original.stat().st_size
-        restored_sha = hashlib.sha256(original.read_bytes()).hexdigest()
-
-        if tx_file and tx_file.is_file():
-            tx_file.unlink(missing_ok=True)
-
-        if restored_sha != original_sha or restored_size != original_size:
-            raise RuntimeError(
-                'Sandbox restoration integrity check failed! Expected SHA-256 {value_0} ({value_1} bytes), but restored file has {value_2} ({value_3} bytes).'.format(value_0=f'{original_sha}', value_1=f'{original_size}', value_2=f'{restored_sha}', value_3=f'{restored_size}')
-            )
-
-        if event_sink is not None:
-            event_sink(
-                'injector_sandbox_guard', state='restored', verified=True, sha256=restored_sha, size=restored_size,
-            )
-
-
-@contextmanager
-def hold_sandbox(
-    game_root: Path,
-    *,
-    state_dir: Path | None = None,
-    event_sink: Callable[..., None] | None = None,
-) -> Iterator[None]:
-    """Transient compatibility guard around upstream EternalModInjector execution.
-
-    Temporarily moves doomSandBox/DOOMSandBox64vk.exe out of the injector's view
-    to prevent injector crashes caused by updated sandbox hashes, while guaranteeing
-    the normal DOOMEternalx64vk.exe executable remains completely validated and
-    the sandbox executable is restored byte-for-byte in all exit scenarios.
-    """
-    sandbox_dir = game_root / SANDBOX_DIR_NAME
-    original = sandbox_dir / SANDBOX_EXE_NAME
-    hold = sandbox_dir / (SANDBOX_EXE_NAME + SANDBOX_HOLD_SUFFIX)
-    tx_file = (state_dir / SANDBOX_TRANSACTION_FILE) if state_dir is not None else None
-
-    _recover_sandbox_file(original, hold, tx_file, event_sink)
-
-    if original.exists() and hold.exists():
-        raise RuntimeError(
-            "Ambiguous sandbox state: both '{value_0}' and hold file '{value_1}' exist. Manual intervention is required to avoid data loss. Neither file was modified.".format(value_0=f'{original}', value_1=f'{hold}')
-        )
-
-    # upstream skips sandbox patching when the executable is absent
-    if not original.is_file():
-        yield
-        return
-
-    original_size = original.stat().st_size
-    original_sha = hashlib.sha256(original.read_bytes()).hexdigest()
-
-    if tx_file is not None:
-        tx_file.parent.mkdir(parents=True, exist_ok=True)
-        tx_data = {
-            'original': str(original), 'hold': str(hold), 'sha256': original_sha, 'size': original_size,
-            'timestamp': datetime.now().isoformat(),
-        }
-        tx_file.write_text(json.dumps(tx_data, indent=2) + "\n", encoding="utf-8")
-
-    publish_file(original, hold, operation="sandbox_hold")
-    if event_sink is not None:
-        event_sink('injector_sandbox_guard', state='held', sha256=original_sha, size=original_size)
-
-    try:
-        yield
-    finally:
-        _restore_sandbox_file(hold, original, tx_file, original_sha, original_size, event_sink)
-
-
 def recover_stale_sandbox_hold(
     game_root: Path,
     *,
@@ -2110,7 +2023,7 @@ def finalize_mod_installation(game_root, staged, result, *, event_sink=None, jou
         details={**result.details, "campaign_resources": resources})
 
 
-def verify_mod_installation(game_root, staged, result, *, platform_name, event_sink=None):
+def verify_mod_installation(game_root, staged, result, *, event_sink=None):
     try:
         from .campaign_resources import installed_resource_fingerprints
         from .native_enemy_resources import verify_native_resource_banks

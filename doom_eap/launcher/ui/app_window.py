@@ -36,7 +36,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGraphicsOpacityEffect,
-    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
@@ -765,9 +764,6 @@ class LauncherUI(QMainWindow):
         self.session_setup.setVisible(bool(detail))
 
 
-    def _set_home_secondary_actions(self, resumable: bool) -> None:
-        self.join_another_button.setVisible(resumable)
-
     def _set_connection_controls(self, editable: bool) -> None:
         for field in (self.game_root, self.saves_root, self.server, self.slot, self.password, self.join_button):
             field.setEnabled(editable)
@@ -910,13 +906,6 @@ class LauncherUI(QMainWindow):
             self.help_view.doctor_room_evidence.setText(player_text('launcher.ui', 'close_game_retry'))
             self._append_log('Room package uninstall failed.')
 
-
-    def _path_row(self, layout: QGridLayout, row: int, label: str, field: QLineEdit, callback) -> None:
-        layout.addWidget(self._label(label, "eyebrow"), row, 0)
-        layout.addWidget(field, row, 1)
-        browse = QPushButton(player_text("launcher.ui", "browse"))
-        browse.clicked.connect(callback)
-        layout.addWidget(browse, row, 2)
 
     def _browse_game(self) -> None:
         value = QFileDialog.getExistingDirectory(self, player_text("launcher.ui", "select_doom_eternal_folder"))
@@ -1120,9 +1109,6 @@ class LauncherUI(QMainWindow):
             dialog.save_draft()
         except (OSError, ValueError) as error:
             self._append_log('Report draft: {value_0}'.format(value_0=f'{error}'))
-
-    def _report_problem(self) -> None:
-        self.controller.request_problem_report(logs=self.help_view.log.toPlainText().splitlines())
 
     def _save_support_bundle(self) -> None:
         self.controller.request_support_bundle(
@@ -1347,7 +1333,7 @@ class LauncherUI(QMainWindow):
         'item_history_status': '_on_item_history_status', 'inventory_resync': '_on_inventory_resync',
         'ammo_refill': '_on_ammo_refill', 'ammo_refill_keybind_status': '_on_ammo_refill_keybind_status',
         'uninstall_queued': '_on_uninstall_queued', 'uninstall_started': '_on_uninstall_started',
-        'uninstall_progress': '_on_uninstall_progress',
+        'uninstall_progress': '_on_uninstall_started',
         'injector_post_run_confirmation': '_on_injector_post_run_confirmation',
         'uninstall_complete': '_on_uninstall_complete', 'uninstall_attention': '_on_uninstall_attention',
         'uninstall_failed': '_on_uninstall_attention', 'connected': '_on_connected',
@@ -2009,14 +1995,6 @@ class LauncherUI(QMainWindow):
         return
 
     def _on_uninstall_started(self, event):
-        self.help_view.uninstall_button.setEnabled(False)
-        self.help_view.doctor_room_status.setText(player_text("launcher.ui", "removing_room_mod"))
-        self.help_view.doctor_room_evidence.setText(
-            player_text("launcher.ui", "removing_this_room_s_mod_keep_the_launcher_open")
-        )
-        return
-
-    def _on_uninstall_progress(self, event):
         self.help_view.uninstall_button.setEnabled(False)
         self.help_view.doctor_room_status.setText(player_text("launcher.ui", "removing_room_mod"))
         self.help_view.doctor_room_evidence.setText(

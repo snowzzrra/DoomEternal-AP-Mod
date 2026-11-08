@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from doom_eap.launcher.launcher_injector import GameLinkResult, probe_meathook
+from doom_eap.launcher.launcher_injector import GameLinkResult, probe_core
 from doom_eap.launcher.launcher_platform import validate_game_root
 
 
@@ -54,7 +54,7 @@ def _repair_game_link(config, workflow, emit, action_key):
     result = install_game_link(config, workflow, emit, force_repair=action_key == "repair_game_link")
     game_root = config.get("game_root") or config.get("doom_base_dir")
     root = validate_game_root(Path(str(game_root))) if game_root else None
-    post_probe = probe_meathook(root)
+    post_probe = probe_core(root)
     if not post_probe.ok:
         emit(
             "repair_failed",
@@ -75,7 +75,7 @@ def _repair_game_link(config, workflow, emit, action_key):
 
 def apply_repair(action_key: str, *, doctor, config, workflow, emit, start_room_setup) -> str:
     """Apply selected Doctor action. Room changes require connected-room setup."""
-    actions = {action.key: action for action in doctor.repair_preview()}
+    actions = {action.key: action for action in doctor.repair_actions()}
     action = actions.get(action_key)
     if action is None:
         raise ValueError('This repair is unavailable. Run Check Setup again.')

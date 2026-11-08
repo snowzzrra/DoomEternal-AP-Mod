@@ -525,20 +525,6 @@ def _windows_crash_evidence() -> dict[str, object]:
     return sanitize_support_value(result)
 
 
-def _most_recent_log(candidates: Sequence[Path]) -> Path | None:
-    useful = []
-    for index in range(0, len(candidates), 2):
-        current = candidates[index]
-        previous = candidates[index + 1] if index + 1 < len(candidates) else None
-        current_stat = _nonempty_log_stat(current)
-        previous_stat = _nonempty_log_stat(previous) if previous is not None else None
-        if current_stat is not None and (previous_stat is None or current_stat.st_mtime_ns >= previous_stat.st_mtime_ns):
-            useful.append((current_stat.st_mtime_ns, 1, current))
-        elif previous_stat is not None:
-            useful.append((previous_stat.st_mtime_ns, 0, previous))
-    return sorted(useful, reverse=True)[0][2] if useful else None
-
-
 def _nonempty_log_stat(path):
     try:
         info = path.stat()

@@ -1102,7 +1102,7 @@ class SteamLaunchOptionsManager:
             raw = next(value for value in match.groups() if value is not None)
             values = [value for value in raw.split(";") if value]
             current = f"{current[: match.start()]} {current[match.end() :]}".strip()
-        filtered = [value for value in values if value.split("=", 1)[0].casefold() != "xinput1_3"]
+        filtered = [value for value in values if value.split("=", 1)[0].casefold() not in {"xinput1_3", REQUIRED_DLL_OVERRIDE.split("=", 1)[0].casefold()}]
         filtered.append(REQUIRED_DLL_OVERRIDE)
         override = 'WINEDLLOVERRIDES="{value_0}"'.format(value_0=f"{';'.join(filtered)}")
         return f"{override} {current}".strip()
@@ -1126,19 +1126,15 @@ class SteamLaunchOptionsManager:
 
     @classmethod
     def _bridge_option_matches(cls, existing_overrides, override_tokens, delay_tokens, script_tokens, delay, script, tokens, current):
-        required_present = any(
-            value.split("=", 1)[0].casefold() == "xinput1_3"
-            and value.split("=", 1)[1].casefold() == "n,b"
-            for value in existing_overrides
-            if "=" in value
-        )
+        core_overrides = [value.casefold() for value in existing_overrides
+                          if value.split("=", 1)[0].casefold() in {"xinput1_3", REQUIRED_DLL_OVERRIDE.split("=", 1)[0].casefold()}]
         if (
             len(override_tokens) == 1
             and len(delay_tokens) == 1
             and delay_tokens[0] == f"AP_CLIENT_DELAY={delay}"
             and script_tokens == [script]
             and tokens.index(script) < tokens.index("%command%")
-            and required_present
+            and core_overrides == [REQUIRED_DLL_OVERRIDE.casefold()]
         ):
             return True
         return False
@@ -1158,7 +1154,7 @@ class SteamLaunchOptionsManager:
         filtered_overrides = [
             value
             for value in existing_overrides
-            if value.split("=", 1)[0].casefold() != "xinput1_3"
+            if value.split("=", 1)[0].casefold() not in {"xinput1_3", REQUIRED_DLL_OVERRIDE.split("=", 1)[0].casefold()}
         ]
         filtered_overrides.append(REQUIRED_DLL_OVERRIDE)
         remaining = cls._bridge_remaining_tokens(tokens)

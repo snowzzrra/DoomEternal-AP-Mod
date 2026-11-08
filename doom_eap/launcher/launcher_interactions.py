@@ -63,9 +63,7 @@ class LauncherInteractions:
                 pending.event.set()
 
     def consent(self, spec, job=None):
-        if spec.name == "Meathook":
-            purpose, source = player_text('launcher.interactions', 'game_link_runtime_library'), player_text('launcher.interactions', 'github_brongo')
-        elif spec.name == "EternalModInjector":
+        if spec.name == "EternalModInjector":
             purpose, source = player_text('launcher.interactions', 'windows_mod_installation_tools'), player_text('launcher.interactions', 'gamebanana_doom_2016_modding_community')
         else:
             purpose, source = player_text('launcher.interactions', 'mod_installation_tool'), "GitHub"

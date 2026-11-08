@@ -330,8 +330,7 @@ class SeedManifest:
     static_precompile: bool = False
 
     @classmethod
-    def _create_resolved(cls, *, seed_name, team, slot, options, active_location_ids, placements, static_content_digest):
-        resolved = admit_slot_data(options)
+    def _create_resolved(cls, *, resolved, seed_name, team, slot, options, active_location_ids, placements, static_content_digest):
         records = _room_placements(options, placements, tuple(sorted(set(active_location_ids))), slot)
         if static_content_digest and not re.fullmatch(r"[0-9a-f]{64}", static_content_digest):
             raise ValueError('static_content_digest must be an empty string or SHA-256')
@@ -353,12 +352,12 @@ class SeedManifest:
         return cls(**{**payload, "placements": records}, manifest_hash=hashlib.sha256(_canonical(payload)).hexdigest())
 
     @classmethod
-    def _from_resolved_room(cls, snapshot, known_location_ids, static_content_digest):
+    def _from_resolved_room(cls, snapshot, known_location_ids, static_content_digest, resolved):
         unknown = set(snapshot.active_location_ids) - known_location_ids - _resolved_kill_ids(snapshot.slot_data)
         if unknown:
             raise SlotAdmissionError("slot_reference", 'Room contains unknown location IDs: {value_0}'.format(value_0=f'{sorted(unknown)}'))
-        return cls.create(
-            seed_name=snapshot.seed_name, team=snapshot.team, slot=snapshot.slot, options=snapshot.slot_data,
+        return cls._create_resolved(
+            resolved=resolved, seed_name=snapshot.seed_name, team=snapshot.team, slot=snapshot.slot, options=snapshot.slot_data,
             active_location_ids=list(snapshot.active_location_ids), placements=snapshot.placements,
             static_content_digest=static_content_digest,
         )
@@ -402,7 +401,7 @@ class SeedManifest:
     ) -> SeedManifest:
         if not static_precompile:
             return cls._create_resolved(
-                seed_name=seed_name, team=team, slot=slot, options=options,
+                resolved=admit_slot_data(options), seed_name=seed_name, team=team, slot=slot, options=options,
                 active_location_ids=active_location_ids, placements=placements,
                 static_content_digest=static_content_digest,
             )
@@ -485,8 +484,8 @@ class SeedManifest:
         *,
         static_content_digest: str = "",
     ) -> SeedManifest:
-        _normalize_slot_data(snapshot.slot_data)
-        return cls._from_resolved_room(snapshot, known_location_ids, static_content_digest)
+        resolved = admit_slot_data(snapshot.slot_data)
+        return cls._from_resolved_room(snapshot, known_location_ids, static_content_digest, resolved)
 
 
 class RoomCompiler:
@@ -635,7 +634,7 @@ class RoomCompiler:
                 "closure_sha256": compiler_identity["fingerprint"],
                 "launcher_core": _file_sha(ROOT / "doom_eap" / "launcher" / "launcher_core.py"),
                 "devinv_builder": _file_sha(ROOT / "tools" / "decls" / "devinv_builder.py"),
-                "tag_prerequisites": _file_sha(ROOT / "doom_eap" / "contracts" / "tag_prerequisites.py"),
+                "tag_prerequisites": _file_sha(ROOT / "doom_eap" / "contracts" / "inventory_domain.py"),
                 "runtime_context": _file_sha(ROOT / "doom_eap" / "contracts" / "runtime_context.py"),
                 "lifecycle": _file_sha(ROOT / "doom_eap" / "runtime" / "lifecycle.py"),
                 "mission_complete_map_patcher": _file_sha(ROOT / "tools" / "maps" / "mission_complete_map_patcher.py"),
@@ -652,19 +651,6 @@ class RoomCompiler:
             },
             "content_catalog_data": catalog_hashes,
         }
-
-    @classmethod
-    def compute_static_content_digest(
-        cls,
-        base_resource: Path,
-        payload_resource: Path,
-        payload_manifest: object,
-    ) -> str:
-        from tools.release.room_payloads import canonical_json
-        material = cls.compute_static_content_material(
-            base_resource, payload_resource, payload_manifest
-        )
-        return hashlib.sha256(canonical_json(material)).hexdigest()
 
     @staticmethod
     def _cached_manifest_matches(manifest_doc, receipt_doc, manifest):
@@ -1575,10 +1561,10 @@ class ModCompiler:
                 "assets": assets.get("assets", []),
                 "default_visual_asset": assets.get("default_visual_asset"),
             }
-        from doom_eap.content.arena_checks import load_arena_checks
+        from doom_eap.content.arena_checks import map_arena_config
 
-        entry = load_arena_checks(self.root).get(map_key, {})
-        config["arena_checks"] = [arena for arena in entry.get("arenas", [])
+        map_arena_config(config, package / "descriptor.json", root=self.root)
+        config["arena_checks"] = [arena for arena in config["arena_checks"]
                                   if arena["location_id"] in manifest.active_location_ids]
         return project_map_config(config, manifest.options)
 
@@ -1643,11 +1629,13 @@ class LaunchWorkflow:
         snapshot: RoomSnapshot,
         *,
         static_content_digest: str = "",
+        resolved=None,
     ) -> SeedManifest:
-        return SeedManifest.from_room(
+        resolved = admit_slot_data(snapshot.slot_data) if resolved is None else resolved
+        return SeedManifest._from_resolved_room(
             snapshot,
             self.compiler.known_location_ids(),
-            static_content_digest=static_content_digest,
+            static_content_digest, resolved,
         )
 
     @staticmethod

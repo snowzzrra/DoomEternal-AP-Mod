@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from doom_eap.launcher.launcher_support import sanitize_support_value
+from ..launcher_reporting import github_issue_url, report_text
+
 import os
 import subprocess
 import webbrowser
@@ -24,7 +27,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from ..presenters.report_presenter import ReportPresenter
 from .doom_style import DoomButton as QPushButton
 from .strings import record_failure
 from .strings import text as player_text
@@ -123,3 +125,14 @@ class ReportDialog(QDialog):
 
     def save_draft(self):
         self.controller.save_problem_report(self.document())
+
+
+class ReportPresenter:
+    def __init__(self, event):
+        self.payload = sanitize_support_value(dict(event["payload"]))
+
+    def document(self, title, description):
+        return sanitize_support_value({**self.payload, "title": title[:120], "description": description[:8000]})
+
+    issue = staticmethod(github_issue_url)
+    copy = staticmethod(report_text)

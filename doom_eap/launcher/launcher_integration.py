@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import threading
 import time
 import zipfile
@@ -26,9 +27,9 @@ from doom_eap.launcher.launcher_injector import (
     GameLinkResult,
     finalize_mod_installation,
     idfile_decompressor_spec,
-    install_meathook,
+    install_core,
     installation_write,
-    probe_meathook,
+    probe_core,
     probe_runtime_prerequisites,
     stage_room_mod,
     verify_linux_mod_installation,
@@ -68,35 +69,6 @@ class ModBuildingToolError(RuntimeError):
     code = "mod_building_tool_unavailable"
     failure_domain = "room_package"
 
-ROOM_PACKAGE_FAILURE_TITLE = player_text('launcher.ui', 'room_mod_could_not_be_built')
-ROOM_PACKAGE_FAILURE_MESSAGE = (
-    player_text('launcher.ui', 'rebuild_room_help')
-)
-ROOM_PACKAGE_FAILURE_ACTION = 'REBUILD ROOM PACKAGE'
-APPLICATION_PACKAGE_FAILURE_TITLE = 'LAUNCHER FILES MISSING OR DAMAGED'
-APPLICATION_PACKAGE_FAILURE_MESSAGE = (
-    'Extract the complete DoomEAP download into a new folder and run it again.'
-)
-APPLICATION_PACKAGE_FAILURE_ACTION = 'EXTRACT THE COMPLETE DOWNLOAD'
-MOD_BUILDING_TOOL_UNAVAILABLE_MESSAGE = (
-    'A required mod-building tool could not be prepared. Check your connection and try rebuilding the Room Package.'
-)
-GAME_SETUP_FAILURE_TITLE = player_text('launcher.ui', 'game_setup_needs_attention')
-GAME_SETUP_FAILURE_MESSAGE = (
-    'Open Help and select Fix Setup. If it fails again, select Help -> SAVE SUPPORT REPORT.'
-)
-GAME_SETUP_FAILURE_ACTION = player_text('common', 'repair_game_connection')
-INSTALLED_PACKAGE_FAILURE_TITLE = player_text('launcher.ui', 'room_mod_update_required')
-INSTALLED_PACKAGE_FAILURE_MESSAGE = (
-    'Select UPDATE ROOM PACKAGE before playing.'
-)
-INSTALLED_PACKAGE_FAILURE_ACTION = 'UPDATE ROOM PACKAGE'
-ROOM_PACKAGE_INCOMPATIBLE_TITLE = player_text('launcher.ui', 'room_mod_needs_rebuilding')
-ROOM_PACKAGE_INCOMPATIBLE_MESSAGE = (
-    'This room is incompatible with this launcher. Select Help -> SAVE SUPPORT REPORT and ask the host which DoomEAP version to use.'
-)
-ROOM_PACKAGE_INCOMPATIBLE_ACTION = 'REBUILD ROOM PACKAGE'
-
 UNINSTALL_OWNED_STATES = frozenset({
     "uninstall_in_progress",
     "uninstall_attention",
@@ -125,7 +97,7 @@ def classify_setup_failure(error: BaseException, *, phase: str = "") -> str:
     return "game_setup"
 
 
-def _campaign_failure_message(error, raw_message):
+def _campaign_failure_message(error):
     if getattr(error, "code", None) == "save_interrupted":
         return player_text('launcher.save', 'interrupted')
     processes = getattr(error, "processes", None)
@@ -133,7 +105,10 @@ def _campaign_failure_message(error, raw_message):
     if processes:
         return player_text('launcher.ui', 'inspect_backups_help')
     elif channel_failure:
-        return ('The game connection helper stopped. Check that the selected Proton version matches DOOM Eternal in Steam, then select Help -> SAVE SUPPORT REPORT before trying again. Save changes are blocked until the game connection can be confirmed.')
+        guidance = ("Check that the selected Proton version matches DOOM Eternal in Steam. "
+                    if sys.platform != 'win32' else '')
+        return ('The game connection helper stopped. ' + guidance
+                + 'Select Help -> SAVE SUPPORT REPORT before trying again. Save changes are blocked until the game connection can be confirmed.')
     elif processes is not None:
         return 'Open AP SAVE to inspect backups, then select Help -> SAVE SUPPORT REPORT before trying again.'
     else:
@@ -168,7 +143,7 @@ def _failure_player_fields(failure_domain, code, tool_unavailable, raw_message, 
     elif failure_domain == "campaign_session":
         recovery_action = "inspect_campaign"
         user_title = player_text('launcher.ui', 'save_setup_failed')
-        user_message = _campaign_failure_message(error, raw_message)
+        user_message = _campaign_failure_message(error)
         user_action = player_text('launcher.ui', 'ap_save_bbd136')
     else:
         recovery_action = "repair_game_integration"
@@ -388,12 +363,12 @@ class IntegratedLaunchWorkflow:
         )
 
     def _manifest_for(self, snapshot: RoomSnapshot) -> SeedManifest:
-        admit_slot_data(snapshot.slot_data)
+        resolved = admit_slot_data(snapshot.slot_data)
         try:
             room_compiler = self._room_compiler()
             return self.base_workflow.manifest_for(
                 snapshot,
-                static_content_digest=room_compiler.static_content_digest,
+                static_content_digest=room_compiler.static_content_digest, resolved=resolved,
             )
         except (OSError, ValueError) as error:
             raise LauncherPackageError(str(error)) from error
@@ -689,9 +664,6 @@ class IntegratedLaunchWorkflow:
         return (bool(receipt.get("injector_version")) and receipt.get("injector_exit_code") == 0
                 and isinstance(command, list | tuple) and bool(command))
 
-    def mark_windows_installation(self, succeeded: bool) -> None:
-        return
-
     def _prepare_adapter(
         self,
         config: dict[str, object],
@@ -819,10 +791,8 @@ class IntegratedLaunchWorkflow:
         if journal is not None:
             journal.document["evidence"]["selected_core_runtime_manifest"] = str(selected)
             journal.save()
-        dep_manager = DependencyManager(self.state_dir / "dependencies")
-        result = install_meathook(
+        result = install_core(
             game_root,
-            dep_manager,
             state_dir=self.state_dir,
             consent=self.consent,
             local_artifact=selected,
@@ -831,7 +801,7 @@ class IntegratedLaunchWorkflow:
         )
         if result.state in {"installed", "repaired"}:
             self.session_owner.retire()
-            post_probe = probe_meathook(game_root)
+            post_probe = probe_core(game_root)
             if not post_probe.ok:
                 return GameLinkResult(
                     state="failed",
@@ -1168,7 +1138,7 @@ class IntegratedLaunchWorkflow:
         staged = plan.game_root / "Mods" / plan.generated.name
         self._verify_room_package(staged, plan.identity)
         result = verify_mod_installation(plan.game_root, staged, outcome.adapter,
-                                         platform_name=self.platform_name, event_sink=self._emit)
+                                         event_sink=self._emit)
         return InstallationOutcome(result, outcome.steam_option, outcome.steam_diff)
 
     def _installation_record(self, plan, manifest, journal, outcome):

@@ -135,7 +135,7 @@ def _self_test_controller_window(fake_app):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
 
-    from doom_eap.launcher.launcher_ui import LauncherUI
+    from doom_eap.launcher.ui.app_window import LauncherUI
     app = QApplication.instance()
     if app is None:
         app = QApplication(["launcher_selftest", "-platform", "offscreen"])
@@ -383,7 +383,7 @@ def _run_ui() -> int:
     from PySide6.QtWidgets import QApplication
 
     from doom_eap.launcher.launcher_controller import LauncherController
-    from doom_eap.launcher.launcher_ui import LauncherUI
+    from doom_eap.launcher.ui.app_window import LauncherUI
 
     if os.name == "nt":
         import ctypes

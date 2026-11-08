@@ -21,7 +21,7 @@ from pathlib import Path
 
 from doom_eap.content.options_foundation import load_options_schema, save_player_yaml
 from doom_eap.launcher.launcher_doctor import Diagnostic, DoctorReport, LauncherDoctor
-from doom_eap.launcher.launcher_injector import client_config_write, probe_meathook, probe_runtime_prerequisites
+from doom_eap.launcher.launcher_injector import client_config_write, probe_core, probe_runtime_prerequisites
 from doom_eap.launcher.launcher_platform import (
     ProcessInspectionError,
     SavedGamesSelection,
@@ -35,7 +35,6 @@ from doom_eap.launcher.launcher_platform import (
     migrate_legacy_launcher_data,
     publish_file,
     read_ap_hotkey_state,
-    read_handshake_probe,
     redact_secrets,
     select_saved_games_dir,
     validate_game_root,
@@ -249,7 +248,7 @@ class LauncherController:
         temporary.write_text(json.dumps(self.config, indent=2, sort_keys=True) + '\n', encoding='utf-8')
         publish_file(temporary, self.config_path, operation="launcher_config_publish")
 
-    def ensure_ammo_refill_keybind(self, *, force_check: bool = False) -> Path | None:
+    def ensure_ammo_refill_keybind(self) -> Path | None:
         """Write AP-owned Ammo Refill hotkey state and clean stale config binds."""
         base_dir = doom_base_dir_from_config(self.config)
         if base_dir is None:
@@ -622,7 +621,7 @@ class LauncherController:
 
         def operation(job):
             root = Path(str(game_root)).expanduser().resolve() if game_root else None
-            meathook = probe_meathook(root)
+            meathook = probe_core(root)
             try:
                 health = self.native_health()
                 state = str(health.get("state", "not_ready")) if isinstance(health, dict) else "not_ready"
@@ -742,9 +741,6 @@ class LauncherController:
             raise RuntimeError('delivery connection unavailable')
         supervisor.resolve_item(request)
 
-
-    def set_ammo_refill_keybind(self, keybind: str) -> None:
-        self.set_ap_keybinds(keybind, str(self.config.get("special_toggle_keybind", "F10")))
 
     def set_ap_keybinds(self, refill: str, special: str) -> None:
         refill, special = normalize_ammo_refill_keybind(refill), normalize_ammo_refill_keybind(special)
@@ -930,9 +926,6 @@ class LauncherController:
                 return False
             self.ensure_ammo_refill_config()
         return self.setup.start(force=force, generation=generation)
-
-    def retry_setup(self) -> bool:
-        return self._start_room_setup(force=True, generation=None)
 
     def prepare_setup(self, *, generation: int | None = None) -> bool:
         return self._start_room_setup(force=False, generation=generation)
@@ -1138,7 +1131,7 @@ class LauncherController:
             and payload.get("readiness") == "blocked"
         ):
             game_root = self.config.get("game_root") or self.config.get("doom_base_dir")
-            meathook = probe_meathook(Path(str(game_root)).expanduser().resolve() if game_root else None)
+            meathook = probe_core(Path(str(game_root)).expanduser().resolve() if game_root else None)
             payload = {**payload, "meathook_ok": meathook.ok, "meathook_status": meathook.status.value}
         return payload
 
@@ -1254,18 +1247,6 @@ class LauncherController:
             return "native_helper_access_denied", False
         return "native_helper_process_creation_failed", False
 
-    def _native_client_running(self) -> bool:
-        with self._lifecycle_lock:
-            if self._native_client_process is None:
-                return False
-            poll = self._native_client_process.poll()
-            if poll is not None:
-                exit_code = poll
-                self._native_client_process = None
-                self.emit("native_client_exited", returncode=exit_code)
-                return False
-            return True
-
     def _native_helper_path(self):
         client_exe = self.client_dir / "ap_client.exe"
         if not client_exe.is_file():
@@ -1375,7 +1356,7 @@ class LauncherController:
 
             self._native_helper_identity(client_exe)
 
-            meathook = probe_meathook(root)
+            meathook = probe_core(root)
             if not meathook.ok:
                 return False
 
@@ -1402,15 +1383,6 @@ class LauncherController:
         if stopped:
             self.emit("native_client_stopped")
         return stopped
-
-    def probe_handshake(self) -> dict[str, object]:
-        base = self.config.get("doom_base_dir")
-        if not base:
-            result = {"status": "unavailable", "reason": 'DOOM Eternal base directory is not configured'}
-        else:
-            result = read_handshake_probe(Path(str(base)).expanduser() / "ap_gameplay_save.state")
-        self.emit("handshake_probe", **result)
-        return dict(result)
 
     def read_native_health(self, *, force: bool = False) -> dict[str, object]:
         """Return normalized native AP health without emitting launcher activity."""
@@ -1572,7 +1544,7 @@ class LauncherController:
                     last_room_package_issue=issue, live_support=None if preview else self._live_support_diagnostics(),
                 )
                 if preview:
-                    payload = {"actions": tuple(asdict(action) for action in doctor.repair_preview())}
+                    payload = {"actions": tuple(asdict(action) for action in doctor.repair_actions())}
                 else:
                     payload = {"report": doctor.run().document()}
                 self._setup_event("repair_preview_result" if preview else "doctor_report", job.event(payload))
@@ -1722,6 +1694,7 @@ class LauncherController:
         return self.request_problem_report(logs=logs)
 
     def request_report_submission(self, payload: dict) -> bool:
+        # envio HTTP ainda sem ligação à interface; será adaptado para criar issues no GitHub
         endpoint = submission_endpoint(self.client_dir)
         if endpoint is None:
             raise RuntimeError('Sending reports is unavailable. Open Report a Problem in Help to save a copy.')

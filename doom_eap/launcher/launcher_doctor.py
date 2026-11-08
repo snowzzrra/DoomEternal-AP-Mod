@@ -20,7 +20,7 @@ from doom_eap.launcher.launcher_injector import (
     PrerequisiteStatus,
     idfile_decompressor_spec,
     installation_error_details,
-    probe_meathook,
+    probe_core,
     verify_linux_mod_installation,
 )
 from doom_eap.launcher.launcher_platform import (
@@ -1101,7 +1101,7 @@ class LauncherDoctor:
             try:
                 root = Path(str(game_root))
                 root = validate_game_root(root.parent if root.name.lower() == "base" else root)
-                meathook_probe = probe_meathook(root)
+                meathook_probe = probe_core(root)
                 if meathook_probe.status == PrerequisiteStatus.MISSING:
                     actions.append(RepairAction(
                         'install_game_link', 'Set up game connection',
@@ -1288,9 +1288,6 @@ class LauncherDoctor:
             return tuple(actions)
 
         return self._receipt_repairs(game_root, state_dir, actions, issue)
-
-    def repair_preview(self) -> tuple[RepairAction, ...]:
-        return self.repair_actions()
 
     def archive_stale_install_record(self) -> Path:
         """Move only launcher state receipt into rollback storage."""
@@ -1557,7 +1554,7 @@ class LauncherDoctor:
         platform_name = 'windows' if os.name == "nt" else 'linux'
         checks.append(Diagnostic("platform", "ok", platform_name))
         root = self._game_diagnostic(checks)
-        meathook_probe = probe_meathook(root)
+        meathook_probe = probe_core(root)
         checks.append(Diagnostic(
             'meathook', meathook_probe.status.value, meathook_probe.message, meathook_probe.details,
         ))
