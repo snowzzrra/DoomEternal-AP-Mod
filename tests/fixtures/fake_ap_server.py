@@ -31,6 +31,8 @@ class Server:
         self.socket = None
         self.pending = []
         self.ammo_fault = ""
+        self.messages = []
+        self.checked = set()
 
     async def connect(self, socket):
         self.socket = socket
@@ -41,6 +43,10 @@ class Server:
 
     async def receive(self, packet, socket):
         print("AP_RECEIVE " + json.dumps(packet), flush=True)
+        self.messages.append(packet)
+        if packet["cmd"] in ("LocationChecks", "Sync"):
+            self.checked.update(packet.get("locations", []))
+            await socket.send(json.dumps([{"cmd": "RoomUpdate", "checked_locations": sorted(self.checked)}]))
         if packet["cmd"] == "Set":
             reply = self.debit(packet)
             if reply is None:
@@ -82,6 +88,13 @@ class Server:
             os.fsync(stream.fileno())
 
     async def control(self, request):
+        if request["action"] == "snapshot":
+            signal("snapshot", messages=self.messages, checked=sorted(self.checked), values=self.values)
+            return
+        if request["action"] == "checked":
+            self.checked = set(request["locations"])
+            signal("checked")
+            return
         if request["action"] == "store":
             self.values.update(request["values"])
             self.save()

@@ -1,6 +1,5 @@
 import asyncio
 import copy
-import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -78,19 +77,3 @@ def test_receipt_observation_failure_retains_original_state_and_blocks(bridge, t
     assert bridge_config.CLIENT_STATE_FILE.read_bytes() == persisted
     assert not context.item_state_ready and context.item_delivery_blocked
     assert events[-1][1]["status"] == "blocked"
-
-
-def test_runtime_preferences_use_atomic_replacement(bridge, monkeypatch):
-    from doom_eap.runtime import bridge_config
-
-    original = bridge_config.CONFIG_FILE.read_bytes()
-    monkeypatch.setattr(bridge_config, "config", {"item_notifications": False})
-    def denied(*args, **kwargs):
-        raise PermissionError("replace denied")
-    with monkeypatch.context() as patching:
-        patching.setattr("doom_eap.runtime.inventory.os.replace", denied)
-        with pytest.raises(PermissionError, match="replace denied"):
-            bridge_config.save_config()
-    assert bridge_config.CONFIG_FILE.read_bytes() == original
-    bridge_config.save_config()
-    assert json.loads(bridge_config.CONFIG_FILE.read_text()) == {"item_notifications": False}

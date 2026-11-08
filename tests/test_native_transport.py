@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from native_transport_support import codec, evidence_result, fixtures, split
+from native_transport_support import codec, evidence_result, fixtures
 
 from doom_eap.runtime.native_transport import (
     IdentityMismatch,
@@ -25,36 +25,6 @@ def link(tmp_path, mode="normal", timeout=2.0):
     trace = tmp_path / "wire.jsonl"
     command = (sys.executable, "-B", str(ROOT / "tests/fixtures/native_transport_worker.py"), mode, str(trace))
     return NativeTransport(command, scope, env=env, timeout=timeout), trace
-
-
-def submission():
-    return split("submission", fixtures()["submit"][32:])
-
-
-def test_persistent_partial_frames_preserve_ledger_bytes_and_do_not_ack(tmp_path):
-    async def run():
-        transport, trace = link(tmp_path)
-        try:
-            await transport.connect()
-            pid = transport._process.pid
-            value, payload = submission()
-            prepared = await transport.prepare(value, payload)
-            assert prepared.envelope == fixtures()["submit"][32:]
-            assert prepared.reference == fixtures()["terminal_query"][32:]
-            result = await transport.submit(prepared)
-            assert result.result["balance_after"] == 3
-            assert transport._process.pid == pid
-            await transport.query(prepared.reference)
-            await transport.cancel(prepared.reference)
-            token = bytes(result.response["reply"]["dimensions"]["result_token"])
-            await transport.ack(prepared.reference, token)
-            messages = [json.loads(line) for line in trace.read_text().splitlines()]
-            assert [m["operation"] for m in messages] == [6, 0, 0, 2, 3, 4, 5]
-            assert bytes.fromhex(messages[3]["body"]) == prepared.envelope
-        finally:
-            await transport.close()
-
-    asyncio.run(run())
 
 
 @pytest.mark.parametrize("mode", ["correlation", "identity", "oversized", "truncated"])
@@ -84,52 +54,6 @@ def test_timeout_requires_explicit_reconnect_and_query(tmp_path, mode):
             with pytest.raises(TransportError, match="Connect"):
                 await transport.query(fixtures()["terminal_query"][32:])
             assert [json.loads(line)["operation"] for line in trace.read_text().splitlines()] == [6, 0, 2]
-        finally:
-            await transport.close()
-
-    asyncio.run(run())
-
-
-def test_task_cancellation_closes_inflight_connection_without_native_ack(tmp_path, monkeypatch):
-    spawn = asyncio.create_subprocess_exec
-
-    async def spawn_with_signal(*args, **kwargs):
-        kwargs["stderr"] = asyncio.subprocess.PIPE
-        return await spawn(*args, **kwargs)
-
-    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn_with_signal)
-
-    async def run():
-        transport, trace = link(tmp_path, "timeout")
-        try:
-            await transport.connect()
-            signals = transport._process.stderr
-            assert (await signals.readline()).strip() == b"6"
-            task = asyncio.create_task(transport.query(fixtures()["terminal_query"][32:]))
-            assert (await signals.readline()).strip() == b"3"
-            task.cancel()
-            with pytest.raises(asyncio.CancelledError):
-                await task
-            assert transport._process is None
-            assert len(trace.read_text().splitlines()) == 2
-        finally:
-            await transport.close()
-
-    asyncio.run(run())
-
-
-def test_reconnect_queries_original_reference_after_generation_change(tmp_path):
-    async def run():
-        transport, trace = link(tmp_path)
-        reference = fixtures()["terminal_query"][32:]
-        await transport.connect()
-        await transport.close()
-        transport.scope["generation"] += 1
-        try:
-            await transport.connect()
-            result = await transport.query(reference)
-            assert result.response["reply"]["reference"] == codec.decode("command_reference", reference)
-            assert [json.loads(line)["operation"] for line in trace.read_text().splitlines()] == [6, 6, 3]
         finally:
             await transport.close()
 

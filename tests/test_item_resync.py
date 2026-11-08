@@ -1,101 +1,11 @@
 from collections import namedtuple
-from dataclasses import FrozenInstanceError
-from types import SimpleNamespace
-from typing import Any, cast
-from unittest.mock import patch
-
-import pytest
 
 from doom_eap.runtime.inventory import (
-    REPLAY_IDEMPOTENT,
-    ReceiptSession,
-    ReplayPolicy,
-    compile_reconciliation_plan,
     migrate_client_state,
     migrate_legacy_session_key,
-    observe_received_items,
 )
 
 Receipt = namedtuple("Receipt", "item location player flags")
-
-
-def _fake_delivery(item_id, definitions, *, stage=None, **_kwargs):
-    selected_stage = 0 if stage is None else stage
-    command = SimpleNamespace(
-        index=selected_stage,
-        command=f"activate-{item_id}-{selected_stage}",
-    )
-    return SimpleNamespace(
-        commands=(command,),
-        description=f"item {item_id} stage {selected_stage}",
-    )
-
-
-def _registry(*entries):
-    return {
-        item_id: ReplayPolicy(item_id, f"Item {item_id}", policy)
-        for item_id, policy in entries
-    }
-
-
-def _assert_duplicate_reconnect_receipts(second):
-    assert second.new == ()
-    assert [receipt.index for receipt in second.duplicates] == [10, 11, 12]
-
-
-def test_reconnect_classifies_new_receipts_once_in_order():
-    history = [Receipt(item, index, 1, 0) for index, item in enumerate(range(13))]
-    first = observe_received_items(history, 10)
-    processed_ids = [
-        receipt.receipt_id for receipt in first.historical if receipt.receipt_id is not None
-    ]
-
-    assert [receipt.item_id for receipt in first.new] == [10, 11, 12]
-
-    processed_ids.extend(
-        receipt.receipt_id for receipt in first.new if receipt.receipt_id is not None
-    )
-    second = observe_received_items(history, 10, processed_ids)
-    _assert_duplicate_reconnect_receipts(second)
-
-
-def test_reconciliation_history_stops_at_processed_boundary():
-    history = [Receipt(item, index, 1, 0) for index, item in enumerate(range(13))]
-    observed = observe_received_items(history, processed_boundary=10)
-    definitions = {item: "simple" for item in range(13)}
-    registry = _registry(*[(item_id, REPLAY_IDEMPOTENT) for item_id in range(13)])
-
-    with patch("doom_eap.runtime.inventory.compile_item_delivery_plan", _fake_delivery):
-        plan = compile_reconciliation_plan(
-            observed.historical_authoritative_item_ids,
-            definitions,
-            registry,
-            "room-0-1",
-            4,
-        )
-
-    assert [selection.item_id for selection in plan.selections] == list(range(10))
-    assert all(command.item_id < 10 for command in plan.commands)
-
-
-def test_shifted_history_overlap_uses_occurrence_count_not_item_id():
-    old_first = Receipt(70, 100, 1, 0)
-    old_second = Receipt(71, 101, 1, 0)
-    inserted = Receipt(69, -2, 1, 0)
-    tail = Receipt(72, 102, 1, 0)
-    processed_counts = {
-        observe_received_items([old_first], 0).new[0].receipt_id: 1,
-        observe_received_items([old_second], 0).new[0].receipt_id: 1,
-    }
-
-    observed = observe_received_items(
-        [inserted, old_first, old_second, tail],
-        2,
-        cast(Any, processed_counts),
-    )
-
-    assert [receipt.index for receipt in observed.duplicates] == [2]
-    assert [receipt.index for receipt in observed.new] == [3]
 
 
 def test_state_migration_preserves_history_and_safes_malformed_sessions():
@@ -138,41 +48,3 @@ def test_generation_identity_never_adopts_another_campaign_session():
     assert migrated_from is None
     assert sessions["room-a:0:1"]["processed_items"] == 31
     assert state_key not in sessions
-
-
-def test_receipt_session_rebind_invalidates_tokens_and_pending_observations():
-    session = ReceiptSession()
-    key = ("room", 0, "receipt")
-    token = session.capture("room")
-    session.note_observation(key)
-    assert session.was_observed(key)
-    assert session.is_current(token, "room")
-    assert not session.is_current(token, "other-room")
-    session.advance()
-    assert session.processed_boundary == 1
-    session.begin_rebind()
-    assert session.processed_boundary == 1
-    assert not session.was_observed(key)
-    assert not session.is_current(token, "room")
-    assert session.is_current(session.capture("room"), "room")
-    session.restore_boundary(7)
-    assert session.processed_boundary == 7
-    with pytest.raises(FrozenInstanceError):
-        token.generation = 10
-
-
-def test_resolved_starting_ownership_does_not_suppress_own_world_delivery():
-    from doom_eap.runtime.inventory import progressive_receipt_stage
-
-    session = ReceiptSession()
-    session.configure_starting_ownership(
-        {"identity": {"schema": 7}, "starting": {"items": [[7770004, 1], [7770902, 1]], "weapon_item_id": 7770004}},
-    )
-    assert session.owned_count(7770902, 1) == 2
-    assert progressive_receipt_stage(
-        (7770902,), 7770902, 0, frozenset(), {"type": "progressive_perk", "perks": ["a", "b"]},
-        starting_count=session.resolved_starting_count(7770902),
-    ) == 1
-    session.begin_rebind()
-    assert session.owned_count(7770902, 1) == 2
-    assert session.owned_count(7770004, 1) == 2

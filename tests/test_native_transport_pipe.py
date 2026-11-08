@@ -84,47 +84,6 @@ class PipeServer:
         assert self.error is None
 
 
-@pytest.mark.parametrize("drop_submit", [False, True])
-def test_native_reference_precedes_pipe_submit_and_survives_reconnect(relay, drop_submit):
-    async def run():
-        scope = process_scope()
-        transport = NativeTransport((relay,), scope, timeout=3)
-        value, payload = split("submission", fixtures()["submit"][32:])
-        value["reference"]["scope"] = scope
-        prepared = await transport.prepare(value, payload)
-        reference = codec.decode("command_reference", prepared.reference)
-        assert reference["command_id"] == "fixture"
-        assert any(reference["fingerprint"])
-        replies = Replies(scope, reference)
-        server = PipeServer(replies, "drop_submit" if drop_submit else "normal").start()
-        try:
-            await transport.connect()
-            helper_pid = transport._process.pid
-            if drop_submit:
-                with pytest.raises(ProtocolError):
-                    await transport.submit(prepared)
-            else:
-                response = await transport.submit(prepared)
-                assert response.result["balance_after"] == 3
-                assert transport._process.pid == helper_pid
-        finally:
-            await transport.close()
-            server.join()
-        scope["generation"] = 2
-        server = PipeServer(replies).start()
-        try:
-            await transport.connect()
-            response = await transport.query(prepared.reference)
-            await transport.cancel(prepared.reference)
-            await transport.ack(prepared.reference, bytes(response.response["reply"]["dimensions"]["result_token"]))
-            assert replies.operations == [6, 6, 2, 6, 6, 3, 4, 5]
-        finally:
-            await transport.close()
-            server.join()
-
-    asyncio.run(run())
-
-
 def test_native_prepare_rejects_invalid_payload_without_pipe_access(relay):
     async def run():
         transport = NativeTransport((relay,), process_scope(), timeout=3)

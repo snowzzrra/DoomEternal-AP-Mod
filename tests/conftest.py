@@ -1,20 +1,25 @@
 import importlib
 import json
 import os
-from functools import cache
+from functools import partial
 from pathlib import Path
-from zipfile import ZipFile
 
 import pytest
 
-from tests.room_fixture import resolved_room as resolved_room
-from tests.test_cross_repo_acceptance import ap_source as ap_source
-from tests.test_cross_repo_acceptance import compiler as compiler
-from tests.test_cross_repo_acceptance import generated as generated
-from tests.test_cross_repo_acceptance import scratch as scratch
+from tests.generation_support import ap_source as ap_source
+from tests.generation_support import compile_once
+from tests.generation_support import compiler as compiler
+from tests.generation_support import generated as generated
+from tests.generation_support import scratch as scratch
 
 # importing Archipelago clients otherwise checks, and may try to install, every world's requirements
 os.environ.setdefault("SKIP_REQUIREMENTS_UPDATE", "1")
+
+
+@pytest.fixture(scope="session")
+def compiled_room(request):
+    return partial(compile_once, request.getfixturevalue("compiler"), request.getfixturevalue("generated"),
+                   request.getfixturevalue("scratch"))
 
 
 def pytest_sessionstart(session):
@@ -33,31 +38,6 @@ def pytest_sessionstart(session):
     path.write_text(json.dumps(config), encoding="utf-8")
     os.environ["DOOM_AP_CONFIG_FILE"] = str(path)
     os.environ["DOOM_AP_APPLICATION_DIR"] = str(root)
-
-
-@pytest.fixture(scope="session")
-def frozen_map(tmp_path_factory):
-    from tools.release.prebuilt_room_resources import get_frozen_bundle_dir
-
-    resources = Path(os.environ.get("DOOMEAP_ROOM_RESOURCES", get_frozen_bundle_dir()))
-    output = tmp_path_factory.mktemp("frozen-maps")
-
-    @cache
-    def extract(map_key):
-        path = output / f"{map_key}.map"
-        with ZipFile(resources / "room_payloads.zip") as archive:
-            path.write_bytes(archive.read(f"sources/{map_key}.entities"))
-        return path
-
-    return extract
-
-
-@pytest.fixture(autouse=True)
-def launcher_test_language(request, monkeypatch):
-    if request.path.name.startswith(("test_launcher_", "test_checkpoint_launcher")):
-        from doom_eap.launcher.ui import strings
-
-        monkeypatch.setattr(strings, "_locale", "en")
 
 
 @pytest.fixture

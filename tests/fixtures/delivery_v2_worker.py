@@ -295,5 +295,61 @@ async def main():
         await ledger.close()
 
 
+async def checks_context(ap):
+    from types import SimpleNamespace
+
+    from doom_eap.runtime.bridge_client import DoomEternalContext
+    from tests.generation_support import runtime_campaign
+
+    slot = json.loads((Path.cwd() / "check-room.json").read_text(encoding="utf-8"))["slots"][0]
+    ctx = DoomEternalContext(None, None)
+    ctx.auth, ctx.team, ctx.slot = "Pillar", 0, 1
+    ctx.room_seed_name = "PillarRoom"
+    ctx.server = SimpleNamespace(socket=ap)
+    ctx._connected_slot_data = slot["connected"]["slot_data"]
+    ctx.server_locations = set(slot["world"]["active_ids"])
+    await ctx.send_msgs([{"cmd": "Sync"}])
+    update, = json.loads(await ap.recv())
+    ctx.checked_locations = set(update["checked_locations"])
+    ctx.missing_locations = ctx.server_locations - ctx.checked_locations
+    ctx.server_checked_locations_ready = True
+
+    async def process_identity():
+        return {"pid": 123, "created": "123"}
+
+    ctx.items._query_process_identity = process_identity
+    ctx.items.initialize_item_state(ctx._connected_slot_data)
+    ctx.unified_campaign = runtime_campaign(ctx._connected_slot_data, slot["world"])
+    await ctx.session_tasks.close()
+    assert ctx.item_state_ready
+    assert await ctx.items.check_and_update_event_session()
+    return ctx
+
+
+async def checks_action(ctx, ap, action):
+    if action == "flush":
+        await ctx.checks.flush_check_event_files()
+    elif action == "ack":
+        update, = json.loads(await asyncio.wait_for(ap.recv(), 5))
+        ctx._handle_checked_locations(update)
+        await ctx.session_tasks.close()
+    elif action == "goal":
+        await ctx.checks.check_campaign_goal_event()
+    elif action == "evaluate":
+        await ctx.checks.evaluate_campaign_goal("pillar goal event")
+    else:
+        raise ValueError(action)
+    await (await ap.ping())
+    signal("done", checked=sorted(ctx.checked_locations))
+
+
+async def checks_main():
+    async with connect(sys.argv[1]) as ap:
+        ctx = await checks_context(ap)
+        signal("ready", checked=sorted(ctx.checked_locations))
+        while line := await asyncio.to_thread(sys.stdin.readline):
+            await checks_action(ctx, ap, json.loads(line)["action"])
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(checks_main() if sys.argv[2] == "--checks" else main())

@@ -11,6 +11,12 @@ import sys
 import threading
 from contextlib import ExitStack, closing
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import UUID
+
+from doom_eap.runtime.inventory import ReceiptSession, load_policy_registry
+from doom_eap.runtime.ledger import CommandState, Ledger, NetworkReceipt, RoomKey
+from doom_eap.runtime.observers import CONTEXT_BY_IDENTITY
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures"
@@ -145,6 +151,12 @@ class Scenario:
         # Popen.kill uses TerminateProcess on Windows; no child unwinding can commit state.
         self.bridge.close()
 
+    def start_checks(self):
+        self.bridge = self.child("delivery_v2_worker.py", f"ws://127.0.0.1:{self.port}", "--checks")
+        self.status = self.bridge.expect("ready")
+        self.ap.expect("connected")
+        return self.status
+
     def start_core(self, stop=""):
         self.core = self.child("fake_delivery_core.py", str(self.root), stop)
         ready = self.core.expect("ready")
@@ -219,3 +231,76 @@ def balance_packets(state_key, consumed=0):
         f"doom_eap:{state_key}:ammo_refill_consumed": consumed,
         f"doom_eap:{state_key}:ammo_refill_discarded": 0,
     }}, tail(1)]
+
+
+def runtime_bridge(tmp_path):
+    root = Path(__file__).resolve().parents[1]
+    definitions = {int(k): v for k, v in json.loads((root / "data/items.json").read_text()).items()}
+    policies = load_policy_registry(root / "data/item_replay_policies.json", definitions)
+    session = ReceiptSession()
+    value = SimpleNamespace(
+        state_key="seed:0:1:fixture",
+        room_seed_name="seed",
+        team=0,
+        slot=1,
+        _connected_slot_data={"native_generation_fingerprint": "a" * 64, "runtime": {"special_weapon": "the_crucible"}},
+        base_directory=tmp_path,
+        session_state={"delivery_backend": "ledger"},
+        receipt_session=session,
+        items_received=[NetworkReceipt(7770900, 1, 1, 0)],
+        persist_session_state=lambda: None,
+        runtime_lifecycle=SimpleNamespace(snapshot=SimpleNamespace(campaign="Base"), map_epochs=SimpleNamespace(published_materialization_lease="1:100")),
+        items=SimpleNamespace(_refresh_runtime_context=lambda *args: CONTEXT_BY_IDENTITY["base/hub"]),
+        checks=SimpleNamespace(),
+        saves=SimpleNamespace()
+    )
+    value.items.ctx = value
+    value.checks.ctx = value
+    value.saves.ctx = value
+    link = SimpleNamespace(pid=123, namespace="a" * 64, probe=tmp_path / "unused-probe", command_prefix=(), environment=None)
+    async def yes(*args, **kwargs):
+        return True
+    async def get_link():
+        return link
+    async def scope(*args, **kwargs):
+        return (link.namespace, "ap-save", 123, "123", UUID(int=2).hex, "build", 1, "game/hub/hub")
+    async def send(packets):
+        raise AssertionError("Storage is replaced by the isolated fixture")
+    value.saves.checkpoint_recovery_ready = value.items.runtime_effects_ready = yes
+    value.items._native_game_link_async = get_link
+    value.items._native_materialization_scope = scope
+    value.send_msgs = send
+    value.delivery_actions_ready = lambda: True
+    value.items.delivery_notification_commands = lambda *args: ()
+    value.items.effective_delivery_ownership = lambda receipts: SimpleNamespace(reconciliation_item_ids=tuple(r.item for r in receipts), blood_punch_upgrades=())
+    return value, definitions, policies
+
+
+def ledger_snapshot(peer):
+    async def read():
+        ledger = await Ledger.open(peer.root / "delivery.sqlite3", read_only=True)
+        key = RoomKey("DeliveryRoomA", 0, 1, "fixture-v2")
+        try:
+            commands = await ledger.commands(key, tuple(CommandState), None, 256)
+            attempts = []
+            for command in commands:
+                attempts.extend(await ledger.attempts(key, command.plan.command_id, 0, 256))
+            return await ledger.room(key), commands, tuple(attempts)
+        finally:
+            await ledger.close()
+    return peer.reader_loop.run_until_complete(read())
+
+
+def finish_v2_script(peer):
+    room, commands, attempts = ledger_snapshot(peer)
+    if room.receipt_boundary == 0:
+        peer.collect([history()])
+    if not commands:
+        peer.action("plan")
+    if not attempts:
+        peer.action("prepare")
+    _, commands, _ = ledger_snapshot(peer)
+    if commands[0].state is not CommandState.CONFIRMED:
+        peer.action("send")
+        peer.action("result", state="confirmed")
+    peer.action("ack")

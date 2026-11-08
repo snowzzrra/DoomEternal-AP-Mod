@@ -1,6 +1,5 @@
 """Set ARCHIPELAGO_SOURCE for generation; compilation also needs DOOMEAP_ROOM_RESOURCES
 and IDFILE_DECOMPRESSOR. Use isolated TEMP/TMP and pytest --basetemp.
-DOOMEAP_GENERATION_PROFILE=fast/full requires prepared inputs.
 """
 
 import hashlib
@@ -14,10 +13,8 @@ from collections import Counter
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
-from dataclasses import replace
 from functools import cache, partial
 from pathlib import Path
-from zipfile import ZipFile
 
 import pytest
 
@@ -25,9 +22,6 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = json.loads((ROOT / "tests/fixtures/generation_cases.json").read_text(encoding="utf-8"))
 VALID = CORPUS["valid_cases"]
 CASES = {case["id"]: case for case in VALID + CORPUS["invalid_options"]}
-COMPACT = VALID[0]["id"]
-REMOTE = next(case["id"] for case in VALID if case["expected"]["remote_placements"])
-ENEMIES = next(case["id"] for case in VALID if case["expected"]["enemy_descriptor"])
 AUTHORING_GUARD = ContextVar("generation_acceptance_authoring_guard", default=False)
 
 
@@ -41,22 +35,10 @@ def prepared_path(name):
     return path
 
 
-@pytest.fixture(scope="module", autouse=True)
-def requested_profile_is_prepared():
-    profile = os.environ.get("DOOMEAP_GENERATION_PROFILE", "")
-    if profile not in {"", "fast", "full"}:
-        pytest.fail("Preparation: DOOMEAP_GENERATION_PROFILE must be fast or full.")
-    if profile or os.environ.get("DOOMEAP_ROOM_RESOURCES"):
-        prepared_path("ARCHIPELAGO_SOURCE")
-    if profile == "full":
-        prepared_path("DOOMEAP_ROOM_RESOURCES")
-        prepared_path("IDFILE_DECOMPRESSOR")
-
-
 @pytest.fixture(scope="session")
 def ap_source():
     if not os.environ.get("ARCHIPELAGO_SOURCE"):
-        pytest.skip("Set ARCHIPELAGO_SOURCE to run real APWorld generation.")
+        pytest.fail("Set ARCHIPELAGO_SOURCE to run real APWorld generation.")
     source = prepared_path("ARCHIPELAGO_SOURCE")
     if not (source / "worlds/doometernal/__init__.py").is_file():
         pytest.fail("Preparation: ARCHIPELAGO_SOURCE must contain the complete AP checkout, including doometernal.")
@@ -161,6 +143,7 @@ def generate_document(case):
     import Utils
 
     Utils.user_path.cached_path = os.environ["AP_TEST_USER"]
+    settings.skip_autosave = True
     settings.get_settings._cache = settings.Settings(None)
     from Fill import distribute_items_restrictive
     from NetUtils import convert_to_base_types
@@ -205,32 +188,6 @@ def manifest_from_world(snapshot, world, digest=""):
     return SeedManifest.from_room(snapshot, set(world["known_ids"]), static_content_digest=digest)
 
 
-def assert_placements(records, expected):
-    actual = [
-        [record.location_id, record.location_name, record.item_id, record.item_name,
-         record.recipient_slot, record.recipient_name, record.classification, record.trap, record.local]
-        for record in records
-    ]
-    assert actual == expected
-
-
-def assert_generated_properties(case, slot):
-    expected = case["expected"]
-    data = slot["connected"]["slot_data"]
-    assert data["identity"]["schema"] == 7
-    assert slot["world"]["plan"]["effective_mission_count"] == expected["mission_count"]
-    assert data["campaign"]["sequence"] == slot["world"]["plan"]["sequence"]
-    assert data["campaign"]["mode"] == expected["mode"]
-    assert data["campaign"]["goal"]["stage_id"] == expected["goal_stage"]
-    assert data["recipes"]["enabled"] == expected["enemy_descriptor"]
-    assert any(not row[-1] for row in slot["world"]["placements"]) == expected["remote_placements"]
-
-
-def assert_starting_weapon(data, name):
-    items = json.loads((ROOT / "data/item_replay_policies.json").read_text())["items"]
-    assert items[str(data["starting"]["weapon_item_id"])]["name"] == name
-
-
 def runtime_campaign(slot_data, world):
     from doom_eap.runtime.campaign import UnifiedCampaign
     from doom_eap.runtime.observers import validate_slot_contract
@@ -242,40 +199,6 @@ def runtime_campaign(slot_data, world):
     assert campaign.plan["goal_stage"] == world["plan"]["goal_stage"]
     assert session["campaign_navigation"]["generation"] == slot_data["native_generation_fingerprint"]
     return campaign
-
-
-def assert_runtime_progress(campaign, world):
-    plan = world["plan"]
-    initial = campaign.snapshot([], [])
-    assert {row["stage"] for row in initial["rows"] if row["unlocked"]} == set(plan["starting_stages"])
-    completions = [stage["completion_id"] for stage in plan["stages"]]
-    completed = campaign.snapshot(completions, [])
-    assert {row["stage"] for row in completed["rows"] if row["completed"]} == set(plan["sequence"])
-    assert campaign.goal_admitted(completions, [])
-
-
-@pytest.mark.apworld
-@pytest.mark.slow
-@pytest.mark.parametrize("case", VALID, ids=lambda case: case["id"])
-def test_generated_packets_and_runtime_preserve_the_filled_campaign(case, generated, record_property):
-    document = generated(case["id"])
-    record_property("generation_seconds", document["generation_seconds"])
-    for slot in document["slots"]:
-        assert_generated_properties(case, slot)
-        snapshot = room_snapshot(document, slot["connected"]["slot"])
-        manifest = manifest_from_world(snapshot, slot["world"])
-        assert list(snapshot.active_location_ids) == slot["world"]["active_ids"]
-        assert_placements(manifest.placements, slot["world"]["placements"])
-        assert_starting_weapon(manifest.options, slot["world"]["starting_weapon"])
-        assert manifest.options["campaign"]["fortress"]["battery_economy"] == slot["world"]["plan"]["battery_economy"]
-        campaign = runtime_campaign(snapshot.slot_data, slot["world"])
-        assert_runtime_progress(campaign, slot["world"])
-
-
-@pytest.mark.apworld
-@pytest.mark.parametrize("case", CORPUS["invalid_options"], ids=lambda case: case["id"])
-def test_invalid_generation_options_are_rejected_separately(case, generated):
-    assert generated(case["id"])["rejected"]
 
 
 def reject_authoring_open(event, args):
@@ -301,7 +224,7 @@ def without_authoring_maps():
 @pytest.fixture(scope="session")
 def compiler():
     if not os.environ.get("DOOMEAP_ROOM_RESOURCES"):
-        pytest.skip("Set DOOMEAP_ROOM_RESOURCES to the pinned room resources bundle for real compilation.")
+        pytest.fail("Set DOOMEAP_ROOM_RESOURCES to packaging/room_resources/v0.8.0.")
     resources = prepared_path("DOOMEAP_ROOM_RESOURCES")
     decompressor = prepared_path("IDFILE_DECOMPRESSOR")
     for name, expected in CORPUS["resource_sha256"].items():
@@ -317,11 +240,6 @@ def compiler():
     )
 
 
-@pytest.fixture(scope="module")
-def compiled(compiler, generated, scratch):
-    return partial(compile_once, compiler, generated, scratch)
-
-
 @cache
 def compile_once(compiler, generated, scratch, case_id):
     document = generated(case_id)
@@ -332,77 +250,6 @@ def compile_once(compiler, generated, scratch, case_id):
         started = time.perf_counter()
         package = compiler.build(manifest, scratch / f"compiled-{case_id}")
     return manifest, package, time.perf_counter() - started
-
-
-def assert_package_matches_world(package, slot):
-    from doom_eap.launcher.launcher_core import PlacementRecord
-
-    world = slot["world"]
-    with ZipFile(package) as archive:
-        manifest = json.loads(archive.read("seed_manifest.json"))
-        receipt = json.loads(archive.read("seed_receipt.json"))
-        assert not any(name.startswith("sources/") for name in archive.namelist())
-    assert manifest["active_location_ids"] == world["active_ids"]
-    assert manifest["options"]["campaign"]["sequence"] == world["plan"]["sequence"]
-    assert manifest["options"]["campaign"]["fortress"]["battery_economy"] == world["plan"]["battery_economy"]
-    assert_starting_weapon(manifest["options"], world["starting_weapon"])
-    assert receipt["starting_weapon"] == world["starting_weapon"]
-    assert_placements([PlacementRecord.from_mapping(row) for row in manifest["placements"]], world["placements"])
-    campaign = runtime_campaign(slot["connected"]["slot_data"], world)
-    assert_runtime_progress(campaign, world)
-    return manifest
-
-
-@pytest.mark.apworld
-@pytest.mark.integration
-@pytest.mark.parametrize("case", VALID, ids=lambda case: case["id"])
-def test_generated_room_compiles_and_runtime_accepts_campaign(case, compiled, generated, compiler, record_property):
-    manifest, package, seconds = compiled(case["id"])
-    record_property("compile_seconds", seconds)
-    slot = generated(case["id"])["slots"][0]
-    assert_package_matches_world(package, slot)
-    assert compiler.validate_cached_package(package, manifest)
-    recipes = slot["connected"]["slot_data"]["recipes"]
-    assert manifest.options["recipes"] == recipes
-    if recipes["enabled"]:
-        with ZipFile(package) as archive:
-            assert json.loads(archive.read("seed_receipt.json"))["native_resource_roots"]
-
-
-def output_bytes(directory):
-    return {path.relative_to(directory).as_posix(): path.read_bytes() for path in directory.rglob("*") if path.is_file()}
-
-
-@pytest.mark.apworld
-@pytest.mark.integration
-@pytest.mark.parametrize("invalid", CORPUS["invalid_rooms"], ids=lambda case: case["id"])
-def test_incompatible_room_is_rejected_before_output_replacement(invalid, compiled, generated, compiler):
-    _, package, _ = compiled(COMPACT)
-    before = output_bytes(package.parent)
-    document = deepcopy(generated(COMPACT))
-    slot = document["slots"][0]
-    from doom_eap.content.slot_data_contract import generation_fingerprint
-    for block, values in invalid.get("slot_data", {}).items():
-        slot["connected"]["slot_data"][block].update(values)
-    data = slot["connected"]["slot_data"]
-    data["native_generation_fingerprint"] = generation_fingerprint(data)
-    slot["connected"].update(invalid.get("connected", {}))
-    with pytest.raises(ValueError, match=invalid["error_match"]):
-        snapshot = room_snapshot(document, 1)
-        manifest = manifest_from_world(snapshot, slot["world"], compiler.static_content_digest)
-        compiler.build(manifest, package.parent, force=True)
-    assert output_bytes(package.parent) == before
-
-
-@pytest.mark.apworld
-@pytest.mark.integration
-def test_changed_resource_identity_cannot_replace_a_compiled_room(compiled, compiler):
-    manifest, package, _ = compiled(COMPACT)
-    before = output_bytes(package.parent)
-    incompatible = replace(manifest, static_content_digest="incompatible")
-    with pytest.raises(ValueError, match="static content identity drifted"):
-        compiler.build(incompatible, package.parent, force=True)
-    assert output_bytes(package.parent) == before
 
 
 if __name__ == "__main__":

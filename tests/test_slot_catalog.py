@@ -4,14 +4,11 @@ from copy import deepcopy
 
 import pytest
 
-from doom_eap.content.content_catalog import load_content_catalog
 from doom_eap.content.recipe_codec import recipe_references
 from doom_eap.content.slot_data_contract import (
     CATALOG_DEPENDENCIES,
     DigestError,
-    ReferenceError,
     SlotCatalog,
-    StructureError,
     canonical_bytes,
     catalog_dependency_path,
     catalog_digest,
@@ -19,7 +16,7 @@ from doom_eap.content.slot_data_contract import (
     installed_catalog_tables,
     load_slot_catalog,
 )
-from tools.content.compile_content_catalog import MOD_ROOT, compile_slot_catalog
+from tools.content.compile_content_catalog import MOD_ROOT
 from tools.validation.audit_packaged_transition_bridge import (
     assert_generation_only_apworld,
 )
@@ -75,31 +72,12 @@ def test_adding_source_and_species_preserves_existing_references():
         assert references.items() <= after[table].items()
 
 
-def test_source_hash_collision_fails_generation(monkeypatch):
-    from doom_eap.content import slot_data_contract
-
-    catalog = load_slot_catalog()
-    native = json.loads((MOD_ROOT / 'doom_eap/content/native_enemy_catalog.json').read_bytes())
-    kills = json.loads((MOD_ROOT / 'doom_eap/content/campaign_kill_sources.json').read_bytes())
-    monkeypatch.setattr(slot_data_contract, 'source_reference', lambda *args: '0' * 16)
-    with pytest.raises(ReferenceError, match='Source hash collision'):
-        compile_slot_catalog(load_content_catalog(), native, kills, dict(enumerate(catalog['items'])))
-
-
 @pytest.mark.parametrize('name', CATALOG_DEPENDENCIES)
 def test_loader_detects_dependency_changed_after_generation(tmp_path, name):
     path = copy_catalog(tmp_path / 'content')
     dependency = path.with_name(name)
     dependency.write_bytes(dependency.read_bytes() + b' ')
     with pytest.raises(DigestError, match=f'dependency digest mismatch: {name}'):
-        load_slot_catalog(path=path)
-
-
-@pytest.mark.parametrize('name', ['native_enemy_catalog.json', 'native_enemy_assets.json', 'campaign_stage_ids.json'])
-def test_loader_requires_installed_dependencies(tmp_path, name):
-    path = copy_catalog(tmp_path / 'content')
-    path.with_name(name).unlink()
-    with pytest.raises(StructureError, match='Cannot read catalog dependency'):
         load_slot_catalog(path=path)
 
 

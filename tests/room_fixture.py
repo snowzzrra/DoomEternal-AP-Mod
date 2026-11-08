@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from doom_eap.content.slot_data_contract import (
     catalog_digest,
     catalog_tables,
@@ -259,33 +257,3 @@ def sample_slot(catalog=None, recipes=None):
         "placement_digest": placement_digest([[2_200_000_001, 7770001, 1]]),
     }
     return sign_slot(data, catalog)
-
-
-@pytest.fixture
-def resolved_room(monkeypatch):
-    catalog = sample_catalog()
-    catalog["stages"]["e1m1_intro"] = catalog["stages"].pop("a")
-    catalog["maps"] = {"e1m1_intro": {"stage_id": "e1m1_intro"}}
-    for table in ("sources", "finite_sources", "timers"):
-        for row in catalog[table].values():
-            row["stage_id"] = "e1m1_intro"
-    data = sample_slot(catalog)
-    data["campaign"].update(mode="Vanilla Order", sequence=["e1m1_intro"], starting_stages=["e1m1_intro"])
-    data["campaign"].update(unprepared_start_stages=["e1m1_intro"], opening_stage="e1m1_intro")
-    data["campaign"]["goal"]["stage_id"] = "e1m1_intro"
-    data["stage_profiles"]["e1m1_intro"] = data["stage_profiles"].pop("a")
-    data["recipes"]["maps"]["e1m1_intro"] = data["recipes"]["maps"].pop("a")
-    from doom_eap.runtime import observers as registry
-
-    identity = registry._SLOT_IDENTITY
-    data["compatibility"].update(
-        apworld_version=identity["apworld_revision"],
-        minimum_client_version=identity["release_version"],
-        bridge_protocol=identity["bridge_protocol_version"],
-        manifest_schema_version=identity["manifest_schema_version"],
-        mod_contract_revision=identity["session_mod_contract_revision"],
-        required_capabilities=["slot_data_v7"],
-    )
-    monkeypatch.setitem(identity, "slot_data_schema_version", 7)
-    monkeypatch.setattr(registry, "load_slot_catalog", lambda: catalog)
-    return sign_slot(data, catalog), catalog
