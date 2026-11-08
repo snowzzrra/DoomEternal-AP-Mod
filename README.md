@@ -6,7 +6,7 @@
 [What gets randomized](#1-what-gets-randomized) · [Player options](#2-player-options) · [Installation](#3-installation) · [How it works](#4-how-it-works) · [Version scope](#5-version-scope) · [Credits](#6-credits) · [License](#7-license)
 
 > [!NOTE]
-> Want to buy me a coffee? No need! But do leave out your feedback. It's greatly appreciated.
+> Want to buy me a coffee? No need! But do leave your feedback. It's greatly appreciated.
 
 ## 1. What gets randomized
 
@@ -184,10 +184,10 @@ language set in DOOM Eternal, and the APWorld's own text stays in English.
 
 ## 5. Version scope
 
-## 0.1.x — First version — DONE
+### 0.1.x — First version — DONE
 
-- Froze the initial route through Cultist Base.
-- Added RPC recovery, DeathLink, and Windows/Linux smoke coverage.
+- Create the initial route through Cultist Base.
+- Add RPC recovery, DeathLink, and Windows/Linux compatibility coverage.
 
 ### 0.2.x — Campaign content expansion and systems foundation — DONE
 
@@ -197,13 +197,13 @@ language set in DOOM Eternal, and the APWorld's own text stays in English.
 
 ### 0.3.x Alpha — Base campaign map expansion — DONE
 
-- include remaining maps from base campaign, up until Final Sin.
+- Include remaining maps from base campaign, up until Final Sin.
 - Fix bugs during playtests in order to make a viable full AP run.
 - First true version of the mod, and prepare for Beta.
 
 ### 0.4.0 Beta — Installation, logic, and option architecture — DONE
 
-- A launcher to setup mod installation automatically with one click.
+- A launcher to set up mod installation automatically with one click.
 - More AP options, such as Starting Weapon and QoL features.
 - Streamlined Help tab, complete with a setup check and support reports to better help development.
 
@@ -223,7 +223,7 @@ language set in DOOM Eternal, and the APWorld's own text stays in English.
 ### 0.7.x Beta — Enemizer — DONE
 
 - Randomize enemy placements and encounters in various different difficulty presets while respecting the player's expected loadout (CR).
-- Add Killsanity, which gives checks per each X configurable demons killed.
+- Add Killsanity, which gives a check every X demons killed (configurable).
 - Add in some new checks in existing missions.
 
 ### 0.8.x–0.9.x — Minor features and polish — Current
@@ -237,7 +237,7 @@ language set in DOOM Eternal, and the APWorld's own text stays in English.
 ### 1.0 — Final Release
 
 - As soon as stability is reached, release a final candidate.
-- Posterior updates should be hotfixes only.
+- Later updates should be hotfixes only.
 
 ## 6. Credits
 

@@ -231,7 +231,7 @@ removed. A half-hooked game is worse than a game with the feature off.
 | Runtime | `ammo.py`, `deathlink.py`, `campaign.py` | Ammo and refills; DeathLink; campaign menu, mission progress, goal and fast travel |
 | Runtime | `observers.py` | Watching the game: level ready, event publishers |
 | Runtime | `native_transport.py` | Persistent pipe to Core (through a relay under Proton) |
-| Shared | `doom_eap/contracts/` | Typed data at boundaries: room data, Core distribution, evidence |
+| Shared | `doom_eap/contracts/` | Typed data at boundaries: `foundation.py` (items and commands), `inventory_domain.py`, `receipt_delivery.py` (delivery and publication), `goal_policy.py`, `save_observation.py`, `core_distribution.py` |
 | Shared | `data/strings/`, `doom_eap/strings.py` | Every player-facing text |
 | Core | `protocol/schema.json`, `tools/generate_protocol.py` | The wire protocol; both sides generate code from it |
 | Core | `src/engine/hooks/`, `src/save_*`, `src/features/expanded/` | HookSet, save checkpoints, encounter and spawn features |

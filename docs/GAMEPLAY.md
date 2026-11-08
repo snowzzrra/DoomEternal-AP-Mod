@@ -97,12 +97,16 @@ a kill by the number of enemies it replaced.
 The HUD displays the current total and next target below **Items Found**.
 
 **Kill Rewards: Auto** estimates campaign kills, adds 10%, divides by Kills per Check
-and rounds down, up to 50 rewards. A fixed reward count can require mission replays.
-The estimate is conservative and does not guarantee that one playthrough reaches
-every target. Rewards beyond the reviewed finite budget cannot hold progression items.
-Logic sums the kill estimates of missions the player can reach and complete, plus 10%
-for ordinary encounter retries. This limit applies to both Auto and fixed reward counts.
-Fixed counts above the campaign's logical budget require Minimal accessibility.
+and rounds down, up to 50 rewards.
+
+A reward is in logic once the missions you can reach and complete add up to its
+target: the sum of their kill estimates, plus 10% for the fights you repeat after
+dying. Missions you can't reach yet don't count, so early in the seed only the first
+targets are in logic.
+
+A fixed reward count can go past what the campaign gives. Those extra rewards only
+hold filler or traps, never progression or useful items, and count as reachable once
+every mission is: reaching them means replaying missions.
 
 The native death hook and recovery behavior have offline tests. Testing still needs
 to confirm death coverage across enemy families and full campaigns in the game.
