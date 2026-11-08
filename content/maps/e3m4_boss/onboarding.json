@@ -113,7 +113,7 @@
       "target_chain": [],
       "vanilla_reward": "native post-Icon terminal",
       "decision": "include",
-      "reason": "native terminal after Icon of Sin destruction; publisher preserves ending/credits flow and emits Mission Complete before the separate goal"
+      "reason": "native terminal after Icon of Sin destruction; publisher emits Mission Complete before the separate goal; map transforms bypass credits and return to the Fortress"
     }
   ],
   "vanilla_guards": {
@@ -147,7 +147,7 @@
     "source and owner payload hashes recorded",
     "packagemapspec priority proven; lower files-array index wins",
     "native Mission Challenges and Secret Encounters absent",
-    "Icon phases, checkpoints, cinematics, credits and return-to-menu flow are untouched",
+    "map transforms preserve Icon phases, checkpoints and cinematics; credits are bypassed and the terminal returns to the Fortress; runtime confirmation is pending",
     "Mission Complete publishes before the separate campaign goal"
   ],
   "source_evidence": {

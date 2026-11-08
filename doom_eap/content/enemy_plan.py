@@ -192,38 +192,3 @@ def sample_instance_attributes(enemies, species, *, seed, instance_key, stage_in
     attributes = {}
     _sample_instance_attributes_attribute(attributes, denominator, draw, enemies, species, stage_index)
     return attributes
-
-
-def build_resolved_enemy_blocks(enemies, campaign, *, seed, catalog=None, resolve_stage_profiles,
-                                killsanity_options, native_catalog=None, kill_catalog=None,
-                                easier_secret_encounters=True):
-    """Produce inactive resolved blocks; readiness receives the final safe plan."""
-    from .killsanity_plan import build_campaign_kill_budget, build_resolved_killsanity
-    from .native_enemy_plan import build_native_recipes, encode_native_recipes
-    from .slot_data_contract import (
-        MAX_PAYLOAD_BYTES,
-        PayloadSizeError,
-        StructureError,
-        canonical_bytes,
-        catalog_tables,
-        load_slot_catalog,
-    )
-
-    catalog = load_slot_catalog() if catalog is None else catalog
-    try:
-        plan = build_native_recipes(enemies, campaign, seed=seed, catalog=native_catalog)
-        profiles = resolve_stage_profiles(plan)
-        budget = (build_campaign_kill_budget(campaign, plan, catalog=kill_catalog)
-                  if killsanity_options.get('enabled', False) else dict(estimated_kills=0, finite_sources=[]))
-    except ValueError as error:
-        raise StructureError(str(error)) from error
-    active = set(campaign['stage_ids'])
-    active.update(key for key, row in catalog_tables(catalog)['maps'].items() if row['stage_id'] is None)
-    blocks = {'recipes': encode_native_recipes(plan, catalog, active_maps=active,
-                   easier_secret_encounters=easier_secret_encounters),
-              'stage_profiles': profiles,
-              'killsanity': build_resolved_killsanity(killsanity_options, budget, catalog)}
-    total, recipe_size = len(canonical_bytes(blocks)), len(canonical_bytes(blocks['recipes']))
-    if total > MAX_PAYLOAD_BYTES:
-        raise PayloadSizeError(total, recipe_size)
-    return blocks

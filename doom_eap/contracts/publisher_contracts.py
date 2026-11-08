@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
 
+from doom_eap.contracts.runtime_context import canonical_map_name as _canonical_map_name
+
 TRIGGER_STRATEGIES = frozenset({"native_transition", "map_event_file", "terminal_owner"})
 EFFECT_STRATEGIES = frozenset({
     "location_check", "campaign_goal", "preserved_native_target",
@@ -15,8 +17,7 @@ FALLBACK_POLICIES = frozenset({"first_success_wins"})
 
 
 def canonical_map_name(name: str | None) -> str:
-    normalized = str(name or "").strip().replace("\\", "/").rstrip("/")
-    return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
+    return _canonical_map_name(name) or ""
 
 
 def _freeze(value: Any) -> Any:
@@ -204,18 +205,6 @@ def thaw_content(value: Any) -> Any:
     if isinstance(value, tuple):
         return [thaw_content(item) for item in value]
     return value
-
-
-def publishers_for_transition(
-    publishers: tuple[PublisherContract, ...],
-    from_map: str,
-    to_map: str,
-) -> tuple[PublisherContract, ...]:
-    index = publishers_by_trigger(publishers)
-    return index.get(trigger_key("native_transition", {
-        "from_map": from_map,
-        "to_map": to_map,
-    }), ())
 
 
 def map_publishers_for_owner(

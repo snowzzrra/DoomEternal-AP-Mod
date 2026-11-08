@@ -81,12 +81,12 @@ def assign_arena_regions(root, topology):
             topology["assignments"].setdefault(arena["region"], []).append(arena["location_id"])
 
 
-def map_arena_config(config, descriptor_path):
+def map_arena_config(config, descriptor_path, root=ROOT):
     if "arena_checks" not in config and descriptor_path.is_file():
         from .master_levels import load_master_levels
 
-        masters = load_master_levels(ROOT)
+        masters = load_master_levels(root)
         layers = {stage["map_key"]: stage["normal_layer"] for stage in masters.values()}
         config["arena_checks"] = [{**arena, "layer": masters[key]["layers"][0] if key in masters else layers.get(key)}
-                                  for key, entry in load_arena_checks().items()
+                                  for key, entry in load_arena_checks(root).items()
                                   if entry.get("map_key", key) == config["map_key"] for arena in entry["arenas"]]

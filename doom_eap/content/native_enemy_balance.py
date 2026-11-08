@@ -122,7 +122,7 @@ def _encounters(profile, *, mobile=False, objective_budgets=False):
         if not mobile:
             return profile['encounters']
         from .native_enemy_safety import AMBIENT_ENCOUNTERS
-        from .secret_encounter_timers import load_secret_encounter_timers
+        from .native_enemy_plan import load_secret_encounter_timers
         secret = {row['manager'] for row in load_secret_encounter_timers()['maps'].get(
             profile['map_key'], {}).get('timers', [])}
         result = []
@@ -314,7 +314,7 @@ def _reserve_ammo_counts(sources, counts, required, *, candidates, catalog, supp
     if not required:
         return counts
     compatible = [source for source in sources if AMMO_FODDER.intersection(
-        _compatible(source, candidates, catalog, supplies, population, special_limits))]
+        _compatible(source, candidates, population, special_limits))]
     _reserve_ammo_counts_identities(compatible, counts, required, sources, supplies)
     return counts
 
@@ -437,7 +437,7 @@ def _population_allows_species(species, mobile, population):
     return ((ROLES[species] != 'heavy' and (not mobile or species not in {'super_tentacle', 'turret'})) or population['heavy'] > 0) and (ROLES[species] != 'superheavy' or population['superheavy'] > 0)
 
 
-def _compatible(source, candidates, catalog, supplies, population, special_limits, *, mobile=False):
+def _compatible(source, candidates, population, special_limits, *, mobile=False):
     eligible = _compatible_eligible(candidates, source)
     return [species for species in eligible if
         _population_allows_species(species, mobile, population) and (species not in SPECIAL_SPECIES or population['species'].get(species, 0) > 0) and (species not in {'marauder', 'archvile', 'spirit'} or special_limits[species] > 0) and (species not in {'buff_pod', 'zombie_t1_screecher'} or special_limits['archvile'] > 0)]
@@ -454,7 +454,7 @@ def _draw_bodies_mobile(candidates, catalog, counts, population, renewable, sett
             continue
         total = count if renewable else _emissions(source, count)
         quotient, remainder = divmod(total, count)
-        eligible = _compatible(source, candidates, catalog, supplies, population, settings['special_limits'], mobile=mobile)
+        eligible = _compatible(source, candidates, population, settings['special_limits'], mobile=mobile)
         if not eligible:
             raise ValueError(f"Vanilla encounter has no enabled compatible enemy: {source['id']}")
         items.extend(dict(source=source, weight=quotient + (ordinal < remainder), eligible=eligible,
@@ -600,10 +600,10 @@ def _compatible_reference(rows, chosen, sources, *, seed, settings, catalog, can
         desired = _modified_budget(raw, factor, target)
         population = _population(row['peak'], _owner(sources[0]), opening=opening, settings=settings)
         categories = {_category(species) for source in finite for species in
-            _compatible(source, candidates, catalog, supplies, population, settings['special_limits'])}
+            _compatible(source, candidates, population, settings['special_limits'])}
         missing = _score_missing(categories, desired, maintained, native, renewable, wanted)
         if _native_ammo_pool(row) and not any(AMMO_FODDER.intersection(
-                _compatible(source, candidates, catalog, supplies, population, settings['special_limits']))
+                _compatible(source, candidates, population, settings['special_limits']))
                 for source in renewable):
             missing += _native_ammo_pool(row)
         if not missing and finite:

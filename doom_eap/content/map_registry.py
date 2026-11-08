@@ -188,20 +188,12 @@ def _plans(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
     )
 
 
-def generation_plan(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
-    return _plans(registry)
-
-
 def validation_plan(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
     return _plans(registry)
 
 
-def package_plan(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
-    return _plans(registry)
-
-
 def release_plan(registry: dict[str, Any]) -> tuple[MapPlan, ...]:
-    return tuple(plan for plan in package_plan(registry) if plan.release_asset)
+    return tuple(plan for plan in validation_plan(registry) if plan.release_asset)
 
 
 def _main() -> None:

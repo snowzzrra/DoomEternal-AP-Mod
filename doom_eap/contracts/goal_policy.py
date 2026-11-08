@@ -1,5 +1,8 @@
 """Pure release goal objective selection from supplied authored catalog facts."""
 
+import json
+from pathlib import Path
+
 
 class GoalPolicy:
     def __init__(self, locations, dlc_prefixes, capabilities, endpoint_ids, suffixes, master_levels=()):
@@ -23,7 +26,7 @@ class GoalPolicy:
 
     def _active_goal_location_names(self, slot_data, server_locations):
         names = {name for identity, name in self._locations.items() if identity in server_locations}
-        if not slot_data.get("use_dlc_content") or not slot_data.get("include_dlc_missions", True):
+        if "campaign" not in slot_data and (not slot_data.get("use_dlc_content") or not slot_data.get("include_dlc_missions", True)):
             names = {
                 name for name in names
                 if name.split(" - ", 1)[0] not in self._dlc_prefixes
@@ -32,19 +35,13 @@ class GoalPolicy:
 
 
     def _objective_ids_goal(self, server_locations, slot_data):
+        active_names = self._active_goal_location_names(slot_data, server_locations)
+        slot_data = self._goal_options(slot_data)
         goal = slot_data.get("goal")
         endpoint_event = slot_data.get("goal_endpoint_event")
-        required_capabilities = slot_data.get("required_capabilities")
         if (
             goal not in self._goal_names
             or endpoint_event != f"Internal Goal Endpoint: {goal}"
-            or slot_data.get("goal_endpoint_available") is not True
-        ):
-            return frozenset()
-        if (
-            not isinstance(required_capabilities, list)
-            or any(not isinstance(value, str) for value in required_capabilities)
-            or not self._capabilities <= set(required_capabilities)
         ):
             return frozenset()
         requirements = slot_data.get("additional_victory_requirements", ())
@@ -54,14 +51,21 @@ class GoalPolicy:
         if not requirements <= self._requirement_names:
             return frozenset()
 
-        active_names = self._active_goal_location_names(slot_data, server_locations)
         return self._objectives(slot_data, goal, requirements, active_names)
 
 
     def objective_ids(self, slot_data, server_locations):
-        slot_data = self._goal_options(slot_data)
         if not isinstance(slot_data, dict):
             return frozenset()
+        if "campaign" not in slot_data:
+            required_capabilities = slot_data.get("required_capabilities")
+            if (
+                slot_data.get("goal_endpoint_available") is not True
+                or not isinstance(required_capabilities, list)
+                or any(not isinstance(value, str) for value in required_capabilities)
+                or not self._capabilities <= set(required_capabilities)
+            ):
+                return frozenset()
         return self._objective_ids_goal(server_locations, slot_data)
 
     def _objectives(self, slot_data, goal, requirements, active_names):
@@ -88,10 +92,49 @@ class GoalPolicy:
             return slot_data
         goal = slot_data["campaign"]["goal"]
         return {"goal": goal["kind"], "goal_endpoint_event": goal["endpoint_event"],
-                "goal_endpoint_available": True, "required_capabilities": list(self._capabilities),
                 "additional_victory_requirements": goal["additional_requirements"],
                 "master_level_completion_ids": [self._master_levels[key]
                     for key in slot_data["campaign"].get("master_level_stage_ids", ())],
-                "campaign_plan": {"goal_stage": goal["stage_id"]},
-                "use_dlc_content": True, "include_dlc_missions": True}
+                "campaign_plan": {"goal_stage": goal["stage_id"]}}
 
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CONTRACT_PATH = REPO_ROOT / "data" / "campaign_goal_contract.json"
+REQUIRED_FIELDS = {
+    "schema_version",
+    "release",
+    "publisher_key",
+    "event_filename",
+    "marker",
+    "event_target",
+    "owner",
+    "source",
+    "runtime_map",
+    "destination_map",
+}
+
+
+def load_campaign_goal_contract(path: Path = CONTRACT_PATH) -> dict:
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    if set(contract) != REQUIRED_FIELDS:
+        raise ValueError(
+            "campaign goal contract fields drift: "
+            f"expected {sorted(REQUIRED_FIELDS)}, got {sorted(contract)}"
+        )
+    if contract["schema_version"] != 1:
+        raise ValueError("unsupported campaign goal contract schema")
+    for key in REQUIRED_FIELDS - {"schema_version"}:
+        if not isinstance(contract[key], str) or not contract[key].strip():
+            raise ValueError(f"campaign goal contract has invalid {key}")
+    if not contract["event_filename"].endswith(".txt"):
+        raise ValueError("campaign goal event_filename must be a .txt file")
+    if not contract["marker"].startswith(("AP_GOAL_EVENT_", "AP_MISSION_EVENT_")):
+        raise ValueError("campaign goal marker must identify a publisher event")
+    if contract["event_target"] != "ap_campaign_goal_event":
+        raise ValueError("campaign goal event_target drift")
+    if contract["runtime_map"] == contract["destination_map"]:
+        raise ValueError("campaign goal transition cannot target its source map")
+    return contract
+
+
+CAMPAIGN_GOAL_CONTRACT = load_campaign_goal_contract()

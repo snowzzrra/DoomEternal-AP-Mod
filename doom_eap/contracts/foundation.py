@@ -145,11 +145,6 @@ FROZEN_CONSTRUCTOR_HASHES = {
     "target_count_relay": "f98420ff14bac0ca887116eef39466b2207bcb58e4fd4827f9e0f00efe139ba4",
     "currency_grant_direct": "52c0c2b7a32450948d8953d8b41a1544dade86348ba80dd06f5a7b97e708f993",
 }
-GAMEPLAY_COMMAND_PREFIXES = (
-    "give ", "chrispy ", "g_giveExtraLives ",
-    "ai_ScriptCmdEnt player1 givePlayerPerk ",
-)
-
 
 def load_primitive_registry() -> dict[str, Any]:
     return PRIMITIVE_REGISTRY
@@ -198,10 +193,7 @@ def _validate_primitive_registry_shape_digest(primitive, primitive_id, source):
         raise ValueError(f"Primitive {primitive_id} cannot enter release")
 
 
-def _validate_primitive_registry_shape(primitive, primitive_id, seen):
-    if primitive_id in seen:
-        raise ValueError(f"Duplicate primitive ID: {primitive_id}")
-    seen.add(primitive_id)
+def _validate_primitive_registry_shape(primitive, primitive_id):
     if primitive.get("status") not in VALID_STATUSES:
         raise ValueError(f"Primitive {primitive_id} has invalid status")
     source = primitive.get("source", {})
@@ -215,9 +207,8 @@ def validate_primitive_registry(registry: dict[str, Any] | None = None) -> dict[
         raise ValueError("Primitive registry is empty")
     if set(registry.get("allowed_statuses", ())) != VALID_STATUSES:
         raise ValueError("Primitive registry status vocabulary drifted")
-    seen = set()
     for primitive_id, primitive in primitives.items():
-        _validate_primitive_registry_shape(primitive, primitive_id, seen)
+        _validate_primitive_registry_shape(primitive, primitive_id)
     return registry
 
 
@@ -715,8 +706,6 @@ def _compile_item_delivery_plan_description(classification, definition, family, 
             command=f"ai_ScriptCmdEnt {notification} activate",
             index=len(commands),
         ))
-    if any(command.command.startswith(GAMEPLAY_COMMAND_PREFIXES) for command in commands):
-        raise ValueError("Delivery plan contains a raw gameplay-changing command")
     return DeliveryPlan(item_id, family, primitive_id, tuple(commands), resolved_stage, description)
 
 
@@ -753,11 +742,3 @@ def compile_all_item_plans(definitions: dict[int, Any]) -> list[DeliveryPlan]:
         stage = 0 if classify_item_definition(definition) in {"progressive_perk", "progressive_item"} else None
         plans.append(compile_item_delivery_plan(item_id, definitions, stage=stage))
     return plans
-
-
-def family_counts(definitions: dict[int, Any]) -> dict[str, int]:
-    counts: dict[str, int] = {}
-    for definition in definitions.values():
-        family = classify_item_definition(definition)
-        counts[family] = counts.get(family, 0) + 1
-    return dict(sorted(counts.items()))

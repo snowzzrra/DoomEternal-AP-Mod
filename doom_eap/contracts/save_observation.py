@@ -97,21 +97,6 @@ def admitted_evidence_matches(evidence, selection, namespace, pid, admission):
         and Path(evidence.source_file.replace("\\", "/")).resolve() == selection.path.with_name("game.details").resolve())
 
 
-def expected_save_prefix_for_campaign(campaign: str | None) -> str | None:
-    """Map campaign identifier to canonical save slot prefix."""
-    if not campaign:
-        return None
-    if campaign == "Base":
-        return "GAME-AUTOSAVE"
-    if campaign in ("TAG1", "ARC"):
-        return "DLC1-AUTOSAVE"
-    if campaign in ("TAG2", "Dark Lord"):
-        return "DLC2-AUTOSAVE"
-    if campaign == "Horde":
-        return "HORDE-AUTOSAVE"
-    return None
-
-
 def unlockable_record_complete(record: Mapping, signal: Mapping) -> bool:
     expected_count = signal.get("rule_0_statCount")
     return (

@@ -13,6 +13,12 @@ def canonical_map_name(name: str | None) -> str | None:
     return "game/hub/hub" if normalized in {"game/hub/hub", "game/sp/hub/hub"} else normalized
 
 
+def catalog_map_key(catalog_maps, runtime_map):
+    normalized = canonical_map_name(runtime_map)
+    matches = [key for key, value in catalog_maps.items() if value == normalized]
+    return matches[0] if len(matches) == 1 else None
+
+
 @dataclass(frozen=True)
 class RuntimeContext:
     identity: str

@@ -157,7 +157,7 @@ def _build_campaign_kill_budget_alternatives(enemy_plan, estimated_kills, key, o
 
 def _build_campaign_kill_budget_stages(campaign, catalog, enemy_plan):
     stages = _campaign_kill_stages(campaign, catalog)
-    result, estimated_kills = [], 0
+    result, estimated_kills, stage_estimates = [], 0, {}
     for key in stages:
         original = catalog["maps"][key]
         stage_estimate_before = estimated_kills
@@ -167,17 +167,56 @@ def _build_campaign_kill_budget_stages(campaign, catalog, enemy_plan):
             if type(estimate) is not int or not 0 <= estimate <= 0xffffffffffffffff:
                 raise ValueError(f'Native campaign kill estimate is invalid: {key}')
             estimated_kills = stage_estimate_before + max(estimated_kills - stage_estimate_before, estimate)
+        stage_estimates[key] = estimated_kills - stage_estimate_before
         sources = list(collapsed.values())
         result.extend(source for source in sources if source["count"] and source['source_id'] in progression
                       and source['source_id'].split('/')[0] not in conditional)
-    return estimated_kills, result
+    return estimated_kills, result, stage_estimates
 
 
 def build_campaign_kill_budget(campaign, enemy_plan, *, catalog=None):
     if catalog is None:
         catalog = load_campaign_kill_sources()
-    estimated_kills, result = _build_campaign_kill_budget_stages(campaign, catalog, enemy_plan)
-    return dict(estimated_kills=estimated_kills, finite_sources=_finite_sources(result, allow_empty=True))
+    estimated_kills, result, stage_estimates = _build_campaign_kill_budget_stages(campaign, catalog, enemy_plan)
+    return dict(estimated_kills=estimated_kills, finite_sources=_finite_sources(result, allow_empty=True),
+                stage_estimates=stage_estimates)
+
+
+def _restored_stage_recipes(stage, record, tables):
+    origins = {row['id']: row for row in tables['maps'][stage]['origins']
+               + tables['maps'][stage].get('runtime_origins', [])}
+    result = []
+    for row in record.rows:
+        if row.role_ref != 'primary':
+            continue
+        origin = origins[tables['sources'][row.source_ref]['source_id']]
+        result.append({**origin, 'logical_count': row.logical_count, 'physical_count': len(row.bodies),
+                       'maximum_emissions': row.maximum_emissions, 'renewable': row.renewable})
+    return result
+
+
+def _campaign_recipe_active(recipe):
+    return not recipe.get('runtime_only') and not (
+        recipe.get('layers') and all('master' in layer.lower() for layer in recipe['layers']))
+
+
+def restore_campaign_kill_budget(campaign, recipes, catalog, *, revision):
+    from .native_enemy_plan import _campaign_kill_estimates
+    from .recipe_codec import decode_recipes
+    from .slot_data_contract import catalog_tables
+
+    if not recipes.enabled:
+        return build_campaign_kill_budget(campaign, None)
+    tables = catalog_tables(catalog)
+    maps, costs = {}, {}
+    for stage, record in decode_recipes(recipes).maps.items():
+        restored = _restored_stage_recipes(stage, record, tables)
+        maps[stage] = {'source_sha256': tables['maps'][stage]['source_sha256'], 'recipes': restored}
+        costs[stage] = {'campaign': {}}
+        active = [row for row in restored if _campaign_recipe_active(row)]
+        _campaign_kill_estimates(active, costs, stage, (), False, ())
+    plan = dict(kind='native_recipes', revision=revision, maps=maps, combat_costs=costs)
+    return build_campaign_kill_budget(campaign, plan)
 
 
 def _finite_sources_identity(source):

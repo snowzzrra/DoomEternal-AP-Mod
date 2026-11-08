@@ -13,7 +13,6 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import Annotated, Literal, Union, get_args, get_origin, get_type_hints
 
-from .fortress_economy import battery_surplus_limit
 
 __all__ = (
     "CATALOG_DEPENDENCIES",
@@ -869,3 +868,7 @@ def _recipe_table_bounds(recipes):
         table = recipes.get(name)
         _require(type(table) is list, f"recipes.{name} must be an array")
         _require(len(table) <= limit, f"recipes.{name} exceeds table limit")
+
+
+def battery_surplus_limit(cost, percent):
+    return (cost * percent + 99) // 100

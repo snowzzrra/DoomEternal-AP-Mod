@@ -48,16 +48,6 @@ def source_species(source, catalog):
     return tuple(native_source_identity(source, catalog)['species'])
 
 
-def source_replenishment(source, catalog):
-    if not source['maximum_emissions'] or source.get('effective_replenishment'):
-        return True
-    key = source['id'].split('/', 1)[0]
-    recorded = load_vanilla_profiles()['maps'].get(key)
-    stage = catalog['maps'].get(key)
-    return bool(recorded and stage and stage.get('source_sha256') == recorded['source_sha256'] and
-                source['id'] in recorded.get('source_lifetimes', {}))
-
-
 def source_is_master(source):
     binding = source.get('binding') or {}
     owner = binding.get('owner', binding.get('entity', '')).lower()

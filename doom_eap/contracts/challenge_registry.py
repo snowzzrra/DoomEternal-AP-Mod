@@ -71,18 +71,6 @@ def all_location_entries(registry: dict) -> list[dict]:
     ]
 
 
-def mastery_entry_by_unlockable(registry: dict) -> dict[str, dict]:
-    return {entry["signal"]["unlockable"]: entry for entry in registry.get("weapon_masteries", [])}
-
-
-def mission_challenge_entry_by_unlockable(registry: dict) -> dict[str, dict]:
-    return {entry["signal"]["unlockable"]: entry for entry in registry.get("mission_challenges", [])}
-
-
-def all_mission_challenge_entries(registry: dict) -> list[dict]:
-    return list(registry.get("all_mission_challenges", []))
-
-
 def aggregate_ready(signal: dict, checked_locations: set[int], server_locations: set[int] | None = None) -> bool:
     if signal.get("authority") != "server_checked_locations":
         raise ValueError("aggregate authority must be server_checked_locations")

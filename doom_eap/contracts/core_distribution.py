@@ -34,8 +34,6 @@ def mod_compatible(value):
         versions = value["mod_versions"]
         return isinstance(versions, list) and MOD_VERSION in versions
     terms = value["mod_version_range"].split(",")
-    if not terms:
-        return False
     current = version_key(MOD_VERSION)
     for term in terms:
         match = re.fullmatch(r"(>=|<=|>|<|==)(.+)", term.strip())
@@ -165,14 +163,3 @@ def verify_runtime(manifest_path, *, bootstrap_from_archive=False):
             raise ValueError("Unexpected runtime ZIP contents")
         contents = _verify_runtime_file_size(archive, bootstrap_from_archive, items, names, path, value)
     return value, contents
-
-def select_compatible(manifests, *, allow_rc=False):
-    accepted = []
-    for value in manifests:
-        try:
-            validate_manifest(value)
-        except (ValueError, KeyError, TypeError):
-            continue
-        if allow_rc or value["channel"] == "stable":
-            accepted.append(value)
-    return max(accepted, key=lambda value: version_key(value["version"]), default=None)

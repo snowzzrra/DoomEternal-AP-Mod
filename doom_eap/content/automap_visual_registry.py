@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any, cast
 
-from doom_eap.contracts.source_bytes import first_party_text_bytes
+from doom_eap.content.compiler_identity import first_party_text_bytes
 
 SCHEMA_VERSION = 1
 REGISTRY_REVISION = "checked-location-visuals-v3"

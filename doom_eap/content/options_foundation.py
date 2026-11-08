@@ -42,22 +42,11 @@ def _validate_options_schema_choices(key, option):
     return choice_keys
 
 
-def _validate_options_schema_default(choices, key, option):
+def _validate_options_schema_default(key, option):
     default = option.get("default")
-    if not isinstance(choices, list) or not choices:
-        raise ValueError(f"option set {key} lacks choices")
+    choice_keys = _validate_options_schema_choices(key, option)
     if not isinstance(default, list):
         raise ValueError(f"option set {key} default must be a list")
-    choice_keys: list[str] = []
-    for choice in choices:
-        if not isinstance(choice, Mapping):
-            raise ValueError(f"option set {key} contains malformed entry")
-        choice_key = choice.get("key")
-        if not isinstance(choice_key, str) or not choice_key:
-            raise ValueError(f"option set {key} contains invalid key")
-        if not isinstance(choice.get("label"), str) or not choice["label"]:
-            raise ValueError(f"option set {key} contains invalid label")
-        choice_keys.append(choice_key)
     return choice_keys, default
 
 
@@ -171,10 +160,8 @@ def _validate_options_schema_excluded(document, options):
     return normalized
 
 
-def _validate_options_schema_choice_keys(choices, key, option):
-    choice_keys, default = _validate_options_schema_default(choices, key, option)
-    if len(choice_keys) != len(set(choice_keys)):
-        raise ValueError(f"option set {key} contains duplicate keys")
+def _validate_options_schema_choice_keys(key, option):
+    choice_keys, default = _validate_options_schema_default(key, option)
     if any(not isinstance(value, str) or value not in choice_keys for value in default):
         raise ValueError(f"option set {key} default contains unknown values")
     if len(default) != len(set(default)):
@@ -215,8 +202,7 @@ def validate_options_schema(document: Mapping[str, Any]) -> dict[str, Any]:
             if option.get("default") not in choice_keys:
                 raise ValueError(f"choice {key} default is not canonical")
         elif ui_type == "option_set":
-            choices = option.get("choices")
-            _validate_options_schema_choice_keys(choices, key, option)
+            _validate_options_schema_choice_keys(key, option)
         elif ui_type == "option_dict":
             _validate_dictionary_schema(key, option)
         elif ui_type in {"range", "named_range"}:
@@ -428,9 +414,8 @@ def validate_player_name(value: str) -> str:
 def player_yaml_document(
     schema: Mapping[str, Any], player_name: str, values: Mapping[str, Any]
 ) -> dict[str, Any]:
-    validated_schema = validate_options_schema(schema)
     name = validate_player_name(player_name)
-    options = validate_option_values(validated_schema, values)
+    options = validate_option_values(schema, values)
     return {
         "name": name,
         "description": "DOOM Eternal player options",
@@ -508,8 +493,8 @@ def _load_player_yaml_raw_options(document):
         raise ValueError("Player YAML lacks DOOM Eternal settings")
     if "dlc_logic_timing" in raw_options:
         raise ValueError(
-            "DLC Logic Timing belongs to DoomEAP 0.6. "
-            "Use the DoomEAP 0.7 template to create a new room."
+            "DLC Logic Timing is not supported. "
+            "Use the player template included with this DoomEAP package to create a new room."
         )
     return name, raw_options
 
