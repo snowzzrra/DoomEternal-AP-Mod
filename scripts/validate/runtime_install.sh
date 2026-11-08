@@ -96,19 +96,22 @@ else
     MAP_SOURCES="$REPO_ROOT/data/map_sources.json"
 fi
 
-mapfile -t expected_entries < <(python3 -c '
-import json, sys
-for entry in json.load(open(sys.argv[1], encoding="utf-8")):
-    if not entry.get("release_asset"): continue
-    res_name = entry["resource_path"].split("/")[-1].replace(".resources", "")
-    print(f"{res_name}/maps/{entry[\"relative_entities_path\"]}")
-' "$MAP_SOURCES")
-
-mapfile -t resource_archives < <(python3 -c '
-import json, sys
-for entry in json.load(open(sys.argv[1], encoding="utf-8")):
-    if entry.get("release_asset"): print(entry["resource_path"])
-' "$MAP_SOURCES")
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+if ! release_rows="$(PYTHONPATH="$REPO_ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 -m doom_eap.content.map_registry release-rows --registry "$MAP_SOURCES")"; then
+    echo "Could not load the release map registry: $MAP_SOURCES" >&2
+    exit 1
+fi
+if [[ -z "$release_rows" ]]; then
+    echo "Release map registry has no release maps: $MAP_SOURCES" >&2
+    exit 1
+fi
+expected_entries=()
+resource_archives=()
+while IFS=$'\t' read -r map_key source_file source_sha256 level_config manifest generated_output resource_path relative_entities_path revision; do
+    resource_name="${resource_path##*/}"
+    expected_entries+=("${resource_name%.resources}/maps/$relative_entities_path")
+    resource_archives+=("$resource_path")
+done <<<"$release_rows"
 
 archive_entries="$(unzip -Z1 "$MOD_ZIP")"
 for entry in "${expected_entries[@]}"; do

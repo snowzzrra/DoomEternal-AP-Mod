@@ -103,6 +103,20 @@ run_build_step() {
     fi
 }
 
+grep_matches() {
+    local status
+    if grep "$@" > /dev/null; then
+        return 0
+    else
+        status=$?
+    fi
+    if [[ "$status" -eq 1 ]]; then
+        return 1
+    fi
+    echo "Package audit grep failed (status=$status)" >&2
+    exit "$status"
+}
+
 cleanup_build() {
     local status=$?
     rm -rf "$TEMP_DIR"
@@ -163,13 +177,7 @@ extract_and_build() {
 
     echo "[$map_key] source=$source_map size=$source_size sha256=$source_hash_before revision=$supported_game_revision" | tee -a "$BUILD_LOG"
 
-    local GENERATOR_ARGS=()
-    if [[ "$ENABLE_ITEM_NOTIFICATIONS" != "1" ]]; then
-        GENERATOR_ARGS+=(--disable-item-notifications)
-    fi
-
-    if [[ -n "${AP_PIPELINE_RECEIPT:-}" ]]; then
-        python3 - "$AP_PIPELINE_RECEIPT" "$map_key" "$generated_file" "$generated_manifest" <<'PYEOF'
+    python3 - "$AP_PIPELINE_RECEIPT" "$map_key" "$generated_file" "$generated_manifest" <<'PYEOF'
 import hashlib
 import json
 import shutil
@@ -202,18 +210,6 @@ actual_hash = hashlib.sha256(manifest_dest.read_bytes()).hexdigest()
 if actual_hash != entry["manifest_sha256"]:
     raise SystemExit(f"Manifest hash mismatch map={map_key} expected={entry['manifest_sha256']} got={actual_hash}")
 PYEOF
-    elif [[ -n "${AP_PIPELINE_ARTIFACT_ROOT:-}" ]]; then
-        cp "$AP_PIPELINE_ARTIFACT_ROOT/maps/$generated_output" "$generated_file"
-        cp "$AP_PIPELINE_ARTIFACT_ROOT/manifests/$map_key.json" "$generated_manifest"
-    else
-        python3 "$REPO_ROOT/tools/maps/ap_map_generator.py" \
-            --input "$source_map" \
-            --output "$generated_file" \
-            --config "$REPO_ROOT/$config_path" \
-            --manifest "$generated_manifest" \
-            --items "$REPO_ROOT/data/items.json" \
-            "${GENERATOR_ARGS[@]}"
-    fi
 
     source_hash_after="$(sha256sum "$source_map" | awk '{print $1}')"
     if [[ "$source_hash_after" != "$source_hash_before" ]]; then
@@ -233,6 +229,12 @@ assert expected == actual, f"generated manifest differs: {sys.argv[1]} | only_ex
 
 }
 
+"$REPO_ROOT/scripts/build/client.sh" "$CLIENT_BUILD_DIR"
+if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
+    echo "Client staging is missing required executable(s)" >&2
+    exit 1
+fi
+
 rm -rf "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/licenses" \
     "$OUTPUT_DIR/DoomEternalArchipelagoLauncher" \
     "$OUTPUT_DIR/DoomEternalArchipelagoLauncher.exe" \
@@ -243,18 +245,14 @@ rm -rf "$OUTPUT_DIR/client" "$OUTPUT_DIR/apworld" "$OUTPUT_DIR/licenses" \
     "$STALE_DEV_ZIP" \
     "$OUTPUT_DIR/DoomEternalArchipelago-v0.3.0-pre-alpha.zip" \
     "$OUTPUT_DIR/DoomEternalArchipelagoPreAlpha.zip"
-find "$OUTPUT_DIR/build" -mindepth 1 -maxdepth 1 ! -name build.log -exec rm -rf -- {} +
+find "$OUTPUT_DIR/build" -mindepth 1 -maxdepth 1 ! -name build.log ! -name client -exec rm -rf -- {} +
+find "$CLIENT_BUILD_DIR" -mindepth 1 -maxdepth 1 ! -name ap_client.exe ! -name save_death_probe.exe -exec rm -rf -- {} +
 mkdir -p "$MOD_STAGING_DIR" "$OUTPUT_DIR/client" "$GENERATED_MAPS_DIR" "$TEMP_DIR"
 echo "Build log: $BUILD_LOG"
 if [[ "$ENABLE_ITEM_NOTIFICATIONS" == "1" ]]; then
     echo "ITEM_NOTIFICATIONS=enabled"
 else
     echo "ITEM_NOTIFICATIONS=disabled"
-fi
-"$REPO_ROOT/scripts/build/client.sh" "$CLIENT_BUILD_DIR"
-if [[ ! -f "$CLIENT_BUILD_DIR/ap_client.exe" || ! -f "$CLIENT_BUILD_DIR/save_death_probe.exe" ]]; then
-    echo "Fresh client build is missing required executable(s)" >&2
-    exit 1
 fi
 if [[ -f "$SCRIPT_DIR/ap_client.exe" ]]; then
     echo "Refusing to package ap_client.exe from the source tree" >&2
@@ -472,7 +470,7 @@ LAUNCHER_PYTHON="${LAUNCHER_PYTHON:-$ARCHIPELAGO_PYTHON}"
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH="$OUTPUT_DIR/client" "$LAUNCHER_PYTHON" -B -c "
 import doom_eap.presentation
 from doom_eap.launcher.launcher_core import RoomCompiler
-from doom_eap.launcher.launcher_ui import LauncherUI
+from doom_eap.launcher.ui.app_window import LauncherUI
 from doom_eap.content.content_catalog import load_content_catalog
 " || { echo "Packaged Python client import closure failed" >&2; exit 1; }
 mkdir -p "$OUTPUT_DIR/client/tools"
@@ -549,31 +547,18 @@ python3 -m tools.release.build_room_resources \
 find "$OUTPUT_DIR/client" -type d -name __pycache__ -prune -exec rm -rf {} +
 
 python3 - "$OUTPUT_DIR" "$RELEASE_VERSION" "$REPO_ROOT" "$MAP_SOURCES_FILE" <<'PY'
-import hashlib
-import json
 import sys
 from pathlib import Path
 
 output_dir = Path(sys.argv[1])
 release_version = sys.argv[2]
 sys.path.insert(0, sys.argv[3])
-from doom_eap.content.map_registry import load_map_registry, release_plan
 from tools.validation.release_layout import expected_release_roots
-plans = release_plan(load_map_registry(Path(sys.argv[4]), authorial=True))
-map_manifest_files = [plan.client_manifest for plan in plans]
-generated_map_hashes = {
-    plan.map_key: hashlib.sha256(
-        (output_dir / "build" / "generated-maps" / plan.generated_output).read_bytes()
-    ).hexdigest()
-    for plan in plans
-}
-visual_registry_path = output_dir / "client/data/checked_location_visuals.json"
 launcher_executable = (
     "DoomEternalArchipelagoLauncher.exe"
     if (output_dir / "DoomEternalArchipelagoLauncher.exe").is_file()
     else "DoomEternalArchipelagoLauncher"
 )
-from tools.validation.release_layout import public_file_members
 client_files = sorted(f"client/{path.relative_to(output_dir / 'client').as_posix()}" for path in (output_dir / "client").rglob("*") if path.is_file())
 public_files = sorted(
     list(expected_release_roots(launcher_executable) - {"client", launcher_executable})
@@ -596,31 +581,31 @@ PY
 
 if [[ "$DEEP_AUDIT" == "1" && "$AUTOMAP_PROTOTYPE_ONLY" != "1" ]]; then
 for generated_map in "$GENERATED_MAPS_DIR"/*.entities; do
-    if grep -q '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
+    if grep_matches '^\s*entityDef ap_bootstrap_v[0-9]_' "$generated_map"; then
         echo "Rejected stat-write bootstrap entered the normal build: $generated_map" >&2
         exit 1
     fi
 done
-if grep -q 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"; then
+if grep_matches 'pickups_pickup_weapon_heavy_cannon_1' "$GENERATED_MAPS_DIR/e1m2_war.entities"; then
     echo "Exultia Heavy Cannon fallback reappeared" >&2
     exit 1
 fi
-if grep -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+if grep_matches -rE 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
     "$MOD_STAGING_DIR" "$GENERATED_MAPS_DIR" "$OUTPUT_DIR/client/data/items.json"; then
     echo "Rejected Armor Drain or watcher architecture entered build" >&2
     exit 1
 fi
-if grep -q 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_client.py"; then
+if grep_matches 'Ignoring unexpected goal transition event' "$OUTPUT_DIR/client/bridge_client.py"; then
     echo "Old goal-only transition handler entered build" >&2
     exit 1
 fi
 CLIENT_STRINGS_FILE="$TEMP_DIR/ap-client.strings"
 strings "$CLIENT_BUILD_DIR/ap_client.exe" > "$CLIENT_STRINGS_FILE"
-if grep -qE 'v0\.3\.(8|9)-alpha' "$CLIENT_STRINGS_FILE"; then
+if grep_matches -E 'v0\.3\.(8|9)-alpha' "$CLIENT_STRINGS_FILE"; then
     echo "Stale alpha product label found in ap_client.exe" >&2
     exit 1
 fi
-if ! grep -Fq "$RELEASE_VERSION" "$CLIENT_STRINGS_FILE"; then
+if ! grep_matches -F "$RELEASE_VERSION" "$CLIENT_STRINGS_FILE"; then
     echo "Current $RELEASE_VERSION product label missing from ap_client.exe" >&2
     exit 1
 fi
@@ -629,11 +614,11 @@ mapfile -t MASTERY_OVERRIDE_FILES < <(find "$MOD_STAGING_DIR" -type f \( \
     -path '*/generated/decls/perks/perk/player/weapons/*' \
 \) | LC_ALL=C sort)
 [[ "${#MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Base Mastery override set is incomplete" >&2; exit 1; }
-if grep -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${MASTERY_OVERRIDE_FILES[@]}"; then
+if grep_matches -E 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${MASTERY_OVERRIDE_FILES[@]}"; then
     echo "Mastery override retains natural reward, completion stat, or global stat" >&2
     exit 1
 fi
-if ! grep -q 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
+if ! grep_matches 'upgrade/weapons/shotguns/shotgun/pop_rocket_more_bombs' \
     "$MOD_STAGING_DIR/gameresources/generated/decls/perks/perk/player/weapons/shotgun/pop_rocket_more_bombs.decl"; then
     echo "Sticky AP gameplay upgrade missing" >&2
     exit 1
@@ -832,16 +817,16 @@ mapfile -t AUDIT_MASTERY_OVERRIDE_FILES < <(find "$MOD_AUDIT_DIR" -type f \( \
     -path '*/generated/decls/perks/perk/player/weapons/*' \
 \) | LC_ALL=C sort)
 [[ "${#AUDIT_MASTERY_OVERRIDE_FILES[@]}" == "26" ]] || { echo "Final ZIP base Mastery override set drifted" >&2; exit 1; }
-if grep -q 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${AUDIT_MASTERY_OVERRIDE_FILES[@]}"; then
+if grep_matches -E 'perkToGive|addStats|STAT_CURRENT_MASTERIES_AQUIRED|MASTERY_EARNED' "${AUDIT_MASTERY_OVERRIDE_FILES[@]}"; then
     echo "Final ZIP does not isolate Mastery item and location paths" >&2
     exit 1
 fi
-if grep -q 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
+if grep_matches -rE 'give armor -200|AP_RUNTIME_CHECK_|3_900_000_000|3_800_000_000' \
     "$MOD_AUDIT_DIR" "$EXTRACTED_AUDIT_DIR/client/data/items.json"; then
     echo "Final ZIP contains Armor Drain or rejected watcher architecture" >&2
     exit 1
 fi
-if grep -q 'Ignoring unexpected goal transition event' \
+if grep_matches 'Ignoring unexpected goal transition event' \
     "$EXTRACTED_AUDIT_DIR/client/bridge_client.py"; then
     echo "Final ZIP contains old goal-only transition handler" >&2
     exit 1

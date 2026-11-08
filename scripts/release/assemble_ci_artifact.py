@@ -67,7 +67,7 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
-def write_deterministic_zip(source_dir: Path, output_zip_path: Path, prefix: str = "DoomEternalArchipelago") -> None:
+def write_release_zip(source_dir: Path, output_zip_path: Path, prefix: str = "DoomEternalArchipelago") -> None:
     """Create a zip archive from a source directory under a single root prefix."""
     output_zip_path.parent.mkdir(parents=True, exist_ok=True)
     temp_zip = output_zip_path.with_suffix(".tmp.zip")
@@ -560,7 +560,7 @@ def _audit_final_zip_infolist(zf, zip_path):
     return names
 
 
-def audit_final_zip(zip_path: Path, expected_platform: str, repo_root: Path | None = None) -> None:
+def audit_final_zip(zip_path: Path, expected_platform: str) -> None:
     """Audit single output release ZIP against canonical contracts."""
     if not zip_path.is_file():
         raise ValueError(f"Release ZIP does not exist: {zip_path}")
@@ -625,8 +625,8 @@ def _assemble_release_archives(args, extracted_handoff, output_dir, repo_root, r
     for platform_name in platforms:
         archive = output_dir / f"DoomEternalArchipelago-{version_label}-{platform_name}-x86_64.zip"
         print(f"--> Creating {archive.name}...")
-        write_deterministic_zip(stages[platform_name], archive)
-        audit_final_zip(archive, platform_name, repo_root=repo_root)
+        write_release_zip(stages[platform_name], archive)
+        audit_final_zip(archive, platform_name)
         archives.append(archive)
     sums_file = output_dir / "SHA256SUMS.txt"
     sums_file.write_text(

@@ -13,7 +13,6 @@ param(
     [string]$CoreSource,
     [string]$ArchipelagoSource,
     [string]$Python,
-    [string]$PipelineReceipt,
     [Alias("h")]
     [switch]$Help
 )
@@ -21,7 +20,7 @@ param(
 if ($Help -or $HelpArgument) {
     Write-Output @"
 Usage: windows_release.ps1 -CoreSource <Sentinel-Core> [-ArchipelagoSource <Archipelago>]
-    [-Python <python.exe>] [-Preflight] [-SkipValidation] [-PipelineReceipt <path>]
+    [-Python <python.exe>] [-Preflight] [-SkipValidation]
     [-RebuildRoomResources] [-PublishRoomResources] [-StagedMod <path>] [-MapSources <path>] [-Compressor <path>]
 ArchipelagoSource defaults to the sibling Archipelago checkout containing worlds/doometernal.
 "@
@@ -121,6 +120,8 @@ try {
         try {
             Remove-Item -LiteralPath $handoff -Recurse -Force -ErrorAction Stop
         } catch {
+            $cause = ($_.Exception.GetType().Name + ": " + $_.Exception.HResult).Replace("`r", " ").Replace("`n", " ")
+            Write-Warning "Handoff cleanup failed: $cause"
             $handoff = Join-Path $releaseRoot "handoff-$PID"
             if (Test-Path -LiteralPath $handoff) {
                 Remove-Item -LiteralPath $handoff -Recurse -Force
