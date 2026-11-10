@@ -52,6 +52,8 @@ Besides the usual pickups, secrets and challenges:
 - **Useful Fortress Rewards** sets how many of the Fortress battery room rewards hold a
   progression or useful item (75% by default). In a multiworld, the rest can hold filler
   or traps from other games, never your own.
+- **Useful Slayer Gate Rewards** applies the same rule to included Slayer Gate completion
+  rewards (75% by default), leaving their keys unchanged.
 
 ## Enemies
 
@@ -66,6 +68,9 @@ many can be alive together; **Intensity** changes the preference for stronger en
 Hell's Vanguard adds up to 20% finite enemies, with at most two superheavies alive
 per arena. Icon's Wrath adds up to 30%, with up to three in large late arenas.
 Limited and unlimited ammunition replacements keep their original quotas.
+An arena never shrinks to a fraction of itself: if the fight it was matched with has
+fewer than half the enemies the arena has in the original game, the arena uses its
+own original size.
 **Progressive Difficulty** raises the enemy mix gradually across whole missions,
 with a smaller rise between waves. Mission Access as Items assigns missions
 different difficulty steps and favors earlier Access rewards for easier options.
@@ -120,6 +125,9 @@ activate during safe gameplay; receiving another copy extends their duration.
 **DeathLink** shares deaths with other enabled players. **Soft** allows Extra Lives
 or Saving Throw to protect you. **Hardcore** causes death and checkpoint reload
 without consuming those protections.
+**Deaths before sending** in the launcher settings chooses how many of your deaths it
+takes to send one DeathLink. Next to it, the launcher shows how many deaths are left
+before the next one goes out. Changing the number starts the count again.
 
 If an owned item appears missing, load a level and choose **RESYNC INVENTORY**.
 Select the scope, return to DOOM and unpause within 30 seconds. The repair waits

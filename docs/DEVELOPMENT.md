@@ -406,6 +406,7 @@ If one of them breaks, something a player would feel broke. They live in
 |---|---|
 | `test_room.py` | Real APWorld generation for three small presets (base campaign; Mission Access as Items with DLC, Master Levels, Arena Checks, Ultra-Nightmare and Killsanity; DLC only), the slot data contract, and the room compiled from the bundle in `packaging/room_resources/`, down to the check chain of a pickup, an arena and a Master Level |
 | `test_checks.py` | The game writes `ap_event_<id>.txt`; the real bridge sends that location to a fake AP server once, also after a repeated file or a bridge restart; the goal reaches the server |
+| `test_deathlink.py` | Your deaths, read from Core's death queue, send one DeathLink per chosen interval even if a send or an ACK fails in between; a received DeathLink is applied once and never sent back |
 | `test_items.py` | The fake server sends a weapon, an upgrade, a trap and a filler; each goes through the ledger and the real pipe to a fake Core once, also after a reconnect and for items received offline |
 | `test_recovery.py` | An interrupted checkpoint write recovers to a valid generation; nothing received is lost or doubled |
 | `test_spending.py` | Ammo Refill and Fortress spending never debit twice across a restart |

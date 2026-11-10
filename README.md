@@ -81,6 +81,7 @@ kill rewards, DeathLink and inventory recovery. The options table below might he
 | Enabled Traps | 14 selected | Pick the traps that other players can send you. | any of 14 |
 | Trap Weights | none | Choose how often each selected trap appears. | per-item values |
 | Useful Fortress Rewards | 75 | Choose how many Fortress battery room rewards hold something useful. | 0–100 |
+| Useful Slayer Gate Rewards | 75 | Choose how many Slayer Gate rewards hold something useful. | 0–100 |
 | **Enemies** | | | |
 | Enemy Randomizer | On | Randomize the enemies you fight and vary their health, damage and size. | Off; On |
 | Enemy Preset | Slayer's Path | Choose a starting setup for enemy randomization. | UAC Patrol; Sentinel Training; Slayer's Path; Hell's Vanguard; Icon's Wrath; Gore Nest; Gladiator's Gauntlet; Cultist Chaos; Oops! All Imps; Piñata Party; Custom |
