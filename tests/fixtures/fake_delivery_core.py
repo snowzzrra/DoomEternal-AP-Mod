@@ -186,9 +186,17 @@ class Core:
         if operation == 0:
             return codec.encode("command_reference", reference)
         identity = reference["command_id"]
+        refusal = os.environ.get("PILLAR_CORE_REFUSAL")
+        if operation == 2 and refusal:
+            rule = next(rule for rule in codec.SCHEMA["command_results"]["admission_refusals"] if rule["name"] == refusal)
+            return codec.encode("command_response", command_response(
+                reference, effect=0, execution=0, error=rule["error"], state=rule.get("state", 0), reason=rule.get("reason", 0)))
         if operation == 2 and identity not in self.state["commands"]:
             self.wire_execute(reference, payload)
         stored = self.state["commands"].get(identity)
+        return self.wire_terminal(reference, stored)
+
+    def wire_terminal(self, reference, stored):
         response = codec.encode("command_response", command_response(
             reference, effect=2 if reference["command_type"] == 46 else 1,
             retention=0 if stored else 2, error=0 if stored else 4))

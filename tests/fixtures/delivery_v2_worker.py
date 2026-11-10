@@ -3,6 +3,7 @@
 import asyncio
 import json
 import sys
+from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -53,7 +54,9 @@ class BarrierLedger:
         return await self.worker.commit(name, self.ledger.apply, binding, changes, *args, **kwargs)
 
     async def ammo(self, binding, operations, changes, *args, **kwargs):
-        name = "ammo_reservation" if operations else "ammo_confirmation" if changes else "ammo_totals"
+        name = ("ammo_reservation" if operations else
+                "ammo_confirmation" if changes and changes[0].state is AmmoState.CONFIRMED else
+                "ammo_authorization" if changes else "ammo_totals")
         return await self.worker.commit(name, self.ledger.ammo, binding, operations, changes, *args, **kwargs)
 
 
@@ -259,7 +262,18 @@ class Worker:
             await self.plan()
         elif action == "ammo":
             scope = AmmoCommandScope("DeliveryRoomA", "map", "save", request.get("crucible", False))
-            await self.ammo.request(scope, (None, {}), request.get("received", 3))
+            refill = self.ammo.request(scope, (None, {}), request.get("received", 3))
+            if request.get("concurrent_balance"):
+                await asyncio.gather(refill, self.ammo.owner())
+            else:
+                await refill
+        elif action == "ammo_context":
+            self.ctx = replace(self.ctx, context_id=str(uuid4()), map_name="next-map", load_id=str(uuid4()))
+            await self.ledger.context(self.binding, self.ctx, ())
+            self.delivery.context = self.ctx
+            for command in await self.ledger.commands(self.key, (CommandState.PLANNED, CommandState.QUEUED), None, 256):
+                await self.delivery.expire_unsent(command.plan.command_id)
+            await self.ammo.recover()
         elif action == "ammo_recover":
             await self.ammo.recover()
         elif action == "ammo_retry":

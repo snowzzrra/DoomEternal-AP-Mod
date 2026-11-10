@@ -1,5 +1,3 @@
-"""Own subprocess lifetimes and delivery barriers; production writes remain delegated unchanged."""
-
 import asyncio
 import json
 import os

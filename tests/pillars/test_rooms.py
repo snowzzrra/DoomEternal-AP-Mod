@@ -81,7 +81,12 @@ def test_second_profile_cannot_spend_first_profiles_charges(tmp_path):
 
         assert status["ammo_operations"] == []
         assert (status["ammo_consumed"], status["ammo_discarded"]) == (0, 0)
-        assert peer.action("ammo")["ammo_consumed"] == first["ammo_consumed"] + 1
+        pending = peer.action("ammo")
+        assert pending["ammo_consumed"] == first["ammo_consumed"] == 0
+        assert pending["ammo_reserved"] == 1
+        command, = peer.action("ammo_deliver")["ammo_commands"]
+        peer.action("resolve", command_id=command["id"], revision=command["revision"], resolution="mark_as_received")
+        assert peer.action("ammo_recover")["ammo_consumed"] == 1
     finally:
         if second is not None:
             second.close()

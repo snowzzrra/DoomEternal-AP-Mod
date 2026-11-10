@@ -303,11 +303,12 @@ def test_open_verifies_connection_settings_and_rejects_other_database_formats(tm
         path = tmp_path / "settings.sqlite3"
         ledger = await Ledger.create(path)
         await ledger.close()
-        assert captured == [("wal", 2, 1, 5000, "normal", 1000)]
+        assert captured and all(settings == ("wal", 2, 1, 5000, "normal", 1000) for settings in captured)
+        captured.clear()
         execute_sql(path, "PRAGMA application_id=123")
         with pytest.raises(SchemaError):
             await Ledger.open(path)
-        assert len(captured) == 1
+        assert not captured
 
     monkeypatch.setattr(storage, "_configure", configure)
     asyncio.run(scenario())

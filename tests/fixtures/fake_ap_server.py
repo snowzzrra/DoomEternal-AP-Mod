@@ -58,10 +58,16 @@ class Server:
                 await socket.send(json.dumps([reply]))
                 if self.ammo_fault == "duplicate" and "ammo/ops/" in packet["key"]:
                     await socket.send(json.dumps([self.debit(packet)]))
-        elif packet["cmd"] == "Get":
+        else:
+            await self.reply(packet, socket)
+
+    async def reply(self, packet, socket):
+        if packet["cmd"] == "Get":
             await socket.send(json.dumps([{
                 "cmd": "Retrieved", "keys": {key: self.values.get(key) for key in packet["keys"]},
             }]))
+        elif packet['cmd'] == 'Bounce':
+            await socket.send(json.dumps([{**packet, 'cmd': 'Bounced'}]))
 
     def debit(self, packet):
         key = packet["key"]
