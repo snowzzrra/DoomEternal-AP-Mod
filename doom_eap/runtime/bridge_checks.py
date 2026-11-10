@@ -341,8 +341,6 @@ class CheckRuntime:
 
     async def queue_received_deathlink(self):
         try:
-            ready = (not self.ctx.save_observer.readiness.frozen and self.ctx.saves.has_authoritative_save_proof()
-                     and (await self.ctx.items.runtime_effects_ready()))
             if not self.ctx.deathlink.receiving:
                 return
             identity = await self.ctx.items._query_process_identity()
@@ -355,12 +353,48 @@ class CheckRuntime:
                     raise RuntimeError("Sentinel requires a qualified Windows game process")
                 return link
             publication = DeathLinkPublication(require_link, session.active_event, session.mode)
+            def advance():
+                try:
+                    DeathLinkPublication.admit(require_link())
+                except (RuntimeError, OSError, ValueError) as error:
+                    session.advance(False, publication, str(error))
+                else:
+                    session.advance(True, publication)
             await self.ctx.items._blocking_native_worker().call(
-                session.advance, ready, publication, process=identity)
+                advance, process=identity)
             if self.ctx.deathlink._receiver.__dict__ == before:
                 self.ctx.deathlink._receiver.__dict__.update(session._receiver.__dict__)
+                self.ctx.deathlink._waiting_reason = session._waiting_reason
         except RuntimeError as error:
             bridge_config.logger.info("[DeathLink] Native receive pending: %s", error)
+
+    async def poll_native_deathlink(self):
+        session = self.ctx.deathlink
+        grace = bridge_config.load_config().get('death_link_grace', 0)
+        if grace != session._grace:
+            session.reconfigure_grace(grace, self.ctx.persist_session_state)
+        token = self.ctx.receipt_session.capture(self.ctx.state_key)
+        try:
+            link = await self.ctx.items._native_game_link_async()
+            for _ in range(16):
+                result = await self.ctx.items._blocking_native_worker().call(
+                    DeathLinkPublication.poll_local, link, session.enabled, session.mode,
+                    process=link._process_identity)
+                session.set_observation(not bool(result['flags'] & 4096))
+                if result['flags'] & 4096:
+                    bridge_config.logger.warning('[DeathLink] Native local queue reports lost observations')
+                if not session.enabled or result['local_state'] != 1:
+                    return
+                domain = f"{link.namespace}:{result['instance_id']}"
+                self.ctx.items.reset_transient_effects('death_boundary')
+                await self.report_local_death(native=(domain, result))
+                if not self.ctx.receipt_session.is_current(token, self.ctx.state_key):
+                    return
+                await self.ctx.items._blocking_native_worker().call(
+                    DeathLinkPublication.ack_local, link, result, process=link._process_identity)
+        except (RuntimeError, OSError, ValueError, WebSocketException) as error:
+            session.set_observation(False)
+            bridge_config.logger.info('[DeathLink] Native local observation pending: %s', error)
 
     async def check_game_duration_death(self):
         selected = (await self.ctx.saves.update_save_slot_lifecycle())
@@ -411,36 +445,17 @@ class CheckRuntime:
             "[DeathLink] LOCAL_DEATH_OBSERVED event_identity=%s",
             event_identity,
         )
-        if not self.ctx.deathlink.enabled:
-            bridge_config.logger.info(
-                "[DeathLink] DEATHLINK_OUTBOUND_SUPPRESSED reason=death_link_disabled"
-            )
-            return True
-
-        await self.report_local_death()
         return True
 
     async def check_game_details_death(self):
         details = (await self.ctx.saves.observe_active_game_details())
         if self.ctx.death_observer.observe_details(details):
             bridge_config.logger.info("[DeathLink] LOCAL_DEATH_OBSERVED source=game.details path=%s", details.get("_path"))
-            await self.report_local_death()
 
-    async def report_local_death(self):
-        from types import SimpleNamespace
-        event, mode = self.ctx.deathlink.active_event, self.ctx.deathlink.mode
-        cancellations = []
-        publication = SimpleNamespace(cancel=cancellations.append)
-        await self.ctx.deathlink.report_local_death(self.ctx.auth, self.ctx.send_death, publication,
-            grace=bridge_config.load_config().get("death_link_grace", 0), persist=self.ctx.persist_session_state)
-        for state_key in cancellations:
-            try:
-                link = await self.ctx.items._native_game_link_async()
-                publication = DeathLinkPublication(lambda link=link: link, event, mode)
-                await self.ctx.items._blocking_native_worker().call(
-                    publication.cancel, state_key, process=link._process_identity)
-            except (RuntimeError, OSError) as error:
-                bridge_config.logger.warning("[DeathLink] Native cancellation unavailable: %s", error)
+    async def report_local_death(self, *, native):
+        await self.ctx.deathlink.report_local_death(self.ctx.auth, self.ctx.send_death,
+            grace=bridge_config.load_config().get("death_link_grace", 0), persist=self.ctx.persist_session_state,
+            native=native)
 
     def check_observation(self):
         return CheckObservation(
@@ -799,8 +814,10 @@ class CheckRuntime:
     async def death_monitor_loop(self):
         while not self.ctx.exit_event.is_set():
             if not self.ctx.item_state_ready:
+                self.ctx.deathlink.set_observation(False)
                 await asyncio.sleep(0.25)
                 continue
+            await self.poll_native_deathlink()
             await self.prime_death_baseline()
             (await self.check_rpc_autopause())
             (await self.queue_received_deathlink())

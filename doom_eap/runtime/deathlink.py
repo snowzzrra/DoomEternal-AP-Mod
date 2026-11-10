@@ -40,6 +40,54 @@ class DeathLinkPublication:
         digest = bytes.fromhex(self._event.event_id)
         return int.from_bytes(digest[:8], "little") or 1, digest[8:24]
 
+    @staticmethod
+    def _validate_gameplay(link, scope):
+        generation = scope.get('lifecycle_generation', 0)
+        if (scope.get('target_pid') != link.pid or scope.get('server_pid') != link.pid
+                or scope.get('availability') != 'enabled' or scope.get('lifecycle') != 'active'
+                or scope.get('context_reason') != 'none' or generation <= 0
+                or scope.get('context_generation') != generation):
+            raise RuntimeError('native_instance_or_gameplay_generation_unavailable')
+
+    @staticmethod
+    def _same_scope(before, after):
+        return all(before.get(key) and before[key] == after.get(key) for key in
+                   ('process_created', 'instance_id', 'lifecycle_generation'))
+
+    @classmethod
+    def admit(cls, link):
+        scope = link._run(['--native'])
+        admission = link.request(12)
+        cls._validate_gameplay(link, scope)
+        if not cls._same_scope(scope, admission):
+            raise RuntimeError('native_instance_or_gameplay_generation_changed')
+        if (admission.get('namespace_id') != link.namespace or admission.get('state') != 'admitted'
+                or not admission.get('accepting_requests') or not admission.get('route_retained')
+                or not any(bytes.fromhex(admission.get('save_binding', '')))):
+            raise RuntimeError('native_namespace_or_save_binding_unavailable')
+        return scope
+
+    @classmethod
+    def poll_local(cls, link, enabled, mode):
+        scope = cls.admit(link)
+        result = link.deathlink_request(1, enabled=enabled, mode=mode)
+        if result['outcome'] not in {0, 1}:
+            raise DeathLinkDispatchError(1, result)
+        if enabled:
+            result = link.deathlink_request(3)
+        if (result.get('namespace_id') != link.namespace
+                or not cls._same_scope(scope, result)):
+            raise RuntimeError('native_deathlink_observation_changed')
+        return result
+
+    @classmethod
+    def ack_local(cls, link, event):
+        if not cls._same_scope(cls.admit(link), event):
+            raise RuntimeError('native_deathlink_ack_scope_changed')
+        result = link.deathlink_request(4, ack_sequence=event['local_death_sequence'])
+        if result['outcome'] not in {0, 1}:
+            raise DeathLinkDispatchError(4, result)
+
     def dispatch(self, state_key):
         event_id, event_hash = self._identity()
         link = self._link()
@@ -314,9 +362,7 @@ class DeathLinkReceiver:
             event_id, deadline = self._late_suppression
             self._late_suppression = None
             if now <= deadline:
-                # Timeout policy: suppress one death arriving shortly after a delivered
-                # kill. This can suppress a coincidental local death during the bounded
-                # grace window, but prevents a late DeathLink kill from echoing.
+                # save observations lack the native cause, so late remote kills need bounded suppression
                 return self._result(event_id, ReceiveState.APPLIED, "late_echo_suppressed", now)
         return self._result(None, None, "not_linked", now)
 
@@ -385,9 +431,14 @@ class DeathLinkSession:
         self._enabled = False
         self._state_key = None
         self._seen = set()
-        self._confirmed_echo = None
+        self._confirmed_echo = deque(maxlen=64)
         self._generation = 0
         self._state = {}
+        self._grace = 0
+        self._available = False
+        self._progress = None
+        self._pending_echo = set()
+        self._waiting_reason = None
 
     @property
     def enabled(self):
@@ -415,9 +466,11 @@ class DeathLinkSession:
     def configure(self, enabled, mode="soft"):
         self._enabled = bool(enabled)
         self._receiver.configure_mode(mode)
+        self.emit_progress(force=True)
 
     def invalidate_outbound(self):
         self._generation += 1
+        self._pending_echo.clear()
 
     def bind(self, state_key, state):
         self.invalidate_outbound()
@@ -428,15 +481,24 @@ class DeathLinkSession:
             seen = []
         self._seen = {value for value in seen[-64:] if isinstance(value, str) and value}
         state["received_deathlink_event_ids"] = sorted(self._seen)[-64:]
+        self._available = False
+        self.emit_progress(force=True)
 
     def abandon(self, now, reason):
         self.invalidate_outbound()
+        self.set_observation(False)
         return self._receiver.abandon(now, reason)
 
-    def observe_echo(self, data_time, last_death_link):
-        if data_time == last_death_link and data_time != self._confirmed_echo:
+    def expect_echo(self, timestamp):
+        self._pending_echo.add(timestamp)
+
+    def observe_echo(self, data_time):
+        if data_time in self._pending_echo:
             self._logger.info("[DeathLink] Server received and echoed the death.")
-            self._confirmed_echo = data_time
+            self._confirmed_echo.append(data_time)
+            self._pending_echo.remove(data_time)
+            return True
+        return data_time is not None and data_time in self._confirmed_echo
 
     def receive(self, data, persist):
         if not self._enabled:
@@ -460,7 +522,7 @@ class DeathLinkSession:
         self._logger.info("[DeathLink] Received logical event %s; queued for safe gameplay.", event_id[:12])
         return event_id
 
-    def advance(self, safe_gameplay, publication):
+    def advance(self, safe_gameplay, publication, waiting_reason=None):
         if not self._enabled:
             return
         result = self._receiver.advance(
@@ -471,6 +533,7 @@ class DeathLinkSession:
         )
         event_id = (result.event_id or "unknown")[:12]
         active = self._receiver.active
+        self._log_wait(result, waiting_reason)
         if result.detail == "dispatched":
             hit_num = active.attempts if active else 1
             self._logger.info(
@@ -500,50 +563,94 @@ class DeathLinkSession:
                 result.detail,
             )
 
+    def _log_wait(self, result, waiting_reason):
+        if result.detail != 'unsafe_gameplay':
+            self._waiting_reason = None
+            return
+        reason = waiting_reason or 'native_gameplay_unavailable'
+        event_id = result.event_id[:12]
+        if self._waiting_reason != (event_id, reason):
+            active = self._receiver.active
+            self._logger.info('[DeathLink] %s waiting reason=%s attempts=%d dispatches=%d unsafe_pauses=%d',
+                              event_id, reason, active.attempts, active.attempts, active.unsafe_pauses)
+            self._waiting_reason = (event_id, reason)
+
 
     def _validate_grace(self, grace):
         if type(grace) is not int or not 0 <= grace <= 2147483647:
             raise ValueError("DeathLink Grace must be a whole number from 0 to 2147483647")
 
-    async def report_local_death(self, player, send, publication, *, grace=0, persist=lambda: None):
+    async def report_local_death(self, player, send, *, native, grace=0, persist):
         self._validate_grace(grace)
-        if not self._enabled:
-            self._logger.info("[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=death_link_disabled")
-            return
-        receive_result = self._receiver.confirm_local_death(time.monotonic())
-        if receive_result.detail in {
-            "echo_suppressed",
-            "late_echo_suppressed",
-            "second_hit_cancelled_player_dead",
-        }:
-            self._cancel(publication)
-            self._logger.info(
-                "[DeathLink] DEATHLINK_OUTBOUND_DROPPED reason=%s event=%s",
-                receive_result.detail,
-                (receive_result.event_id or "unknown")[:12],
-            )
-            return
-        if self._apply_grace(grace, persist):
-            return
-        player = player or text("deathlink", "local_player_fallback")
-        cause = random.choice(self._messages).format(player=player)
-        self._logger.info("[DeathLink] DEATHLINK_OUTBOUND_ACCEPTED cause=%s", cause)
-        generation = self._generation
-        try:
-            await send(cause)
-        except (OSError, RuntimeError, WebSocketException):
-            if generation != self._generation:
+        domain, event = native
+        sequence = event['local_death_sequence']
+        previous = self._state.get('death_link_native', {}).get(domain, {})
+        if previous.get('status') == 'pending' and previous['sequence'] < sequence:
+            persist()
+            if not await self._send_native_decision(previous, send, persist):
                 return
-            raise
-        if generation != self._generation:
+        decision = self._native_decision(domain, event, player, grace)
+        # the queue may replay after an ACK failure or bridge restart
+        persist()
+        self.emit_progress()
+        self._logger.info('[DeathLink] LOCAL_DEATH_OBSERVED source=native domain=%s sequence=%s decision=%s',
+                          domain, sequence, decision['status'])
+        if sequence != decision.get('sequence') or decision['status'] != 'pending':
             return
-        self._logger.info("[DeathLink] DEATHLINK_SEND_CONFIRMED")
-        self._emit(
-            "deathlink",
-            direction="sent",
-            cause=cause,
-            message=cause,
-        )
+        await self._send_native_decision(decision, send, persist)
+
+    async def _send_native_decision(self, decision, send, persist):
+        sequence = decision['sequence']
+        generation = self._generation
+        self._logger.info('[DeathLink] DEATHLINK_OUTBOUND_ACCEPTED sequence=%s', sequence)
+        await send(decision['cause'], timestamp=decision['time'])
+        if generation != self._generation:
+            return False
+        decision['status'] = 'sent'
+        persist()
+        self._logger.info('[DeathLink] DEATHLINK_SEND_CONFIRMED sequence=%s', sequence)
+        self._emit('deathlink', direction='sent', cause=decision['cause'], message=decision['cause'])
+        return True
+
+    def _native_decision(self, domain, event, player, grace):
+        decisions = self._state.setdefault('death_link_native', {})
+        decision = decisions.get(domain, {})
+        sequence = event['local_death_sequence']
+        if sequence <= decision.get('sequence', 0):
+            return decision
+        suppressed = not self._enabled or event['local_cause'] != 0 or bool(event['local_flags'] & 512)
+        skipped = suppressed or self._apply_grace(grace, lambda: None)
+        status = 'suppressed' if suppressed else 'skipped' if skipped else 'pending'
+        cause = '' if skipped else random.choice(self._messages).format(
+            player=player or text('deathlink', 'local_player_fallback'))
+        decision = dict(sequence=sequence, status=status, cause=cause, time=time.time())
+        decisions[domain] = decision
+        return decision
+
+    def reconfigure_grace(self, grace, persist):
+        self._validate_grace(grace)
+        self._grace = grace
+        progress = self._state.get('death_link_grace')
+        if not isinstance(progress, dict) or progress.get('interval') != grace:
+            self._state['death_link_grace'] = dict(interval=grace, deaths=0)
+            persist()
+        self.emit_progress(force=True)
+
+    def set_observation(self, available):
+        self._available = available
+        self.emit_progress()
+
+    def emit_progress(self, force=False):
+        progress = self._state.get('death_link_grace', {})
+        deaths = progress.get('deaths', 0) if isinstance(progress, dict) and progress.get('interval') == self._grace else 0
+        interval = max(1, self._grace)
+        if type(deaths) is not int or not 0 <= deaths < interval:
+            deaths = 0
+        status = 'off' if not self._enabled else 'ready' if self._available else 'unavailable'
+        payload = dict(status=status, interval=interval, remaining=interval-deaths if status == 'ready' else None)
+        if force or payload != self._progress:
+            self._emit('deathlink_progress', **payload)
+            self._progress = payload
 
     def _cancel(self, publication):
         try:

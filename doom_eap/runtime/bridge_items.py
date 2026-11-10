@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from websockets.exceptions import WebSocketException
+
 from doom_eap.content.item_classification import (
     load_item_classification_identity,
 )
@@ -57,7 +59,8 @@ from doom_eap.runtime.inventory import (
     validate_receipt_history_prefix,
     validate_session_receipt_prefix,
 )
-from doom_eap.runtime.native_transport import StaleNativeResult
+from doom_eap.runtime.ledger import LedgerError
+from doom_eap.runtime.native_transport import StaleNativeResult, TransportError
 from doom_eap.runtime.observers import (
     BOOTSTRAP_ACTIONS,
     BOOTSTRAP_REVISION,
@@ -116,7 +119,7 @@ class ItemRuntime:
             return None, 'Return to DOOM and unpause within 30 seconds. Inventory resync is waiting for safe gameplay.'
         try:
             return await self.ctx.room_delivery.reconcile(evidence, selected=selected)
-        except (LedgerError, TransportError, OSError, TimeoutError) as error:
+        except (LedgerError, TransportError, OSError, TimeoutError, WebSocketException) as error:
             bridge_config.logger.error("DELIVERY_BLOCKED error=%s", error)
             bridge_config.emit_launcher_event("item_history_status", status="blocked", message=player_text("launcher.items", "unavailable"))
             return None, player_text("launcher.items", "unavailable")
@@ -201,7 +204,7 @@ class ItemRuntime:
 
     async def _publish_owner_ammo_refill(self):
         owner = self.ctx.room_delivery
-        if owner.coordinator is None:
+        if owner is None or owner.coordinator is None:
             return None
         try:
             link = await self._native_game_link_async()
@@ -216,8 +219,18 @@ class ItemRuntime:
     async def request_ammo_refill(self):
         _, error = await self._owner_reconcile(bridge_saves.read_gameplay_save_evidence())
         owner = self.ctx.room_delivery
-        if error or not owner.can_spend:
-            return False
+        if error or owner is None or not owner.can_spend:
+            return None
+        try:
+            async with owner.lock:
+                return await self._request_owner_ammo_refill(owner)
+        except (LedgerError, TransportError, OSError, TimeoutError, WebSocketException) as error:
+            bridge_config.logger.warning("AMMO_REFILL_DEFERRED error=%s", error)
+            return None
+
+    async def _request_owner_ammo_refill(self, owner):
+        if owner is not self.ctx.room_delivery or not owner.current():
+            return None
         scope = AmmoCommandScope(self.ctx.state_key, self.ctx.runtime_lifecycle.map_identity.current_map, self.ctx.save_observer.selection.slot,
                                 active_crucible(self.ctx._connected_slot_data["runtime"].get("special_weapon"), self.received_item_ids(processed_only=True)))
         operation = await owner.ammo.request(scope, (None, {}), sum(item.item == AMMO_REFILL_ITEM_ID for item in self.ctx.items_received[:self.items_processed])
@@ -491,6 +504,8 @@ class ItemRuntime:
             f"{self.ctx.state_key}."
         )
         self.ctx._room_session_authoritative = True
+        self.ctx.deathlink.reconfigure_grace(bridge_config.load_config().get('death_link_grace', 0),
+                                          self.ctx.persist_session_state)
         self.ctx.session_tasks.start(self.check_and_update_event_session)
 
     def native_game_link(self):

@@ -782,6 +782,12 @@ class LauncherController:
         except OSError:
             self.config["death_link_grace"] = previous
             raise
+        supervisor = self.supervisor
+        if supervisor is not None and supervisor.running:
+            try:
+                supervisor.send_command('AP_CONTROL {"type":"deathlink_grace"}')
+            except (OSError, RuntimeError):
+                self.emit('deathlink_progress', status='unavailable', interval=max(1, deaths), remaining=None)
 
     def request_ammo_refill(self) -> None:
         with self._lifecycle_lock:

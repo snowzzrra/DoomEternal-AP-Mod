@@ -341,6 +341,8 @@ class DoomEternalContext(CommonContext):
             raise
 
     def on_deathlink(self, data: dict):
+        if self.deathlink.observe_echo(data.get('time')):
+            return
         super().on_deathlink(data)
         event_id = self.deathlink.receive(data, self.persist_session_state)
         if event_id is None:
@@ -355,6 +357,14 @@ class DoomEternalContext(CommonContext):
             cause=cause,
             message=cause or player_text("deathlink", "received", source=str(source)),
         )
+
+    async def send_death(self, death_text='', *, timestamp=None):
+        if not self.server or not self.server.socket or self.server.socket.closed:
+            raise RuntimeError('DeathLink send requires a connected AP server')
+        self.last_death_link = time.time() if timestamp is None else timestamp
+        self.deathlink.expect_echo(self.last_death_link)
+        await self.send_msgs([dict(cmd='Bounce', tags=['DeathLink'], data=dict(
+            time=self.last_death_link, source=self.player_names[self.slot], cause=death_text))])
 
     def on_print_json(self, args: dict):
         try:
@@ -413,7 +423,6 @@ class DoomEternalContext(CommonContext):
         self.level_ready.invalidate()
         self.location_setup.invalidate()
         self.protocol_feed.invalidate()
-        self.ammo_requests.reset()
         self.session_tasks.start(lambda: self.items._publish_owner_ammo_refill())
         self.deathlink.invalidate_outbound()
         self.goals.invalidate_publication()
@@ -581,7 +590,7 @@ class DoomEternalContext(CommonContext):
             self._handle_checked_locations(args)
         elif cmd == "Bounced" and "DeathLink" in args.get("tags", []):
             data = args.get("data", {})
-            self.deathlink.observe_echo(data.get("time"), self.last_death_link)
+            self.deathlink.observe_echo(data.get("time"))
 
     def _fail_placement_scout(self, message):
         if not self.location_setup.fail(message):
@@ -691,6 +700,7 @@ class DoomEternalContext(CommonContext):
 
     def _abandon_previous_room(self, previous_state_key):
         if previous_state_key and previous_state_key != self.state_key:
+            self.ammo_requests.reset()
             abandoned = self.deathlink.abandon(time.monotonic(), "room_changed")
             if abandoned:
                 bridge_config.logger.warning(
@@ -726,10 +736,10 @@ class DoomEternalContext(CommonContext):
         try:
             self.unified_campaign = UnifiedCampaign(admission, self.session_state, self.persist_session_state)
         except ValueError as error:
-            message = f'Estado local incompatÃƒÂ­vel com a campanha: {error!s}'
+            message = player_text("launcher.connection", "campaign_state")
             bridge_config.logger.error("[State] Connected campaign rejected: %s", error)
             self._report_launcher_connection_failure(
-                message, code="campaign_state_incompatible", technical_message=message,
+                message, code="campaign_state_incompatible", technical_message=f"Campaign state incompatible: {error}",
             )
             return
         self.goals.connected(self.persist_session_state)
@@ -1096,13 +1106,16 @@ def _resync_correlation(ctx):
     return {}
 
 
-async def _handle_delivery_control(ctx, control):
+async def _handle_session_control(ctx, control):
     if await handle_delivery_control(getattr(ctx, "delivery_coordinator", None), control, bridge_config.emit_launcher_event):
         ctx.items._schedule_item_delivery("resolution")
+    if control.get('type') == 'deathlink_grace':
+        ctx.deathlink.reconfigure_grace(bridge_config.load_config().get('death_link_grace', 0),
+                                      ctx.persist_session_state)
 
 
 async def _dispatch_launcher_control(ctx, control):
-    await _handle_delivery_control(ctx, control)
+    await _handle_session_control(ctx, control)
     match control.get("type"):
         case "killsanity_counter_visibility":
             if type(control.get("visible")) is bool:
@@ -1146,7 +1159,7 @@ async def _support_condump(ctx, control):
 
 async def _launcher_refill(ctx, control):
     try:
-        await ctx.items.request_ammo_refill()
+        ctx.ammo_requests.enqueue()
     except (OSError, RuntimeError, ValueError, WebSocketException) as error:
         bridge_config.logger.warning("[Ammo Refill] Launcher request failed: %s", error)
         bridge_config.emit_launcher_event(

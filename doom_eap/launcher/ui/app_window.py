@@ -588,6 +588,8 @@ class LauncherUI(QMainWindow):
     def _save_death_link_grace(self, deaths: int) -> None:
         try:
             self.controller.set_death_link_grace(deaths)
+            progress = dict(self._deathlink_progress, interval=max(1, deaths), remaining=max(1, deaths))
+            self._on_deathlink_progress(progress)
         except (OSError, ValueError) as error:
             self._append_log('DeathLink Grace setting failed: {value_0}'.format(value_0=f'{error}'))
             self.death_link_grace.blockSignals(True)
@@ -1265,7 +1267,14 @@ class LauncherUI(QMainWindow):
         self.death_link_grace.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.death_link_grace.setAlignment(Qt.AlignmentFlag.AlignCenter)
         grace_control = QWidget()
-        self.grace_control = grace_control
+        self.grace_control = QWidget()
+        progress_layout = QVBoxLayout(self.grace_control)
+        progress_layout.setContentsMargins(0, 0, 0, 0)
+        progress_layout.addWidget(grace_control)
+        self.death_link_progress = self._label(player_text('launcher.settings', 'deathlink_unavailable'), 'muted')
+        self.death_link_progress.setWordWrap(True)
+        progress_layout.addWidget(self.death_link_progress)
+        self._deathlink_progress = dict(status='unavailable')
         grace_control.setObjectName("stepper")
         grace_control.setFixedSize(128, 36)
         grace_layout = QHBoxLayout(grace_control)
@@ -1320,6 +1329,7 @@ class LauncherUI(QMainWindow):
 
 
     _EVENT_HANDLERS: ClassVar = {
+        'deathlink_progress': '_on_deathlink_progress',
         'core_update_status': '_on_core_update_status', 'core_runtime_selected': '_on_core_update_status',
         'support_bundle_ready': '_on_support_bundle_ready', 'support_bundle_failed': '_on_support_bundle_failed',
         'problem_report_ready': '_on_problem_report_ready', 'ap_backup_result': '_on_ap_backup_result',
@@ -1864,6 +1874,20 @@ class LauncherUI(QMainWindow):
         if handler:
             getattr(self, handler)(event)
 
+    def _on_deathlink_progress(self, event):
+        status = event.get('status', 'unavailable')
+        if status == 'ready' and event.get('interval') != max(1, self.death_link_grace.value()):
+            return
+        self._deathlink_progress = event
+        if status != 'ready':
+            key = 'deathlink_off' if status == 'off' else 'deathlink_unavailable'
+            message = player_text('launcher.settings', key)
+        elif event.get('remaining') == 1:
+            message = player_text('launcher.settings', 'deathlink_remaining_one')
+        else:
+            message = player_text('launcher.settings', 'deathlink_remaining_many', count=event['remaining'])
+        self.death_link_progress.setText(message)
+
     def _on_core_update_status(self, event):
         self._render_core_update(event)
         return
@@ -2162,6 +2186,7 @@ class LauncherUI(QMainWindow):
             self._log_installation_failure(event, stdout, stderr)
 
     def _on_disconnected(self, event):
+        self._on_deathlink_progress(dict(status='unavailable'))
         self._reconnecting = False
         self._connection_pending = False
         self._room_connected = False
@@ -2188,6 +2213,7 @@ class LauncherUI(QMainWindow):
         )
 
     def _on_connection_lost(self, event):
+        self._on_deathlink_progress(dict(status='unavailable'))
         if self._reconnecting:
             return
         self._reconnecting = True
