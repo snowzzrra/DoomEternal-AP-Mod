@@ -231,11 +231,16 @@ class DeliveryCoordinator:
     async def _eligible(self, command: CommandRow) -> bool:
         if command.resolution is not None or command.state in TERMINAL:
             return False
+        if command.next_eligible_at is not None and command.next_eligible_at > time.time_ns() // 1000:
+            return False
         original = await self.ledger.saved_context(self.binding.room, command.plan.context_id)
         if not self._same_context(original):
             return False
-        if not await self._ammo_paid(command):
+        if not await self._ammo_authorized(command):
             return False
+        return await self._dependency_ready(command)
+
+    async def _dependency_ready(self, command):
         if command.plan.predecessor_id is None:
             return True
         predecessor = await self._command(command.plan.predecessor_id)
@@ -244,12 +249,13 @@ class DeliveryCoordinator:
             predecessor = await self._command(predecessor.replacement_id)
         return predecessor.state is CommandState.CONFIRMED or predecessor.resolution is Resolution.ACCEPTED_BY_PLAYER
 
-    async def _ammo_paid(self, command):
+    async def _ammo_authorized(self, command):
         operation_id = command.plan.ammo_operation_id
         if operation_id is None:
             return True
         row = await self.ledger.ammo_operation(self.binding.room, operation_id)
-        return row is not None and row.state is AmmoState.CONFIRMED
+        return row is not None and (row.state is AmmoState.CONFIRMED
+                                   or (row.state is AmmoState.REQUESTED and row.evidence == row.operation.request))
 
     def _same_context(self, original):
         fields = ("pid", "process_created", "native_instance", "campaign", "map_name", "save_id",
@@ -270,6 +276,8 @@ class DeliveryCoordinator:
             command = await self._command(command_id)
             stored = await self._attempt(command)
             if stored is not None:
+                if not stored.attempt.reference:
+                    raise Conflict("Legacy delivery needs the player's decision before retrying")
                 return PreparedCommand(stored.attempt.envelope, stored.attempt.reference)
             if not await self._eligible(command):
                 raise Conflict("Delivery command is waiting for its context or dependency")
@@ -294,7 +302,7 @@ class DeliveryCoordinator:
                 return None
             if response.response["error"] == CommandError.NOT_FOUND:
                 if not await self._eligible(command):
-                    await self._record(command, stored, CommandState.STALE, response)
+                    await self._record(command, stored, CommandState.EFFECT_UNKNOWN, response)
                     return response
                 prepared = PreparedCommand(stored.attempt.envelope, stored.attempt.reference)
                 await self.require_owner()
@@ -310,6 +318,9 @@ class DeliveryCoordinator:
             return response
 
     async def _query(self, command: CommandRow, stored: AttemptRow) -> CommandResponse | None:
+        if not stored.attempt.reference:
+            await self._record(command, stored, CommandState.EFFECT_UNKNOWN, None)
+            return None
         try:
             return await self.transport.query(stored.attempt.reference)
         except IdentityMismatch:
@@ -327,6 +338,8 @@ class DeliveryCoordinator:
             stored = await self._attempt(command)
             if stored is None:
                 return None
+            if not stored.attempt.reference:
+                return await self._query(command, stored)
             expectation = await self._prepare_expectation(command, stored, expectation, evidence)
             if not _recoverable(command, evidence or expectation):
                 return None
@@ -357,20 +370,33 @@ class DeliveryCoordinator:
             await self._replace_unexecuted(await self._command(command.plan.command_id))
 
     async def _replace_unexecuted(self, command):
-        if command.resolution is not None:
+        if command.resolution is not None or command.state is not CommandState.STALE:
             return
         stored = await self._attempt(command)
-        if stored is not None:
-            if not stored.result:
-                return
-            result, _ = codec._decode_type("command_response", stored.result, 0)
-            response = CommandResponse(result, None, stored.result)
-            if classify(response) is not CommandState.STALE:
-                return
+        if stored is not None and not await self._retry_ready(command, stored):
+            return
         replacement = await self._replacement_plan(command, stored)
+        if stored is not None:
+            replacement = replace(replacement, retry_limit=max(0, command.plan.retry_limit - 1))
         await self.ledger.resolve(self.binding, ManualResolution(
             command.plan.command_id, command.revision, ResolutionAction.TRY_AGAIN, replacement,
             stored.result if stored else b"unsent"))
+
+    async def _retry_ready(self, command, stored):
+        if not stored.attempt.reference:
+            await self._record(command, stored, CommandState.EFFECT_UNKNOWN, None)
+            return False
+        if not stored.result:
+            return False
+        result, _ = codec._decode_type("command_response", stored.result, 0)
+        response = CommandResponse(result, None, stored.result)
+        if _refusal_state(response) is not CommandState.STALE:
+            await self._record(command, stored, CommandState.EFFECT_UNKNOWN, response)
+            return False
+        if command.plan.retry_limit == 0:
+            await self._record(command, stored, CommandState.STALE, response)
+            return False
+        return command.next_eligible_at is None or command.next_eligible_at <= time.time_ns() // 1000
 
     async def _currency_expectation(self, command, stored):
         _, grant = codec.decode_variant(COMMAND_IDS["currencies"], command.plan.payload_revision, command.plan.payload)
@@ -427,16 +453,25 @@ class DeliveryCoordinator:
 
     async def _record(self, command: CommandRow, stored: AttemptRow, state: CommandState,
                       response: CommandResponse | None, *, proof: bytes = b"") -> None:
-        terminal = state in TERMINAL
         evidence = response.body if response is not None else b""
-        reason = state.value if state in (CommandState.EFFECT_UNKNOWN, CommandState.REJECTED) else None
+        state, reason, next_eligible_at = self._retry_schedule(command, state, response)
+        terminal = state in TERMINAL
         if response is None:
-            reason = "core_identity_changed"
+            reason = "core_identity_changed" if stored.attempt.reference else "legacy_reference_missing"
         completion = AttemptChange(command.plan.command_id, stored.attempt.number, stored.revision,
                                    stored.acceptance if terminal else evidence,
                                    evidence if terminal else b"", time.time_ns() // 1000 if terminal else None)
-        change = CommandChange(command.plan.command_id, command.revision, state, reason, proof or evidence, None)
+        change = CommandChange(command.plan.command_id, command.revision, state, reason, proof or evidence, next_eligible_at)
         await self.ledger.apply(self.binding, (change,), (), (), attempts=(completion,))
+
+    @staticmethod
+    def _retry_schedule(command, state, response):
+        reason = state.value if state in (CommandState.EFFECT_UNKNOWN, CommandState.REJECTED) else None
+        if state is CommandState.STALE and response is not None and _refusal_state(response) is CommandState.STALE:
+            if command.plan.retry_limit == 0:
+                return CommandState.REJECTED, "retry_limit", None
+            return state, reason, time.time_ns() // 1000 + 5_000_000
+        return state, reason, None
 
     async def ack(self, command_id: str) -> CommandResponse | None:
         async with self._lock:
@@ -445,7 +480,7 @@ class DeliveryCoordinator:
             stored = await self._attempt(command)
             if stored is None or stored.completed_at is None:
                 raise Conflict("Record the delivery result before acknowledging it")
-            if not stored.result:
+            if not stored.attempt.reference or not stored.result:
                 return None
             response, _ = codec._decode_type("command_response", stored.result, 0)
             if response["error"] or response["reply"]["dimensions"]["progress"] != Progress.TERMINAL:
@@ -483,7 +518,7 @@ class DeliveryCoordinator:
         if command.plan.kind not in ("currencies", "weapon_points"):
             return replacement
         from doom_eap.runtime.inventory import namespace_id
-        namespace = (bytes(codec.decode("command_reference", stored.attempt.reference)["namespace_id"]) if stored else
+        namespace = (bytes(codec.decode("command_reference", stored.attempt.reference)["namespace_id"]) if stored and stored.attempt.reference else
                      namespace_id(self.binding.room.seed, self.binding.room.team, self.binding.room.slot,
                                   self.binding.room.generation_fp).encode("ascii"))
         kind = COMMAND_IDS[command.plan.kind]
@@ -497,7 +532,7 @@ class DeliveryCoordinator:
                        {**grant, "expected_gained": observed["gained_after"]}))
 
     async def _cancel(self, stored: AttemptRow | None) -> CommandResponse | None:
-        if stored is None:
+        if stored is None or not stored.attempt.reference:
             return None
         try:
             response = await self.transport.query(stored.attempt.reference)
@@ -691,13 +726,14 @@ class RoomDelivery:
             raise StorageError(text("launcher.items", "missing"))
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with expected.open("xb") as stream:
-                stream.write(b"delivery ledger\n")
-                stream.flush()
-                os.fsync(stream.fileno())
             self.ledger = await Ledger.create(self.path)
         completed = False
         try:
+            if not expected.exists():
+                with expected.open("xb") as stream:
+                    stream.write(b"delivery ledger\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
             await self._bind()
             completed = True
         finally:
@@ -714,7 +750,9 @@ class RoomDelivery:
 
     async def _ingest_existing_owner(self):
         if self.coordinator is None:
-            if not await owner_room_exists(self.config, self.key.seed, self.key.team, self.key.slot, self.key.generation_fp):
+            if not self.path.is_file():
+                if self.path.with_suffix(".expected").exists() or self.config.get("delivery_ledger_expected") or self.bridge.session_state.get("delivery_ledger_expected"):
+                    raise StorageError(text("launcher.items", "missing"))
                 return
             await self._open()
             self.coordinator = DeliveryCoordinator(self.ledger, self.binding, transport=self.transport,

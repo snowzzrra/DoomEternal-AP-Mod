@@ -8,6 +8,8 @@ from collections import deque
 from dataclasses import dataclass, replace
 from uuid import uuid4
 
+from websockets.exceptions import WebSocketException
+
 from doom_eap.runtime import sentinel_protocol_generated as codec
 from doom_eap.runtime.ledger import (
     AmmoChange,
@@ -18,9 +20,12 @@ from doom_eap.runtime.ledger import (
     CommandPlan,
     CommandState,
     Conflict,
+    LedgerError,
     ReplayPolicy,
+    Resolution,
     RevisionConflict,
 )
+from doom_eap.runtime.native_transport import TransportError
 
 AMMO_REFILL_ITEM_ID = 7770024
 AMMO_REFILL_PRIMITIVE_ITEM_ID = 7770042
@@ -73,6 +78,10 @@ class LedgerAmmoRefill:
         return owner == self.writer_id
 
     async def owner(self):
+        async with self._lock:
+            return await self._owner()
+
+    async def _owner(self):
         await self.delivery.require_owner()
         return await self.storage.read(self._key("ammo/writer"), self.timeout)
 
@@ -98,13 +107,15 @@ class LedgerAmmoRefill:
 
     async def _spending_ready(self, scope, readiness_result):
         return (scope.state_key == self.state_key and readiness_result[0] is None
-                and await self.owner() in (None, self.writer_id) and await self._recover())
+                and await self._owner() in (None, self.writer_id) and await self._recover())
 
     async def synchronize(self, received, scope):
         async with self._lock:
-            owner = await self.owner()
-            if owner not in (None, self.writer_id) or not await self._recover():
+            owner = await self._owner()
+            if owner not in (None, self.writer_id):
                 return None
+            if not await self._recover():
+                return await self.ledger.ammo_totals(self.room)
             totals = await self._synchronize(received)
             overflow = max(0, totals.credited - totals.consumed - totals.discarded - AMMO_REFILL_CAPACITY)
             if overflow and owner == self.writer_id:
@@ -151,8 +162,10 @@ class LedgerAmmoRefill:
     async def _publish(self, row):
         try:
             value = await self.storage.create(row.operation.storage_key, json.loads(row.operation.request), self.timeout)
-            return await self._settle(row, value)
-        except (TimeoutError, ConnectionError, OSError, ValueError):
+            settled = await self._settle(row, value)
+            current = await self.ledger.ammo_operation(self.room, row.operation.operation_id)
+            return settled or (current.state is AmmoState.REQUESTED and current.evidence == row.operation.request)
+        except (TimeoutError, ConnectionError, OSError, ValueError, WebSocketException):
             await self._uncertain(row, "storage_response_missing")
             return False
 
@@ -162,6 +175,9 @@ class LedgerAmmoRefill:
         if json.dumps(value, sort_keys=True).encode() != operation.request:
             await self._uncertain(row, "storage_operation_unconfirmed")
             return False
+        if operation.kind is AmmoKind.SPEND:
+            if not await self._release_commands(row, request["crucible"]):
+                return False
         suffix = "consumed" if operation.kind is AmmoKind.SPEND else "discarded"
         total = await self.storage.maximum(self._key(f"ammo_refill_{suffix}"), operation.absolute_target, self.timeout)
         if total != operation.absolute_target:
@@ -170,19 +186,30 @@ class LedgerAmmoRefill:
         totals = await self.ledger.ammo_totals(self.room)
         totals = replace(totals, **{suffix: max(getattr(totals, suffix), total)},
                          reserved=totals.reserved - request["amount"], observations=operation.request)
-        commands = await self._release_commands(operation, request["crucible"])
         change = AmmoChange(operation.operation_id, row.revision, AmmoState.CONFIRMED, operation.request, None)
-        await self.delivery.ammo(changes=(change,), totals=totals, commands=commands)
+        await self.delivery.ammo(changes=(change,), totals=totals)
         return True
 
-    async def _release_commands(self, operation, crucible):
-        if operation.kind is not AmmoKind.SPEND:
-            return ()
+    async def _release_commands(self, row, crucible):
+        operation = row.operation
+        commands = await self._spend_commands(operation, crucible)
+        if all(command.state is CommandState.CONFIRMED or command.resolution is Resolution.ACCEPTED_BY_PLAYER
+               for command in commands):
+            return True
+        releases = tuple(CommandChange(command.plan.command_id, command.revision, CommandState.QUEUED,
+                                       None, operation.request, command.next_eligible_at)
+                         for command in commands if command.state is CommandState.PLANNED and not command.attempt_count)
+        change = AmmoChange(operation.operation_id, row.revision, AmmoState.REQUESTED, operation.request, None)
+        await self.delivery.ammo(changes=(change,), commands=releases)
+        return False
+
+    async def _spend_commands(self, operation, crucible):
         commands = []
         for ordinal in range(2 if crucible else 1):
             command = await self.ledger.command(self.room, f"{operation.operation_id}:{ordinal}")
-            commands.append(CommandChange(command.plan.command_id, command.revision, CommandState.QUEUED,
-                                          None, operation.request, None))
+            while command.replacement_id is not None:
+                command = await self.ledger.command(self.room, command.replacement_id)
+            commands.append(command)
         return tuple(commands)
 
     async def _uncertain(self, row, reason):
@@ -192,7 +219,7 @@ class LedgerAmmoRefill:
 
     async def recover(self):
         async with self._lock:
-            return await self.owner() in (None, self.writer_id) and await self._recover()
+            return await self._owner() in (None, self.writer_id) and await self._recover()
 
     async def _recover(self):
         rows = await self.ledger.ammo_operations(
@@ -205,7 +232,7 @@ class LedgerAmmoRefill:
                 value = await self.storage.read(row.operation.storage_key, self.timeout)
                 if not await self._settle(row, value):
                     return False
-            except (TimeoutError, ConnectionError, OSError, ValueError):
+            except (TimeoutError, ConnectionError, OSError, ValueError, WebSocketException):
                 await self._uncertain(row, "storage_response_missing")
                 return False
         return True
@@ -299,10 +326,15 @@ class AmmoRequestPump:
     async def _run(self, generation):
         try:
             while self._queue and not self._exit_event.is_set() and generation == self._generation:
-                if self._exit_event.is_set() or generation != self._generation:
-                    break
-                self._queue.popleft()
-                await self._request()
+                try:
+                    result = await self._request()
+                except (LedgerError, TransportError, OSError, TimeoutError, WebSocketException) as error:
+                    self._logger.warning("[Ammo Refill] Request deferred: %s", error)
+                    result = None
+                if result is None:
+                    await asyncio.sleep(1)
+                else:
+                    self._queue.popleft()
         except asyncio.CancelledError:
             raise
         except (OSError, RuntimeError, ValueError):
@@ -324,7 +356,10 @@ class AmmoRequestPump:
             accepted.append(path)
         if not accepted:
             return False
-        self._queue.extend(accepted)
+        self.enqueue(accepted)
+        return True
+
+    def enqueue(self, requests=(None,)):
+        self._queue.extend(requests)
         if self._task is None or self._task.done():
             self._task = asyncio.get_running_loop().create_task(self._run(self._generation))
-        return True

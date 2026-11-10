@@ -459,9 +459,6 @@ class Ledger:
     def _connect(self) -> sqlite3.Connection:
         from doom_eap.runtime import ledger_schema
 
-        if self._create:
-            descriptor = os.open(self._path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-            os.close(descriptor)
         mode = "ro" if self._read_only else "rw"
         connection = sqlite3.connect(f"{self._path.as_uri()}?mode={mode}", uri=True, isolation_level=None)
         self._connection = connection
@@ -479,6 +476,28 @@ class Ledger:
         if not self._read_only:
             self._claim_writer()
         return connection
+
+    def _initialize(self):
+        from doom_eap.runtime import ledger_schema
+
+        if self._path.exists():
+            raise StorageError("delivery ledger already exists")
+        staging = self._path.with_name(self._path.name + ".creating")
+        for suffix in ("", "-wal", "-shm"):
+            staging.with_name(staging.name + suffix).unlink(missing_ok=True)
+        try:
+            descriptor = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            os.close(descriptor)
+            connection = sqlite3.connect(staging, isolation_level=None)
+            try:
+                ledger_schema._configure(connection, False)
+                ledger_schema._migrate(connection, staging, True, False, 0)
+            finally:
+                connection.close()
+            os.rename(staging, self._path)
+        finally:
+            for suffix in ("", "-wal", "-shm"):
+                staging.with_name(staging.name + suffix).unlink(missing_ok=True)
 
     def _claim_writer(self) -> None:
         connection = self._connection
@@ -502,6 +521,8 @@ class Ledger:
         try:
             if not self._read_only:
                 lock = ledger_schema._writer_lock(self._path)
+            if self._create:
+                self._initialize()
             self._connect()
             self._ready.set_result(None)
             self._work_loop()
