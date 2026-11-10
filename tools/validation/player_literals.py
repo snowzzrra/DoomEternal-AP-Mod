@@ -2,6 +2,7 @@
 
 import argparse
 import ast
+import os
 import re
 from pathlib import Path
 
@@ -272,7 +273,22 @@ def scan(root=ROOT):
                      "doom_eap/launcher/launcher_core.py"):
         path = root / filename
         failures.extend(issues(path.read_text(encoding="utf-8"), filename, game_only=True))
+    failures.extend(mojibake_issues(root))
     return failures
+
+
+def mojibake_issues(root):
+    pattern = re.compile(r"\u00c3[\u0080-\u00ff\u0192]")
+    excluded = {"build", "release", "dist", "gameresources", "vanillamaps", "vanilla_decls", "__pycache__"}
+    paths = []
+    for directory, folders, files in os.walk(root):
+        folders[:] = [folder for folder in folders if not folder.startswith(".") and folder not in excluded]
+        paths.extend(Path(directory) / filename for filename in files if filename.endswith(".py"))
+    paths.extend((root / "data/strings").glob("*.json"))
+    return [f"{path.relative_to(root)}:{line}: mojibake {match.group()!r}"
+            for path in sorted(paths)
+            for line, source in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+            for match in pattern.finditer(source)]
 
 
 def player_error_issues(source, filename):

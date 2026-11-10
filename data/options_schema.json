@@ -1770,6 +1770,17 @@
       "ui_type": "range"
     },
     {
+      "default": 75,
+      "description": "Choose how many Slayer Gate rewards hold something useful.\n\nThis percentage of the Slayer Gate rewards only holds progression or useful items, from any world. The others can hold filler and traps from other worlds; your own filler and traps only go there in a single-player seed.\n0%: no restriction. 100%: every Slayer Gate reward is useful.",
+      "display_name": "Useful Slayer Gate Rewards",
+      "group": "Game Options",
+      "key": "useful_slayer_gate_rewards",
+      "maximum": 100,
+      "minimum": 0,
+      "source_class": "UsefulSlayerGateRewards",
+      "ui_type": "range"
+    },
+    {
       "default": {},
       "description": "Choose exact amounts of individual upgrades and permanent items to place in your campaign.\n\nZero leaves the item out. Positive numbers add that many copies, up to the item's upgrade limit.\nEmpty entries use Resource Profile. Required challenge items can raise the amount.",
       "display_name": "Item Pool Overrides",
@@ -9447,5 +9458,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "50804cb22ef3f77191999e8f4f14fcdefe382eca1f7f0735bf2be23b8e879221"
+  "source_sha256": "3037623cba226c601a769c0bbb54b995b7364996034c16c5b6e74b46bc7a23f1"
 }
