@@ -986,6 +986,13 @@ def _reported_combat_costs(chosen, mobile, seed):
     return {key: str(value) for key, value in _native_costs(chosen, seed=seed, renewable=False, mobile=mobile).items()}
 
 
+def _arena_reference_count_floor(chosen, kind, map_key, own_row, recipe_revision, row_reference_map, translation):
+    if (recipe_revision >= 21 and kind == 'arena_encounter'
+            and chosen['finite_total'] * 2 < own_row.get('finite_total', 0)):
+        return own_row, map_key, 'native_arena_count_floor'
+    return chosen, row_reference_map, translation
+
+
 def _build_reference_encounters(candidates, catalog, encounters, factor, grouped, hitpoints, map_key, mobile, opening_sources, own_encounters, recipe_revision, reference_map, reports, result, seed, settings, stage_count, stage_index, supplies, target_owners, unknown):
     for (owner, variant), sources in grouped.items():
         ammo_geometry, chosen, kind, local_kind, mobile, own_row, same_kind = _choose_reference_encounter(encounters, grouped, map_key, own_encounters, owner, recipe_revision, reference_map, sources, target_owners, variant)
@@ -994,6 +1001,7 @@ def _build_reference_encounters(candidates, catalog, encounters, factor, grouped
             translation = 'native_encounter_kind'
         native_only = all(source.get('protected_reason') for source in sources)
         chosen, row_reference_map, translation, unknown_context = _preserve_native_encounter(candidates, catalog, chosen, factor, map_key, mobile, native_only, opening_sources, own_row, owner, reference_map, row_reference_map, same_kind, seed, settings, sources, supplies, translation, unknown, variant)
+        chosen, row_reference_map, translation = _arena_reference_count_floor(chosen, kind, map_key, own_row, recipe_revision, row_reference_map, translation)
         ref_owner = chosen['owner']
         finite_supply = 0
         chosen, finite_supply, folded_renewable = _fold_renewable_slots(ammo_geometry, chosen, finite_supply, kind, recipe_revision)

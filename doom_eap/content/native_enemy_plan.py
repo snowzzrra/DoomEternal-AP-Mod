@@ -1431,8 +1431,8 @@ def _build_native_recipes_enabled(campaign, catalog, enemies, revision, seed):
     return _freeze_native_plan(campaign, catalog, combat_costs, composition_bands, mai, maps, revision, seed, sequence)
 
 
-def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=20):
-    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20):
+def build_native_recipes(enemies, campaign, *, seed, catalog=None, revision=21):
+    if type(revision) is not int or revision not in (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21):
         raise ValueError('Unsupported native recipe revision')
     return _build_native_recipes_enabled(campaign, catalog, enemies, revision, seed)
 
