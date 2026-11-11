@@ -3,6 +3,7 @@ import re
 from doom_eap.content.master_levels import load_master_levels
 from tools.maps.ap_map_generator import (
     append_target_to_named_entity,
+    apply_entity_edits,
     build_universal_physical_policy,
     entity_definition_index,
     extract_target_names,
@@ -35,9 +36,7 @@ def gate_normal_checks(text, entities, layer):
                 if name != check and re.search(r'\blayers\s*\{', text[start:end]):
                     continue
                 changes.append((start, end, in_layer(text[start:end], layer)))
-    for start, end, replacement in sorted(changes, reverse=True):
-        text = text[:start] + replacement + text[end:]
-    return text
+    return apply_entity_edits(text, changes)
 
 
 def pickup_entities(source, pickup, stage, model, placements, notifications):

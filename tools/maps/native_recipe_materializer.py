@@ -1,5 +1,6 @@
 """Prepare frozen native body definitions and encounter bindings."""
 
+import copy
 import hashlib
 import math
 import re
@@ -334,11 +335,24 @@ def _functional_sources_inherited(records):
     return inherited
 
 
-def _functional_sources_properties(source):
-    selected = {name for name, inherit, kind in ENTITY_HEADER.findall(source)
+def _source_record(source, name, index, records):
+    if name not in records:
+        start, end = find_entity_block_bounds(source, name, index=index)
+        records[name], = entity_records(source[start:end], include_names={name})
+    return records[name]
+
+
+def _functional_source_names(source):
+    return {name for name, inherit, kind in ENTITY_HEADER.findall(source)
                 if kind in SPAWN_CLASSES | {"idAI2", "idInfoTraversal", "idInfoCoverExposed", "idPlayerStart", "idInfo_TeleportDestination"}
                 or (kind == 'idProp2' and inherit.startswith(('pickup/ammo/', 'pickup/armor/', 'pickup/health/')))}
+
+
+def _functional_sources_properties(source, cache=None):
+    selected = _functional_source_names(source)
     records = {row["name"]: row for row in entity_records(source, include_names=selected)}
+    if cache is not None:
+        cache.update(records)
     properties = {name: _functional_properties(row["edit"]) for name, row in records.items() if row["class"] == "idAI2"}
     properties = {name: value for name, value in properties.items() if value}
     return properties, records
@@ -363,8 +377,8 @@ def _reachable_class(inherited, name, properties, reachable, records, visited):
     return result
 
 
-def _functional_sources(source):
-    properties, records = _functional_sources_properties(source)
+def _functional_sources(source, cache=None):
+    properties, records = _functional_sources_properties(source, cache)
     inherited = _functional_sources_inherited(records)
     sources = {}
 
@@ -540,7 +554,9 @@ def _nearest_entrance_landing(anchors, choices, edit, fallback_owners, name, own
     if not all(math.isfinite(position.get(axis, math.nan)) for axis in ('x','y','z')):
         return
     def distance(other):
-        return sum((position[axis]-positions[other][axis])**2 for axis in ('x','y','z')), other
+        target = positions[other]
+        return ((position['x'] - target['x'])**2 + (position['y'] - target['y'])**2
+                + (position['z'] - target['z'])**2), other
     candidates = {other for other in candidates if distance(other)[0] <= 50**2}
     if scope(recipe) in fallback_owners or not candidates:
         candidates, direction = _entrance_landings_animation(anchors, candidates, distance, edit, pickups)
@@ -802,7 +818,7 @@ def _append_functional_variants(clone, functional, functional_libraries, generat
         functional_libraries.setdefault(source_name, []).append({"name": variant})
 
 
-def _append_native_body(body, compatible, definitions, donor_indexes, donors, emitted_bodies, functional, functional_libraries, generated, name, names, recipe, recipe_definitions, source_maps, source_names):
+def _append_native_body(body, compatible, definitions, donor_indexes, donors, emitted_bodies, functional, functional_libraries, generated, name, names, recipe, recipe_definitions, source_maps, source_names, clones):
     reference, attributes = body["ai"], body["attributes"]
     if compatible and emitted_bodies.get(name) == body:
         recipe_definitions.append({"name": name})
@@ -813,8 +829,12 @@ def _append_native_body(body, compatible, definitions, donor_indexes, donors, em
     paths = []
     if attributes["health_percent"] != 100:
         paths.extend(("aiHealth", "components", "components[0]", field) for field in ("max", "starting"))
-    clone = _materialize_native_recipe_definitions_damage_percent(attributes, baseline, block, donors, key, name, paths, recipe, record)
+    clone_key = key, tuple((field, type(value), value) for field, value in sorted(attributes.items())), recipe['binding'].get('entity') == 'ap_darklord_phantoms'
+    if clone_key not in clones:
+        clones[clone_key] = _materialize_native_recipe_definitions_damage_percent(attributes, baseline, block, donors, key, name, paths, recipe, record)
+    clone = clones[clone_key]
     header = ENTITY_HEADER.search(clone)
+    clone = clone[:header.start(1)] + name + clone[header.end(1):]
     generated.append('entity {\n\tlayers { "spawn_target_layer" }\n\t' + clone[header.start():].rstrip())
     _append_functional_variants(clone, functional, functional_libraries, generated, name, names, source_names)
     definitions.append({"name": name})
@@ -833,6 +853,7 @@ def _append_body_library(generated, names, prefix, recipe, recipe_definitions):
 
 
 def _build_body_libraries(definitions, diagnostics, donor_indexes, donors, emitted_bodies, functional, functional_libraries, generated, landing_positions, map_key, names, reachable, records, settings, source_maps, stage):
+    clones = {}
     for recipe, compatible, prefix in ([(recipe, False, 'ap_v070_bodies_r') for recipe in stage['recipes']] +
             [(recipe, True, 'ap_v070_compat_r') for recipe in stage.get('compatibility_recipes', [])] +
             [(recipe, True, 'ap_v070_counter_r') for recipe in stage.get('counter_recipes', [])]):
@@ -845,7 +866,7 @@ def _build_body_libraries(definitions, diagnostics, donor_indexes, donors, emitt
         if re.fullmatch(r"[0-9a-f]{20}", recipe["origin"]) is None:
             raise ValueError("Invalid native recipe origin")
         for body, name in _body_definitions(recipe, settings):
-            _append_native_body(body, compatible, definitions, donor_indexes, donors, emitted_bodies, functional, functional_libraries, generated, name, names, recipe, recipe_definitions, source_maps, source_names)
+            _append_native_body(body, compatible, definitions, donor_indexes, donors, emitted_bodies, functional, functional_libraries, generated, name, names, recipe, recipe_definitions, source_maps, source_names, clones)
         _append_body_library(generated, names, prefix, recipe, recipe_definitions)
 
 
@@ -858,7 +879,7 @@ def _validate_recipe_source(map_key, plan, source, stage):
         raise ValueError("Invalid native recipe fingerprint")
 
 
-def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
+def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None, source_records=None):
     stage = plan["maps"][map_key]
     settings = {**stage, "revision": enemy_revision}
     _validate_recipe_source(map_key, plan, source, stage)
@@ -867,7 +888,7 @@ def materialize_native_recipe_definitions(source, map_key, plan, source_maps, *,
     donor_indexes = {}
     if plan.get('revision', 0) >= 17:
         _materialize_native_recipe_definitions_groups(generated, stage)
-    functional, reachable, records = _functional_sources(source)
+    functional, reachable, records = _functional_sources(source, source_records)
     landing_positions = _build_landing_definitions(generated, map_key, names, records, stage)
     functional_libraries = {}
     emitted_bodies = {}
@@ -917,9 +938,13 @@ def _refill_limits_binding(recipe, record, stops, types):
     return binding, call, finite_stop, label
 
 
-def _refill_limits_owners(recipes, source):
+def _refill_limits_owners(recipes, source, source_records=None):
     owners = {r['binding'].get('owner') for r in recipes
               if r['family'] == 'maintenance' and not r['maximum_emissions']}
+    if source_records is not None:
+        index = entity_definition_index(source)
+        names = sorted((name for name in owners if name in index), key=index.get)
+        return {name: _source_record(source, name, index, source_records) for name in names}
     records = {r['name']: r for r in entity_records(source, include_names=owners - {None, ''})}
     return records
 
@@ -970,9 +995,9 @@ def _refill_limits_maximum_emissions(calls, finite, kills, limits, owner, recipe
         limits[recipe['origin']] = max(recipe['physical_count'] * 2, finite + recipe['physical_count'])
 
 
-def _refill_limits(source, recipes):
+def _refill_limits(source, recipes, source_records=None):
     limits = {}
-    records = _refill_limits_owners(recipes, source)
+    records = _refill_limits_owners(recipes, source, source_records)
     for owner, record in records.items():
         calls, kills, stops = _refill_limits_calls(record)
         finite = _refill_limits_finite(owner, recipes)
@@ -1072,8 +1097,8 @@ def _materialize_native_recipe_calls_fragments(aliases, changes, map_key, plan, 
     return compiled + prepared[len(source):] + "\n\n".join(aliases) + ("\n" if aliases else "")
 
 
-def _append_refill_aliases(aliases, map_key, names, plan, source):
-    for origin, limit in _refill_limits(source, plan['maps'][map_key]['recipes']).items():
+def _append_refill_aliases(aliases, map_key, names, plan, source, source_records=None):
+    for origin, limit in _refill_limits(source, plan['maps'][map_key]['recipes'], source_records).items():
         alias = 'ap_v070_refill_r' + origin
         if alias in names or limit > 0x7fffffff:
             raise ValueError('Invalid native refill limit')
@@ -1082,20 +1107,20 @@ def _append_refill_aliases(aliases, map_key, names, plan, source):
                        'edit = { spawnEditableShared = { groupName = "' + str(limit) + '"; } } } }')
 
 
-def _materialize_direct_activation(aliases, binding, changes, names, owners, recipe, source, source_index):
+def _materialize_direct_activation(aliases, binding, changes, names, owners, recipe, source, source_index, source_records):
     name, target = binding["entity"], binding["reference"]
     if name not in changes:
         start, end = find_entity_block_bounds(source, name, index=source_index)
         changes[name] = start, end, source[start:end]
     start, end, block = changes[name]
     if name not in owners:
-        owners[name], = entity_records(block, include_names={name})
+        owners[name] = copy.deepcopy(_source_record(source, name, source_index, source_records))
     owner = owners[name]
     path = tuple(binding["path"].split("."))
     if _get(owner["edit"], path) != target:
         raise ValueError("Native direct activation binding differs from the source")
     first, last = find_entity_block_bounds(source, target, index=source_index)
-    original, = entity_records(source[first:last])
+    original = _source_record(source, target, source_index, source_records)
     if original["class"] != "idTarget_Spawn":
         raise ValueError("Native direct activation target is not a spawn point")
     alias = "ap_v070_direct_r" + recipe["origin"]
@@ -1108,10 +1133,10 @@ def _materialize_direct_activation(aliases, binding, changes, names, owners, rec
     _get(owner["edit"], path[:-1])[path[-1]] = alias
 
 
-def _materialize_independent_actor(aliases, binding, changes, map_key, names, plan, recipe, source, source_index):
+def _materialize_independent_actor(aliases, binding, changes, map_key, names, plan, recipe, source, source_index, source_records):
     name = binding["entity"]
     first, last = find_entity_block_bounds(source, name, index=source_index)
-    original, = entity_records(source[first:last])
+    original = _source_record(source, name, source_index, source_records)
     if original["class"] != "idAI2" or name in changes:
         raise ValueError("Independent native binding differs from the source")
     replacement, definitions = _independent_definitions(recipe, original, names)
@@ -1123,10 +1148,10 @@ def _materialize_independent_actor(aliases, binding, changes, map_key, names, pl
     aliases.extend(definitions)
 
 
-def _materialize_summon(binding, changes, recipe, source, source_index):
+def _materialize_summon(binding, changes, recipe, source, source_index, source_records):
     name = binding["entity"]
     first, last = find_entity_block_bounds(source, name, index=source_index)
-    original, = entity_records(source[first:last])
+    original = _source_record(source, name, source_index, source_records)
     if original["class"] != "idArchvileTemplate":
         raise ValueError("Native summon binding is not a template")
     if name not in changes:
@@ -1151,21 +1176,21 @@ def _request_spawn_settings_fallback_target(bounds, kind, source, source_index):
     return fallback_bounds
 
 
-def _request_source_shape(recipe, source, source_index, target):
+def _request_source_shape(recipe, source, source_index, target, source_records):
     bounds = find_entity_block_bounds(source, target, index=source_index) if target else None
     if bounds is None:
         if recipe["family"] in {"group", "maintenance", "staggered"}:
             return bounds, None, "encounter/spawn_group/zone", "idTargetSpawnGroup"
         return bounds, None, "target/spawn", "idTarget_Spawn"
     first, last = bounds
-    record, = entity_records(source[first:last])
+    record = _source_record(source, target, source_index, source_records)
     if record["class"] not in {"idTarget_Spawn", "idTarget_Spawn_Parent", "idTargetSpawnGroup"}:
         raise ValueError("Native recipe target is not a native spawner")
     return bounds, record, record["inherit"], record["class"]
 
 
-def _request_spawn_settings(aliases, binding, names, recipe, source, source_index, target):
-    bounds, record, inherit, kind = _request_source_shape(recipe, source, source_index, target)
+def _request_spawn_settings(aliases, binding, names, recipe, source, source_index, target, source_records):
+    bounds, record, inherit, kind = _request_source_shape(recipe, source, source_index, target, source_records)
     settings = ({"spawners": {"num": 0}, "includeTouchingSpawners": False, "includeInGlobalOverrideGroup": False,
                  "clipModelInfo": {"type": "CLIPMODEL_NONE"}}
                 if kind == "idTargetSpawnGroup" else
@@ -1175,7 +1200,7 @@ def _request_spawn_settings(aliases, binding, names, recipe, source, source_inde
             target == 'breach_wasteland_arena_encounter_spawn_group_zone_2'):
         fallback_bounds = _request_spawn_settings_fallback_target(bounds, kind, source, source_index)
         first, last = fallback_bounds
-        fallback_record, = entity_records(source[first:last])
+        fallback_record = _source_record(source, "breach_wasteland_arena_target_spawn_60", source_index, source_records)
     elif bounds is not None and kind == 'idTarget_Spawn' and recipe['family'] in {'immediate', 'possessed'}:
         fallback_record = record
     if fallback_record:
@@ -1186,14 +1211,14 @@ def _request_spawn_settings(aliases, binding, names, recipe, source, source_inde
     return inherit, kind, settings
 
 
-def _materialize_native_event(aliases, binding, changes, names, owners, profiles, recipe, source, source_index):
+def _materialize_native_event(aliases, binding, changes, names, owners, profiles, recipe, source, source_index, source_records):
     name, path = binding["entity"], binding["path"].split(".")
     if name not in changes:
         start, end = find_entity_block_bounds(source, name, index=source_index)
         changes[name] = start, end, source[start:end]
     start, end, block = changes[name]
     if name not in owners:
-        owners[name], = entity_records(block, include_names={name})
+        owners[name] = copy.deepcopy(_source_record(source, name, source_index, source_records))
     owner = owners[name]
     target = _native_event_target(owner, path, binding)
     # preserve native calls when frozen recipes conflict with encounter safety.
@@ -1205,7 +1230,7 @@ def _materialize_native_event(aliases, binding, changes, names, owners, profiles
     if alias in names:
         raise ValueError("Duplicate native recipe request alias")
     names.add(alias)
-    inherit, kind, settings = _request_spawn_settings(aliases, binding, names, recipe, source, source_index, target)
+    inherit, kind, settings = _request_spawn_settings(aliases, binding, names, recipe, source, source_index, target, source_records)
     aliases.append('entity { entityDef ' + alias + ' { inherit = ' + _render(inherit, 0) +
         '; class = ' + _render(kind, 0) + '; edit = ' + _render(settings, 2) + ' } }')
     block = _edit(block, (*path, "args", f"item[{argument}]", "entity"), alias)
@@ -1213,30 +1238,31 @@ def _materialize_native_event(aliases, binding, changes, names, owners, profiles
     changes[name] = start, end, block
 
 
-def _materialize_recipe_binding(aliases, changes, map_key, names, owners, plan, profiles, recipe, source, source_index):
+def _materialize_recipe_binding(aliases, changes, map_key, names, owners, plan, profiles, recipe, source, source_index, source_records):
     binding = recipe["binding"]
     if binding["mode"] == "direct_point":
-        _materialize_direct_activation(aliases, binding, changes, names, owners, recipe, source, source_index)
+        _materialize_direct_activation(aliases, binding, changes, names, owners, recipe, source, source_index, source_records)
         return
     if binding["mode"] == "independent_actor":
-        _materialize_independent_actor(aliases, binding, changes, map_key, names, plan, recipe, source, source_index)
+        _materialize_independent_actor(aliases, binding, changes, map_key, names, plan, recipe, source, source_index, source_records)
         return
     if binding["mode"] == "summon" and binding["entity"] not in {"", "ap_darklord_phantoms"}:
-        _materialize_summon(binding, changes, recipe, source, source_index)
+        _materialize_summon(binding, changes, recipe, source, source_index, source_records)
         return
     if binding["mode"] != "event":
         return
-    return _materialize_native_event(aliases, binding, changes, names, owners, profiles, recipe, source, source_index)
+    return _materialize_native_event(aliases, binding, changes, names, owners, profiles, recipe, source, source_index, source_records)
 
 
 def materialize_native_recipe_calls(source, map_key, plan, source_maps, *, enemy_revision=2, diagnostics=None):
-    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision, diagnostics=diagnostics)
+    source_records = {}
+    prepared = materialize_native_recipe_definitions(source, map_key, plan, source_maps, enemy_revision=enemy_revision, diagnostics=diagnostics, source_records=source_records)
     names = {name for name, _, _ in ENTITY_HEADER.findall(prepared)}
     changes, aliases = {}, []
     source_index = entity_definition_index(source)
     owners = {}
     profiles = load_encounter_profiles().get(map_key, {})
-    _append_refill_aliases(aliases, map_key, names, plan, source)
+    _append_refill_aliases(aliases, map_key, names, plan, source, source_records)
     for recipe in plan["maps"][map_key]["recipes"]:
-        _materialize_recipe_binding(aliases, changes, map_key, names, owners, plan, profiles, recipe, source, source_index)
+        _materialize_recipe_binding(aliases, changes, map_key, names, owners, plan, profiles, recipe, source, source_index, source_records)
     return _materialize_native_recipe_calls_fragments(aliases, changes, map_key, plan, prepared, source)

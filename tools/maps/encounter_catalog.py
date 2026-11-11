@@ -10,6 +10,8 @@ from tools.maps.ap_map_generator import find_matching_brace
 ENTITY_START = re.compile(r"(?m)^entity\s*\{")
 ENTITY_HEADER = re.compile(r'entityDef\s+(\S+)\s*\{\s*inherit\s*=\s*"([^"]*)";\s*class\s*=\s*"([^"]+)";')
 MEMBER = re.compile(r'\s*([\w.\[\]-]+)\s*=\s*(\{|"(?:\\.|[^"\\])*"|[^;{}]+;)')
+MEMBER_SPACE = re.compile(r"[\s;]*")
+STRING_ESCAPE = re.compile(r"[\x00-\x1f\\]")
 SPAWN_CLASSES = {"idTarget_Spawn", "idTarget_Spawn_Parent", "idTargetSpawnGroup"}
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -50,7 +52,7 @@ def _parse_member_value(endings, limit, match, name, result, text, value):
         result[name] = _parse_object(text, match.end(), end - 1, endings)
         offset = end
     elif value.startswith('"'):
-        result[name] = json.loads(value)
+        result[name] = json.loads(value) if STRING_ESCAPE.search(value) else value[1:-1]
         offset = match.end()
     else:
         offset = _parse_object_offset(match, name, result, value)
@@ -69,8 +71,7 @@ def _parse_object(text, offset, limit, endings):
         if name in result:
             raise ValueError(f"Duplicate entity property: {name}")
         offset = _parse_member_value(endings, limit, match, name, result, text, value)
-        while offset < limit and (text[offset].isspace() or text[offset] == ";"):
-            offset += 1
+        offset = MEMBER_SPACE.match(text, offset, limit).end()
     return result
 
 

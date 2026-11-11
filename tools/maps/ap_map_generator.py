@@ -4,6 +4,8 @@ import hashlib
 import json
 import os
 import re
+from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 
 from doom_eap.content.content_catalog import load_ap_visual_contract
@@ -349,16 +351,19 @@ def suppress_vanilla_secret_found_ui(content):
     blocks = content.split("entity {")
     updated = [blocks[0]]
     for block in blocks[1:]:
-        if "secret" not in block.casefold() or not SECRET_IDENTITY_HINT_RE.search(block):
+        identity = block.casefold()
+        if not ("target/secret" in identity or "idtarget_secret" in identity) or not SECRET_IDENTITY_HINT_RE.search(block):
             updated.append("entity {" + block)
             continue
 
         block = _suppress_vanilla_secret_found_ui_inherit_matches(block)
         updated.append("entity {" + block)
-    result = "".join(updated)
-    if ACTIVE_SECRET_INHERIT_RE.search(result) or ACTIVE_SECRET_CLASS_RE.search(result):
-        raise ValueError("Secret target suppression left active vanilla identity")
-    return result
+    for block in updated:
+        identity = block.casefold()
+        if (("target/secret" in identity and ACTIVE_SECRET_INHERIT_RE.search(block))
+                or ("idtarget_secret" in identity and ACTIVE_SECRET_CLASS_RE.search(block))):
+            raise ValueError("Secret target suppression left active vanilla identity")
+    return "".join(updated)
 
 
 def retain_single_stat_increase(content, property_name, stat_name):
@@ -411,35 +416,46 @@ def find_matching_brace(content, open_brace_index):
     raise ValueError("Unbalanced braces while parsing entities content")
 
 
-_ENTITY_INDEXES = {}
+class EntityDefinitionIndex(dict):
+    def __init__(self, content):
+        super().__init__()
+        self.counts = Counter()
+        for match in re.finditer(r"entityDef\s+([^\s{]+)\s*\{", content):
+            self.setdefault(match[1], match.start())
+            self.counts[match[1]] += 1
 
 
+@lru_cache(maxsize=4)
 def entity_definition_index(content):
-    digest = hashlib.sha256(content.encode("utf-8")).digest()
-    if digest in _ENTITY_INDEXES:
-        return _ENTITY_INDEXES[digest]
-    offsets = {}
-    for match in re.finditer(r"entityDef\s+([^\s{]+)\s*\{", content):
-        offsets.setdefault(match[1], match.start())
-    if len(_ENTITY_INDEXES) >= 32:
-        del _ENTITY_INDEXES[next(iter(_ENTITY_INDEXES))]
-    _ENTITY_INDEXES[digest] = offsets
-    return offsets
+    return EntityDefinitionIndex(content)
+
+
+def apply_entity_edits(content, changes):
+    fragments = []
+    offset = 0
+    for start, end, replacement in sorted(changes):
+        if start < offset:
+            raise ValueError("Overlapping entity edits")
+        fragments.extend((content[offset:start], replacement))
+        offset = end
+    fragments.append(content[offset:])
+    return "".join(fragments)
 
 
 def find_entity_block_bounds(content, entity_name, *, index=None):
     if index is None:
-        entity_match = re.search(
-            r"entityDef\s+" + re.escape(entity_name) + r"\s*\{",
-            content,
-        )
-        if not entity_match:
-            return None
-        offset = entity_match.start()
+        offset = content.find(f"entityDef {entity_name} {{")
+        if offset == -1:
+            if entity_name not in content:
+                return None
+            match = re.search(r"entityDef\s+" + re.escape(entity_name) + r"\s*\{", content)
+            if match is None:
+                return None
+            offset = match.start()
     else:
         offset = index.get(entity_name)
-        if offset is None:
-            return None
+    if offset is None:
+        return None
 
     block_start = content.rfind("entity {", 0, offset)
     if block_start == -1:
@@ -2339,7 +2355,11 @@ def remove_blood_punch_grants(text):
         return field + " = {\n\t\t\tnum = " + str(len(kept)) + ";\n" + "".join(
             f'\t\t\titem[{i}] = "{path}";\n' for i, path in enumerate(kept)
         ) + "\t\t}"
-    return re.sub(r'\b(?:perkList|itemList)\s*=\s*\{[^{}]*\}', project, text)
+    pattern = re.compile(r'\b(?:perkList|itemList)\s*=\s*\{[^{}]*\}')
+    return "entity {".join(
+        pattern.sub(project, block) if "blood_punch" in block else block
+        for block in text.split("entity {")
+    )
 
 
 def progressive_effect_command(effect):
@@ -3045,8 +3065,10 @@ def _map_placements(config_entities, placement_metadata, secret_encounters):
 
 
 def _remove_configured_targets(content, target_removals):
+    index = entity_definition_index(content)
+    changes = []
     for entity_name, removed_targets in target_removals.items():
-        bounds = find_entity_block_bounds(content, entity_name)
+        bounds = find_entity_block_bounds(content, entity_name, index=index)
         if bounds is None:
             raise ValueError(f"Target-removal entity not found: {entity_name}")
         start, end = bounds
@@ -3062,17 +3084,19 @@ def _remove_configured_targets(content, target_removals):
             block,
             [target for target in existing_targets if target not in removed_targets],
         )
-        content = content[:start] + block + content[end:]
-    return content
+        changes.append((start, end, block))
+    return apply_entity_edits(content, changes)
 
 
 def _remove_configured_entities(content, remove_entities):
+    index = entity_definition_index(content)
+    changes = []
     for entity_name in remove_entities:
-        bounds = find_entity_block_bounds(content, entity_name)
+        bounds = find_entity_block_bounds(content, entity_name, index=index)
         if bounds is None:
             raise ValueError(f"Configured removal entity not found: {entity_name}")
-        content = content[:bounds[0]] + content[bounds[1]:]
-    return content
+        changes.append((*bounds, ""))
+    return apply_entity_edits(content, changes)
 
 
 def _neutralize_configured_references(content, neutralize_entity_references, target_policies):
@@ -3331,6 +3355,8 @@ def _append_independent_check(ap_check_id, asset_specs, block, config_entities, 
 
 def _compile_secret_checks(encounter_source, location_feedback, manifest_data, map_content, modified_count, placement_by_id, secret_encounters):
     secret_blocks = []
+    index = entity_definition_index(map_content)
+    changes = {}
     for secret_hook in secret_encounters:
         ap_check_id = secret_hook["ap_check"]
         location_id = secret_hook["location_id"]
@@ -3342,26 +3368,26 @@ def _compile_secret_checks(encounter_source, location_feedback, manifest_data, m
         expected_last_event_index = secret_hook["after_event_index"]
         automap_owner = secret_hook.get("automap_owner")
         automap_source = automap_owner or manager_name
-        if len(re.findall(rf"\bentityDef\s+{re.escape(automap_source)}\b", map_content)) != 1:
+        if index.counts[automap_source] != 1 or changes.get(automap_source) == "":
             raise ValueError(
                 f"Secret encounter automap source is missing or duplicated: {automap_source}"
             )
-        automap_bounds = find_entity_block_bounds(map_content, automap_source)
+        automap_bounds = find_entity_block_bounds(map_content, automap_source, index=index)
         if automap_bounds is None:
             raise ValueError(
                 f"Secret encounter automap source not found: {automap_source}"
             )
-        automap_block = map_content[automap_bounds[0]:automap_bounds[1]]
+        automap_block = changes.get(automap_source, map_content[automap_bounds[0]:automap_bounds[1]])
         secret_blocks.append(
             generate_automap_location_helper(automap_block, location_id)
         )
         if automap_owner:
-            map_content = (
-                map_content[:automap_bounds[0]]
-                + map_content[automap_bounds[1]:]
-            )
-        map_content = inject_secret_encounter_completion(
-            map_content,
+            changes[automap_owner] = ""
+        manager_bounds = find_entity_block_bounds(map_content, manager_name, index=index)
+        if manager_bounds is None:
+            raise ValueError(f"Secret encounter manager not found: {manager_name}")
+        changes[manager_name] = inject_secret_encounter_completion(
+            changes.get(manager_name, map_content[slice(*manager_bounds)]),
             manager_name,
             ap_check_id,
             expected_last_event_index,
@@ -3383,6 +3409,9 @@ def _compile_secret_checks(encounter_source, location_feedback, manifest_data, m
         )
         secret_blocks.append(generate_check_event(location_id))
         modified_count += 1
+    map_content = apply_entity_edits(map_content, [
+        (*find_entity_block_bounds(map_content, name, index=index), block) for name, block in changes.items()
+    ])
     return map_content, modified_count, secret_blocks
 
 
@@ -3521,10 +3550,11 @@ def generate_map(
         *LEGACY_RPC_ENTITY_PREFIXES, "ap_deathlink", "ap_rpc_auto_enable",
         "ap_fast_travel_unlock_native", "ap_fast_travel_unlock",
     ))
-    content = re.sub(r'\s*item\[\d+\]\s*=\s*"ap_logic_[^"]+";', '', content, flags=re.IGNORECASE)
-    content = re.sub(r'\s*item\[\d+\]\s*=\s*"AP_CHECK_[^"]+";', '', content, flags=re.IGNORECASE)
-
     blocks = content.split("entity {")
+    reference_pattern = re.compile(r'\s*item\[\d+\]\s*=\s*"(?:ap_logic_|AP_CHECK_)[^"]+";', re.IGNORECASE)
+    blocks = [reference_pattern.sub('', block) if 'ap_logic_' in block.lower() or 'ap_check_' in block.lower() else block
+              for block in blocks]
+    content = "entity {".join(blocks)
     sentinel_crystal_pairs, sentinel_crystal_top_names = _crystal_source_pairs(blocks, config_entities)
     modified_count, new_blocks = _compile_physical_checks(asset_specs, blocks, config_entities, content, default_visual_asset, default_visual_model, location_feedback, manifest_data, placement_by_id, preserve_rotation, preserve_visual_layers, sentinel_check_ids, sentinel_crystal_pairs, sentinel_crystal_top_names, target_policies)
 

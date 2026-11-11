@@ -16,6 +16,7 @@ from doom_eap.contracts.publisher_contracts import (
     map_publishers_for_owner,
 )
 from tools.maps.ap_map_generator import (
+    entity_definition_index,
     extract_target_names,
     find_entity_block_bounds,
     find_matching_brace,
@@ -476,10 +477,10 @@ def _patch_declared_terminal_text(
     publishers: tuple[PublisherContract, ...],
     text: str,
 ) -> tuple[str, dict]:
-    owner_pattern = rf"\bentityDef\s+{re.escape(owner)}\s*\{{"
-    if len(re.findall(owner_pattern, text)) != 1:
+    index = entity_definition_index(text)
+    if index.counts[owner] != 1:
         raise ValueError(f"{map_key}: terminal owner is missing or duplicated: {owner}")
-    bounds = find_entity_block_bounds(text, owner)
+    bounds = find_entity_block_bounds(text, owner, index=index)
     if bounds is None:
         raise ValueError(f"{map_key}: terminal owner block not found: {owner}")
     return _patch_declared_terminal_text_block(bounds, map_key, owner, publishers, text)
@@ -514,11 +515,14 @@ def _unrelated_entity_diff_count(before: str, after: str, owners: set[str]) -> i
 
     def blocks(text: str) -> dict[str, str]:
         result = {}
-        pattern = re.compile(r"\bentity\s*\{\s*entityDef\s+([^\s{]+)")
+        pattern = re.compile(r"entity\s*\{\s*entityDef\s+([^\s{]+)")
         for match in pattern.finditer(text):
-            opening = text.find("{", match.start())
+            start = match.start()
+            if start and (text[start - 1].isalnum() or text[start - 1] == "_"):
+                continue
+            opening = text.find("{", start)
             end = _matching_brace(text, opening)
-            result[match.group(1)] = text[match.start():end]
+            result[match[1]] = text[start:end]
         return result
 
     original = blocks(before)

@@ -2,6 +2,8 @@
 
 from doom_eap.content.arena_checks import arena_check_name, load_arena_checks
 from tools.maps.ap_map_generator import (
+    apply_entity_edits,
+    entity_definition_index,
     extract_target_names,
     find_entity_block_bounds,
     generate_check_event,
@@ -21,12 +23,13 @@ def room_compile_maps(maps, active_locations, root):
     return {key: row for key, row in maps.items() if row["recipes"] or key in arena_maps}
 
 
-def _replace_entity(text, name, transform):
-    bounds = find_entity_block_bounds(text, name)
+def _replace_entity(text, name, transform, index, changes):
+    bounds = find_entity_block_bounds(text, name, index=index)
     if bounds is None:
         raise ValueError(f"Arena completion entity missing: {name}")
     start, end = bounds
-    return text[:start] + transform(text[start:end]) + text[end:]
+    block = changes.get(name, (start, end, text[start:end]))[2]
+    changes[name] = start, end, transform(block)
 
 
 def _script_hook(block, source, check):
@@ -67,22 +70,26 @@ def suppress_arena_check(arena):
 
 def compile_arena_checks(text, arenas, placements, *, notifications=True):
     manifest = {}
+    index = entity_definition_index(text)
+    existing = set(index)
+    changes, additions = {}, []
     for arena in arenas:
         check = arena_check_name(arena)
         code = arena["location_id"]
         manifest[check] = code
-        if find_entity_block_bounds(text, check) is not None:
+        if check in existing:
             continue
+        existing.add(check)
         for source in arena["completion"]:
             if "target" in source:
-                text = _replace_entity(text, source["target"], lambda block, check=check: _target_hook(block, check))
+                _replace_entity(text, source["target"], lambda block, check=check: _target_hook(block, check), index, changes)
             else:
-                text = _replace_entity(text, source["manager"],
-                                       lambda block, source=source, check=check: _script_hook(block, source, check))
+                _replace_entity(text, source["manager"],
+                                lambda block, source=source, check=check: _script_hook(block, source, check), index, changes)
         relay = generate_event_relay(check, code, "", include_notification=notifications).replace(
             "count = 1;", "count = 1;\n\t\t\treuseable = false;", 1)
-        text += in_layer(relay, arena["layer"]) if arena.get("layer") else relay
+        additions.append(in_layer(relay, arena["layer"]) if arena.get("layer") else relay)
         if notifications:
-            text += generate_pickup_notification(code, placements.get(code))
-        text += generate_check_event(code) + suppress_arena_check(arena)
-    return text, manifest
+            additions.append(generate_pickup_notification(code, placements.get(code)))
+        additions.append(generate_check_event(code) + suppress_arena_check(arena))
+    return apply_entity_edits(text, changes.values()) + "".join(additions), manifest
