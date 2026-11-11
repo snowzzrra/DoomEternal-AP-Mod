@@ -8,6 +8,7 @@ from pathlib import Path
 SOURCE_ROOTS = ("doom_eap/content", "doom_eap/contracts", "tools/decls", "tools/maps")
 SOURCE_FILES = ("doom_eap/strings.py", "tools/release/build_string_table.py",
                 "doom_eap/launcher/launcher_core.py", "doom_eap/runtime/bridge_saves.py",
+                "doom_eap/launcher/room_map_workers.py",
                 "doom_eap/runtime/observers.py", "tools/release/room_payloads.py",
                 "tools/release/build_room_resources.py", "tools/release/stage_room_resources.py")
 BUNDLED_IDENTITY_PATH = "data/compiler_source_identity.json"

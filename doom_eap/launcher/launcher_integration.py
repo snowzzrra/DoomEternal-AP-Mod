@@ -1037,6 +1037,24 @@ class IntegratedLaunchWorkflow:
             raise RuntimeError('Runtime prerequisites not met: {value_0}'.format(value_0=f"{'; '.join(failed)}"))
 
 
+    def _room_build_progress(self):
+        previous = None
+        last_update = 0.0
+
+        def report(stage, done, total):
+            nonlocal previous, last_update
+            self.check_cancelled()
+            now = time.monotonic()
+            value = stage, done, total
+            if value == previous:
+                return
+            if previous is not None and stage == previous[0] and done != total and now - last_update < 0.5:
+                return
+            previous, last_update = value, now
+            self._emit("mod_building", build_stage=stage, build_done=done, build_total=total)
+
+        return report
+
     def _compile_installation(self, manifest):
         self._emit(
             "room_validated",
@@ -1057,6 +1075,7 @@ class IntegratedLaunchWorkflow:
         ).build(
             manifest,
             self.state_dir / "generated_mods",
+            progress=self._room_build_progress(),
         )
         return generated
 

@@ -9,7 +9,7 @@ import re
 import subprocess
 import tempfile
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -588,6 +588,16 @@ class RoomCompiler:
         self.consent = consent
 
     @classmethod
+    def _from_map_worker_resources(cls, payload_resource, payload_manifest, decompressor):
+        # the parent verifies package identity; workers verify each requested snapshot.
+        worker = cls.__new__(cls)
+        worker.payload_resource = payload_resource
+        worker.payload_manifest = payload_manifest
+        worker.decompressor = decompressor
+        worker.dependency_manager = worker.consent = None
+        return worker
+
+    @classmethod
     def compute_static_content_material(
         cls,
         base_resource: Path,
@@ -785,13 +795,22 @@ class RoomCompiler:
 
     def _remove_inactive_notifications(self, economy_enabled, notification_header, text, placement_by_id):
         if economy_enabled:
-            from tools.maps.ap_map_generator import find_entity_block_bounds
+            from tools.maps.ap_map_generator import (
+                apply_entity_edits,
+                entity_definition_index,
+                find_entity_block_bounds,
+            )
             inactive = {int(match.group(2)) for match in notification_header.finditer(text)} - placement_by_id.keys()
+            if not inactive:
+                return text
+            index = entity_definition_index(text)
+            changes = []
             for location_id in sorted(inactive):
-                bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}")
+                bounds = find_entity_block_bounds(text, f"ap_notify_location_{location_id}", index=index)
                 if bounds is None:
                     raise ValueError('notification entity missing: {value_0}'.format(value_0=f'{location_id}'))
-                text = text[:bounds[0]] + text[bounds[1]:]
+                changes.append((*bounds, ""))
+            text = apply_entity_edits(text, changes)
         return text
 
     def _append_fortress_labels(self, member, fortress_member_suffix, fortress_labels_written, economy_enabled, rewritten_text, fortress_labels):
@@ -855,60 +874,70 @@ class RoomCompiler:
         fortress_labels_written = False
         return placement_by_id, inactive_aliases, timer_transform, options, selected_groups, economy_enabled, fortress_member_suffix, fortress_labels, fortress_labels_written
 
-    def _apply_placement_entities(
-        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...],
-        options: dict | None = None, *, resolved=None,
-    ) -> None:
-        """Bind packaged location notifications to their room placements."""
-        import re
-
+    def _apply_placement_entity(self, member, content, policies, *, temporary_root=None):
         from tools.maps.notification_formatting import placement_sent_key
 
         decompressor = self._verified_decompressor()
-
-        placement_by_id, inactive_aliases, timer_transform, options, selected_groups, economy_enabled, fortress_member_suffix, fortress_labels, fortress_labels_written = self._placement_entity_policies(placements, options, resolved)
+        assembled = {}
+        placement_by_id, inactive_aliases, timer_transform, options, selected_groups, economy_enabled, fortress_member_suffix, fortress_labels, fortress_labels_written = policies
         notification_header = re.compile(
             r'(entityDef\s+ap_notify_location_(\d+)\s*\{.*?'
             r'header\s*=\s*")#str_ap_location_sent(";)',
             re.DOTALL,
         )
-        for member, content in list(assembled.items()):
-            if not member.endswith(".entities"):
-                continue
 
-            with tempfile.TemporaryDirectory(prefix="doom-ap-entities-") as temporary:
-                temporary_dir = Path(temporary)
-                compressed = temporary_dir / "input.entities"
-                decoded = temporary_dir / "decoded.entities"
-                recompressed = temporary_dir / "output.entities"
-                text = self._decode_placement_entities(compressed, content, decompressor, decoded, member)
+        with tempfile.TemporaryDirectory(prefix="doom-ap-entities-", dir=temporary_root) as temporary:
+            temporary_dir = Path(temporary)
+            compressed = temporary_dir / "input.entities"
+            decoded = temporary_dir / "decoded.entities"
+            recompressed = temporary_dir / "output.entities"
+            text = self._decode_placement_entities(compressed, content, decompressor, decoded, member)
 
-                replace_header = self._placement_header_rewriter(placement_by_id, placement_sent_key)
+            replace_header = self._placement_header_rewriter(placement_by_id, placement_sent_key)
 
-                if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
-                    from tools.maps.ap_map_generator import remove_blood_punch_grants
-                    text = remove_blood_punch_grants(text)
-                text = self._neutralize_inactive_aliases(inactive_aliases, text)
-                text = timer_transform(text, member)
-                if economy_enabled and member.endswith(fortress_member_suffix):
-                    from tools.maps.fortress_campaign import project_spend_groups
-                    text = text.rstrip() + "\n" + fortress_labels
-                    text = project_spend_groups(text, selected_groups)
-                text = self._remove_inactive_notifications(economy_enabled, notification_header, text, placement_by_id)
-                rewritten_text = notification_header.sub(replace_header, text)
-                rewritten_text, fortress_labels_written = self._append_fortress_labels(member, fortress_member_suffix, fortress_labels_written, economy_enabled, rewritten_text, fortress_labels)
-                rewritten = self._encode_placement_entities(rewritten_text, decoded, decompressor, recompressed, member, assembled)
-                LOGGER.info(
-                    "ROOM_PACKAGE_MEMBER member=%s compressed_bytes=%d decoded_bytes=%d encoded_bytes=%d",
-                    member[:256],
-                    len(content),
-                    len(rewritten),
-                    len(assembled[member]),
-                )
-        if not fortress_labels_written:
-            raise ValueError(
-                'room package lacks Fortress hub entities required for Battery placement labels'
+            if "progressive_blood_punch_v1" in (options or {}).get("required_capabilities", ()):
+                from tools.maps.ap_map_generator import remove_blood_punch_grants
+                text = remove_blood_punch_grants(text)
+            text = self._neutralize_inactive_aliases(inactive_aliases, text)
+            text = timer_transform(text, member)
+            if economy_enabled and member.endswith(fortress_member_suffix):
+                from tools.maps.fortress_campaign import project_spend_groups
+                text = text.rstrip() + "\n" + fortress_labels
+                text = project_spend_groups(text, selected_groups)
+            text = self._remove_inactive_notifications(economy_enabled, notification_header, text, placement_by_id)
+            rewritten_text = notification_header.sub(replace_header, text)
+            rewritten_text, fortress_labels_written = self._append_fortress_labels(member, fortress_member_suffix, fortress_labels_written, economy_enabled, rewritten_text, fortress_labels)
+            rewritten = self._encode_placement_entities(rewritten_text, decoded, decompressor, recompressed, member, assembled)
+            LOGGER.info(
+                "ROOM_PACKAGE_MEMBER member=%s compressed_bytes=%d decoded_bytes=%d encoded_bytes=%d",
+                member[:256],
+                len(content),
+                len(rewritten),
+                len(assembled[member]),
             )
+        return assembled[member], fortress_labels_written
+
+    def _map_worker_resources(self):
+        return self.payload_resource, self.payload_manifest, self._verified_decompressor()
+
+    def _apply_placement_entities(
+        self, assembled: dict[str, bytes], placements: tuple[PlacementRecord, ...],
+        options: dict | None = None, *, resolved=None, progress=None,
+    ) -> None:
+        from .room_map_workers import run_map_workers
+
+        jobs = [{"kind": "placement", "key": member, "content": content}
+                for member, content in sorted(assembled.items()) if member.endswith(".entities")]
+        results = run_map_workers(jobs, self._map_worker_resources(),
+            {"placements": placements, "options": options}, progress)
+        fortress_labels_written = False
+        for member, (content, fortress) in results:
+            if fortress and fortress_labels_written:
+                raise ValueError('room package contains multiple Fortress hub entity members')
+            fortress_labels_written |= fortress
+            assembled[member] = content
+        if not fortress_labels_written:
+            raise ValueError('room package lacks Fortress hub entities required for Battery placement labels')
 
     @staticmethod
     def _doom_gui_text(value: str) -> str:
@@ -1177,11 +1206,11 @@ class RoomCompiler:
 
         return expand_resolved_native_recipes(resolved if resolved is not None else admit_slot_data(manifest.options), load_slot_catalog())
 
-    def _compile_enemy_content(self, assembled, manifest, plan=None):
+    def _compile_enemy_content(self, assembled, manifest, plan=None, progress=None):
         from tools.maps.native_recipe_materializer import RecipeMaterializationError
 
         try:
-            return self._apply_enemy_plan(assembled, manifest, plan=plan)
+            return self._apply_enemy_plan(assembled, manifest, plan=plan, progress=progress)
         except (ValueError, KeyError, TypeError, OSError) as error:
             if isinstance(error, RecipeMaterializationError | SlotAdmissionError):
                 raise
@@ -1266,65 +1295,59 @@ class RoomCompiler:
             resource_roots[row["runtime_map"]] = sorted(roots - {""})
         return map_assets, resource_roots
 
-    def _materialize_enemy_maps(self, changed_maps, assembled, sources, plan, spawn_diagnostics, staged, compiler, neutral_manifest, patch_mission_complete_maps, materialize_native_recipe_calls, map_assets):
+    def _materialize_enemy_maps(self, changed_maps, assembled, plan, neutral_manifest, progress=None):
+        from .room_map_workers import run_map_workers
+
+        jobs = []
         for map_key, row in sorted(changed_maps.items()):
             if map_key not in self.payload_manifest["maps"]:
-                raise ValueError('Enemy generation map is not packaged: {value_0}'.format(value_0=f'{map_key}'))
+                raise ValueError(f"Enemy generation map is not packaged: {map_key}")
             member = self.payload_manifest["maps"][map_key]["target_member"]
             if member not in assembled:
-                raise ValueError('Enemy generation map is not active: {value_0}'.format(value_0=f'{map_key}'))
-            materialized = materialize_native_recipe_calls(sources[map_key], map_key, plan, sources,
-                enemy_revision=9, diagnostics=spawn_diagnostics)
-            source_path = staged / f"{map_key}.source"
-            output_path = staged / f"{map_key}.entities"
-            source_path.write_bytes(materialized.encode("utf-8"))
-            compiler.compile_map(neutral_manifest, source_path, output_path, map_key,
-                                 encounter_source=sources[map_key], write_seed_sidecar=False)
-            audit = patch_mission_complete_maps(ROOT / "data/mission_complete_map_contracts.json",
-                                                 {map_key: output_path}, staged / "publishers",
-                                                 source_maps=sources, retained_overrides=assembled)
-            if audit["unrelated_generated_entity_diff_count"]:
-                raise ValueError('Enemy map publisher patch changed unrelated entities: {value_0}'.format(value_0=f'{map_key}'))
-            assembled[member] = self._compress_entities_text(output_path.read_bytes().decode("utf-8"))
-            assets_path = member.split('/', 1)[0] + "/EternalMod/assetsinfo/" + row["runtime_map"].rsplit("/", 1)[1] + ".json"
-            assets = json.loads(assembled.get(assets_path, b"{}"))
-            entries = assets.setdefault("assets", [])
-            existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
-            # binary dependencies need their own native cache entries before model preparation.
-            entries.extend({"name": name, "mapResourceType": kind}
-                           for kind, name in map_assets[map_key] if (kind, name) not in existing)
-            assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
+                raise ValueError(f"Enemy generation map is not active: {map_key}")
+            jobs.append({"kind": "enemy", "key": map_key, "row": row})
+        contracts = json.loads((ROOT / "data/mission_complete_map_contracts.json").read_bytes())
+        retained = {row["override_path"]: assembled[row["override_path"]] for row in contracts.values()
+                    if isinstance(row, dict) and row.get("override_path") in assembled}
+        shared = {"manifest": neutral_manifest, "plan": plan, "retained_overrides": retained,
+                  "precache": json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes())["bodies"]}
+        return run_map_workers(jobs, self._map_worker_resources(), shared, progress)
 
-    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest, *, plan=None) -> dict[str, list[str]]:
+    def _merge_enemy_map(self, map_key, result, assembled, plan):
+        content, map_assets, roots, diagnostics = result
+        member = self.payload_manifest["maps"][map_key]["target_member"]
+        assembled[member] = content
+        runtime = plan["maps"][map_key]["runtime_map"]
+        assets_path = member.split('/', 1)[0] + "/EternalMod/assetsinfo/" + runtime.rsplit("/", 1)[1] + ".json"
+        assets = json.loads(assembled.get(assets_path, b"{}"))
+        entries = assets.setdefault("assets", [])
+        existing = {(entry["mapResourceType"], entry["name"]) for entry in entries}
+        # binary dependencies need their own native cache entries before model preparation.
+        entries.extend({"name": name, "mapResourceType": kind}
+                       for kind, name in map_assets if (kind, name) not in existing)
+        assembled[assets_path] = (json.dumps(assets, sort_keys=True) + "\n").encode("utf-8")
+        return roots, diagnostics
+
+    def _apply_enemy_plan(self, assembled: dict[str, bytes], manifest: SeedManifest, *, plan=None, progress=None) -> dict[str, list[str]]:
         from dataclasses import replace
 
-        from tools.maps.mission_complete_map_patcher import patch_mission_complete_maps
-        from tools.maps.native_recipe_materializer import (
-            MAX_POSITION_DIAGNOSTICS,
-            MAX_POSITION_DIAGNOSTICS_PER_MAP,
-            materialize_native_recipe_calls,
-        )
-        from tools.release.room_payloads import read_source_snapshots
+        from tools.maps.arena_checks import room_compile_maps
+        from tools.maps.native_recipe_materializer import MAX_POSITION_DIAGNOSTICS, MAX_POSITION_DIAGNOSTICS_PER_MAP
 
         if plan is None:
             plan = self._resolved_enemy_plan(manifest)
         if plan is None:
             return {}
-        from tools.maps.arena_checks import room_compile_maps
         changed_maps = room_compile_maps(plan["maps"], manifest.active_location_ids, ROOT)
         if not changed_maps:
             return {}
-        required_sources = self._enemy_required_sources(changed_maps)
-        sources = read_source_snapshots(self.payload_resource, self.payload_manifest, required_sources)
-        from tools.maps.ap_map_generator import find_entity_block_bounds
-        precache = json.loads((ROOT / "content/catalog/native_enemy_assets.json").read_bytes())["bodies"]
-        map_assets, resource_roots = self._enemy_resource_assets(changed_maps, precache, sources, find_entity_block_bounds)
-        compiler = ModCompiler(ROOT)
-        neutral_manifest = replace(manifest, options=self._compile_options(manifest.options), static_precompile=True)
-        spawn_diagnostics = []
-        with tempfile.TemporaryDirectory(prefix="doom-ap-enemies-") as temporary:
-            staged = Path(temporary)
-            self._materialize_enemy_maps(changed_maps, assembled, sources, plan, spawn_diagnostics, staged, compiler, neutral_manifest, patch_mission_complete_maps, materialize_native_recipe_calls, map_assets)
+        neutral = replace(manifest, options=self._compile_options(manifest.options), static_precompile=True)
+        results = self._materialize_enemy_maps(changed_maps, assembled, plan, neutral, progress)
+        resource_roots, spawn_diagnostics = {}, []
+        for map_key, result in results:
+            roots, diagnostics = self._merge_enemy_map(map_key, result, assembled, plan)
+            resource_roots.update(roots)
+            spawn_diagnostics.extend(diagnostics[:max(0, MAX_POSITION_DIAGNOSTICS - len(spawn_diagnostics))])
         assembled['enemy_spawn_diagnostics.json'] = (json.dumps({
             'positions': spawn_diagnostics, 'limit': MAX_POSITION_DIAGNOSTICS,
             'limit_per_map': MAX_POSITION_DIAGNOSTICS_PER_MAP,
@@ -1458,8 +1481,14 @@ class RoomCompiler:
             ):
                 raise ValueError('assembled Enhanced Melee Damage validation failed')
 
-    def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False) -> Path:
+    def build(self, manifest: SeedManifest, output_root: Path, *, force: bool = False,
+              progress: Callable[[str, int, int], None] | None = None) -> Path:
         from tools.release.room_payloads import canonical_json, write_deterministic_zip
+        def report(stage, done=0, total=0):
+            if progress is not None:
+                progress(stage, done, total)
+
+        report("reading")
         resolved = _admit_manifest(manifest)
         placements = manifest._complete_placements()
         if resolved is None:
@@ -1473,7 +1502,8 @@ class RoomCompiler:
         if not force and self._cached_package_matches(destination, manifest):
             return destination
         assembled, selected = self._assemble_room_files(manifest, options)
-        resource_roots = self._compile_enemy_content(assembled, manifest, plan)
+        resource_roots = self._compile_enemy_content(assembled, manifest, plan,
+            progress=lambda done, total: report("enemies", done, total))
         self._apply_boon_resources(assembled, manifest, resource_roots)
         seed_document = json.loads(canonical_json(manifest.document()))
         room_config = project_room_config(options)
@@ -1497,7 +1527,10 @@ class RoomCompiler:
         if options.get("enhanced_melee_damage", False):
             assembled[self.ENHANCED_MELEE_PATH] = self.ENHANCED_MELEE_DECL
         if not manifest.static_precompile:
-            self._apply_placement_entities(assembled, placements, manifest.options, resolved=resolved)
+            self._apply_placement_entities(assembled, placements, manifest.options, resolved=resolved,
+                progress=lambda done, total: report("placements", done, total))
+        report("packing")
+        if not manifest.static_precompile:
             self._apply_placement_strings(assembled, placements)
         self._publish_room_package(destination, assembled, write_deterministic_zip)
         self._verify_room_package(destination, assembled, seed_document, room_config, receipt, devinv_path, devinv_source, options)

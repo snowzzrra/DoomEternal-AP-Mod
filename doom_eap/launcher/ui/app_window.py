@@ -81,7 +81,7 @@ from ..launcher_integration import RoomSetupCoordinator
 from ..presenters.diagnostics_presenter import DiagnosticsPresenter
 from ..presenters.items_presenter import ItemsPresenter
 from ..presenters.play_presenter import PlayPresenter
-from ..setup_progress import STEP_TEXT, SetupAction
+from ..setup_progress import SetupAction
 from .controls import (
     AmmoRefillKeyControl,
     ElidedLabel,
@@ -2517,8 +2517,7 @@ class LauncherUI(QMainWindow):
             self.setup_elapsed.setText('{minutes}:{seconds}'.format(minutes=str(minutes), seconds=f'{seconds:02d}'))
         self.session_setup_help.setVisible(active and view.next_action is SetupAction.DIAGNOSE)
         if self._setup_state in {"checking", "installing", "updating"}:
-            operation = STEP_TEXT[view.step] if active else self._setup_copy
-            copy = '{operation}…'.format(operation=operation.rstrip("…."))
+            copy = view.activity_text if active else self._setup_copy.rstrip("….") + "…"
             self.session_setup_detail.setText(copy)
             self.hero_detail.setText(copy)
 
