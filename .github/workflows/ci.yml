@@ -42,10 +42,10 @@ jobs:
         subst X: "${{ github.workspace }}"
         python -m pip install -r requirements-launcher.txt -r requirements-ci.txt jellyfish==1.2.1 jinja2==3.1.6
         if ($LASTEXITCODE) { exit $LASTEXITCODE }
-        $scratch = 'X:/DoomEternal-AP-Mod/.tmp'
+        $scratch = '${{ runner.temp }}/doom-eap'
         New-Item -ItemType Directory -Force $scratch | Out-Null
         $codec = Join-Path $scratch 'idFileDeCompressor.exe'
-        Invoke-WebRequest https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/idFileDeCompressor.exe -OutFile $codec
+        Invoke-WebRequest https://github.com/brunoanc/idFileDeCompressorGo/releases/download/v1.0.1/idFileDeCompressor.exe -OutFile $codec -MaximumRetryCount 3 -RetryIntervalSec 5
         if ((Get-FileHash $codec -Algorithm SHA256).Hash.ToLowerInvariant() -ne '02488dfb2999542cee4b7c0713ec03dd534ddd876169aac43b0217b362427a06') { throw 'Codec SHA-256 mismatch' }
         "IDFILE_DECOMPRESSOR=$codec" >> $env:GITHUB_ENV
         "TEMP=$scratch" >> $env:GITHUB_ENV
@@ -107,7 +107,7 @@ jobs:
         if errorlevel 1 exit /b 1
         python -m pytest ../Archipelago/worlds/doometernal/test -q --basetemp .tmp/ap-tests -p no:cacheprovider
         if errorlevel 1 exit /b 1
-        ctest --test-dir X:/Sentinel-Core/build -L pillar --output-on-failure --timeout 180
+        ctest --test-dir X:/Sentinel-Core/build -L "pillar|persisted" --output-on-failure --timeout 180
         if errorlevel 1 exit /b 1
     - name: Complexity and lint
       shell: cmd
