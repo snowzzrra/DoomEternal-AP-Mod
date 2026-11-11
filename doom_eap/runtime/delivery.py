@@ -429,6 +429,8 @@ class DeliveryCoordinator:
 
     @staticmethod
     def _classify(command, response, **proof):
+        if command.plan.ammo_operation_id is not None and _refill_dispatched(command, response):
+            return CommandState.CONFIRMED
         if command.plan.kind == "weapon_points" and _weapon_points_confirmed(command, response):
             return CommandState.CONFIRMED
         request = None
@@ -1269,6 +1271,16 @@ def _proof_bytes(expectation, evidence):
                        "evidence": asdict(evidence)},
                       default=lambda value: value.hex() if isinstance(value, bytes) else value.value,
                       sort_keys=True).encode("utf-8")
+
+
+def _refill_dispatched(command, response):
+    dimensions = response.response["reply"]["dimensions"]
+    if (command.plan.kind != "command" or response.response["error"]
+            or dimensions["progress"] != Progress.TERMINAL or dimensions["execution"] != Execution.ENTERED
+            or dimensions["effect"] != Effect.DISPATCH_ONLY or dimensions["retention"] == Retention.NOT_FOUND):
+        return False
+    tag, _ = codec.decode_variant(COMMAND_IDS["command"], command.plan.payload_revision, command.plan.payload)
+    return tag in (3, 4)
 
 
 def _weapon_points_confirmed(command, response):
