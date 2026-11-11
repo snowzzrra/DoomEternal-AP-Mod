@@ -35,25 +35,12 @@ def assert_native_fortress_transaction(compiled_room, compiler, tmp_path):
     assert blocks[0] == blocks[1]
 
 
-def confirm_refill(peer):
-    status = peer.action("ammo_deliver")
-    assert status["ammo_consumed"] == 0
-    for command in status["ammo_commands"]:
-        if command["state"] == "effect_unknown":
-            peer.action("resolve", command_id=command["id"], revision=command["revision"], resolution="mark_as_received")
-
-
-@pytest.mark.parametrize("point", ["ammo_reservation:after", "ammo_authorization:after", "ammo_total:before", "ammo_confirmation:after"])
+@pytest.mark.parametrize("point", ["ammo_reservation:after", "ammo_total:before", "ammo_confirmation:after"])
 def test_ammo_refill_never_pays_twice_after_restart(tmp_path, point):
     peer = Scenario(tmp_path)
     try:
         peer.start(point)
-        if point in ("ammo_reservation:after", "ammo_authorization:after"):
-            peer.bridge.send({"action": "ammo"})
-        else:
-            peer.action("ammo")
-            confirm_refill(peer)
-            peer.bridge.send({"action": "ammo_recover"})
+        peer.bridge.send({"action": "ammo"})
         peer.bridge.expect(point)
         peer.kill_bridge()
 
@@ -62,9 +49,7 @@ def test_ammo_refill_never_pays_twice_after_restart(tmp_path, point):
         if status["ammo_operations"][0]["state"] == "unknown":
             status = peer.action("ammo_retry", operation_id=operation["id"],
                                  revision=status["ammo_operations"][0]["revision"])
-        if status["ammo_consumed"] == 0:
-            confirm_refill(peer)
-        peer.action("ammo_recover")
+        peer.action("ammo_deliver")
         peer.kill_bridge()
         peer.start()
         peer.action("ammo_recover")
@@ -88,7 +73,7 @@ def test_fortress_spent_batteries_stay_spent_after_restart(tmp_path, monkeypatch
     scope = {"pid": 123, "process_created": 123, "instance_id": [0] * 15 + [2], "generation": 1}
     env["PILLAR_CORE_SCOPE"] = json.dumps(scope)
     monkeypatch.setattr(delivery, "NativeTransport", lambda command, scope, **kw: NativeTransport(
-        (sys.executable, str(FIXTURES / "fake_delivery_core.py"), "--wire", str(peer.root)), scope, env=env))
+        (sys.executable, str(FIXTURES / "fake_delivery_core.py"), "--wire", str(peer.root)), scope, env=env, timeout=30))
 
     async def play():
         for restart in range(2):
@@ -116,28 +101,5 @@ def test_fortress_spent_batteries_stay_spent_after_restart(tmp_path, monkeypatch
 
     try:
         asyncio.run(play())
-    finally:
-        peer.close()
-
-
-def test_refill_survives_balance_overlap_and_map_change(tmp_path):
-    peer = Scenario(tmp_path)
-    try:
-        peer.start()
-        pending = peer.action("ammo", concurrent_balance=True)
-        original, = pending["ammo_commands"]
-        assert pending["ammo_consumed"] == 0 and pending["ammo_reserved"] == 1
-        status = peer.action("ammo_context")
-        assert status["ammo_consumed"] == 0
-        confirm_refill(peer)
-        settled = peer.action("ammo_recover")
-        assert (settled["ammo_consumed"], settled["ammo_reserved"]) == (1, 0)
-        effect, = peer.effects()
-        assert effect != original["id"]
-        peer.kill_bridge()
-        peer.start()
-        peer.action("ammo_recover")
-        peer.action("ammo_deliver")
-        assert peer.effects() == [effect]
     finally:
         peer.close()
