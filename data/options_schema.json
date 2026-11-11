@@ -2878,7 +2878,7 @@
       "display_name": "Density",
       "group": "Game Options",
       "key": "enemy_density",
-      "maximum": 10000,
+      "maximum": 500,
       "minimum": 1,
       "source_class": "EnemyDensity",
       "special_values": [
@@ -2896,7 +2896,7 @@
       "display_name": "Enemy Length",
       "group": "Game Options",
       "key": "enemy_length",
-      "maximum": 10000,
+      "maximum": 500,
       "minimum": 100,
       "source_class": "EnemyLength",
       "special_values": [
@@ -2967,7 +2967,7 @@
       "display_name": "Enemy Count Multiplier",
       "group": "Game Options",
       "key": "enemy_count_multiplier",
-      "maximum": 10000,
+      "maximum": 500,
       "minimum": 1,
       "source_class": "EnemyCountMultiplier",
       "special_values": [
@@ -9458,5 +9458,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "3037623cba226c601a769c0bbb54b995b7364996034c16c5b6e74b46bc7a23f1"
+  "source_sha256": "15c13d1c8432512a2933d9acc5784c371e4e2954cd36c8a4c4d2db31ec8eba34"
 }
