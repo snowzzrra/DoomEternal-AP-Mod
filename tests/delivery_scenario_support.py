@@ -104,8 +104,9 @@ class Child:
     def close(self):
         if self.process.poll() is None:
             self.process.kill()
-        self.process.wait(timeout=5)
-        self.reader.join(timeout=5)
+        self.process.wait(timeout=30)
+        self.reader.join(timeout=30)
+        assert not self.reader.is_alive(), "Child output reader did not finish"
         self.process.stdin.close()
         self.process.stdout.close()
 

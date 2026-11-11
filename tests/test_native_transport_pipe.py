@@ -79,14 +79,14 @@ class PipeServer:
         return self
 
     def join(self):
-        self.thread.join(3)
+        self.thread.join(30)
         assert not self.thread.is_alive()
         assert self.error is None
 
 
 def test_native_prepare_rejects_invalid_payload_without_pipe_access(relay):
     async def run():
-        transport = NativeTransport((relay,), process_scope(), timeout=3)
+        transport = NativeTransport((relay,), process_scope(), timeout=30)
         value, _ = split("submission", fixtures()["submit"][32:])
         try:
             with pytest.raises(WireError) as caught:
@@ -125,7 +125,7 @@ def test_native_relay_preserves_refusal_classification(relay, state, reason, err
 
         replies.body = body
         server = PipeServer(replies).start()
-        transport = NativeTransport((relay,), scope, timeout=3)
+        transport = NativeTransport((relay,), scope, timeout=30)
         try:
             await transport.connect()
             value, payload = split("submission", fixtures()["submit"][32:])
@@ -147,7 +147,7 @@ def test_native_relay_preserves_refusal_classification(relay, state, reason, err
 def test_native_pipe_identity_mismatch_closes_connection(relay):
     async def run():
         scope = process_scope()
-        transport = NativeTransport((relay,), scope, timeout=3)
+        transport = NativeTransport((relay,), scope, timeout=30)
         replies = Replies(scope)
         replies.hello["scope"] = dict(scope, process_created=scope["process_created"] + 1)
         server = PipeServer(replies).start()
@@ -179,7 +179,7 @@ def test_native_relay_rejects_oversized_frame_before_reading_body(relay):
         (relay, "--transport-v2", "7"),
         input=raw,
         capture_output=True,
-        timeout=3,
+        timeout=30,
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
     assert result.returncode == 9

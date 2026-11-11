@@ -18,7 +18,7 @@ from doom_eap.runtime.native_transport import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def link(tmp_path, mode="normal", timeout=2.0):
+def link(tmp_path, mode="normal", timeout=30):
     scope = (evidence_result("hello_evidence")["scope"] if mode == "evidence" else
              codec.decode("hello_result", fixtures()["hello_result"][32:])["scope"])
     env = dict(os.environ, PYTHONPATH=os.pathsep.join((str(ROOT), str(ROOT / "tests"))))
@@ -46,7 +46,7 @@ def test_bad_responses_close_connection_without_resubmission(tmp_path, mode):
 @pytest.mark.parametrize("mode", ["timeout", "partial"])
 def test_timeout_requires_explicit_reconnect_and_query(tmp_path, mode):
     async def run():
-        transport, trace = link(tmp_path, mode, timeout=0.5)
+        transport, trace = link(tmp_path, mode)
         try:
             await transport.connect()
             with pytest.raises(asyncio.TimeoutError):

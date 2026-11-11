@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from doom_eap.runtime import ledger_schema as storage
+from doom_eap.runtime.delivery import DeliveryCoordinator, DeliveryMode
 from doom_eap.runtime.ledger import (
     AmmoKind,
     AmmoOperation,
@@ -454,6 +455,15 @@ def test_v1_migration_preserves_commands_attempts_events_and_backup(tmp_path, mo
             backups = list(tmp_path.glob("*.backup"))
             assert len(backups) == 1 and rows(backups[0], "PRAGMA user_version") == [(1,)]
             assert rows(backups[0], "SELECT result FROM commands") == [(b"old evidence",)]
+            binding = await bind(ledger, key, authority=Authority.LEDGER,
+                                 expected_revision=(await ledger.room(key)).revision)
+            ctx = replace(await ledger.saved_context(key, command.context_id), binding=binding, context_id=uid())
+            await ledger.context(binding, ctx, ())
+            coordinator = DeliveryCoordinator(ledger, binding, ctx, object(), mode=DeliveryMode.OWNER)
+            assert await coordinator.recover(command.command_id) is None
+            current = await ledger.command(key, command.command_id)
+            assert current.state is CommandState.EFFECT_UNKNOWN and current.reason == "legacy_reference_missing"
+            assert await coordinator.ack(command.command_id) is None
         finally:
             await ledger.close()
         reader = await Ledger.open(path, read_only=True)

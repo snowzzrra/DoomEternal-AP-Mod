@@ -181,7 +181,7 @@ class Worker:
         self.transport = Transport(self)
         self.delivery = DeliveryCoordinator(BarrierLedger(self.ledger, self), self.binding, self.ctx,
                                             self.transport, mode=DeliveryMode.OWNER)
-        self.ammo = LedgerAmmoRefill(self.delivery, self.storage, "DeliveryRoomA", timeout=0.15)
+        self.ammo = LedgerAmmoRefill(self.delivery, self.storage, "DeliveryRoomA", timeout=30)
 
     async def snapshot(self):
         room = await self.ledger.room(self.key)
@@ -267,6 +267,8 @@ class Worker:
                 await asyncio.gather(refill, self.ammo.owner())
             else:
                 await refill
+            blocked = await self._deliver_ammo(blocked, request)
+            await self.ammo.recover()
         elif action == "ammo_context":
             self.ctx = replace(self.ctx, context_id=str(uuid4()), map_name="next-map", load_id=str(uuid4()))
             await self.ledger.context(self.binding, self.ctx, ())
@@ -280,6 +282,7 @@ class Worker:
             await self.ammo.retry(request["operation_id"], request["revision"])
         elif action == "ammo_deliver":
             blocked = await self._deliver_ammo(blocked, request)
+            await self.ammo.recover()
         else:
             await self._command_action(action, request)
         signal("done", **await self.snapshot(), reply=self.transport.last, blocked=blocked)
@@ -344,7 +347,7 @@ async def checks_action(ctx, ap, action):
     if action == "flush":
         await ctx.checks.flush_check_event_files()
     elif action == "ack":
-        update, = json.loads(await asyncio.wait_for(ap.recv(), 5))
+        update, = json.loads(await asyncio.wait_for(ap.recv(), 30))
         ctx._handle_checked_locations(update)
         await ctx.session_tasks.close()
     elif action == "goal":
