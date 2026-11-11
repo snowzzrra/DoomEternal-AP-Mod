@@ -370,16 +370,28 @@ def _modified_budget(counts, factor, total):
 
 
 def _subset(items, needed, candidates):
-    states = {0: ()}
+    if needed <= 0:
+        return ()
+    states = 1
+    limit = (1 << (needed + 1)) - 1
+    parents = {}
     for index in candidates:
         weight = items[index]['weight']
-        for total, selected in list(states.items())[::-1]:
-            value = total + weight
-            if value <= needed and value not in states:
-                states[value] = (*selected, index)
-        if needed in states:
-            return states[needed]
-    return states[max(states)]
+        added = ((states << weight) & limit) & ~states
+        states |= added
+        while added:
+            bit = added & -added
+            total = bit.bit_length() - 1
+            parents[total] = (total - weight, index)
+            added ^= bit
+        if states.bit_length() == needed + 1:
+            break
+    total = states.bit_length() - 1
+    selected = []
+    while total:
+        total, index = parents[total]
+        selected.append(index)
+    return tuple(reversed(selected))
 
 
 def _population_density(result, settings):
@@ -837,7 +849,8 @@ def _reserve_renewable_ammunition_ammo_required(desired_renewable, native_ammo_p
             desired_renewable['fodder'] += removed
             shortfall -= removed
     if shortfall:
-        raise ValueError('Requested renewable pool cannot preserve native ammunition')
+        # ammunition rounds up, so the rounded body budget may need another fodder body
+        desired_renewable['fodder'] += shortfall
     return ammo_required
 
 
@@ -961,12 +974,12 @@ def _draw_renewable_reference(candidates, catalog, chosen, encounter_settings, f
                                 for key, value in maintained.items() if key != 'stationary'})
     renewable_target = round(sum(random_maintained.values()) * Fraction(
         settings['count_multiplier'] if settings['count_mode'] == 'multiplier' else 100, 100))
-    renewable_counts = _allocate_pool_counts(renewable, renewable_target)
     desired_renewable = _modified_budget(random_maintained, factor, renewable_target)
     reference_ammo_pool = _native_ammo_pool(chosen)
     target_ammo_pool = (reference_ammo_pool * (settings['count_multiplier'] if
         settings['count_mode'] == 'multiplier' else 100) + 99) // 100
     ammo_required, native_ammo_pool = _reserve_renewable_ammunition(catalog, desired_renewable, random_maintained, sources, target_ammo_pool)
+    renewable_counts = _allocate_pool_counts(renewable, sum(desired_renewable.values()))
     renewable_counts = _reserve_ammo_counts(renewable, renewable_counts, ammo_required,
         candidates=candidates, catalog=catalog, supplies=supplies, population=population,
         special_limits=settings['special_limits'])
