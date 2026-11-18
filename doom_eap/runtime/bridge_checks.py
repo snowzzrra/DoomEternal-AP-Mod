@@ -1645,7 +1645,7 @@ def resolve_placement_records(location_ids, network_items, slot_info_by_id, name
         if classification < 0:
             raise ValueError(f"invalid item classification at location {location_id}")
         local = recipient_slot == local_slot
-        recipient_name = names.player_names.get(recipient_slot, str(recipient_slot))
+        recipient_name = slot_info.name
         if not isinstance(recipient_name, str) or not recipient_name.strip():
             raise ValueError(f"recipient name is unavailable: {recipient_slot}")
         records.append({
