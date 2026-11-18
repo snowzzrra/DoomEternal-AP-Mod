@@ -67,6 +67,7 @@ ROOM_SLOT_DEFAULTS: dict[str, Any] = {
     "arena_checks": 1,
     "easier_secret_encounters": False,
     REVEAL_AP_LOCATIONS_OPTION_KEY: False,
+    "skip_cutscenes": True,
     "starting_weapon": "Combat Shotgun",
     "praetor_suit_upgrades_in_pool": 6,
     "trap_percentage": 10,
@@ -377,9 +378,8 @@ class SeedManifest:
             raise ValueError(
                 'manifest option {value_0} must be boolean'.format(value_0=f'{REVEAL_AP_LOCATIONS_OPTION_KEY}')
             )
-        normalized_options.setdefault("use_dlc_content", True)
-        normalized_options.setdefault("include_dlc_missions", True)
-        for key in ("use_dlc_content", "include_dlc_missions"):
+        for key in ("use_dlc_content", "include_dlc_missions", "skip_cutscenes"):
+            normalized_options.setdefault(key, True)
             if not isinstance(normalized_options[key], bool):
                 raise ValueError('manifest option {value_0} must be boolean'.format(value_0=f'{key}'))
         project_room_config(normalized_options)
@@ -1399,14 +1399,18 @@ class RoomCompiler:
             ''.join(('{{', '\n', '', '\t', 'edit = {{', '\n', '', '\t', '', '\t', 'clearAllBeforeApply = false;', '\n', '', '\t', '', '\t', 'startingInventory = {{ num = 0; }}', '\n', '', '\t', '', '\t', 'currencyToGive = {{ num = 0; }}', '\n', '', '\t', '}}', '\n', '}}', '\n', ''))
         ).encode("utf-8")
         from tools.decls.campaign_builder import build_campaign_overrides
+        from tools.maps.final_credits import restore_cinematic_edges
+
+        skip_cutscenes = options.get("skip_cutscenes", True)
+        if not skip_cutscenes:
+            restore_cinematic_edges(assembled)
         holt_member = "gameresources_patch2/generated/decls/campaign/campaign/dlc1.decl"
         if hashlib.sha256(assembled[holt_member]).hexdigest() != \
                 "4475c7dc6a745d5ed26d9bfe40b7536e6b90afe6a7536e7df998951fc776ee19":
             raise ValueError('credits overlay drifted')
         assembled.update(build_campaign_overrides(
             assembled["hub_patch2/EternalMod/assetsinfo/hub.json"],
-            skip_dlc1_credits=True,
-            skip_dlc2_credits=True,
+            skip_cutscenes=skip_cutscenes,
         ))
         return devinv_path, devinv_source
 

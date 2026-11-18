@@ -29,7 +29,7 @@ def _source(key: str, manifest: dict) -> str:
     return raw.decode("utf-8")
 
 
-def _build_campaign_overrides_progress(manifest, result, skip_dlc1_credits, skip_dlc2_credits):
+def _build_campaign_overrides_progress(manifest, result, skip_cutscenes):
     progress = _source("unmaykr_progress", manifest)
     name = 'name = "unmaykr_unlocked_To_unnmaykr_acquired";'
     first = progress.index(name)
@@ -50,7 +50,7 @@ def _build_campaign_overrides_progress(manifest, result, skip_dlc1_credits, skip
         # The ordinary dossier reads the player's existing global currencies.
         # Change only visibility; preserve slots, purchase logic and balances.
         source = source.replace(before, "showDossierCurrency = true;")
-        if (key == "dlc1" and skip_dlc1_credits) or (key == "dlc2" and skip_dlc2_credits):
+        if skip_cutscenes:
             credits = f'credits = "{key}";'
             if source.count(credits) != 1:
                 raise ValueError(f"Native {key} credits field drifted")
@@ -79,8 +79,7 @@ def _unified_replay_entries(content_layers, hub_entries, manifest, stages):
     return rows
 
 
-def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool = False,
-                             skip_dlc2_credits: bool = False) -> dict[str, bytes]:
+def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_cutscenes: bool) -> dict[str, bytes]:
     manifest = json.loads((SOURCES / "manifest.json").read_text(encoding="utf-8"))
     result = {}
     for tier in ("area_of_effect", "ai_charge_rate", "max_charges"):
@@ -90,7 +89,7 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
         if count != 1:
             raise ValueError(f"Blood Punch notification source drifted: {tier}")
         result[PREFIX + f"perks/perk/player/blood_punch/{tier}.decl"] = source.encode("utf8")
-    _build_campaign_overrides_progress(manifest, result, skip_dlc1_credits, skip_dlc2_credits)
+    _build_campaign_overrides_progress(manifest, result, skip_cutscenes)
     hub = (SOURCES / "hub.decl").read_bytes()
     if hashlib.sha256(hub).hexdigest() != manifest["hub"]["sha256"]:
         raise ValueError("Native Fortress DevMenu source drifted")
@@ -119,9 +118,11 @@ def build_campaign_overrides(hub_assetsinfo: bytes, *, skip_dlc1_credits: bool =
         raise ValueError("Native Base campaign mission roster is missing")
     if main.count('credits = "credits";') != 1:
         raise ValueError("Native Base campaign credits field drifted")
+    if skip_cutscenes:
+        main = main.replace('credits = "credits";', '', 1)
     result[PREFIX + "campaign/campaign/main.decl"] = main.replace(
         'missionSelectList = "missionlist";', 'missionSelectList = "missionlist_ap_unified";'
-    ).replace('credits = "credits";', '', 1).encode("utf-8")
+    ).encode("utf-8")
     resource_layers = [*content_layers(7), "game/sp/hub/ap_excluded"]
     for layer in resource_layers:
         result[PREFIX + f"layer/{layer}.decl"] = b"{\n}\n"

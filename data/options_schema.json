@@ -9279,12 +9279,47 @@
       "ui_type": "toggle"
     },
     {
+      "choices": [
+        {
+          "key": "strict",
+          "label": "Strict",
+          "value": 0
+        },
+        {
+          "key": "excluded",
+          "label": "Excluded",
+          "value": 1
+        },
+        {
+          "key": "relaxed",
+          "label": "Relaxed",
+          "value": 2
+        }
+      ],
+      "default": "strict",
+      "description": "Weapon upgrade points cannot be refunded. Each mod needs three bundles of points.\n\nStrict waits until you have enough points for every active mastery.\nExcluded opens each mastery after three bundles. Its reward can only be a non-progression item.\nRelaxed opens each mastery after three bundles and allows progression rewards. Spending points on\nanother mod can block your progress until more points arrive.\nCompleting all masteries for victory requires enough points for every active mastery in all modes.",
+      "display_name": "Mastery Logic",
+      "group": "Game Options",
+      "key": "mastery_logic",
+      "source_class": "MasteryLogic",
+      "ui_type": "choice"
+    },
+    {
       "default": false,
       "description": "Show Archipelago pickup locations on the DOOM Eternal Automap, making checks easier to find while exploring or replaying missions.\n\nOn: Show the markers. Off: Explore with the usual Automap markers.",
       "display_name": "Reveal AP Locations on Automap",
       "group": "Game Options",
       "key": "reveal_ap_locations_on_automap",
       "source_class": "RevealAPLocationsOnAutomap",
+      "ui_type": "toggle"
+    },
+    {
+      "default": true,
+      "description": "Skip the opening cutscenes of Hell on Earth, UAC Atlantica and The World Spear.\nAlso skip the ending cutscenes and credits of Final Sin, The Dark Lord (Davoth) and The Holt.",
+      "display_name": "Skip Cutscenes",
+      "group": "Game Options",
+      "key": "skip_cutscenes",
+      "source_class": "SkipCutscenes",
       "ui_type": "toggle"
     },
     {
@@ -9458,5 +9493,5 @@
   ],
   "schema_version": 3,
   "source": "Archipelago/worlds/doometernal/options.py",
-  "source_sha256": "15c13d1c8432512a2933d9acc5784c371e4e2954cd36c8a4c4d2db31ec8eba34"
+  "source_sha256": "f477882594299b276350cb5f37d546ee75441c8675e4db30838b57d03561be95"
 }

@@ -3,7 +3,7 @@
     "map": "final_sin_death",
     "resource": "e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_of_sin_death/icon_of_sin_death_cinematic_info_logic.decl",
     "source_sha256": "755c2fb0227e9c6ed63c963431db3b407facbfe34f6984fe5e583a7fafd11a5c",
-    "result_sha256": "6dc720eddcad383dedb7ef89e91fe8cf81f3d0106fab187b99abd13c301c0550",
+    "result_sha256": "97e3db92b7f1d6e9f6f80e7d8605e66cd171ba4a91aad8e0466187a1a174ca6c",
     "edge": [
       522942224,
       3031889519,
@@ -18,7 +18,7 @@
     "map": "final_sin_destroyer",
     "resource": "e3m4_boss_patch3/generated/decls/logicentity/maps/game/sp/e3m4_boss/e3m4_boss_cinematic_icon_destroyer/icon_destroyer_info_logic.decl",
     "source_sha256": "e511f007155cc95391b65c8e9e17adb3253163bd759322316d045b13f05e22b9",
-    "result_sha256": "30154762f1182c91a58f18c6e7edf8655e5152f03c3e1ab953b6fd46d80819ef",
+    "result_sha256": "6bcb035fc8efd033d117ca53013360dc0121f2f8d7f9404d63bbab4f32648be2",
     "edge": [
       1465269036,
       1893163630,
@@ -33,7 +33,7 @@
     "map": "dark_lord",
     "resource": "e5m4_boss_patch1/generated/decls/logicentity/maps/game/dlc2/e5m4_boss/e5m4_boss_cinematics_death_of_the_darklord/death_of_the_darklord_info_logic.decl",
     "source_sha256": "9994dce950ab4eb97f95dacc540581283723e35e50992713501a2a1ae0c24aba",
-    "result_sha256": "09e8ca10d30b66dc31eeb2adc7b3e913214296ec02dbb113f37d35627b793f25",
+    "result_sha256": "7716a201ff8f4301a3088b7b5d7399b0efd70110a8fab002e730baf0b4934385",
     "edge": [
       2938577565,
       3661270880,
@@ -41,6 +41,21 @@
       1937119747,
       0,
       302987093,
+      0
+    ]
+  },
+  {
+    "map": "the_holt_ending",
+    "resource": "e4m3_mcity_patch2/generated/decls/logicentity/maps/game/dlc/e4m3_mcity/e4m3_mcity_art_cinematics_seraphim_death/seraphim_death_info_logic.decl",
+    "source_sha256": "23b205de918ae01f5432e77cd73f974c80273c9b675f550e2d0e3badbb526a30",
+    "result_sha256": "f7937e88a19be77f69d164a70698575813f355463f0149622c6b0b7136772d38",
+    "edge": [
+      3891148376,
+      76270236,
+      1,
+      1037894397,
+      0,
+      117100117,
       0
     ]
   },

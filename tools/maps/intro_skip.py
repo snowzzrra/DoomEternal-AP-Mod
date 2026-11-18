@@ -39,15 +39,18 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def patch(text, edge):
+def patch(text, edge, *, reverse=False):
     edge_id, source, source_pin, old_target, old_pin, target, target_pin = edge
+    if reverse:
+        old_target, target = target, old_target
+        old_pin, target_pin = target_pin, old_pin
     pattern = re.compile(
         rf'(id = {edge_id};\s*fromNodeId = {source};\s*fromPinId = {source_pin};\s*'
         rf'toNodeId = ){old_target}(;\s*toPinId = ){old_pin}(;)' 
     )
     result, count = pattern.subn(lambda m: f"{m[1]}{target}{m[2]}{target_pin}{m[3]}", text)
     if count != 1:
-        raise ValueError(f"expected one opening-scene edge {edge_id}, found {count}")
+        raise ValueError(f"expected one cinematic edge {edge_id}, found {count}")
     return result
 
 
@@ -68,12 +71,12 @@ def main():
             raise ValueError(f"{map_id}: graph line count changed")
         output = ROOT / "packaging/mod_assets" / owner / member
         output.parent.mkdir(parents=True, exist_ok=True)
-        result = after.encode("utf-8")
+        result = after.replace("\r\n", "\n").encode("utf-8")
         output.write_bytes(result)
         recipes.append(dict(map=map_id, resource=f"{owner}/{member}", source_sha256=expected,
                             result_sha256=sha(result), edges=edges))
     recipe = ROOT / "packaging/intro-decl-patches.json"
-    recipe.write_text(json.dumps(recipes, indent=2) + "\n", encoding="utf-8")
+    recipe.write_text(json.dumps(recipes, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(recipes, indent=2))
 
 

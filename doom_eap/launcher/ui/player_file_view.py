@@ -162,6 +162,7 @@ class PlayerFileView(QWidget):
                     "randomize_dash",
                     "include_weapon_mastery_challenges",
                     "mastery_requirements",
+                    "mastery_logic",
                     "include_slayer_gates",
                     "include_secret_encounters",
                     "arena_checks",
@@ -207,6 +208,7 @@ class PlayerFileView(QWidget):
                     "campaign_difficulty",
                     "logic_difficulty",
                     "reveal_ap_locations_on_automap",
+                    "skip_cutscenes",
                 ),
             ),
             (

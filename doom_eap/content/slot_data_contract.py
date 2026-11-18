@@ -228,6 +228,7 @@ class Runtime:
     enhanced_melee_damage: bool
     easier_secret_encounters: bool
     reveal_ap_locations_on_automap: bool
+    skip_cutscenes: bool
     checks: Checks
     special_weapon: str
     mastery_requirement_counts: Mapping[str, Positive]
@@ -831,7 +832,14 @@ def validate_slot_data(slot_data: dict, catalog: dict | None = None, *, placemen
     if total > MAX_PAYLOAD_BYTES:
         raise PayloadSizeError(total, recipe_size)
     _recipe_table_bounds(slot_data.get("recipes"))
-    data = _read_record(SlotData, slot_data, "slot_data")
+    runtime, options = slot_data.get("runtime"), slot_data.get("tracker_options")
+    resolved = slot_data
+    if (type(runtime) is dict and "skip_cutscenes" not in runtime and type(options) is dict
+            and options.keys().isdisjoint(("mastery_logic", "skip_cutscenes"))):
+        # v7 rooms without these options use strict mastery logic and keep their packaged cutscene skips.
+        resolved = dict(slot_data, runtime=dict(runtime, skip_cutscenes=True),
+                        tracker_options=dict(options, mastery_logic=0, skip_cutscenes=1))
+    data = _read_record(SlotData, resolved, "slot_data")
     _catalog_references(catalog)
     _unique(data.compatibility.required_capabilities, "required_capabilities")
     _difficulty(data.runtime.difficulty, data.compatibility.required_capabilities)

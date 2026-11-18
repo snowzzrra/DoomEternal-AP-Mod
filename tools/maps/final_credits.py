@@ -4,7 +4,10 @@
 import json
 from pathlib import Path
 
-from intro_skip import patch, sha
+if __package__:
+    from .intro_skip import ROUTES as INTRO_ROUTES, patch, sha
+else:
+    from intro_skip import ROUTES as INTRO_ROUTES, patch, sha
 
 ROOT = Path(__file__).resolve().parents[2]
 DECL = "generated/decls/logicentity/maps/game/"
@@ -28,7 +31,27 @@ ROUTES = {
         ('className = "idLogicNodeModelRollCredits";', 'credits = "dlc2";',
          "stage_3_target_campaign_complete_1"),
     ),
+    "the_holt_ending": (
+        "e4m3_mcity_patch2", DECL + "dlc/e4m3_mcity/e4m3_mcity_art_cinematics_seraphim_death/seraphim_death_info_logic.decl",
+        "23b205de918ae01f5432e77cd73f974c80273c9b675f550e2d0e3badbb526a30",
+        (3891148376, 76270236, 1, 1037894397, 0, 117100117, 0),
+        ('scene = "maps/dlc1/e4m3_mcity/seraphim_death";', 'value = "cinEnd";',
+         'soundStateToSet = "music_ghost_states/credits_end";', '"game_target_relay_1";'),
+    ),
 }
+
+
+def restore_cinematic_edges(assembled):
+    routes = [(owner, member, edges) for owner, member, _, edges, _ in INTRO_ROUTES.values()]
+    routes.extend((owner, member, (edge,)) for owner, member, _, edge, _ in ROUTES.values())
+    for owner, member, edges in routes:
+        path = f"{owner}/{member}"
+        if path not in assembled:
+            raise ValueError(f"missing cinematic graph: {path}")
+        graph = assembled[path].decode("utf-8")
+        for edge in edges:
+            graph = patch(graph, edge, reverse=True)
+        assembled[path] = graph.encode("utf-8")
 
 
 def _main_member(recipes):
@@ -45,11 +68,11 @@ def _main_member(recipes):
             raise ValueError(f"{name}: graph line count changed")
         output = ROOT / "packaging/mod_assets" / owner / member
         output.parent.mkdir(parents=True, exist_ok=True)
-        result = after.encode("utf-8")
+        result = after.replace("\r\n", "\n").encode("utf-8")
         output.write_bytes(result)
         recipes.append(dict(map=name, resource=f"{owner}/{member}", source_sha256=expected,
                             result_sha256=sha(result), edge=edge))
-    # The Holt has no map credit node: campaign completion reads this DLC1 field.
+    # DLC1 selects credits from its campaign declaration after the map exit.
     owner, member = "gameresources_patch2", "generated/decls/campaign/campaign/dlc1.decl"
     expected = "bf1c077fad4c482bfc718cc9bbdda5e6b0dcaa265e50b8c2a06e71f75a5a4d8e"
     source = ROOT / "vanilla_decls/owners" / owner / member
@@ -77,7 +100,7 @@ def main():
     recipes.append(dict(map="the_holt", resource=f"{owner}/{member}",
                         source_sha256=expected, result_sha256=sha(result), field="credits"))
     (ROOT / "packaging/final-credit-decl-patches.json").write_text(
-        json.dumps(recipes, indent=2) + "\n", encoding="utf-8"
+        json.dumps(recipes, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
     print(json.dumps(recipes, indent=2))
 

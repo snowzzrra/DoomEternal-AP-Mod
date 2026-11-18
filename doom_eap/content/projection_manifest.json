@@ -20,7 +20,7 @@
     "recipe_codec.py": "b899ee5290dbdcec3fbd5e27e3b5b58854e90a464a0642a9fa3b33155f2cb46b",
     "secret_encounter_timers.json": "376397784d5378a6d2c1f1578e4a1999230c20f87c1ff7ba00e4f7c428bd0806",
     "slot_catalog.json": "a6232c39055e99485dfe6caf5c7bdea1fb298f0203a53e0d1f967ad22283cd5e",
-    "slot_data_contract.py": "abb93ff301eb7bfced9a92fce1a1c1fdfce1ad421ba85a9ac64087e6e964435a",
+    "slot_data_contract.py": "451da3a5050e0cc81c74c1bbc50221f95aeebc7a03a807357195da3f107ef774",
     "vanilla_enemy_profiles.json": "346f1f30a3096dd99d88ac649b11f71efc3e8bf1a2d59a8c4439bcde94c9d1ca",
     "vanilla_enemy_profiles.py": "80da000818b5a8c7cd9ac4e8181c96186e116279221b249ea06987abae19fe01"
   },

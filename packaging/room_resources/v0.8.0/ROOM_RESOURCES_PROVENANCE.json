@@ -1,20 +1,20 @@
 {
   "base_mod": {
-    "sha256": "74cc6b7ab53b8d9f1c9acb792f26395a529709255e4eba10e8f9bc363da29af7",
-    "size": 13994844
+    "sha256": "dbe5760371ab7acdfd09d98ae93dca5a8871864bfa5b379d2af37bfd27070067",
+    "size": 14000073
   },
   "compiler_input_byte_contract": "first_party_utf8_lf_v1",
-  "inputs_count": 436,
+  "inputs_count": 437,
   "release_version": "0.8.0",
   "room_payload_manifest": {
-    "sha256": "66b56881a8f5eaf9315adbd6919459180db2ea08c4fe1f1bf963d146357bfd01",
-    "size": 30786
+    "sha256": "18a9b77c4175bd6f0ab32f56f98a5667e8274fc923e66134db4c63b61599228f",
+    "size": 30936
   },
   "room_payloads": {
     "sha256": "17175ca35b78a559f8250ec67838c59914de51fed7cfb72ea4017f3b93c9f0b5",
     "size": 18713969
   },
-  "room_resource_input_fingerprint": "695b26994e1c21a2fd32b0ad9f12498c0298236bf499e00d01f2d05484d5a7f4",
+  "room_resource_input_fingerprint": "4c5c35b1acb45a478a714824bedc188774466588d8fae3867580408360ea3b5d",
   "schema_version": 1,
   "source_hashes": {
     "content/catalog/actorpopulation/default_iconofsin-282d6be564ae.decl": "77c53e5b6b92d5f242bc219957fab4860f6d7e57ddba35e0d202350859ad1903",
@@ -212,7 +212,7 @@
     "data/map_sources.json": "4a86467de786d38768b26f1fbad8a4f374a17e2beda9778cffd0b887e0d4b6ff",
     "data/mission_complete_map_contracts.json": "f1b4cfbf45f7960cc4f2bfa765a4ffc35ce72641092e87a566df0b8266edb2e9",
     "data/observer_contracts.json": "3e604750ef57c6164eeb30edd785e1efc286062b981c51efddd040bfe74a4b98",
-    "data/options_schema.json": "6d027fd23ba89bff626688d10091723342b600fd5c490e356d72208801047d0e",
+    "data/options_schema.json": "0f1d4dc1d0fff1ef8025d44fe97ff384b99fa476319acba112d7537757da92ad",
     "data/perk_candidates.json": "0d989a009c6907a3930f874312caeaf377b14e6069f50a478961b2e316a7ba71",
     "data/physical_pickups.json": "257d53d3de15581047aafb97f7a6937957fb20d40d30889ff14b62f68f6281b3",
     "data/publisher_contracts.json": "14156d2c9f80760619a06d12223a9118c37c4a07b8d7c1fb173252600c0e81f1",
@@ -249,11 +249,11 @@
     "doom_eap/content/option_text.py": "a5e979bc11e67414bca549eaddf5ba8c947293205f211cdd120ef5e22ecb6084",
     "doom_eap/content/options_foundation.py": "681b2688c6f0ed76642df5cc2f8963a59721ab2cd89c6893eda3e690a13490f9",
     "doom_eap/content/physical_options.py": "7a1405263a26cd966d9ca78628bef2ca0ffb3b926089c5ef891ea449de051716",
-    "doom_eap/content/projection_manifest.json": "6d81b21e03b9b867dadbd39b1aa37de9cec804ab9233e31f1c1e151f1b04bbfc",
+    "doom_eap/content/projection_manifest.json": "2bbd8f06803768c6f2cbb3458e66e902ac776661f5f1a08a03ee1c3620bbbadc",
     "doom_eap/content/recipe_codec.py": "cd8e7a236e1a95a3f40b49a438d1ee0d24bdc72fae3f24ff88ac4486b93c7d50",
     "doom_eap/content/secret_encounter_timers.json": "376397784d5378a6d2c1f1578e4a1999230c20f87c1ff7ba00e4f7c428bd0806",
     "doom_eap/content/slot_catalog.json": "a6232c39055e99485dfe6caf5c7bdea1fb298f0203a53e0d1f967ad22283cd5e",
-    "doom_eap/content/slot_data_contract.py": "653402ed1d21f549376dbddbe2d7a6e37df4a9afe9bd33658699fbba1ddab918",
+    "doom_eap/content/slot_data_contract.py": "68c9271087454c9c4b64591fdaa20b0e906baf1053cd5cd739a349aaf1ceb34d",
     "doom_eap/content/vanilla_enemy_profiles.json": "346f1f30a3096dd99d88ac649b11f71efc3e8bf1a2d59a8c4439bcde94c9d1ca",
     "doom_eap/content/vanilla_enemy_profiles.py": "80da000818b5a8c7cd9ac4e8181c96186e116279221b249ea06987abae19fe01",
     "doom_eap/contracts/__init__.py": "3f2ecdaed1b27d99205251aaab21d06eae0ce583f8cd7aecccb82e28cfe21256",
@@ -265,7 +265,7 @@
     "doom_eap/contracts/receipt_delivery.py": "3be6f59cfeb0ed6d919be4040c3f1d01dab378bf72db96f42d5a83f7f294f1de",
     "doom_eap/contracts/runtime_context.py": "6c54ec1744d0d2017d9c4bf7db2c7cbf64f104e7f77671c9f662b80b805366ea",
     "doom_eap/contracts/save_observation.py": "9e60b69bed7e93e35de22fd45ab15f699858c712fe8c58b236c8c8222e5b8436",
-    "doom_eap/launcher/launcher_core.py": "7ca7dc853f2477eec2b4157a9913843c1daf6fc4e27fb4bf6f4f4056d2ba69ac",
+    "doom_eap/launcher/launcher_core.py": "bb5490398086b649167479c7df46b67dda0c46bcb512db1cba8aa4414adf39d9",
     "doom_eap/runtime/bridge_saves.py": "69e808c68d7299294b00e9cfda275767d1328d74fd7cad32d8ca18a6d5289ad7",
     "doom_eap/runtime/observers.py": "a6f6280d6c6713e214d6feef6d8aca5cc7398c0a268ef67d646ab307173d499c",
     "doom_eap/strings.py": "61f961d3608e2225d1dcc679932bf4e97b28fdf82a79adbd512b5e344977766a",
@@ -363,6 +363,7 @@
     "packaging/mod_assets/e4m3_mcity/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e4m3_mcity/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
     "packaging/mod_assets/e4m3_mcity_patch1/swf/hud/hud_score.swf": "3fa23163fc15fc9c03ef20b5cebcdb058f5ceb236266767b4f84afda160f5f96",
+    "packaging/mod_assets/e4m3_mcity_patch2/generated/decls/logicentity/maps/game/dlc/e4m3_mcity/e4m3_mcity_art_cinematics_seraphim_death/seraphim_death_info_logic.decl": "f7937e88a19be77f69d164a70698575813f355463f0149622c6b0b7136772d38",
     "packaging/mod_assets/e5m1_spear/art/pickups/codex.lwo": "fa617a2f3d43a99510a512c6d7ea47fd3f7ed3a1ac32c4e01d36561f20478ac1",
     "packaging/mod_assets/e5m1_spear/art/pickups/codex.tga$streamed$mtlkind=albedo": "6716b617263a8b16ab9af28edd69dd976aaf42ec237f81e6bd8763c746564f1a",
     "packaging/mod_assets/e5m1_spear/generated/decls/material2/art/pickups/codex.decl": "f2f33d9d52bae5502d621882e67a8fc7254a85c70909011fcd094147f7eef3f7",
@@ -419,7 +420,7 @@
     "tools/content/compile_content_catalog.py": "e82de1231819502faef946c253f4e56f10f6ae8865de1485f539755f12edac6e",
     "tools/content/compile_start_inventory_catalog.py": "4a671f7ea8564432f6ff5f9fd07a5871ca3826587e94a71bfe8cb84b2944bb88",
     "tools/decls/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "tools/decls/campaign_builder.py": "98ad8ec4b2029c9d7b8db935421ada7550c775d359610fb3afcf3e9b62d5cc2b",
+    "tools/decls/campaign_builder.py": "d3af97392dc77959467fc7c30bee0529f19886e93c785d9e3a1b8399f966d75b",
     "tools/decls/devinv_builder.py": "c0996facaf6375c5be04067faa6873620c91edc775b1f6364fff17be4baf9d77",
     "tools/decls/mastery_decl_builder.py": "2c7bf43e8d35bbf7a8540f4cb60bf339f998f46970bb1897f4dc6cd8cb0ff88c",
     "tools/decls/mission_challenge_decl_builder.py": "dd8f9bf1662203a9072e245d2d9019d67ce6e62a41d865d2c36961f57a8c89ab",
@@ -434,10 +435,10 @@
     "tools/maps/encounter_catalog.py": "78b579e2e1d762487a1db59779bcc249ebad18e133f1d03891482129ddeb0d4a",
     "tools/maps/enemy_attribute_baselines.py": "a3ace575efbddc5e93493e59010ef451071549452984f083c7cbee475582dd60",
     "tools/maps/enemy_attributes.py": "8b8ed29ec81f01319752cd671354bfc11a7d753df6fe94d1b24eed1f03e410f3",
-    "tools/maps/final_credits.py": "6eb53bf74b41186cd22dab59e0f4e2917ca6c98eeb8750b72d6d095457f4ec37",
+    "tools/maps/final_credits.py": "279b45d685db81f0251d22baf521a8e544bfbcbb5bae59847ff9ae1d5632fa8a",
     "tools/maps/fortress_campaign.py": "1d19d56bdea6e477446e161e2a4bdda5b9f8c0764c1e1dd4d07a1cc1c9bdbf7f",
     "tools/maps/hub_diff_guard.py": "9e340ea2080707228a4ee872a98762d9f64a3cf687633e8b73071e675cfde80a",
-    "tools/maps/intro_skip.py": "45b226f6b9cd341cc2e4d35eb56f5d648b9ca9a0c795ea42343ca3511b2bce95",
+    "tools/maps/intro_skip.py": "68c84327cb9b811e5aeb06c9adfbd9506e5de505c356e9926b6619acdf32261c",
     "tools/maps/logic_decl_patcher.py": "cb7c7801f8a0d665a81d7ba8ab0fe7303e4e6d56999672fb41093d9aa6d61651",
     "tools/maps/map_semantic_baseline.py": "a45d7c578c6068a85fe5ead1772fd3de93d22a42b50a71a0221db7f61e719323",
     "tools/maps/master_levels.py": "06a6a9b5cf78a6585b2c55507be0647115da4ef2d97a82d4124d6f40e236ec7a",
@@ -459,15 +460,15 @@
       "base_commit_sha": "4c1b3757c80c9f910e695aeb39f6261abd5780e4",
       "source_state": {
         "byte_contract": "exact_file_bytes",
-        "fingerprint": "728bef5414cf7b0c1f8de5c491e66a5185d2a1b1273b996605fd17713ddb5c93",
+        "fingerprint": "cd83c58e3b9f7b9828b3f9b794f107d69b1d120320dd5ccaa426a94db27fbc50",
         "kind": "working_tree_snapshot"
       }
     },
     "mod": {
-      "base_commit_sha": "3b7f0733e8834144c1dceeb45207e08c3e94d6e2",
+      "base_commit_sha": "1f1824ac54ff855a235ed44432d4be4bb990948a",
       "source_state": {
         "byte_contract": "exact_file_bytes",
-        "fingerprint": "f92f2763534e4e3db56755c7de95635fefb8ae35461783c643c6116faed306a4",
+        "fingerprint": "fb0f3260a62f3c8538899f7d528c22500940a2970d5c30811ae72ef58469a2c6",
         "kind": "working_tree_snapshot"
       }
     }
